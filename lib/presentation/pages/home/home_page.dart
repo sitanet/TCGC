@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/notification_provider.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../data/services/data_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/event.dart';
@@ -19,20 +20,33 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  late ScrollController _eventsScrollController;
-  double _scrollOffset = 0;
   final DataService _dataService = DataService();
+  final PageController _eventsPageController = PageController();
   
   List<Sermon> _sermons = [];
   List<Event> _events = [];
   bool _isLoading = true;
+  int _currentEventIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _eventsScrollController = ScrollController();
-    _eventsScrollController.addListener(_onScroll);
     _loadData();
+    _startEventAutoSlide();
+  }
+
+  void _startEventAutoSlide() {
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted && _events.isNotEmpty) {
+        final nextIndex = (_currentEventIndex + 1) % _events.length;
+        _eventsPageController.animateToPage(
+          nextIndex,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOut,
+        );
+        _startEventAutoSlide();
+      }
+    });
   }
 
   Future<void> _loadData() async {
@@ -57,33 +71,32 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    _eventsScrollController.removeListener(_onScroll);
-    _eventsScrollController.dispose();
+    _eventsPageController.dispose();
     super.dispose();
-  }
-
-  void _onScroll() {
-    setState(() {
-      _scrollOffset = _eventsScrollController.offset;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final spacing = Responsive.verticalSpacing(context);
 
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeaderBanner(context, isDark),
-            const SizedBox(height: 24),
-            _buildUpcomingEvents(context, isDark),
-            const SizedBox(height: 24),
-            _buildRecentActivities(context, isDark),
-            const SizedBox(height: 100),
-          ],
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        color: AppColors.primaryGold,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeaderBanner(context, isDark),
+              SizedBox(height: spacing * 1.5),
+              _buildUpcomingEvents(context, isDark),
+              SizedBox(height: spacing * 1.5),
+              _buildRecentActivities(context, isDark),
+              SizedBox(height: spacing * 6),
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -96,16 +109,23 @@ class _HomePageState extends State<HomePage> {
           );
         },
         backgroundColor: AppColors.primaryGold,
-        child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+        child: Icon(Icons.chat_bubble_outline, color: Colors.white, size: Responsive.iconSize(context)),
       ),
     );
   }
 
   Widget _buildHeaderBanner(BuildContext context, bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final logoSize = Responsive.logoSize(context);
+    final borderRadius = Responsive.largeBorderRadius(context);
+    final smallFontSize = Responsive.smallFontSize(context);
+    final titleFontSize = Responsive.value(context, mobile: 18.0, tablet: 22.0, desktop: 26.0);
+
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
           colors: [
             Color(0xFF2D0A0A),
             Color(0xFF1A0505),
@@ -115,46 +135,46 @@ class _HomePageState extends State<HomePage> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
+          bottomLeft: Radius.circular(borderRadius),
+          bottomRight: Radius.circular(borderRadius),
         ),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          padding: EdgeInsets.fromLTRB(horizontalPadding, spacing, horizontalPadding, spacing * 1.5),
           child: Column(
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 80,
-                    height: 80,
+                    width: logoSize,
+                    height: logoSize,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(Responsive.borderRadius(context)),
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(Responsive.borderRadius(context)),
                       child: Image.asset(
                         'assets/images/tcgc_logo.png',
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) => Container(
                           decoration: BoxDecoration(
                             color: AppColors.primaryGold,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(Responsive.borderRadius(context)),
                           ),
-                          child: const Center(
-                            child: Icon(Icons.church, color: Colors.white, size: 40),
+                          child: Center(
+                            child: Icon(Icons.church, color: Colors.white, size: logoSize * 0.5),
                           ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: spacing),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 8),
+                      padding: EdgeInsets.only(top: spacing * 0.5),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -162,6 +182,7 @@ class _HomePageState extends State<HomePage> {
                             'Welcome to',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   color: Colors.white70,
+                                  fontSize: smallFontSize,
                                 ),
                           ),
                           const SizedBox(height: 2),
@@ -170,6 +191,7 @@ class _HomePageState extends State<HomePage> {
                             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
+                                  fontSize: titleFontSize,
                                 ),
                           ),
                           const SizedBox(height: 2),
@@ -177,6 +199,7 @@ class _HomePageState extends State<HomePage> {
                             'Where sons are raised',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: Colors.white54,
+                                  fontSize: smallFontSize * 0.9,
                                 ),
                           ),
                         ],
@@ -185,7 +208,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: spacing * 1.25),
               Consumer<AuthProvider>(
                 builder: (context, authProvider, child) {
                   final user = authProvider.user;
@@ -274,7 +297,12 @@ class _HomePageState extends State<HomePage> {
                             child: CircleAvatar(
                               radius: 24,
                               backgroundColor: AppColors.primaryGold,
-                              child: const Icon(Icons.person, color: Colors.white, size: 28),
+                              backgroundImage: user?.photoUrl != null && user!.photoUrl!.isNotEmpty
+                                  ? NetworkImage(user.photoUrl!)
+                                  : null,
+                              child: user?.photoUrl == null || user!.photoUrl!.isEmpty
+                                  ? const Icon(Icons.person, color: Colors.white, size: 28)
+                                  : null,
                             ),
                           ),
                         ],
@@ -291,209 +319,229 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildUpcomingEvents(BuildContext context, bool isDark) {
-    final double baseItemWidth = 120.0;
-    final double activeItemWidth = 160.0;
-    final double baseItemHeight = 120.0;
-    final double activeItemHeight = 160.0;
-    final double spacing = 12.0;
-
-    final defaultColors = [
-      const Color(0xFF1A2744),
-      const Color(0xFFF5E6C8),
-      const Color(0xFF1A1A2E),
-      const Color(0xFF2D0A0A),
-      const Color(0xFF0A2D1A),
-    ];
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final eventCardHeight = Responsive.eventCardHeight(context);
+    final subtitleFontSize = Responsive.subtitleFontSize(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: Text(
             'Upcoming Events',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: AppColors.primaryGold,
                   fontWeight: FontWeight.w600,
+                  fontSize: subtitleFontSize,
                 ),
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: spacing),
         if (_isLoading)
-          const SizedBox(
-            height: 180,
-            child: Center(child: CircularProgressIndicator()),
+          SizedBox(
+            height: eventCardHeight,
+            child: const Center(child: CircularProgressIndicator()),
           )
         else if (_events.isEmpty)
-          SizedBox(
-            height: 180,
-            child: Center(
-              child: Text(
-                'No upcoming events',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            child: Container(
+              height: eventCardHeight,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.cardDark : Colors.grey[100],
+                borderRadius: BorderRadius.circular(Responsive.borderRadius(context)),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.event_busy,
+                      size: Responsive.iconSize(context) * 2,
+                      color: isDark ? Colors.grey[600] : Colors.grey[400],
                     ),
+                    SizedBox(height: spacing * 0.75),
+                    Text(
+                      'No upcoming events',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                            fontSize: bodyFontSize,
+                          ),
+                    ),
+                  ],
+                ),
               ),
             ),
           )
         else
-          SizedBox(
-            height: activeItemHeight + 20,
-            child: ListView.builder(
-              controller: _eventsScrollController,
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: _events.length,
-              itemBuilder: (context, index) {
-                final event = _events[index];
-                final isFirst = index == 0;
-                final isLast = index == _events.length - 1;
-                
-                final itemStart = (index * (baseItemWidth + spacing)) + 20;
-                final itemCenter = itemStart + (baseItemWidth / 2);
-                final viewportCenter = _scrollOffset + (MediaQuery.of(context).size.width / 2);
-                final distance = (itemCenter - viewportCenter).abs();
-                
-                final threshold = baseItemWidth * 0.6;
-                final isCenter = distance < threshold;
-                
-                final currentWidth = isCenter ? activeItemWidth : baseItemWidth;
-                final currentHeight = isCenter ? activeItemHeight : baseItemHeight;
-                final scale = isCenter ? 1.0 : 0.75;
-                
-                return _buildEventCard(
-                  context,
-                  isDark,
-                  event.title,
-                  event.imageUrl,
-                  defaultColors[index % defaultColors.length],
-                  width: currentWidth,
-                  height: currentHeight,
-                  scale: scale,
-                  isFirst: isFirst,
-                  isLast: isLast,
-                );
-              },
-            ),
+          Column(
+            children: [
+              SizedBox(
+                height: eventCardHeight,
+                child: PageView.builder(
+                  controller: _eventsPageController,
+                  itemCount: _events.length,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentEventIndex = index;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    final event = _events[index];
+                    return _buildEventCard(context, isDark, event);
+                  },
+                ),
+              ),
+              if (_events.length > 1) ...[
+                SizedBox(height: spacing * 0.75),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    _events.length,
+                    (index) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      margin: EdgeInsets.symmetric(horizontal: spacing * 0.25),
+                      width: _currentEventIndex == index ? spacing * 1.5 : spacing * 0.5,
+                      height: spacing * 0.5,
+                      decoration: BoxDecoration(
+                        color: _currentEventIndex == index
+                            ? AppColors.primaryGold
+                            : (isDark ? Colors.grey[700] : Colors.grey[300]),
+                        borderRadius: BorderRadius.circular(spacing * 0.25),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
       ],
     );
   }
 
-  Widget _buildEventCard(
-    BuildContext context,
-    bool isDark,
-    String title,
-    String? imagePath,
-    Color color, {
-    double width = 120.0,
-    double height = 140.0,
-    double scale = 1.0,
-    bool isFirst = false,
-    bool isLast = false,
-  }) {
-    final double leftMargin = isFirst ? 0 : 6;
-    final double rightMargin = isLast ? 0 : 6;
-
-    Widget buildImage() {
-      Widget placeholder = Container(
+  Widget _buildEventCard(BuildContext context, bool isDark, Event event) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [color, color.withValues(alpha: 0.7)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _buildEventImage(event.imageUrl),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.8),
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: const [0.3, 1.0],
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 16,
+                left: 16,
+                right: 16,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      event.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.schedule,
+                          color: AppColors.primaryGold,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            event.schedule,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        child: Center(
-          child: Icon(
-            Icons.event,
-            size: 30,
-            color: Colors.white.withValues(alpha: 0.3),
-          ),
+      ),
+    );
+  }
+
+  Widget _buildEventImage(String? imageUrl) {
+    Widget placeholder = Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF1A2744), Color(0xFF0D1522)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-      );
+      ),
+      child: Center(
+        child: Icon(
+          Icons.event,
+          size: 48,
+          color: Colors.white.withOpacity(0.3),
+        ),
+      ),
+    );
 
-      if (imagePath == null || imagePath.isEmpty) {
-        return placeholder;
-      }
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return placeholder;
+    }
 
-      if (imagePath.startsWith('http')) {
-        return Image.network(
-          imagePath,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => placeholder,
-        );
-      }
-
-      return Image.asset(
-        imagePath,
+    if (imageUrl.startsWith('http')) {
+      return Image.network(
+        imageUrl,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => placeholder,
       );
     }
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOutCubic,
-      width: width,
-      height: height,
-      margin: EdgeInsets.only(
-        left: leftMargin,
-        right: rightMargin,
-        top: (180.0 - height) / 2,
-        bottom: (180.0 - height) / 2,
-      ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: color,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1 + (0.15 * scale)),
-            blurRadius: 8 + (8 * scale),
-            offset: Offset(0, 4 + (4 * scale)),
-            spreadRadius: scale > 0.9 ? 2 : 0,
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            buildImage(),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.7),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: const [0.4, 1.0],
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: 12,
-              left: 10,
-              right: 10,
-              child: Text(
-                title,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: scale > 0.9 ? 12 : 10,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
-                ),
-                maxLines: 2,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return Image.asset(
+      imageUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => placeholder,
     );
   }
 

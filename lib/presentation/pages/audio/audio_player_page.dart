@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/audio_player_provider.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../widgets/custom_app_bar.dart';
 
@@ -13,31 +15,76 @@ class AudioPlayerPage extends StatefulWidget {
 }
 
 class _AudioPlayerPageState extends State<AudioPlayerPage> {
-  bool isPlaying = false;
-  double currentPosition = 0.3;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+      if (audioProvider.currentSermon?.id != widget.sermon.id) {
+        audioProvider.playSermon(widget.sermon);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: CustomAppBar(title: widget.sermon.category),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            const Spacer(),
-            _buildAlbumArt(isDark),
-            const SizedBox(height: 32),
-            _buildSongInfo(context),
-            const SizedBox(height: 32),
-            _buildProgressBar(isDark),
-            const SizedBox(height: 24),
-            _buildControls(isDark),
-            const Spacer(flex: 2),
-          ],
-        ),
-      ),
+    return Consumer<AudioPlayerProvider>(
+      builder: (context, audioProvider, child) {
+        final errorMessage = audioProvider.errorMessage;
+
+        return Scaffold(
+          appBar: CustomAppBar(
+            title: widget.sermon.categoryName.isNotEmpty
+                ? widget.sermon.categoryName
+                : widget.sermon.category,
+          ),
+          body: errorMessage != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 64,
+                          color: Colors.red.withOpacity(0.7),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          errorMessage,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: () => audioProvider.playSermon(widget.sermon),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      const Spacer(),
+                      _buildAlbumArt(isDark),
+                      const SizedBox(height: 32),
+                      _buildSongInfo(context),
+                      const SizedBox(height: 32),
+                      _buildProgressBar(isDark, audioProvider),
+                      const SizedBox(height: 24),
+                      _buildControls(isDark, audioProvider),
+                      const Spacer(flex: 2),
+                    ],
+                  ),
+                ),
+        );
+      },
     );
   }
 
@@ -123,14 +170,22 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          widget.sermon.category,
+          widget.sermon.categoryName.isNotEmpty
+              ? widget.sermon.categoryName
+              : widget.sermon.category,
           style: Theme.of(context).textTheme.bodyMedium,
         ),
       ],
     );
   }
 
-  Widget _buildProgressBar(bool isDark) {
+  Widget _buildProgressBar(bool isDark, AudioPlayerProvider audioProvider) {
+    final duration = audioProvider.duration;
+    final position = audioProvider.position;
+    final durationMs = duration.inMilliseconds.toDouble();
+    final positionMs = position.inMilliseconds.toDouble();
+    final sliderValue = durationMs > 0 ? (positionMs / durationMs).clamp(0.0, 1.0) : 0.0;
+
     return Column(
       children: [
         SliderTheme(
@@ -144,11 +199,12 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
             overlayColor: AppColors.primaryGold.withOpacity(0.2),
           ),
           child: Slider(
-            value: currentPosition,
+            value: sliderValue,
             onChanged: (value) {
-              setState(() {
-                currentPosition = value;
-              });
+              final newPosition = Duration(
+                milliseconds: (value * durationMs).toInt(),
+              );
+              audioProvider.seek(newPosition);
             },
           ),
         ),
@@ -158,16 +214,14 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                _formatDuration(Duration(
-                  minutes: (widget.sermon.duration.inMinutes * currentPosition).toInt(),
-                )),
+                _formatDuration(position),
                 style: TextStyle(
                   color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                   fontSize: 12,
                 ),
               ),
               Text(
-                _formatDuration(widget.sermon.duration),
+                _formatDuration(duration),
                 style: TextStyle(
                   color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                   fontSize: 12,
@@ -180,24 +234,29 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     );
   }
 
-  Widget _buildControls(bool isDark) {
+  Widget _buildControls(bool isDark, AudioPlayerProvider audioProvider) {
+    final isPlaying = audioProvider.isPlaying;
+    final isLoading = audioProvider.isLoading;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         IconButton(
-          onPressed: () {},
+          onPressed: isLoading ? null : () => audioProvider.seekBackward(),
           icon: Icon(
-            Icons.skip_previous,
+            Icons.replay_10,
             size: 36,
             color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
           ),
         ),
         const SizedBox(width: 24),
         GestureDetector(
-          onTap: () {
-            setState(() {
-              isPlaying = !isPlaying;
-            });
+          onTap: isLoading ? null : () {
+            if (isPlaying) {
+              audioProvider.pause();
+            } else {
+              audioProvider.play();
+            }
           },
           child: Container(
             width: 70,
@@ -213,18 +272,26 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                 ),
               ],
             ),
-            child: Icon(
-              isPlaying ? Icons.pause : Icons.play_arrow,
-              color: Colors.white,
-              size: 36,
-            ),
+            child: isLoading
+                ? const Padding(
+                    padding: EdgeInsets.all(18),
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                  )
+                : Icon(
+                    isPlaying ? Icons.pause : Icons.play_arrow,
+                    color: Colors.white,
+                    size: 36,
+                  ),
           ),
         ),
         const SizedBox(width: 24),
         IconButton(
-          onPressed: () {},
+          onPressed: isLoading ? null : () => audioProvider.seekForward(),
           icon: Icon(
-            Icons.skip_next,
+            Icons.forward_10,
             size: 36,
             color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
           ),

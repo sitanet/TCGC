@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/api_constants.dart';
@@ -192,6 +193,67 @@ class ApiService {
           Uri.parse('${ApiConstants.baseUrl}$endpoint'),
           headers: _headers,
         );
+      }
+
+      return ApiResponse(
+        statusCode: response.statusCode,
+        body: response.body,
+        isSuccess: response.statusCode >= 200 && response.statusCode < 300,
+      );
+    } catch (e) {
+      return ApiResponse(
+        statusCode: 0,
+        body: jsonEncode({'error': e.toString()}),
+        isSuccess: false,
+      );
+    }
+  }
+
+  Future<ApiResponse> uploadFile(
+    String endpoint,
+    File file, {
+    String fieldName = 'file',
+    Map<String, String>? additionalFields,
+  }) async {
+    try {
+      var request = http.MultipartRequest(
+        'PATCH',
+        Uri.parse('${ApiConstants.baseUrl}$endpoint'),
+      );
+
+      // Add authorization header
+      if (_accessToken != null) {
+        request.headers['Authorization'] = 'Bearer $_accessToken';
+      }
+
+      // Add the file
+      request.files.add(
+        await http.MultipartFile.fromPath(fieldName, file.path),
+      );
+
+      // Add additional fields if any
+      if (additionalFields != null) {
+        request.fields.addAll(additionalFields);
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      // Handle token refresh
+      if (response.statusCode == 401 && await _refreshAccessToken()) {
+        request = http.MultipartRequest(
+          'PATCH',
+          Uri.parse('${ApiConstants.baseUrl}$endpoint'),
+        );
+        request.headers['Authorization'] = 'Bearer $_accessToken';
+        request.files.add(
+          await http.MultipartFile.fromPath(fieldName, file.path),
+        );
+        if (additionalFields != null) {
+          request.fields.addAll(additionalFields);
+        }
+        streamedResponse = await request.send();
+        response = await http.Response.fromStream(streamedResponse);
       }
 
       return ApiResponse(

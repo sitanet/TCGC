@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/responsive.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -14,58 +15,63 @@ class BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final spacing = Responsive.verticalSpacing(context);
+    final borderRadius = Responsive.largeBorderRadius(context);
     
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: EdgeInsets.all(spacing),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(30),
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(
+          color: AppColors.primaryGold.withOpacity(0.3),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 5),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: spacing, vertical: spacing * 0.875),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(context, 0, Icons.home_outlined, Icons.home_rounded),
-            _buildNavItem(context, 1, Icons.music_note_outlined, Icons.music_note_rounded),
-            _buildNavItem(context, 2, Icons.stream_outlined, Icons.stream),
-            _buildNavItem(context, 3, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded),
-            _buildNavItem(context, 4, Icons.groups_outlined, Icons.groups),
-            _buildNavItem(context, 5, Icons.settings_outlined, Icons.settings),
+            _buildNavItem(context, 0, 'assets/images/nav_home.png'),
+            _buildNavItem(context, 1, 'assets/images/nav_audio.png'),
+            _buildNavItem(context, 2, 'assets/images/nav_streaming.png'),
+            _buildNavItem(context, 3, 'assets/images/nav_wallet.png'),
+            _buildNavItem(context, 4, 'assets/images/nav_teens.png'),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(BuildContext context, int index, IconData icon, IconData activeIcon) {
+  Widget _buildNavItem(BuildContext context, int index, String iconPath) {
     final isSelected = currentIndex == index;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconSize = Responsive.navIconSize(context);
+    final spacing = Responsive.verticalSpacing(context);
     
     return GestureDetector(
       onTap: () => onTap(index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: spacing * 0.75, vertical: spacing * 0.5),
         decoration: BoxDecoration(
           color: isSelected 
-              ? AppColors.primaryGold.withOpacity(0.15)
+              ? AppColors.primaryGold.withOpacity(0.1)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(Responsive.borderRadius(context)),
         ),
-        child: Icon(
-          isSelected ? activeIcon : icon,
-          color: isSelected 
-              ? AppColors.primaryGold 
-              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-          size: 26,
+        child: Image.asset(
+          iconPath,
+          width: iconSize,
+          height: iconSize,
+          color: AppColors.primaryGold,
         ),
       ),
     );

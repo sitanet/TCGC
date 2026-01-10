@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../data/services/data_service.dart';
 import '../../../domain/entities/teens_content.dart';
-import '../../../domain/entities/event.dart';
 import '../../widgets/custom_app_bar.dart';
-import '../../widgets/event_tile.dart';
 import 'teens_content_list_page.dart';
 
 class TeensPage extends StatefulWidget {
@@ -17,7 +16,6 @@ class TeensPage extends StatefulWidget {
 class _TeensPageState extends State<TeensPage> {
   final DataService _dataService = DataService();
   
-  List<Event> _teensEvents = [];
   List<TeensContent> _devotionals = [];
   List<TeensContent> _retreats = [];
   List<TeensContent> _forgeCamp = [];
@@ -32,14 +30,12 @@ class _TeensPageState extends State<TeensPage> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final events = await _dataService.getTeensEvents();
       final devotionals = await _dataService.getDevotionals();
       final retreats = await _dataService.getRetreats();
       final forgeCamp = await _dataService.getForgeCamp();
       
       if (mounted) {
         setState(() {
-          _teensEvents = events;
           _devotionals = devotionals;
           _retreats = retreats;
           _forgeCamp = forgeCamp;
@@ -47,7 +43,7 @@ class _TeensPageState extends State<TeensPage> {
         });
       }
     } catch (e) {
-      print('Error loading teens data: $e');
+      debugPrint('Error loading teens data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -58,36 +54,47 @@ class _TeensPageState extends State<TeensPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final spacing = Responsive.verticalSpacing(context);
 
     return Scaffold(
       appBar: const CustomAppBar(title: '', showBackButton: false),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.only(bottom: 80 + bottomPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildBanner(context, isDark),
-                    const SizedBox(height: 24),
-                    _buildEventsList(context, isDark),
-                  ],
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        color: AppColors.primaryGold,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 80 + bottomPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildBanner(context, isDark),
+                      SizedBox(height: spacing * 1.5),
+                      _buildCategoryList(context, isDark),
+                    ],
+                  ),
                 ),
               ),
-            ),
+      ),
     );
   }
 
   Widget _buildBanner(BuildContext context, bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final bannerHeight = Responsive.eventCardHeight(context);
+    final borderRadius = Responsive.largeBorderRadius(context);
+    final titleFontSize = Responsive.subtitleFontSize(context);
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      height: 180,
+      margin: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      height: bannerHeight,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(borderRadius),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(borderRadius),
         child: Image.asset(
           'assets/images/teens_banner.png',
           fit: BoxFit.cover,
@@ -95,7 +102,7 @@ class _TeensPageState extends State<TeensPage> {
           errorBuilder: (context, error, stackTrace) {
             return Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(borderRadius),
                 gradient: const LinearGradient(
                   colors: [
                     Color(0xFFFF9800),
@@ -109,8 +116,8 @@ class _TeensPageState extends State<TeensPage> {
                 child: Text(
                   'YOUNG ADULTS & TEENS',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 24,
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: titleFontSize,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.2,
                   ),
@@ -123,49 +130,57 @@ class _TeensPageState extends State<TeensPage> {
     );
   }
 
-  Widget _buildEventsList(BuildContext context, bool isDark) {
-    if (_teensEvents.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Center(
-          child: Text(
-            'No events available',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-          ),
-        ),
-      );
-    }
+  Widget _buildCategoryList(BuildContext context, bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final borderRadius = Responsive.borderRadius(context);
+
+    final categories = [
+      _CategoryItem(
+        title: 'Daily Devotional',
+        icon: Icons.menu_book,
+        color: AppColors.orange,
+        count: _devotionals.length,
+        contents: _devotionals,
+      ),
+      _CategoryItem(
+        title: 'Teens Retreat',
+        icon: Icons.hiking,
+        color: const Color(0xFF8B0000),
+        count: _retreats.length,
+        contents: _retreats,
+      ),
+      _CategoryItem(
+        title: 'The Forge Teens Camp',
+        icon: Icons.local_fire_department,
+        color: AppColors.teal,
+        count: _forgeCamp.length,
+        contents: _forgeCamp,
+      ),
+    ];
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(borderRadius),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Column(
-          children: _teensEvents
-              .map<Widget>((event) => Column(
+          children: categories
+              .map((category) => Column(
                     children: [
-                      EventTile(
-                        event: event,
-                        onTap: () => _navigateToContentList(context, event.title),
-                      ),
-                      if (_teensEvents.indexOf(event) < _teensEvents.length - 1)
+                      _buildCategoryTile(context, isDark, category),
+                      if (categories.indexOf(category) < categories.length - 1)
                         Divider(
                           height: 1,
-                          indent: 80,
+                          indent: 72,
                           color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
                         ),
                     ],
@@ -176,40 +191,78 @@ class _TeensPageState extends State<TeensPage> {
     );
   }
 
-  void _navigateToContentList(BuildContext context, String eventTitle) {
-    String title;
-    List<TeensContent> contents;
-    Color accentColor;
+  Widget _buildCategoryTile(BuildContext context, bool isDark, _CategoryItem category) {
+    final spacing = Responsive.verticalSpacing(context);
+    final iconSize = Responsive.iconSize(context);
+    final iconContainerSize = Responsive.value(context, mobile: 48.0, tablet: 56.0, desktop: 64.0);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    final smallFontSize = Responsive.smallFontSize(context);
+    final borderRadius = Responsive.borderRadius(context);
 
-    switch (eventTitle) {
-      case 'Daily Devotional':
-        title = 'Daily Devotional';
-        contents = _devotionals;
-        accentColor = AppColors.orange;
-        break;
-      case 'Teens Retreat':
-        title = 'Teens Retreat';
-        contents = _retreats;
-        accentColor = const Color(0xFF8B0000);
-        break;
-      case 'The Forge Teens Camp':
-        title = 'The Forge Teens Camp';
-        contents = _forgeCamp;
-        accentColor = AppColors.teal;
-        break;
-      default:
-        return;
-    }
+    return ListTile(
+      contentPadding: EdgeInsets.symmetric(horizontal: spacing, vertical: spacing * 0.5),
+      leading: Container(
+        width: iconContainerSize,
+        height: iconContainerSize,
+        decoration: BoxDecoration(
+          color: category.color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        child: Icon(
+          category.icon,
+          color: category.color,
+          size: iconSize,
+        ),
+      ),
+      title: Text(
+        category.title,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              fontSize: bodyFontSize,
+            ),
+      ),
+      subtitle: Text(
+        '${category.count} ${category.count == 1 ? 'item' : 'items'}',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              fontSize: smallFontSize,
+            ),
+      ),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+        size: iconSize,
+      ),
+      onTap: () => _navigateToContentList(context, category),
+    );
+  }
 
+  void _navigateToContentList(BuildContext context, _CategoryItem category) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => TeensContentListPage(
-          title: title,
-          contents: contents,
-          accentColor: accentColor,
+          title: category.title,
+          contents: category.contents,
+          accentColor: category.color,
         ),
       ),
     );
   }
+}
+
+class _CategoryItem {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final int count;
+  final List<TeensContent> contents;
+
+  _CategoryItem({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.count,
+    required this.contents,
+  });
 }

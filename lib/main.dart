@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -5,16 +6,21 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/notification_provider.dart';
+import 'core/providers/audio_player_provider.dart';
 import 'presentation/pages/home/home_page.dart';
 import 'presentation/pages/audio/audio_page.dart';
 import 'presentation/pages/livestream/livestream_page.dart';
 import 'presentation/pages/wallet/wallet_page.dart';
-import 'presentation/pages/profile/profile_page.dart';
+
 import 'presentation/pages/teens/teens_page.dart';
 import 'presentation/pages/get_started/get_started_page.dart';
 import 'presentation/pages/auth/sign_in_page.dart';
 import 'presentation/pages/auth/sign_up_page.dart';
 import 'presentation/widgets/bottom_nav_bar.dart';
+import 'presentation/widgets/mini_player.dart';
+import 'presentation/widgets/promotion_popup.dart';
+import 'data/services/data_service.dart';
+import 'domain/entities/promotion.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,6 +32,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => AudioPlayerProvider()),
       ],
       child: const MyApp(),
     ),
@@ -55,14 +62,17 @@ class _MyAppState extends State<MyApp> {
   Future<void> _initializeApp() async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
       
-      await authProvider.initialize();
-      await notificationProvider.initialize();
+      // Initialize auth first (this is quick - just loads tokens from storage)
+      await authProvider.initialize().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('Auth initialization timed out');
+        },
+      );
       
-      if (authProvider.isAuthenticated) {
-        await notificationProvider.registerDevice();
-      }
+      // Initialize notifications in background (don't block the app)
+      _initializeNotifications();
       
       if (mounted) {
         setState(() {
@@ -73,11 +83,21 @@ class _MyAppState extends State<MyApp> {
         });
       }
     } catch (e) {
+      debugPrint('Initialization error: $e');
       if (mounted) {
         setState(() {
           _initialized = true;
         });
       }
+    }
+  }
+  
+  Future<void> _initializeNotifications() async {
+    try {
+      final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
+      await notificationProvider.initialize();
+    } catch (e) {
+      debugPrint('Notification initialization error: $e');
     }
   }
 
@@ -173,6 +193,9 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  bool _showPromotion = false;
+  List<Promotion> _activePromotions = [];
+  final DataService _dataService = DataService();
 
   final List<Widget> _pages = const [
     HomePage(),
@@ -180,23 +203,62 @@ class _MainScreenState extends State<MainScreen> {
     LiveStreamPage(),
     WalletPage(),
     TeensPage(),
-    ProfilePage(),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _checkForPromotion();
+  }
+
+  Future<void> _checkForPromotion() async {
+    try {
+      final promotions = await _dataService.getActivePromotions();
+      if (promotions.isNotEmpty && mounted) {
+        setState(() {
+          _activePromotions = promotions;
+          _showPromotion = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking promotion: $e');
+    }
+  }
+
+  void _closePromotion() {
+    setState(() {
+      _showPromotion = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Show promotion popup if active
+    if (_showPromotion && _activePromotions.isNotEmpty) {
+      return PromotionPopup(
+        promotions: _activePromotions,
+        onClose: _closePromotion,
+      );
+    }
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
         children: _pages,
       ),
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const MiniPlayer(),
+          BottomNavBar(
+            currentIndex: _currentIndex,
+            onTap: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+          ),
+        ],
       ),
     );
   }

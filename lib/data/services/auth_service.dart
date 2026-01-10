@@ -1,5 +1,7 @@
+import 'dart:io';
 import '../../core/constants/api_constants.dart';
 import '../../domain/entities/user.dart';
+import '../models/contact_message.dart';
 import 'api_service.dart';
 
 class AuthService {
@@ -165,6 +167,22 @@ class AuthService {
     );
   }
 
+  Future<AuthResult> uploadProfilePhoto(File imageFile) async {
+    final response = await _api.uploadFile(
+      ApiConstants.userProfile,
+      imageFile,
+      fieldName: 'photo',
+    );
+    
+    if (response.isSuccess) {
+      return AuthResult(success: true);
+    }
+    return AuthResult(
+      success: false,
+      error: response.errorMessage ?? 'Failed to upload photo',
+    );
+  }
+
   Future<AuthResult> changePassword(String oldPassword, String newPassword) async {
     final response = await _api.put(ApiConstants.changePassword, {
       'old_password': oldPassword,
@@ -217,6 +235,25 @@ class AuthService {
       success: false,
       error: _parseErrorMessage(response),
     );
+  }
+
+  Future<List<ContactMessage>> getMyContactMessages() async {
+    final response = await _api.get(ApiConstants.myContactMessages);
+    
+    if (response.isSuccess) {
+      final List<dynamic> data = response.dataList;
+      return data.map((json) => ContactMessage.fromJson(json)).toList();
+    }
+    return [];
+  }
+
+  Future<ContactMessage?> getContactMessageDetail(int id) async {
+    final response = await _api.get('${ApiConstants.myContactMessageDetail}$id/');
+    
+    if (response.isSuccess) {
+      return ContactMessage.fromJson(response.data);
+    }
+    return null;
   }
 
   bool get isAuthenticated => _api.isAuthenticated;

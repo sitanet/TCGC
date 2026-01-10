@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/utils/responsive.dart';
 import '../legal/privacy_policy_page.dart';
 import '../support/complaint_page.dart';
 import 'edit_profile_page.dart';
@@ -15,20 +16,27 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final spacing = Responsive.verticalSpacing(context);
+    final maxWidth = Responsive.maxContentWidth(context);
 
     return Scaffold(
       body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildProfileHeader(context, isDark),
-            const SizedBox(height: 24),
-            _buildMenuItems(context, isDark),
-            const SizedBox(height: 24),
-            _buildLogoutButton(context, isDark),
-            const SizedBox(height: 24),
-            _buildPrivacyPolicyLink(context, isDark),
-            const SizedBox(height: 100),
-          ],
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Column(
+              children: [
+                _buildProfileHeader(context, isDark),
+                SizedBox(height: spacing * 1.5),
+                _buildMenuItems(context, isDark),
+                SizedBox(height: spacing * 1.5),
+                _buildLogoutButton(context, isDark),
+                SizedBox(height: spacing * 1.5),
+                _buildPrivacyPolicyLink(context, isDark),
+                SizedBox(height: spacing * 6),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -89,11 +97,16 @@ class ProfilePage extends StatelessWidget {
                     CircleAvatar(
                       radius: 50,
                       backgroundColor: Colors.grey[300],
-                      child: const Icon(
-                        Icons.person,
-                        size: 50,
-                        color: Colors.grey,
-                      ),
+                      backgroundImage: user?.photoUrl != null && user!.photoUrl!.isNotEmpty
+                          ? NetworkImage(user.photoUrl!)
+                          : null,
+                      child: user?.photoUrl == null || user!.photoUrl!.isEmpty
+                          ? const Icon(
+                              Icons.person,
+                              size: 50,
+                              color: Colors.grey,
+                            )
+                          : null,
                     ),
                     Container(
                       width: 20,
@@ -174,12 +187,15 @@ class ProfilePage extends StatelessWidget {
   }
 
   Widget _buildMenuItems(BuildContext context, bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final borderRadius = Responsive.borderRadius(context);
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(borderRadius),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -262,23 +278,30 @@ class ProfilePage extends StatelessWidget {
     String title,
     VoidCallback onTap,
   ) {
+    final spacing = Responsive.verticalSpacing(context);
+    final iconSize = Responsive.iconSize(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    final borderRadius = Responsive.borderRadius(context);
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(borderRadius),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(spacing),
         child: Row(
           children: [
             Icon(
               icon,
               color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-              size: 24,
+              size: iconSize,
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: spacing),
             Expanded(
               child: Text(
                 title,
-                style: Theme.of(context).textTheme.titleMedium,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontSize: bodyFontSize,
+                ),
               ),
             ),
           ],
@@ -296,29 +319,37 @@ class ProfilePage extends StatelessWidget {
   }
 
   Widget _buildLogoutButton(BuildContext context, bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final buttonHeight = Responsive.buttonHeight(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    final iconSize = Responsive.iconSize(context);
+    final borderRadius = Responsive.borderRadius(context);
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: SizedBox(
         width: double.infinity,
+        height: buttonHeight,
         child: ElevatedButton.icon(
           onPressed: () async {
             final authProvider = Provider.of<AuthProvider>(context, listen: false);
             await authProvider.logout();
           },
-          icon: const Icon(Icons.logout, color: Colors.white),
-          label: const Text(
+          icon: Icon(Icons.logout, color: Colors.white, size: iconSize),
+          label: Text(
             'Log Out',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: bodyFontSize,
               fontWeight: FontWeight.w600,
             ),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primaryGold,
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: EdgeInsets.symmetric(vertical: spacing),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(borderRadius),
             ),
           ),
         ),
@@ -327,8 +358,14 @@ class ProfilePage extends StatelessWidget {
   }
 
   Widget _buildPrivacyPolicyLink(BuildContext context, bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final iconSize = Responsive.iconSize(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    final borderRadius = Responsive.borderRadius(context);
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: GestureDetector(
         onTap: () {
           Navigator.push(
@@ -339,10 +376,10 @@ class ProfilePage extends StatelessWidget {
           );
         },
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(spacing),
           decoration: BoxDecoration(
             color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(borderRadius),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withAlpha(13),
@@ -356,19 +393,21 @@ class ProfilePage extends StatelessWidget {
               Icon(
                 Icons.privacy_tip_outlined,
                 color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                size: 24,
+                size: iconSize,
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: spacing),
               Expanded(
                 child: Text(
                   'Privacy & Data Policy',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontSize: bodyFontSize,
+                  ),
                 ),
               ),
               Icon(
                 Icons.arrow_forward_ios,
                 color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                size: 16,
+                size: iconSize * 0.67,
               ),
             ],
           ),

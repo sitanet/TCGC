@@ -7,6 +7,8 @@ class Event {
   final String? iconColor;
   final bool isLive;
   final bool isTeensEvent;
+  final String? youtubeUrl;
+  final String? location;
 
   const Event({
     required this.id,
@@ -17,6 +19,8 @@ class Event {
     this.iconColor,
     this.isLive = false,
     this.isTeensEvent = false,
+    this.youtubeUrl,
+    this.location,
   });
 
   factory Event.fromJson(Map<String, dynamic> json) {
@@ -29,6 +33,8 @@ class Event {
       iconColor: json['icon_color'],
       isLive: json['is_live'] ?? false,
       isTeensEvent: json['is_teens_event'] ?? false,
+      youtubeUrl: json['youtube_url'],
+      location: json['location'],
     );
   }
 }

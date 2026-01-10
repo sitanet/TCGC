@@ -4,6 +4,7 @@ import '../../domain/entities/event.dart';
 import '../../domain/entities/teens_content.dart';
 import '../../domain/entities/wallet.dart';
 import '../../domain/entities/transaction.dart';
+import '../../domain/entities/promotion.dart';
 import 'api_service.dart';
 
 class DataService {
@@ -13,7 +14,9 @@ class DataService {
   Future<List<MessageCategory>> getMessageCategories() async {
     final response = await _api.get(ApiConstants.messageCategories);
     if (response.isSuccess) {
-      final List<dynamic> data = response.dataList;
+      final decoded = response.data;
+      // Handle both paginated and non-paginated responses
+      final List<dynamic> data = decoded is List ? decoded : (decoded['results'] ?? decoded);
       return data.map((json) => MessageCategory.fromJson(json)).toList();
     }
     return [];
@@ -188,6 +191,20 @@ class DataService {
       success: false,
       error: response.errorMessage ?? 'Failed to process giving',
     );
+  }
+
+  // Promotions
+  Future<List<Promotion>> getActivePromotions() async {
+    final response = await _api.get(ApiConstants.activePromotion);
+    if (response.isSuccess) {
+      try {
+        final List<dynamic> data = response.dataList;
+        return data.map((json) => Promotion.fromJson(json)).toList();
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
   }
 }
 

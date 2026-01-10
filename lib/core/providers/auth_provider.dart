@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../../data/services/auth_service.dart';
 import '../../domain/entities/user.dart';
@@ -148,6 +149,26 @@ class AuthProvider extends ChangeNotifier {
     return false;
   }
 
+  Future<bool> uploadProfilePhoto(File imageFile) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    final result = await _authService.uploadProfilePhoto(imageFile);
+    
+    if (result.success) {
+      _user = await _authService.getProfile();
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    }
+    
+    _error = result.error;
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+
   Future<bool> changePassword(String oldPassword, String newPassword) async {
     _isLoading = true;
     _error = null;
@@ -209,6 +230,11 @@ class AuthProvider extends ChangeNotifier {
     }
     notifyListeners();
     return result.success;
+  }
+
+  // Get user's contact messages
+  Future<List<dynamic>> getMyContactMessages() async {
+    return await _authService.getMyContactMessages();
   }
 
   void clearError() {

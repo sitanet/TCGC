@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../widgets/custom_app_bar.dart';
 
 class LiveStreamPage extends StatefulWidget {
@@ -13,14 +14,19 @@ class LiveStreamPage extends StatefulWidget {
 class _LiveStreamPageState extends State<LiveStreamPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late WebViewController _webViewController;
+  late WebViewController _watchLiveController;
   
   static const String _liveStreamUrl = 'https://waystre.am/embed/dcitygatechurch';
+  static const String _watchLiveUrl = 'https://thecitygatechurch.org/tcgc/watchlive_mobile/';
+  
+  bool _isWatchLiveLoading = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _initializeWebView();
+    _initializeWatchLiveWebView();
   }
 
   void _initializeWebView() {
@@ -28,6 +34,26 @@ class _LiveStreamPageState extends State<LiveStreamPage> with SingleTickerProvid
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
       ..loadRequest(Uri.parse(_liveStreamUrl));
+  }
+
+  void _initializeWatchLiveWebView() {
+    _watchLiveController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (url) {
+            setState(() => _isWatchLiveLoading = true);
+          },
+          onPageFinished: (url) {
+            setState(() => _isWatchLiveLoading = false);
+          },
+          onWebResourceError: (error) {
+            setState(() => _isWatchLiveLoading = false);
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(_watchLiveUrl));
   }
 
   @override
@@ -60,11 +86,16 @@ class _LiveStreamPageState extends State<LiveStreamPage> with SingleTickerProvid
   }
 
   Widget _buildTabBar(bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final borderRadius = Responsive.largeBorderRadius(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      margin: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: spacing * 0.625),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
           color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
         ),
@@ -72,14 +103,14 @@ class _LiveStreamPageState extends State<LiveStreamPage> with SingleTickerProvid
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(borderRadius),
           color: Colors.transparent,
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         dividerColor: Colors.transparent,
         labelColor: AppColors.primaryGold,
         unselectedLabelColor: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+        labelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: bodyFontSize),
         tabs: const [
           Tab(text: 'Stream Live'),
           Tab(text: 'Watch Live'),
@@ -89,62 +120,85 @@ class _LiveStreamPageState extends State<LiveStreamPage> with SingleTickerProvid
   }
 
   Widget _buildWatchLive(BuildContext context, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Text(
-            'Watch Live',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Watch live services and events on YouTube',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                // TODO: Launch YouTube live URL
-              },
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Image.asset(
-                      'assets/images/video_thumbnail.png',
-                      width: double.infinity,
-                      fit: BoxFit.cover,
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final borderRadius = Responsive.borderRadius(context);
+    final iconSize = Responsive.iconSize(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+
+    return Column(
+      children: [
+        // Compact header
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: spacing * 0.5),
+          child: Row(
+            children: [
+              Icon(
+                Icons.live_tv_rounded,
+                color: AppColors.primaryGold,
+                size: iconSize * 0.83,
+              ),
+              SizedBox(width: spacing * 0.5),
+              Text(
+                'Watch Live Service',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: bodyFontSize,
                     ),
+              ),
+              const Spacer(),
+              _buildLiveIndicator(),
+            ],
+          ),
+        ),
+        // WebView takes most of the space
+        Expanded(
+          child: Container(
+            margin: EdgeInsets.fromLTRB(borderRadius, 0, borderRadius, spacing * 0.5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(borderRadius),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(borderRadius),
+              child: Stack(
+                children: [
+                  WebViewWidget(controller: _watchLiveController),
+                  if (_isWatchLiveLoading)
                     Container(
-                      width: 68,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.play_arrow,
-                        color: Colors.white,
-                        size: 40,
+                      color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.primaryGold,
+                          strokeWidth: 3,
+                        ),
                       ),
                     ),
-                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Compact refresh button
+        Padding(
+          padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, spacing * 0.75),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _watchLiveController.reload(),
+              icon: Icon(Icons.refresh_rounded, size: iconSize * 0.75),
+              label: Text('Refresh', style: TextStyle(fontSize: bodyFontSize)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryGold,
+                side: const BorderSide(color: AppColors.primaryGold, width: 1),
+                padding: EdgeInsets.symmetric(vertical: spacing * 0.625),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(borderRadius * 0.83),
                 ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -181,36 +235,71 @@ class _LiveStreamPageState extends State<LiveStreamPage> with SingleTickerProvid
   }
 
   Widget _buildStreamLive(BuildContext context, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final borderRadius = Responsive.borderRadius(context);
+    final iconSize = Responsive.iconSize(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+
+    return Column(
+      children: [
+        // Compact header
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: spacing * 0.5),
+          child: Row(
             children: [
+              Icon(
+                Icons.headphones_rounded,
+                color: AppColors.primaryGold,
+                size: iconSize * 0.83,
+              ),
+              SizedBox(width: spacing * 0.5),
               Text(
                 'Stream Live Service',
-                style: Theme.of(context).textTheme.titleLarge,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: bodyFontSize,
+                    ),
               ),
-              const SizedBox(width: 12),
+              const Spacer(),
               _buildLiveIndicator(),
             ],
           ),
-          const SizedBox(height: 16),
-          Expanded(
+        ),
+        // WebView takes most of the space
+        Expanded(
+          child: Container(
+            margin: EdgeInsets.fromLTRB(borderRadius, 0, borderRadius, spacing * 0.5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(borderRadius),
+            ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(borderRadius),
               child: WebViewWidget(controller: _webViewController),
             ),
           ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: () => _webViewController.reload(),
-            icon: const Icon(Icons.refresh),
-            label: const Text('Refresh'),
+        ),
+        // Compact refresh button
+        Padding(
+          padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, spacing * 0.75),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _webViewController.reload(),
+              icon: Icon(Icons.refresh_rounded, size: iconSize * 0.75),
+              label: Text('Refresh', style: TextStyle(fontSize: bodyFontSize)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryGold,
+                side: const BorderSide(color: AppColors.primaryGold, width: 1),
+                padding: EdgeInsets.symmetric(vertical: spacing * 0.625),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(borderRadius * 0.83),
+                ),
+              ),
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

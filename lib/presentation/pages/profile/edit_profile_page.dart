@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -30,6 +32,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String? _selectedMembershipStatus;
   CountryCode _selectedCountryCode = CountryCode.countries.first;
   String? _profilePhotoUrl;
+  File? _selectedImageFile;
+  final ImagePicker _imagePicker = ImagePicker();
+  bool _isUploadingPhoto = false;
 
   final List<String> _genderOptions = ['Male', 'Female'];
   final List<String> _kccOptions = [
@@ -257,6 +262,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Widget _buildProfilePhotoSection(BuildContext context, bool isDark) {
+    ImageProvider? imageProvider;
+    if (_selectedImageFile != null) {
+      imageProvider = FileImage(_selectedImageFile!);
+    } else if (_profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty) {
+      imageProvider = NetworkImage(_profilePhotoUrl!);
+    }
+
     return Center(
       child: Column(
         children: [
@@ -265,9 +277,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
               CircleAvatar(
                 radius: 60,
                 backgroundColor: isDark ? AppColors.cardDark : Colors.grey[200],
-                backgroundImage:
-                    _profilePhotoUrl != null ? NetworkImage(_profilePhotoUrl!) : null,
-                child: _profilePhotoUrl == null
+                backgroundImage: imageProvider,
+                child: imageProvider == null
                     ? Icon(
                         Icons.person,
                         size: 60,
@@ -275,11 +286,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       )
                     : null,
               ),
+              if (_isUploadingPhoto)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaryGold,
+                        strokeWidth: 3,
+                      ),
+                    ),
+                  ),
+                ),
               Positioned(
                 bottom: 0,
                 right: 0,
                 child: GestureDetector(
-                  onTap: () => _showPhotoOptions(context, isDark),
+                  onTap: _isUploadingPhoto ? null : () => _showPhotoOptions(context, isDark),
                   child: Container(
                     width: 36,
                     height: 36,
@@ -303,11 +329,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
           ),
           const SizedBox(height: 12),
           TextButton(
-            onPressed: () => _showPhotoOptions(context, isDark),
-            child: const Text(
-              'Change Profile Photo',
+            onPressed: _isUploadingPhoto ? null : () => _showPhotoOptions(context, isDark),
+            child: Text(
+              _isUploadingPhoto ? 'Uploading...' : 'Change Profile Photo',
               style: TextStyle(
-                color: AppColors.primaryGold,
+                color: _isUploadingPhoto ? Colors.grey : AppColors.primaryGold,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -335,7 +361,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 title: const Text('Take Photo'),
                 onTap: () {
                   Navigator.pop(context);
-                  // TODO: Implement camera capture
+                  _pickImage(ImageSource.camera);
                 },
               ),
               ListTile(
@@ -343,10 +369,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 title: const Text('Choose from Gallery'),
                 onTap: () {
                   Navigator.pop(context);
-                  // TODO: Implement gallery picker
+                  _pickImage(ImageSource.gallery);
                 },
               ),
-              if (_profilePhotoUrl != null)
+              if (_profilePhotoUrl != null || _selectedImageFile != null)
                 ListTile(
                   leading: const Icon(Icons.delete, color: AppColors.error),
                   title: const Text(
@@ -357,6 +383,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     Navigator.pop(context);
                     setState(() {
                       _profilePhotoUrl = null;
+                      _selectedImageFile = null;
                     });
                   },
                 ),
@@ -365,6 +392,75 @@ class _EditProfilePageState extends State<EditProfilePage> {
         ),
       ),
     );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        final imageFile = File(pickedFile.path);
+        setState(() {
+          _selectedImageFile = imageFile;
+        });
+
+        // Upload immediately
+        await _uploadPhoto(imageFile);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to pick image: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _uploadPhoto(File imageFile) async {
+    setState(() {
+      _isUploadingPhoto = true;
+    });
+
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.uploadProfilePhoto(imageFile);
+
+    if (mounted) {
+      setState(() {
+        _isUploadingPhoto = false;
+      });
+
+      if (success) {
+        // Update the profile photo URL from the refreshed user data
+        final user = authProvider.user;
+        if (user != null) {
+          setState(() {
+            _profilePhotoUrl = user.photoUrl;
+            _selectedImageFile = null;
+          });
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile photo updated successfully'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.error ?? 'Failed to upload photo'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildSectionTitle(BuildContext context, String title) {

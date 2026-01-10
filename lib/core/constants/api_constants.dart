@@ -1,5 +1,6 @@
 class ApiConstants {
-  static const String baseUrl = 'http://192.168.43.57:8000/api'; // Your local network IP
+  static const String baseUrl = 'https://tcgc.thecitygatechurch.org/api'; // Production server
+  // static const String baseUrl = 'http://192.168.43.57:8000/api'; // Your local network IP
   
   // Auth
   static const String register = '/auth/register/';
@@ -41,6 +42,8 @@ class ApiConstants {
   
   // Contact
   static const String contact = '/contact/';
+  static const String myContactMessages = '/contact/my-messages/';
+  static const String myContactMessageDetail = '/contact/my-messages/'; // append {id}/
   
   // Notifications
   static const String notifications = '/notifications/';
@@ -49,4 +52,7 @@ class ApiConstants {
   static const String notificationReadAll = '/notifications/read-all/';
   static const String deviceRegister = '/devices/register/';
   static const String deviceUnregister = '/devices/unregister/';
+  
+  // Promotions
+  static const String activePromotion = '/promotions/active/';
 }

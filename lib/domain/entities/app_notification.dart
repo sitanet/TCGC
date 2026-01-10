@@ -3,9 +3,10 @@ class AppNotification {
   final String title;
   final String body;
   final String? imageUrl;
-  final String type;
+  final String notificationType;
   final Map<String, dynamic>? data;
   final bool isRead;
+  final bool isGlobal;
   final DateTime createdAt;
 
   AppNotification({
@@ -13,9 +14,10 @@ class AppNotification {
     required this.title,
     required this.body,
     this.imageUrl,
-    required this.type,
+    required this.notificationType,
     this.data,
     this.isRead = false,
+    this.isGlobal = false,
     required this.createdAt,
   });
 
@@ -25,9 +27,10 @@ class AppNotification {
       title: json['title'] ?? '',
       body: json['body'] ?? '',
       imageUrl: json['image_url'],
-      type: json['type'] ?? 'general',
+      notificationType: json['notification_type'] ?? 'system',
       data: json['data'],
       isRead: json['is_read'] ?? false,
+      isGlobal: json['is_global'] ?? false,
       createdAt: DateTime.parse(json['created_at']),
     );
   }
@@ -38,9 +41,10 @@ class AppNotification {
       'title': title,
       'body': body,
       'image_url': imageUrl,
-      'type': type,
+      'notification_type': notificationType,
       'data': data,
       'is_read': isRead,
+      'is_global': isGlobal,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -50,9 +54,10 @@ class AppNotification {
     String? title,
     String? body,
     String? imageUrl,
-    String? type,
+    String? notificationType,
     Map<String, dynamic>? data,
     bool? isRead,
+    bool? isGlobal,
     DateTime? createdAt,
   }) {
     return AppNotification(
@@ -60,9 +65,10 @@ class AppNotification {
       title: title ?? this.title,
       body: body ?? this.body,
       imageUrl: imageUrl ?? this.imageUrl,
-      type: type ?? this.type,
+      notificationType: notificationType ?? this.notificationType,
       data: data ?? this.data,
       isRead: isRead ?? this.isRead,
+      isGlobal: isGlobal ?? this.isGlobal,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -74,25 +80,34 @@ class NotificationPreferences {
   final bool smsEnabled;
   final bool eventsEnabled;
   final bool sermonsEnabled;
+  final bool messagesEnabled;
   final bool walletEnabled;
+  final bool teensEnabled;
+  final bool announcementsEnabled;
 
   NotificationPreferences({
     this.pushEnabled = true,
     this.emailEnabled = true,
-    this.smsEnabled = false,
+    this.smsEnabled = true,
     this.eventsEnabled = true,
     this.sermonsEnabled = true,
+    this.messagesEnabled = true,
     this.walletEnabled = true,
+    this.teensEnabled = true,
+    this.announcementsEnabled = true,
   });
 
   factory NotificationPreferences.fromJson(Map<String, dynamic> json) {
     return NotificationPreferences(
       pushEnabled: json['push_enabled'] ?? true,
       emailEnabled: json['email_enabled'] ?? true,
-      smsEnabled: json['sms_enabled'] ?? false,
+      smsEnabled: json['sms_enabled'] ?? true,
       eventsEnabled: json['events_enabled'] ?? true,
       sermonsEnabled: json['sermons_enabled'] ?? true,
+      messagesEnabled: json['messages_enabled'] ?? true,
       walletEnabled: json['wallet_enabled'] ?? true,
+      teensEnabled: json['teens_enabled'] ?? true,
+      announcementsEnabled: json['announcements_enabled'] ?? true,
     );
   }
 
@@ -103,7 +118,10 @@ class NotificationPreferences {
       'sms_enabled': smsEnabled,
       'events_enabled': eventsEnabled,
       'sermons_enabled': sermonsEnabled,
+      'messages_enabled': messagesEnabled,
       'wallet_enabled': walletEnabled,
+      'teens_enabled': teensEnabled,
+      'announcements_enabled': announcementsEnabled,
     };
   }
 
@@ -113,7 +131,10 @@ class NotificationPreferences {
     bool? smsEnabled,
     bool? eventsEnabled,
     bool? sermonsEnabled,
+    bool? messagesEnabled,
     bool? walletEnabled,
+    bool? teensEnabled,
+    bool? announcementsEnabled,
   }) {
     return NotificationPreferences(
       pushEnabled: pushEnabled ?? this.pushEnabled,
@@ -121,7 +142,10 @@ class NotificationPreferences {
       smsEnabled: smsEnabled ?? this.smsEnabled,
       eventsEnabled: eventsEnabled ?? this.eventsEnabled,
       sermonsEnabled: sermonsEnabled ?? this.sermonsEnabled,
+      messagesEnabled: messagesEnabled ?? this.messagesEnabled,
       walletEnabled: walletEnabled ?? this.walletEnabled,
+      teensEnabled: teensEnabled ?? this.teensEnabled,
+      announcementsEnabled: announcementsEnabled ?? this.announcementsEnabled,
     );
   }
 }

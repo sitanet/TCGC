@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../widgets/custom_app_bar.dart';
+import 'my_messages_page.dart';
 
 class ComplaintPage extends StatefulWidget {
   const ComplaintPage({super.key});
@@ -140,52 +141,100 @@ class _ComplaintPageState extends State<ComplaintPage> {
   }
 
   Widget _buildHeader(BuildContext context, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.primaryGold.withAlpha(25),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppColors.primaryGold.withAlpha(50),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.support_agent,
-              color: AppColors.primaryGold,
-              size: 32,
-            ),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : AppColors.primaryGold.withAlpha(25),
+            borderRadius: BorderRadius.circular(16),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'How can we help?',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withAlpha(50),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Send us your feedback, complaints, or inquiries',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
+                child: const Icon(
+                  Icons.support_agent,
+                  color: AppColors.primaryGold,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'How can we help?',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Send us your feedback, complaints, or inquiries',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // View my messages button
+        InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const MyMessagesPage()),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? Colors.grey[800]! : Colors.grey[300]!,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.inbox_outlined,
+                  color: AppColors.primaryGold,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'View My Messages',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: isDark ? Colors.grey[500] : Colors.grey[400],
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

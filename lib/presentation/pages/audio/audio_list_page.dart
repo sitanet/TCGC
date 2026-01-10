@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/sermon.dart';
@@ -6,14 +7,18 @@ import 'audio_player_page.dart';
 
 class AudioListPage extends StatefulWidget {
   final String category;
+  final String? categoryId;
   final List<Sermon> audioItems;
   final List<String> categories;
+  final Map<String, String>? categoryNameToId;
 
   const AudioListPage({
     super.key,
     required this.category,
+    this.categoryId,
     required this.audioItems,
     required this.categories,
+    this.categoryNameToId,
   });
 
   @override
@@ -24,11 +29,13 @@ class _AudioListPageState extends State<AudioListPage> {
   final TextEditingController _searchController = TextEditingController();
   List<Sermon> _filteredItems = [];
   late String _selectedCategory;
+  late String? _selectedCategoryId;
 
   @override
   void initState() {
     super.initState();
     _selectedCategory = widget.category;
+    _selectedCategoryId = widget.categoryId;
     _filteredItems = _getFilteredItems('');
     _searchController.addListener(_filterAudio);
   }
@@ -47,20 +54,43 @@ class _AudioListPageState extends State<AudioListPage> {
   }
 
   List<Sermon> _getFilteredItems(String query) {
-    return widget.audioItems.where((audio) {
-      final matchesCategory = _selectedCategory == 'All' ||
-          audio.category.toLowerCase() == _selectedCategory.toLowerCase();
+    debugPrint('Filtering: category=$_selectedCategory, categoryId=$_selectedCategoryId');
+    debugPrint('Total audio items: ${widget.audioItems.length}');
+    
+    final filtered = widget.audioItems.where((audio) {
+      bool matchesCategory = _selectedCategory == 'All';
+      
+      if (!matchesCategory) {
+        // Try matching by category ID first
+        if (_selectedCategoryId != null && _selectedCategoryId!.isNotEmpty) {
+          matchesCategory = audio.category == _selectedCategoryId;
+        }
+        // Also try matching by category name
+        if (!matchesCategory && audio.categoryName.isNotEmpty) {
+          matchesCategory = audio.categoryName.toLowerCase() == _selectedCategory.toLowerCase();
+        }
+        // Last resort: try matching category field against name
+        if (!matchesCategory) {
+          matchesCategory = audio.category.toLowerCase() == _selectedCategory.toLowerCase();
+        }
+      }
+      
       final matchesSearch = query.isEmpty ||
           audio.title.toLowerCase().contains(query) ||
           audio.description.toLowerCase().contains(query);
+      
       return matchesCategory && matchesSearch;
     }).toList();
+    
+    debugPrint('Filtered items: ${filtered.length}');
+    return filtered;
   }
 
   void _selectCategory(String category) {
     final query = _searchController.text.toLowerCase();
     setState(() {
       _selectedCategory = category;
+      _selectedCategoryId = widget.categoryNameToId?[category];
       _filteredItems = _getFilteredItems(query);
     });
   }

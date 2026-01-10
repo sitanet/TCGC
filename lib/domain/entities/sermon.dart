@@ -26,6 +26,13 @@ class Sermon {
   });
 
   factory Sermon.fromJson(Map<String, dynamic> json) {
+    // Handle category - could be int or string
+    final categoryValue = json['category'];
+    final categoryStr = categoryValue?.toString() ?? '';
+    
+    // Handle category_name
+    final categoryName = json['category_name']?.toString() ?? '';
+    
     return Sermon(
       id: json['id'].toString(),
       title: json['title'] ?? '',
@@ -34,8 +41,8 @@ class Sermon {
       audioUrl: json['audio_url'],
       videoUrl: json['video_url'],
       transcript: json['transcript'],
-      category: json['category'].toString(),
-      categoryName: json['category_name'] ?? '',
+      category: categoryStr,
+      categoryName: categoryName,
       date: json['date'] != null 
           ? DateTime.parse(json['date']) 
           : DateTime.now(),
