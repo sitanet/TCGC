@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../../core/theme/app_colors.dart';
@@ -162,7 +164,17 @@ class _LiveStreamPageState extends State<LiveStreamPage> with SingleTickerProvid
               borderRadius: BorderRadius.circular(borderRadius),
               child: Stack(
                 children: [
-                  WebViewWidget(controller: _watchLiveController),
+                  WebViewWidget(
+                    controller: _watchLiveController,
+                    gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                      Factory<VerticalDragGestureRecognizer>(
+                        () => VerticalDragGestureRecognizer(),
+                      ),
+                      Factory<HorizontalDragGestureRecognizer>(
+                        () => HorizontalDragGestureRecognizer(),
+                      ),
+                    },
+                  ),
                   if (_isWatchLiveLoading)
                     Container(
                       color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
@@ -275,7 +287,17 @@ class _LiveStreamPageState extends State<LiveStreamPage> with SingleTickerProvid
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(borderRadius),
-              child: WebViewWidget(controller: _webViewController),
+              child: WebViewWidget(
+                controller: _webViewController,
+                gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                  Factory<VerticalDragGestureRecognizer>(
+                    () => VerticalDragGestureRecognizer(),
+                  ),
+                  Factory<HorizontalDragGestureRecognizer>(
+                    () => HorizontalDragGestureRecognizer(),
+                  ),
+                },
+              ),
             ),
           ),
         ),

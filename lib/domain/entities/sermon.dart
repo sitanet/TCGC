@@ -57,6 +57,8 @@ class MessageCategory {
   final String? description;
   final String? imageUrl;
   final bool isActive;
+  final DateTime? latestMessageDate;
+  final bool hasNewMessage;
 
   const MessageCategory({
     required this.id,
@@ -64,6 +66,8 @@ class MessageCategory {
     this.description,
     this.imageUrl,
     this.isActive = true,
+    this.latestMessageDate,
+    this.hasNewMessage = false,
   });
 
   factory MessageCategory.fromJson(Map<String, dynamic> json) {
@@ -73,6 +77,30 @@ class MessageCategory {
       description: json['description'],
       imageUrl: json['image_url'],
       isActive: json['is_active'] ?? true,
+      latestMessageDate: json['latest_message_date'] != null 
+          ? DateTime.tryParse(json['latest_message_date'].toString())
+          : null,
+      hasNewMessage: json['has_new_message'] ?? false,
+    );
+  }
+
+  MessageCategory copyWith({
+    String? id,
+    String? name,
+    String? description,
+    String? imageUrl,
+    bool? isActive,
+    DateTime? latestMessageDate,
+    bool? hasNewMessage,
+  }) {
+    return MessageCategory(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
+      isActive: isActive ?? this.isActive,
+      latestMessageDate: latestMessageDate ?? this.latestMessageDate,
+      hasNewMessage: hasNewMessage ?? this.hasNewMessage,
     );
   }
 }

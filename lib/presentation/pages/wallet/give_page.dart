@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../data/datasources/mock_data.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'tithe_page.dart';
 import 'transactions_page.dart';
+import 'add_money_page.dart';
 
 class GivePage extends StatefulWidget {
   const GivePage({super.key});
@@ -18,35 +20,65 @@ class _GivePageState extends State<GivePage> {
   bool isGiveExpanded = true;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<WalletProvider>();
+      provider.fetchTransactions();
+      provider.fetchGivings();
+    });
+  }
+
+  String _formatCurrency(double amount, String currency) {
+    final symbols = {'NGN': '₦', 'USD': '\$', 'EUR': '€', 'GBP': '£'};
+    final formatted = amount.toStringAsFixed(2).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+    return '${symbols[currency] ?? currency}$formatted';
+  }
+
+  String _formatDate(DateTime date) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${date.day} ${months[date.month - 1]}, ${date.year}';
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: const CustomAppBar(title: ''),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildPortfolioCard(context, isDark),
-              const SizedBox(height: 24),
-              _buildCurrencySelector(isDark),
-              const SizedBox(height: 24),
-              _buildGiveSection(context, isDark),
-              const SizedBox(height: 16),
-              _buildTransactionsItem(context, isDark),
-              const SizedBox(height: 16),
-              _buildMyCardsItem(context, isDark),
-              const SizedBox(height: 100),
-            ],
-          ),
-        ),
+      body: Consumer<WalletProvider>(
+        builder: (context, walletProvider, child) {
+          return SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildPortfolioCard(context, isDark, walletProvider),
+                  const SizedBox(height: 24),
+                  _buildCurrencySelector(isDark),
+                  const SizedBox(height: 24),
+                  _buildGiveSection(context, isDark, walletProvider),
+                  const SizedBox(height: 16),
+                  _buildTransactionsItem(context, isDark),
+                  const SizedBox(height: 16),
+                  _buildAddMoneyItem(context, isDark),
+                  const SizedBox(height: 100),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildPortfolioCard(BuildContext context, bool isDark) {
+  Widget _buildPortfolioCard(BuildContext context, bool isDark, WalletProvider walletProvider) {
+    final now = DateTime.now();
+    
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -76,7 +108,7 @@ class _GivePageState extends State<GivePage> {
                 ),
               ),
               Text(
-                '10th Dec, 2025',
+                _formatDate(now),
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.6),
                   fontSize: 12,
@@ -93,9 +125,9 @@ class _GivePageState extends State<GivePage> {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'N50,000',
-            style: TextStyle(
+          Text(
+            _formatCurrency(walletProvider.balance, walletProvider.currency),
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 36,
               fontWeight: FontWeight.bold,
@@ -175,8 +207,8 @@ class _GivePageState extends State<GivePage> {
     );
   }
 
-  Widget _buildGiveSection(BuildContext context, bool isDark) {
-    final giveOptions = MockData.giveOptions;
+  Widget _buildGiveSection(BuildContext context, bool isDark, WalletProvider walletProvider) {
+    final giveOptions = walletProvider.giveOptions;
 
     return Container(
       decoration: BoxDecoration(
@@ -229,7 +261,10 @@ class _GivePageState extends State<GivePage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => TithePage(title: option),
+                        builder: (_) => TithePage(
+                          title: option.name,
+                          giveOptionId: option.id,
+                        ),
                       ),
                     );
                   },
@@ -239,7 +274,7 @@ class _GivePageState extends State<GivePage> {
                       children: [
                         Expanded(
                           child: Text(
-                            option,
+                            option.name,
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ),
@@ -298,7 +333,7 @@ class _GivePageState extends State<GivePage> {
     );
   }
 
-  Widget _buildMyCardsItem(BuildContext context, bool isDark) {
+  Widget _buildAddMoneyItem(BuildContext context, bool isDark) {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
@@ -312,21 +347,24 @@ class _GivePageState extends State<GivePage> {
         ],
       ),
       child: InkWell(
-        onTap: () {},
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AddMoneyPage()),
+        ),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
               const Icon(
-                Icons.credit_card,
+                Icons.add_circle_outline,
                 color: AppColors.primaryGold,
                 size: 24,
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Text(
-                  'My Cards',
+                  'Add Money',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),

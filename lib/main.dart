@@ -1,12 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/notification_provider.dart';
-import 'core/providers/audio_player_provider.dart';
+import 'core/providers/audio_player_provider.dart' show AudioPlayerProvider, initAudioService;
+import 'core/providers/wallet_provider.dart';
 import 'presentation/pages/home/home_page.dart';
 import 'presentation/pages/audio/audio_page.dart';
 import 'presentation/pages/livestream/livestream_page.dart';
@@ -25,6 +27,16 @@ import 'domain/entities/promotion.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await initAudioService();
+  
+  // Set default status bar style (dark icons for light theme)
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+    ),
+  );
   
   runApp(
     MultiProvider(
@@ -33,6 +45,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => AudioPlayerProvider()),
+        ChangeNotifierProvider(create: (_) => WalletProvider()),
       ],
       child: const MyApp(),
     ),
@@ -208,7 +221,17 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeWallet();
     _checkForPromotion();
+  }
+
+  Future<void> _initializeWallet() async {
+    try {
+      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+      await walletProvider.initialize();
+    } catch (e) {
+      debugPrint('Wallet initialization error: $e');
+    }
   }
 
   Future<void> _checkForPromotion() async {

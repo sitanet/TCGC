@@ -30,11 +30,19 @@ class ApiConstants {
   static const String retreats = '/teens-content/retreats/';
   static const String forgeCamp = '/teens-content/forge_camp/';
   
-  // Wallet
+  // Wallet - 9PSB Integration
   static const String wallet = '/wallet/';
+  static const String walletOpen = '/wallet/open/';
+  static const String walletDetails = '/wallet/details/';
+  static const String walletBalance = '/wallet/balance/';
+  static const String walletFund = '/wallet/fund/';
+  static const String walletGive = '/wallet/give/';
+  static const String walletUpgrade = '/wallet/upgrade/';
+  static const String walletUpgradeStatus = '/wallet/upgrade/status/';
+  static const String walletTiers = '/wallet/tiers/';
   static const String transactions = '/wallet/transactions/';
-  static const String addMoney = '/wallet/add-money/';
-  static const String sendMoney = '/wallet/send-money/';
+  static const String walletReport = '/wallet/report/';
+  static const String givingReport = '/wallet/giving-report/';
   
   // Giving
   static const String giveOptions = '/give-options/';

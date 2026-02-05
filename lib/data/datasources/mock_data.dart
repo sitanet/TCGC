@@ -132,11 +132,13 @@ class MockData {
       ];
 
   static List<String> get giveOptions => [
-        'Tithe',
         'Offering',
-        'Baba\'s Land',
-        'IMGC Seed',
-        'Prophet\'s Offering',
+        'Tithe',
+        'Project: Baba\'s Land',
+        'Branches',
+        'Special Offering',
+        'Giving to Ministers',
+        'IMGC',
       ];
 
   static List<TeensContent> get dailyDevotionals => [

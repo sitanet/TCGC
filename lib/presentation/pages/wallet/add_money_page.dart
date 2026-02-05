@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'success_page.dart';
@@ -12,10 +14,53 @@ class AddMoneyPage extends StatefulWidget {
 
 class _AddMoneyPageState extends State<AddMoneyPage> {
   String amount = '1,000';
+  bool _isProcessing = false;
+
+  Future<void> _addMoney() async {
+    final cleanAmount = amount.replaceAll(',', '');
+    final amountValue = double.tryParse(cleanAmount) ?? 0;
+    
+    if (amountValue <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid amount'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isProcessing = true);
+    
+    final walletProvider = context.read<WalletProvider>();
+    final success = await walletProvider.addMoney(amountValue);
+    
+    setState(() => _isProcessing = false);
+    
+    if (success && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SuccessPage(
+            title: 'Add Money',
+            amount: amount,
+          ),
+        ),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(walletProvider.error ?? 'Failed to add money'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final walletProvider = context.watch<WalletProvider>();
 
     return Scaffold(
       appBar: const CustomAppBar(title: 'Add Money'),
@@ -36,7 +81,7 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'N$amount',
+                    '₦$amount',
                     style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: 40,
@@ -58,6 +103,14 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
                           fontWeight: FontWeight.w500,
                         ),
                   ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Current Balance: ₦${walletProvider.balance.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      fontSize: 14,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -68,17 +121,7 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => SuccessPage(
-                          title: 'Add Money',
-                          amount: amount,
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: _isProcessing ? null : _addMoney,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryGold,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -86,14 +129,23 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'Add Money',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: _isProcessing
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Add Money',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
             ),

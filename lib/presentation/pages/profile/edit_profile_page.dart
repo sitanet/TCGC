@@ -36,7 +36,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final ImagePicker _imagePicker = ImagePicker();
   bool _isUploadingPhoto = false;
 
-  final List<String> _genderOptions = ['Male', 'Female'];
+  // Gender options - values must match backend choices (lowercase)
+  final Map<String, String> _genderOptions = {
+    'male': 'Male',
+    'female': 'Female',
+    'other': 'Other',
+  };
   final List<String> _kccOptions = [
     'Akobo KCC',
     'Bodija1 KCC',
@@ -60,14 +65,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
     'Hospitality',
     'Security',
   ];
-  final List<String> _membershipStatusOptions = [
-    'pending',
-    'Member',
-    'Worker',
-    'Volunteer',
-    'Visitor',
-    'Pastorate',
-  ];
+  // Membership status options - values must match backend choices (lowercase)
+  final Map<String, String> _membershipStatusOptions = {
+    'pending': 'Pending',
+    'active': 'Active',
+    'inactive': 'Inactive',
+  };
 
   bool _biometricEnabled = false;
 
@@ -139,12 +142,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   label: 'First Name',
                   hint: 'Enter your first name',
                   isDark: isDark,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'First name is required';
-                    }
-                    return null;
-                  },
+                  enabled: false,
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
@@ -152,6 +150,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   label: 'Middle Name',
                   hint: 'Enter your middle name (optional)',
                   isDark: isDark,
+                  enabled: false,
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
@@ -159,12 +158,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   label: 'Last Name',
                   hint: 'Enter your last name',
                   isDark: isDark,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Last name is required';
-                    }
-                    return null;
-                  },
+                  enabled: false,
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
@@ -173,21 +167,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   hint: 'Enter your email',
                   isDark: isDark,
                   keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Email is required';
-                    }
-                    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                    if (!emailRegex.hasMatch(value)) {
-                      return 'Enter a valid email';
-                    }
-                    return null;
-                  },
+                  enabled: false,
                 ),
                 const SizedBox(height: 16),
-                _buildPhoneField(isDark),
+                _buildPhoneField(isDark, enabled: false),
                 const SizedBox(height: 16),
-                _buildDropdownField(
+                _buildMapDropdownField(
                   label: 'Gender',
                   value: _selectedGender,
                   items: _genderOptions,
@@ -227,7 +212,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   },
                 ),
                 const SizedBox(height: 16),
-                _buildDropdownField(
+                _buildMapDropdownField(
                   label: 'Membership Status',
                   value: _selectedMembershipStatus,
                   items: _membershipStatusOptions,
@@ -481,6 +466,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
     int maxLines = 1,
+    bool enabled = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -499,16 +485,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
           keyboardType: keyboardType,
           maxLines: maxLines,
           validator: validator,
+          enabled: enabled,
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(color: Colors.grey[400]),
             filled: true,
-            fillColor: isDark ? AppColors.cardDark : Colors.grey[100],
+            fillColor: enabled 
+                ? (isDark ? AppColors.cardDark : Colors.grey[100])
+                : (isDark ? AppColors.cardDark.withOpacity(0.5) : Colors.grey[200]),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
             ),
@@ -527,7 +520,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  Widget _buildPhoneField(bool isDark) {
+  Widget _buildPhoneField(bool isDark, {bool enabled = true}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -543,11 +536,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
         Row(
           children: [
             GestureDetector(
-              onTap: () => _showCountryCodePicker(context, isDark),
+              onTap: enabled ? () => _showCountryCodePicker(context, isDark) : null,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                 decoration: BoxDecoration(
-                  color: isDark ? AppColors.cardDark : Colors.grey[100],
+                  color: enabled
+                      ? (isDark ? AppColors.cardDark : Colors.grey[100])
+                      : (isDark ? AppColors.cardDark.withOpacity(0.5) : Colors.grey[200]),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -561,15 +556,19 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     Text(
                       _selectedCountryCode.dialCode,
                       style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black,
+                        color: enabled
+                            ? (isDark ? Colors.white : Colors.black)
+                            : (isDark ? Colors.white54 : Colors.black54),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.arrow_drop_down,
-                      color: isDark ? Colors.white : Colors.black,
-                    ),
+                    if (enabled) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_drop_down,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -580,16 +579,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                enabled: enabled,
                 decoration: InputDecoration(
                   hintText: 'Enter phone number',
                   hintStyle: TextStyle(color: Colors.grey[400]),
                   filled: true,
-                  fillColor: isDark ? AppColors.cardDark : Colors.grey[100],
+                  fillColor: enabled
+                      ? (isDark ? AppColors.cardDark : Colors.grey[100])
+                      : (isDark ? AppColors.cardDark.withOpacity(0.5) : Colors.grey[200]),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  disabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
@@ -700,6 +706,59 @@ class _EditProfilePageState extends State<EditProfilePage> {
               return DropdownMenuItem(
                 value: item,
                 child: Text(item),
+              );
+            }).toList(),
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Dropdown for Map<String, String> where key is the value sent to backend and value is display text
+  Widget _buildMapDropdownField({
+    required String label,
+    required String? value,
+    required Map<String, String> items,
+    required bool isDark,
+    required void Function(String?) onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? AppColors.textSecondaryDark : Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: DropdownButtonFormField<String>(
+            value: value,
+            isExpanded: true,
+            decoration: InputDecoration(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+            hint: Text(
+              'Select $label',
+              style: TextStyle(color: Colors.grey[400]),
+            ),
+            dropdownColor: isDark ? AppColors.cardDark : Colors.white,
+            items: items.entries.map((entry) {
+              return DropdownMenuItem(
+                value: entry.key,
+                child: Text(entry.value),
               );
             }).toList(),
             onChanged: onChanged,
@@ -874,26 +933,33 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (_formKey.currentState?.validate() ?? false) {
       final authProvider = context.read<AuthProvider>();
       
-      final profileData = {
-        'first_name': _firstNameController.text.trim(),
-        'middle_name': _middleNameController.text.trim().isEmpty 
-            ? null 
-            : _middleNameController.text.trim(),
-        'last_name': _lastNameController.text.trim(),
-        'email': _emailController.text.trim(),
-        'phone_number': _phoneController.text.trim().isEmpty 
-            ? null 
-            : _phoneController.text.trim(),
-        'country_code': _selectedCountryCode.dialCode,
-        'gender': _selectedGender,
-        'date_of_birth': _selectedDateOfBirth?.toIso8601String().split('T').first,
-        'kcc': _selectedKCC,
-        'department': _selectedDepartment,
-        'membership_status': _selectedMembershipStatus,
-        'address': _addressController.text.trim().isEmpty 
-            ? null 
-            : _addressController.text.trim(),
-      };
+      // Build profile data - only editable fields
+      // Note: first_name, middle_name, last_name, email, and phone_number are not editable for security
+      final Map<String, dynamic> profileData = {};
+      
+      if (_selectedGender != null) {
+        profileData['gender'] = _selectedGender;
+      }
+      
+      if (_selectedDateOfBirth != null) {
+        profileData['date_of_birth'] = _selectedDateOfBirth!.toIso8601String().split('T').first;
+      }
+      
+      if (_selectedKCC != null) {
+        profileData['kcc'] = _selectedKCC;
+      }
+      
+      if (_selectedDepartment != null) {
+        profileData['department'] = _selectedDepartment;
+      }
+      
+      if (_selectedMembershipStatus != null) {
+        profileData['membership_status'] = _selectedMembershipStatus;
+      }
+      
+      if (_addressController.text.trim().isNotEmpty) {
+        profileData['address'] = _addressController.text.trim();
+      }
       
       final success = await authProvider.updateProfile(profileData);
       

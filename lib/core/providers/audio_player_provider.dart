@@ -3,16 +3,51 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import '../../domain/entities/sermon.dart';
 
-class AudioPlayerProvider extends ChangeNotifier {
-  static AudioHandler? _audioHandler;
+AudioHandler? _audioHandler;
+bool _audioServiceInitialized = false;
+String? _initError;
+
+Future<void> initAudioService() async {
+  if (_audioServiceInitialized) return;
   
+  try {
+    debugPrint('Initializing audio service...');
+    _audioHandler = await AudioService.init(
+      builder: () => AudioPlayerHandler(),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.tcgc.app.audio',
+        androidNotificationChannelName: 'TCGC Audio',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: true,
+        androidNotificationIcon: 'mipmap/ic_launcher',
+        androidShowNotificationBadge: true,
+        notificationColor: Color(0xFFD4A84B),
+      ),
+    );
+    _audioServiceInitialized = true;
+    debugPrint('Audio service initialized successfully');
+  } catch (e, stack) {
+    _initError = e.toString();
+    debugPrint('Audio service init error: $e');
+    debugPrint('Stack trace: $stack');
+    // Continue without audio_service - use fallback player
+  }
+}
+
+bool get isAudioServiceAvailable => _audioServiceInitialized && _audioHandler != null;
+
+class AudioPlayerProvider extends ChangeNotifier {
   Sermon? _currentSermon;
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
   bool _isPlaying = false;
   bool _isLoading = false;
   String? _errorMessage;
-  bool _initialized = false;
+  bool _listenersSetup = false;
+  
+  // Fallback player when audio_service fails
+  AudioPlayer? _fallbackPlayer;
+  bool _usingFallback = false;
 
   Sermon? get currentSermon => _currentSermon;
   Duration get duration => _duration;
@@ -23,57 +58,62 @@ class AudioPlayerProvider extends ChangeNotifier {
   bool get hasAudio => _currentSermon != null;
 
   AudioPlayerProvider() {
-    _init();
-  }
-
-  Future<void> _init() async {
-    if (_initialized) return;
-    
-    try {
-      _audioHandler = await AudioService.init(
-        builder: () => AudioPlayerHandler(),
-        config: const AudioServiceConfig(
-          androidNotificationChannelId: 'com.tcgc.app.audio',
-          androidNotificationChannelName: 'TCGC Audio',
-          androidNotificationOngoing: true,
-          androidStopForegroundOnPause: true,
-          androidNotificationIcon: 'mipmap/ic_launcher',
-        ),
-      );
-      
-      _initialized = true;
-      _setupListeners();
-    } catch (e) {
-      debugPrint('Audio service init error: $e');
-    }
+    _setupListeners();
   }
 
   void _setupListeners() {
-    if (_audioHandler == null) return;
+    if (_audioServiceInitialized && _audioHandler != null && !_listenersSetup) {
+      _listenersSetup = true;
+      
+      _audioHandler!.playbackState.listen((state) {
+        _isPlaying = state.playing;
+        _isLoading = state.processingState == AudioProcessingState.loading ||
+                     state.processingState == AudioProcessingState.buffering;
+        _position = state.position;
+        notifyListeners();
+      });
+
+      _audioHandler!.mediaItem.listen((item) {
+        if (item != null) {
+          _duration = item.duration ?? Duration.zero;
+          notifyListeners();
+        }
+      });
+    }
+  }
+  
+  void _setupFallbackPlayer() {
+    if (_fallbackPlayer != null) return;
     
-    _audioHandler!.playbackState.listen((state) {
+    _fallbackPlayer = AudioPlayer();
+    _usingFallback = true;
+    
+    _fallbackPlayer!.playerStateStream.listen((state) {
       _isPlaying = state.playing;
-      _isLoading = state.processingState == AudioProcessingState.loading ||
-                   state.processingState == AudioProcessingState.buffering;
-      _position = state.position;
+      _isLoading = state.processingState == ProcessingState.loading ||
+                   state.processingState == ProcessingState.buffering;
       notifyListeners();
     });
-
-    _audioHandler!.mediaItem.listen((item) {
-      if (item != null) {
-        _duration = item.duration ?? Duration.zero;
-        notifyListeners();
-      }
+    
+    _fallbackPlayer!.positionStream.listen((pos) {
+      _position = pos;
+      notifyListeners();
+    });
+    
+    _fallbackPlayer!.durationStream.listen((dur) {
+      _duration = dur ?? Duration.zero;
+      notifyListeners();
     });
   }
 
   Future<void> playSermon(Sermon sermon) async {
-    await _init();
+    // Try to setup audio service listeners
+    _setupListeners();
     
-    if (_audioHandler == null) {
-      _errorMessage = 'Audio service not available';
-      notifyListeners();
-      return;
+    // If audio_service failed, use fallback player
+    if (!_audioServiceInitialized || _audioHandler == null) {
+      debugPrint('Using fallback audio player');
+      _setupFallbackPlayer();
     }
 
     // If same sermon, just toggle play/pause
@@ -95,42 +135,63 @@ class AudioPlayerProvider extends ChangeNotifier {
     final audioUrl = sermon.audioUrl;
     if (audioUrl == null || audioUrl.isEmpty) {
       _isLoading = false;
-      _errorMessage = 'No audio URL available';
+      _errorMessage = 'No audio URL available for this sermon';
       notifyListeners();
       return;
     }
+    
+    debugPrint('Playing audio from: $audioUrl');
 
     try {
-      final mediaItem = MediaItem(
-        id: sermon.id,
-        title: sermon.title,
-        artist: 'TCGC',
-        album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Sermons',
-        duration: sermon.duration,
-        artUri: sermon.imageUrl != null ? Uri.parse(sermon.imageUrl!) : null,
-        extras: {'url': audioUrl},
-      );
-
-      await _audioHandler!.playMediaItem(mediaItem);
+      if (_usingFallback && _fallbackPlayer != null) {
+        // Use fallback player
+        await _fallbackPlayer!.setUrl(audioUrl);
+        await _fallbackPlayer!.play();
+      } else if (_audioHandler != null) {
+        // Use audio_service
+        final mediaItem = MediaItem(
+          id: sermon.id,
+          title: sermon.title,
+          artist: 'TCGC',
+          album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Sermons',
+          duration: sermon.duration,
+          artUri: sermon.imageUrl != null ? Uri.parse(sermon.imageUrl!) : null,
+          extras: {'url': audioUrl},
+        );
+        await _audioHandler!.playMediaItem(mediaItem);
+      }
       _isLoading = false;
       notifyListeners();
     } catch (e) {
       _isLoading = false;
       _errorMessage = 'Failed to load audio: $e';
+      debugPrint('Audio playback error: $e');
       notifyListeners();
     }
   }
 
   Future<void> play() async {
-    await _audioHandler?.play();
+    if (_usingFallback && _fallbackPlayer != null) {
+      await _fallbackPlayer!.play();
+    } else if (_audioServiceInitialized && _audioHandler != null) {
+      await _audioHandler!.play();
+    }
   }
 
   Future<void> pause() async {
-    await _audioHandler?.pause();
+    if (_usingFallback && _fallbackPlayer != null) {
+      await _fallbackPlayer!.pause();
+    } else if (_audioServiceInitialized && _audioHandler != null) {
+      await _audioHandler!.pause();
+    }
   }
 
   Future<void> stop() async {
-    await _audioHandler?.stop();
+    if (_usingFallback && _fallbackPlayer != null) {
+      await _fallbackPlayer!.stop();
+    } else if (_audioServiceInitialized && _audioHandler != null) {
+      await _audioHandler!.stop();
+    }
     _currentSermon = null;
     _position = Duration.zero;
     _duration = Duration.zero;
@@ -138,30 +199,38 @@ class AudioPlayerProvider extends ChangeNotifier {
   }
 
   Future<void> seek(Duration position) async {
-    await _audioHandler?.seek(position);
+    if (_usingFallback && _fallbackPlayer != null) {
+      await _fallbackPlayer!.seek(position);
+    } else if (_audioServiceInitialized && _audioHandler != null) {
+      await _audioHandler!.seek(position);
+    }
   }
 
   Future<void> seekForward() async {
     final newPosition = _position + const Duration(seconds: 10);
     if (newPosition < _duration) {
-      await _audioHandler?.seek(newPosition);
+      await seek(newPosition);
     } else {
-      await _audioHandler?.seek(_duration);
+      await seek(_duration);
     }
   }
 
   Future<void> seekBackward() async {
     final newPosition = _position - const Duration(seconds: 10);
     if (newPosition > Duration.zero) {
-      await _audioHandler?.seek(newPosition);
+      await seek(newPosition);
     } else {
-      await _audioHandler?.seek(Duration.zero);
+      await seek(Duration.zero);
     }
   }
 
   @override
   void dispose() {
-    _audioHandler?.stop();
+    if (_usingFallback && _fallbackPlayer != null) {
+      _fallbackPlayer!.dispose();
+    } else if (_audioServiceInitialized && _audioHandler != null) {
+      _audioHandler!.stop();
+    }
     super.dispose();
   }
 }

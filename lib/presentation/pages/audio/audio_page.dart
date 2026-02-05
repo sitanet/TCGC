@@ -46,9 +46,53 @@ class _AudioPageState extends State<AudioPage>
         debugPrint('  Sermon: ${s.title} - Category: ${s.category}, CategoryName: ${s.categoryName}');
       }
       
+      // Calculate latest message date for each category and sort
+      final now = DateTime.now();
+      final threeDaysAgo = now.subtract(const Duration(days: 3));
+      
+      final updatedCategories = categories.map((category) {
+        // Find sermons in this category
+        final categorySermons = sermons.where((s) => 
+          s.category == category.id || s.categoryName == category.name
+        ).toList();
+        
+        // Find the most recent message date
+        DateTime? latestDate;
+        for (var sermon in categorySermons) {
+          if (latestDate == null || sermon.date.isAfter(latestDate)) {
+            latestDate = sermon.date;
+          }
+        }
+        
+        // Check if there's a new message (within last 3 days)
+        final hasNew = latestDate != null && latestDate.isAfter(threeDaysAgo);
+        
+        return category.copyWith(
+          latestMessageDate: latestDate,
+          hasNewMessage: hasNew,
+        );
+      }).toList();
+      
+      // Sort categories: those with recent messages first, then by latest message date
+      updatedCategories.sort((a, b) {
+        // Categories with new messages come first
+        if (a.hasNewMessage && !b.hasNewMessage) return -1;
+        if (!a.hasNewMessage && b.hasNewMessage) return 1;
+        
+        // Then sort by latest message date (most recent first)
+        if (a.latestMessageDate != null && b.latestMessageDate != null) {
+          return b.latestMessageDate!.compareTo(a.latestMessageDate!);
+        }
+        if (a.latestMessageDate != null) return -1;
+        if (b.latestMessageDate != null) return 1;
+        
+        // Finally, sort alphabetically
+        return a.name.compareTo(b.name);
+      });
+      
       if (mounted) {
         setState(() {
-          _categories = categories;
+          _categories = updatedCategories;
           _sermons = sermons;
           _isLoading = false;
         });
@@ -213,9 +257,33 @@ class _AudioPageState extends State<AudioPage>
         ),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: _buildCategoryImage(category, isDark),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: _buildCategoryImage(category, isDark),
+                ),
+                if (category.hasNewMessage)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'NEW',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -223,11 +291,27 @@ class _AudioPageState extends State<AudioPage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    category.name,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          category.name,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
+                      ),
+                      if (category.hasNewMessage)
+                        Container(
+                          margin: const EdgeInsets.only(left: 8),
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(

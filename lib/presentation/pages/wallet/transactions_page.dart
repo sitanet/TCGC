@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../data/datasources/mock_data.dart';
 import '../../widgets/custom_app_bar.dart';
 
 class TransactionsPage extends StatefulWidget {
@@ -11,42 +12,61 @@ class TransactionsPage extends StatefulWidget {
 }
 
 class _TransactionsPageState extends State<TransactionsPage> {
-  String selectedCurrency = 'NGN';
-  final currencies = ['NGN', 'USD', 'EUR', 'GBP'];
-  bool isTransactionsExpanded = true;
+  String selectedFilter = 'All';
+  final filters = ['All', 'Money In', 'Money Out'];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<WalletProvider>().fetchTransactions();
+    });
+  }
+
+  String _formatCurrency(double amount, String currency) {
+    final symbols = {'NGN': '₦', 'USD': '\$', 'EUR': '€', 'GBP': '£'};
+    final formatted = amount.toStringAsFixed(2).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+    return '${symbols[currency] ?? currency}$formatted';
+  }
+
+  String _formatDate(DateTime date) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${date.day} ${months[date.month - 1]}, ${date.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: const CustomAppBar(title: ''),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildPortfolioCard(context, isDark),
-              const SizedBox(height: 24),
-              _buildCurrencySelector(isDark),
-              const SizedBox(height: 24),
-              _buildGiveItem(context, isDark),
-              const SizedBox(height: 16),
-              _buildTransactionsSection(context, isDark),
-              const SizedBox(height: 16),
-              _buildMyCardsItem(context, isDark),
-              const SizedBox(height: 16),
-              _buildSavingsItem(context, isDark),
-              const SizedBox(height: 100),
-            ],
-          ),
-        ),
+      appBar: const CustomAppBar(title: 'Transactions'),
+      body: Consumer<WalletProvider>(
+        builder: (context, walletProvider, child) {
+          return SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSummaryCard(context, isDark, walletProvider),
+                  const SizedBox(height: 24),
+                  _buildFilterSelector(isDark),
+                  const SizedBox(height: 24),
+                  _buildTransactionsList(context, isDark, walletProvider),
+                  const SizedBox(height: 100),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildPortfolioCard(BuildContext context, bool isDark) {
+  Widget _buildSummaryCard(BuildContext context, bool isDark, WalletProvider walletProvider) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -69,14 +89,14 @@ class _TransactionsPageState extends State<TransactionsPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Your Portfolio',
+                'Transaction Summary',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 14,
                 ),
               ),
               Text(
-                '10th Dec, 2025',
+                _formatDate(DateTime.now()),
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.6),
                   fontSize: 12,
@@ -86,293 +106,183 @@ class _TransactionsPageState extends State<TransactionsPage> {
           ),
           const SizedBox(height: 20),
           const Text(
-            'Your Balance:',
+            'Current Balance:',
             style: TextStyle(
               color: Colors.white70,
               fontSize: 12,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'N50,000',
-            style: TextStyle(
+          Text(
+            _formatCurrency(walletProvider.balance, walletProvider.currency),
+            style: const TextStyle(
               color: Colors.white,
-              fontSize: 36,
+              fontSize: 32,
               fontWeight: FontWeight.bold,
             ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Total Transactions',
+                      style: TextStyle(color: Colors.white70, fontSize: 11),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${walletProvider.transactions.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCurrencySelector(bool isDark) {
+  Widget _buildFilterSelector(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Your Wallet',
-            style: TextStyle(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: currencies.map((currency) {
-              final isSelected = currency == selectedCurrency;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      selectedCurrency = currency;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.textPrimaryLight
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.textPrimaryLight
-                            : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
-                      ),
-                    ),
-                    child: Text(
-                      currency,
-                      style: TextStyle(
-                        color: isSelected
-                            ? Colors.white
-                            : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
-                        fontWeight: FontWeight.w500,
-                        fontSize: 13,
-                      ),
-                    ),
+      child: Row(
+        children: filters.map((filter) {
+          final isSelected = filter == selectedFilter;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  selectedFilter = filter;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primaryGold : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected
+                        ? AppColors.primaryGold
+                        : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
                   ),
                 ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGiveItem(BuildContext context, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: InkWell(
-        onTap: () {},
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.monetization_on_outlined,
-                color: AppColors.primaryGold,
-                size: 24,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
                 child: Text(
-                  'Give',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  filter,
+                  style: TextStyle(
+                    color: isSelected
+                        ? Colors.white
+                        : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                  ),
                 ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTransactionsSection(BuildContext context, bool isDark) {
-    final transactions = MockData.transactions;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: () {
-              setState(() {
-                isTransactionsExpanded = !isTransactionsExpanded;
-              });
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.swap_horiz,
-                    color: AppColors.primaryGold,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      'Transactions',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  Icon(
-                    isTransactionsExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  ),
-                ],
               ),
             ),
-          ),
-          if (isTransactionsExpanded)
-            ...transactions.map((transaction) => Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        transaction.title,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      Text(
-                        'N${transaction.amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                    ],
-                  ),
-                )),
-          if (isTransactionsExpanded) const SizedBox(height: 8),
-        ],
+          );
+        }).toList(),
       ),
     );
   }
 
-  Widget _buildMyCardsItem(BuildContext context, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: InkWell(
-        onTap: () {},
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.credit_card,
-                color: AppColors.primaryGold,
-                size: 24,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  'My Cards',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _buildTransactionsList(BuildContext context, bool isDark, WalletProvider walletProvider) {
+    var transactions = walletProvider.transactions;
+    
+    if (selectedFilter == 'Money In') {
+      transactions = transactions.where((t) => t.isMoneyIn).toList();
+    } else if (selectedFilter == 'Money Out') {
+      transactions = transactions.where((t) => !t.isMoneyIn).toList();
+    }
 
-  Widget _buildSavingsItem(BuildContext context, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: InkWell(
-        onTap: () {},
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+    if (transactions.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(40),
+        child: Center(
+          child: Column(
             children: [
-              const Icon(
-                Icons.savings_outlined,
-                color: AppColors.primaryGold,
-                size: 24,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  'Savings',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
               Icon(
-                Icons.chevron_right,
+                Icons.receipt_long_outlined,
+                size: 64,
                 color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No transactions yet',
+                style: TextStyle(
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  fontSize: 16,
+                ),
               ),
             ],
           ),
         ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: transactions.length,
+        separatorBuilder: (_, __) => Divider(
+          height: 1,
+          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+        ),
+        itemBuilder: (context, index) {
+          final transaction = transactions[index];
+          final isMoneyIn = transaction.isMoneyIn;
+          
+          return ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: (isMoneyIn ? Colors.green : Colors.red).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                isMoneyIn ? Icons.arrow_downward : Icons.arrow_upward,
+                color: isMoneyIn ? Colors.green : Colors.red,
+              ),
+            ),
+            title: Text(
+              transaction.title,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(
+              _formatDate(transaction.date),
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              ),
+            ),
+            trailing: Text(
+              '${isMoneyIn ? '+' : '-'}${_formatCurrency(transaction.amount, transaction.currency)}',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isMoneyIn ? Colors.green : Colors.red,
+              ),
+            ),
+          );
+        },
       ),
     );
   }

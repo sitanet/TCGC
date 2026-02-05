@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/auth_provider.dart';
-import '../../../core/providers/notification_provider.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/services/data_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/event.dart';
 import '../audio/audio_player_page.dart';
-import '../profile/edit_profile_page.dart';
+import '../profile/profile_page.dart';
 import '../support/complaint_page.dart';
-import '../notifications/notifications_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -115,15 +113,31 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildHeaderBanner(BuildContext context, bool isDark) {
-    final horizontalPadding = Responsive.horizontalPadding(context);
-    final spacing = Responsive.verticalSpacing(context);
-    final logoSize = Responsive.logoSize(context);
     final borderRadius = Responsive.largeBorderRadius(context);
-    final smallFontSize = Responsive.smallFontSize(context);
-    final titleFontSize = Responsive.value(context, mobile: 18.0, tablet: 22.0, desktop: 26.0);
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Responsive sizing
+    final isMobile = Responsive.isMobile(context);
+    final isTablet = Responsive.isTablet(context);
+    
+    // Logo size based on device
+    final logoSize = isMobile ? 80.0 : isTablet ? 100.0 : 120.0;
+    
+    // Font sizes based on device
+    final welcomeFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
+    final titleFontSize = isMobile ? 18.0 : isTablet ? 22.0 : 26.0;
+    final subtitleFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
+    final nameFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    
+    // Avatar size based on device
+    final avatarRadius = isMobile ? 24.0 : isTablet ? 30.0 : 36.0;
+    
+    // Padding based on device
+    final horizontalPadding = isMobile ? 20.0 : isTablet ? 30.0 : 40.0;
+    final bottomPadding = isMobile ? 20.0 : isTablet ? 25.0 : 30.0;
 
     return Container(
-      width: double.infinity,
+      width: screenWidth,  // Always full width
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
@@ -142,174 +156,109 @@ class _HomePageState extends State<HomePage> {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: EdgeInsets.fromLTRB(horizontalPadding, spacing, horizontalPadding, spacing * 1.5),
+          padding: EdgeInsets.only(bottom: bottomPadding),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: logoSize,
-                    height: logoSize,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(Responsive.borderRadius(context)),
+              // Centered logo and text
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: isMobile ? 30.0 : 40.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset(
+                      'assets/images/tcgc_logo.png',
+                      width: logoSize,
+                      height: logoSize,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: logoSize,
+                        height: logoSize,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGold,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.church, color: Colors.white, size: logoSize * 0.5),
+                      ),
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(Responsive.borderRadius(context)),
-                      child: Image.asset(
-                        'assets/images/tcgc_logo.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryGold,
-                            borderRadius: BorderRadius.circular(Responsive.borderRadius(context)),
+                    SizedBox(width: isMobile ? 16 : 24),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Welcome to',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Colors.white70,
+                                  fontSize: welcomeFontSize,
+                                ),
                           ),
-                          child: Center(
-                            child: Icon(Icons.church, color: Colors.white, size: logoSize * 0.5),
+                        const SizedBox(height: 2),
+                        Text(
+                          'The CityGate Church',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: titleFontSize,
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Where sons are raised',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.white54,
+                                fontSize: subtitleFontSize,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Bottom row with name and profile picture
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: Consumer<AuthProvider>(
+                  builder: (context, authProvider, child) {
+                    final user = authProvider.user;
+                    final displayName = user != null
+                        ? '${user.firstName} ${user.lastName}'.trim()
+                        : 'Guest';
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          displayName.isNotEmpty ? displayName : 'Welcome',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                                fontSize: nameFontSize,
+                              ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ProfilePage(),
+                              ),
+                            );
+                          },
+                          child: CircleAvatar(
+                            radius: avatarRadius,
+                            backgroundColor: AppColors.primaryGold,
+                            backgroundImage: user?.photoUrl != null && user!.photoUrl!.isNotEmpty
+                                ? NetworkImage(user.photoUrl!)
+                                : null,
+                            child: user?.photoUrl == null || user!.photoUrl!.isEmpty
+                                ? Icon(Icons.person, color: Colors.white, size: avatarRadius * 1.2)
+                                : null,
                           ),
                         ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: spacing),
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(top: spacing * 0.5),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Welcome to',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white70,
-                                  fontSize: smallFontSize,
-                                ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'The CityGate Church',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: titleFontSize,
-                                ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Where sons are raised',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Colors.white54,
-                                  fontSize: smallFontSize * 0.9,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: spacing * 1.25),
-              Consumer<AuthProvider>(
-                builder: (context, authProvider, child) {
-                  final user = authProvider.user;
-                  final displayName = user != null
-                      ? '${user.firstName} ${user.lastName}'.trim()
-                      : 'Guest';
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        displayName.isNotEmpty ? displayName : 'Welcome',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                            ),
-                      ),
-                      Row(
-                        children: [
-                          Consumer<NotificationProvider>(
-                            builder: (context, notificationProvider, _) {
-                              final unreadCount = notificationProvider.unreadCount;
-                              return GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const NotificationsPage(),
-                                    ),
-                                  );
-                                },
-                                child: Stack(
-                                  children: [
-                                    Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: const Icon(
-                                        Icons.notifications_outlined,
-                                        color: Colors.white,
-                                        size: 24,
-                                      ),
-                                    ),
-                                    if (unreadCount > 0)
-                                      Positioned(
-                                        right: 0,
-                                        top: 0,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.red,
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          constraints: const BoxConstraints(
-                                            minWidth: 18,
-                                            minHeight: 18,
-                                          ),
-                                          child: Text(
-                                            unreadCount > 99 ? '99+' : '$unreadCount',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 12),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const EditProfilePage(),
-                                ),
-                              );
-                            },
-                            child: CircleAvatar(
-                              radius: 24,
-                              backgroundColor: AppColors.primaryGold,
-                              backgroundImage: user?.photoUrl != null && user!.photoUrl!.isNotEmpty
-                                  ? NetworkImage(user.photoUrl!)
-                                  : null,
-                              child: user?.photoUrl == null || user!.photoUrl!.isEmpty
-                                  ? const Icon(Icons.person, color: Colors.white, size: 28)
-                                  : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                },
+                      ],
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -546,7 +495,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildRecentActivities(BuildContext context, bool isDark) {
-    final recentSermons = _sermons.take(2).toList();
+    final recentSermons = _sermons.take(10).toList();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),

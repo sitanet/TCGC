@@ -1,10 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../widgets/custom_app_bar.dart';
+import 'give_page.dart';
 
 class WalletPage extends StatelessWidget {
   const WalletPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<WalletProvider>(
+      builder: (context, walletProvider, child) {
+        if (walletProvider.hasWallet) {
+          return const GivePage();
+        }
+        return const _CreateWalletView();
+      },
+    );
+  }
+}
+
+class _CreateWalletView extends StatelessWidget {
+  const _CreateWalletView();
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +36,7 @@ class WalletPage extends StatelessWidget {
     final iconContainerSize = Responsive.value(context, mobile: 120.0, tablet: 150.0, desktop: 180.0);
     final iconSize = iconContainerSize * 0.5;
     final borderRadius = Responsive.borderRadius(context);
+    final walletProvider = context.watch<WalletProvider>();
 
     return Scaffold(
       appBar: const CustomAppBar(title: '', showBackButton: false),
@@ -30,7 +50,6 @@ class WalletPage extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(height: spacing * 2.5),
-                  // Wallet icon with gradient background
                   Container(
                     width: iconContainerSize,
                     height: iconContainerSize,
@@ -53,9 +72,8 @@ class WalletPage extends StatelessWidget {
                   ),
                   SizedBox(height: spacing * 2),
                   
-                  // Coming Soon text
                   Text(
-                    'Coming Soon',
+                    'TCGC Wallet',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: AppColors.primaryGold,
@@ -64,9 +82,8 @@ class WalletPage extends StatelessWidget {
                   ),
                   SizedBox(height: spacing),
                   
-                  // Description
                   Text(
-                    'The TCGC Wallet feature is currently under development. Soon you\'ll be able to manage your tithes, offerings, and donations right from the app.',
+                    'Create your TCGC Wallet to start giving. You\'ll be able to pay Tithes, Offerings, support projects, and more.',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: isDark 
@@ -78,7 +95,6 @@ class WalletPage extends StatelessWidget {
                   ),
                   SizedBox(height: spacing * 2.5),
                   
-                  // Features coming
                   Container(
                     padding: EdgeInsets.all(horizontalPadding * 1.25),
                     decoration: BoxDecoration(
@@ -88,18 +104,56 @@ class WalletPage extends StatelessWidget {
                     child: Column(
                       children: [
                         Text(
-                          'Features Coming',
+                          'What You Can Do',
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                             fontSize: Responsive.subtitleFontSize(context) * 0.85,
                           ),
                         ),
                         SizedBox(height: spacing),
-                        _buildFeatureItem(context, isDark, Icons.volunteer_activism, 'Tithes & Offerings'),
-                        _buildFeatureItem(context, isDark, Icons.card_giftcard, 'Special Donations'),
-                        _buildFeatureItem(context, isDark, Icons.history, 'Transaction History'),
-                        _buildFeatureItem(context, isDark, Icons.receipt_long, 'Digital Receipts'),
+                        _buildFeatureItem(context, isDark, Icons.volunteer_activism, 'Offering'),
+                        _buildFeatureItem(context, isDark, Icons.church, 'Tithe'),
+                        _buildFeatureItem(context, isDark, Icons.landscape, 'Project: Baba\'s Land'),
+                        _buildFeatureItem(context, isDark, Icons.account_tree, 'Branches'),
+                        _buildFeatureItem(context, isDark, Icons.card_giftcard, 'Special Offering'),
+                        _buildFeatureItem(context, isDark, Icons.people, 'Giving to Ministers'),
+                        _buildFeatureItem(context, isDark, Icons.stars, 'IMGC'),
                       ],
+                    ),
+                  ),
+                  SizedBox(height: spacing * 3),
+                  
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: walletProvider.isLoading 
+                          ? null 
+                          : () => _createWallet(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryGold,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(borderRadius),
+                        ),
+                        elevation: 2,
+                      ),
+                      child: walletProvider.isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              'Create Wallet',
+                              style: TextStyle(
+                                fontSize: bodyFontSize,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                   SizedBox(height: spacing * 6),
@@ -110,6 +164,20 @@ class WalletPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _createWallet(BuildContext context) async {
+    final walletProvider = context.read<WalletProvider>();
+    final success = await walletProvider.createWallet();
+    
+    if (success && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Wallet created successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   Widget _buildFeatureItem(BuildContext context, bool isDark, IconData icon, String text) {

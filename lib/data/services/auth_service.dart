@@ -156,14 +156,17 @@ class AuthService {
   }
 
   Future<AuthResult> updateProfile(Map<String, dynamic> data) async {
+    print('Update profile request data: $data');
     final response = await _api.patch(ApiConstants.userProfile, data);
+    
+    print('Update profile response: ${response.statusCode} - ${response.body}');
     
     if (response.isSuccess) {
       return AuthResult(success: true);
     }
     return AuthResult(
       success: false,
-      error: response.errorMessage ?? 'Update failed',
+      error: _parseErrorMessage(response),
     );
   }
 
