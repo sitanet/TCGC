@@ -284,7 +284,9 @@ class _AudioListItem extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Pastor Dimeji Elugbadebo - ${_formatTimeAgo(sermon.date)}',
+                    sermon.speaker != null && sermon.speaker!.isNotEmpty
+                        ? '${sermon.speaker} - ${_formatTimeAgo(sermon.date)}'
+                        : _formatTimeAgo(sermon.date),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: isDark
                               ? AppColors.textSecondaryDark

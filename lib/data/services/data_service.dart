@@ -206,6 +206,20 @@ class DataService {
     }
     return [];
   }
+  
+  Future<AppUpdateInfo?> checkForAppUpdate(String currentVersion, String platform) async {
+    final response = await _api.get(
+      '${ApiConstants.checkAppUpdate}?version=$currentVersion&platform=$platform'
+    );
+    if (response.isSuccess) {
+      try {
+        return AppUpdateInfo.fromJson(response.data);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
 }
 
 class WalletResult {
@@ -235,6 +249,38 @@ class GiveOption {
       name: json['name'] ?? '',
       description: json['description'],
       isActive: json['is_active'] ?? true,
+    );
+  }
+}
+
+class AppUpdateInfo {
+  final bool updateAvailable;
+  final bool forceUpdate;
+  final String currentVersion;
+  final String latestVersion;
+  final String minimumVersion;
+  final String updateMessage;
+  final String? updateUrl;
+
+  AppUpdateInfo({
+    required this.updateAvailable,
+    required this.forceUpdate,
+    required this.currentVersion,
+    required this.latestVersion,
+    required this.minimumVersion,
+    required this.updateMessage,
+    this.updateUrl,
+  });
+
+  factory AppUpdateInfo.fromJson(Map<String, dynamic> json) {
+    return AppUpdateInfo(
+      updateAvailable: json['update_available'] ?? false,
+      forceUpdate: json['force_update'] ?? false,
+      currentVersion: json['current_version'] ?? '',
+      latestVersion: json['latest_version'] ?? '',
+      minimumVersion: json['minimum_version'] ?? '',
+      updateMessage: json['update_message'] ?? '',
+      updateUrl: json['update_url'],
     );
   }
 }

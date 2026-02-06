@@ -357,7 +357,7 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> give(int giveOptionId, double amount) async {
+  Future<bool> give(int giveOptionId, double amount, String pin) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -366,6 +366,7 @@ class WalletProvider extends ChangeNotifier {
       final response = await _api.post(ApiConstants.walletGive, {
         'give_option': giveOptionId,
         'amount': amount,
+        'pin': pin,
       });
       
       if (response.isSuccess) {
@@ -384,6 +385,78 @@ class WalletProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error giving: $e');
       _error = 'Failed to process giving';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+  
+  Future<bool> checkHasPin() async {
+    try {
+      final response = await _api.get(ApiConstants.transactionPin);
+      if (response.isSuccess) {
+        return response.data['has_pin'] == true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error checking PIN status: $e');
+      return false;
+    }
+  }
+  
+  Future<bool> setTransactionPin(String pin, String confirmPin) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.post(ApiConstants.transactionPin, {
+        'pin': pin,
+        'confirm_pin': confirmPin,
+      });
+      
+      _isLoading = false;
+      if (response.isSuccess) {
+        notifyListeners();
+        return true;
+      }
+      
+      _error = response.errorMessage;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      debugPrint('Error setting PIN: $e');
+      _error = 'Failed to set transaction PIN';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+  
+  Future<bool> changeTransactionPin(String oldPin, String newPin, String confirmPin) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.post(ApiConstants.changeTransactionPin, {
+        'old_pin': oldPin,
+        'new_pin': newPin,
+        'confirm_pin': confirmPin,
+      });
+      
+      _isLoading = false;
+      if (response.isSuccess) {
+        notifyListeners();
+        return true;
+      }
+      
+      _error = response.errorMessage;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      debugPrint('Error changing PIN: $e');
+      _error = 'Failed to change transaction PIN';
       _isLoading = false;
       notifyListeners();
       return false;

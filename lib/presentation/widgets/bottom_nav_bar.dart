@@ -24,12 +24,12 @@ class BottomNavBar extends StatelessWidget {
         color: isDark ? AppColors.cardDark : Colors.white,
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
-          color: AppColors.primaryGold.withOpacity(0.3),
+          color: AppColors.primaryGold.withValues(alpha: 0.3),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -53,6 +53,7 @@ class BottomNavBar extends StatelessWidget {
 
   Widget _buildNavItem(BuildContext context, int index, String iconPath) {
     final isSelected = currentIndex == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final iconSize = Responsive.navIconSize(context);
     final spacing = Responsive.verticalSpacing(context);
     
@@ -63,15 +64,36 @@ class BottomNavBar extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: spacing * 0.75, vertical: spacing * 0.5),
         decoration: BoxDecoration(
           color: isSelected 
-              ? AppColors.primaryGold.withOpacity(0.1)
+              ? AppColors.primaryGold.withValues(alpha: 0.2)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(Responsive.borderRadius(context)),
+          border: isSelected
+              ? Border.all(color: AppColors.primaryGold, width: 1.5)
+              : null,
         ),
-        child: Image.asset(
-          iconPath,
-          width: iconSize,
-          height: iconSize,
-          color: AppColors.primaryGold,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              iconPath,
+              width: iconSize,
+              height: iconSize,
+              color: isSelected 
+                  ? AppColors.primaryGold 
+                  : (isDark ? Colors.grey[400] : Colors.grey[600]),
+            ),
+            if (isSelected) ...[
+              const SizedBox(height: 4),
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryGold,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

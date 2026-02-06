@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/app_colors.dart';
 import 'core/theme/theme_provider.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/notification_provider.dart';
@@ -21,8 +24,10 @@ import 'presentation/pages/auth/sign_up_page.dart';
 import 'presentation/widgets/bottom_nav_bar.dart';
 import 'presentation/widgets/mini_player.dart';
 import 'presentation/widgets/promotion_popup.dart';
-import 'data/services/data_service.dart';
+import 'data/services/data_service.dart' show DataService, AppUpdateInfo;
 import 'domain/entities/promotion.dart';
+
+const String appVersion = '1.0.0';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -207,8 +212,10 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   bool _showPromotion = false;
+  bool _showUpdateDialog = false;
   List<Promotion> _activePromotions = [];
   final DataService _dataService = DataService();
+  AppUpdateInfo? _updateInfo;
 
   final List<Widget> _pages = const [
     HomePage(),
@@ -222,6 +229,7 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _initializeWallet();
+    _checkForAppUpdate();
     _checkForPromotion();
   }
 
@@ -231,6 +239,29 @@ class _MainScreenState extends State<MainScreen> {
       await walletProvider.initialize();
     } catch (e) {
       debugPrint('Wallet initialization error: $e');
+    }
+  }
+  
+  Future<void> _checkForAppUpdate() async {
+    try {
+      String platform = 'all';
+      if (!kIsWeb) {
+        if (Platform.isAndroid) {
+          platform = 'android';
+        } else if (Platform.isIOS) {
+          platform = 'ios';
+        }
+      }
+      
+      final updateInfo = await _dataService.checkForAppUpdate(appVersion, platform);
+      if (updateInfo != null && updateInfo.updateAvailable && mounted) {
+        setState(() {
+          _updateInfo = updateInfo;
+          _showUpdateDialog = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Update check error: $e');
     }
   }
 
@@ -253,9 +284,108 @@ class _MainScreenState extends State<MainScreen> {
       _showPromotion = false;
     });
   }
+  
+  void _closeUpdateDialog() {
+    if (_updateInfo?.forceUpdate == true) {
+      return;
+    }
+    setState(() {
+      _showUpdateDialog = false;
+    });
+  }
+  
+  Future<void> _openUpdateUrl() async {
+    final url = _updateInfo?.updateUrl;
+    if (url != null && url.isNotEmpty) {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Show update dialog if available
+    if (_showUpdateDialog && _updateInfo != null) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.system_update,
+                  size: 80,
+                  color: AppColors.primaryGold,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Update Available',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Version ${_updateInfo!.latestVersion}',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    _updateInfo!.updateMessage,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _openUpdateUrl,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGold,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Update Now',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                if (!_updateInfo!.forceUpdate) ...[
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: _closeUpdateDialog,
+                    child: Text(
+                      'Later',
+                      style: TextStyle(
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    
     // Show promotion popup if active
     if (_showPromotion && _activePromotions.isNotEmpty) {
       return PromotionPopup(

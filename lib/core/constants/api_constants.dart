@@ -13,6 +13,8 @@ class ApiConstants {
   // User
   static const String userProfile = '/user/profile/';
   static const String changePassword = '/user/change-password/';
+  static const String transactionPin = '/user/transaction-pin/';
+  static const String changeTransactionPin = '/user/transaction-pin/change/';
   
   // Messages
   static const String messageCategories = '/message-categories/';
@@ -63,4 +65,7 @@ class ApiConstants {
   
   // Promotions
   static const String activePromotion = '/promotions/active/';
+  
+  // App Version
+  static const String checkAppUpdate = '/app/check-update/';
 }

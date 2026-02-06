@@ -2,6 +2,18 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../domain/entities/sermon.dart';
 
+String _stripHtmlTags(String htmlText) {
+  return htmlText
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .trim();
+}
+
 class SermonCard extends StatelessWidget {
   final Sermon sermon;
   final VoidCallback? onTap;
@@ -67,7 +79,7 @@ class SermonCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    sermon.description,
+                    _stripHtmlTags(sermon.description),
                     style: Theme.of(context).textTheme.bodySmall,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

@@ -10,6 +10,18 @@ import '../audio/audio_player_page.dart';
 import '../profile/profile_page.dart';
 import '../support/complaint_page.dart';
 
+String _stripHtmlTags(String htmlText) {
+  return htmlText
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .trim();
+}
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -619,7 +631,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    sermon.description,
+                    _stripHtmlTags(sermon.description),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: isDark
                               ? AppColors.textSecondaryDark

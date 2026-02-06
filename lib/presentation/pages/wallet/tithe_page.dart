@@ -32,13 +32,10 @@ class _TithePageState extends State<TithePage> {
       );
       return;
     }
-
-    setState(() => _isProcessing = true);
     
     final walletProvider = context.read<WalletProvider>();
     
     if (walletProvider.balance < amountValue) {
-      setState(() => _isProcessing = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -49,8 +46,162 @@ class _TithePageState extends State<TithePage> {
       }
       return;
     }
-
-    final success = await walletProvider.give(widget.giveOptionId, amountValue);
+    
+    // Check if user has PIN set
+    final hasPin = await walletProvider.checkHasPin();
+    if (!hasPin && mounted) {
+      _showSetPinDialog();
+      return;
+    }
+    
+    // Show PIN input dialog
+    if (mounted) {
+      _showPinDialog(amountValue);
+    }
+  }
+  
+  void _showSetPinDialog() {
+    final pinController = TextEditingController();
+    final confirmPinController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+        title: const Text('Set Transaction PIN'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('You need to set a transaction PIN before making payments.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: pinController,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Enter PIN (4-6 digits)',
+                counterText: '',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: confirmPinController,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Confirm PIN',
+                counterText: '',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (pinController.text.length < 4) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('PIN must be at least 4 digits')),
+                );
+                return;
+              }
+              if (pinController.text != confirmPinController.text) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('PINs do not match')),
+                );
+                return;
+              }
+              
+              final walletProvider = context.read<WalletProvider>();
+              final success = await walletProvider.setTransactionPin(
+                pinController.text,
+                confirmPinController.text,
+              );
+              
+              if (success && mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('PIN set successfully')),
+                );
+              } else if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(walletProvider.error ?? 'Failed to set PIN')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
+            child: const Text('Set PIN', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showPinDialog(double amountValue) {
+    final pinController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+        title: const Text('Enter Transaction PIN'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Amount: ₦$amount'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: pinController,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              obscureText: true,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'PIN',
+                counterText: '',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (pinController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter your PIN')),
+                );
+                return;
+              }
+              
+              Navigator.pop(dialogContext);
+              await _executePayment(amountValue, pinController.text);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
+            child: const Text('Confirm', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Future<void> _executePayment(double amountValue, String pin) async {
+    setState(() => _isProcessing = true);
+    
+    final walletProvider = context.read<WalletProvider>();
+    final success = await walletProvider.give(widget.giveOptionId, amountValue, pin);
     
     setState(() => _isProcessing = false);
     

@@ -4,6 +4,18 @@ import '../../../domain/entities/teens_content.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'teens_content_detail_page.dart';
 
+String _stripHtmlTags(String htmlText) {
+  return htmlText
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .trim();
+}
+
 class TeensContentListPage extends StatelessWidget {
   final String title;
   final List<TeensContent> contents;
@@ -195,7 +207,7 @@ class TeensContentListPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    content.description,
+                    _stripHtmlTags(content.description),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: isDark
                               ? AppColors.textSecondaryDark

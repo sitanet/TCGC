@@ -2,6 +2,7 @@ class Sermon {
   final String id;
   final String title;
   final String description;
+  final String? speaker;
   final String? imageUrl;
   final String? audioUrl;
   final String? videoUrl;
@@ -15,6 +16,7 @@ class Sermon {
     required this.id,
     required this.title,
     required this.description,
+    this.speaker,
     this.imageUrl,
     this.audioUrl,
     this.videoUrl,
@@ -37,6 +39,7 @@ class Sermon {
       id: json['id'].toString(),
       title: json['title'] ?? '',
       description: json['description'] ?? '',
+      speaker: json['speaker'],
       imageUrl: json['image_url'],
       audioUrl: json['audio_url'],
       videoUrl: json['video_url'],
