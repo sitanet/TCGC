@@ -14,8 +14,6 @@ class AuthService {
       'password': password,
     });
 
-    print('Login response: ${response.statusCode} - ${response.body}');
-
     if (response.isSuccess) {
       final data = response.data;
       await _api.saveTokens(data['access'], data['refresh']);
@@ -56,8 +54,6 @@ class AuthService {
       if (phoneNumber != null) 'phone_number': phoneNumber,
       if (countryCode != null) 'country_code': countryCode,
     });
-
-    print('Register response: ${response.statusCode} - ${response.body}');
 
     if (response.isSuccess) {
       return AuthResult(
@@ -140,15 +136,11 @@ class AuthService {
   Future<AppUser?> getProfile() async {
     final response = await _api.get(ApiConstants.userProfile);
     
-    print('Profile response: ${response.statusCode} - ${response.body}');
-    
     if (response.isSuccess) {
       try {
         final user = AppUser.fromJson(response.data);
-        print('User parsed: ${user.email}');
         return user;
       } catch (e) {
-        print('Error parsing user: $e');
         return null;
       }
     }
@@ -156,10 +148,7 @@ class AuthService {
   }
 
   Future<AuthResult> updateProfile(Map<String, dynamic> data) async {
-    print('Update profile request data: $data');
     final response = await _api.patch(ApiConstants.userProfile, data);
-    
-    print('Update profile response: ${response.statusCode} - ${response.body}');
     
     if (response.isSuccess) {
       return AuthResult(success: true);
