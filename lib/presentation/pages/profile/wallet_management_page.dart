@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/custom_app_bar.dart';
 
@@ -623,32 +624,58 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
 
   void _createWallet() async {
     if (_formKey.currentState?.validate() ?? false) {
-      // Get user before async gap
       final user = context.read<AuthProvider>().user;
+      final walletProvider = context.read<WalletProvider>();
       
       setState(() {
         _isLoading = true;
       });
 
-      // Simulated API call delay
-      await Future.delayed(const Duration(seconds: 2));
+      // Call the actual API with user data
+      final userData = {
+        'nin': _ninController.text,
+        'bvn': _bvnController.text,
+        'phone_number': user?.phoneNumber,
+        'date_of_birth': user?.dateOfBirth,
+        'address': user?.address,
+        'gender': user?.gender,
+      };
 
-      // Simulated wallet creation success
+      final success = await walletProvider.openWallet(userData);
+
       setState(() {
         _isLoading = false;
-        _hasWallet = true;
-        _walletAccountNumber = '9000123456';
-        _walletAccountName = user?.fullName ?? 'N/A';
-        _walletBalance = 0.00;
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Wallet created successfully!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        if (success) {
+          setState(() {
+            _hasWallet = true;
+            _walletAccountNumber = walletProvider.accountNumber;
+            _walletAccountName = walletProvider.accountName;
+            _walletBalance = walletProvider.balance;
+          });
+          
+          // Set transaction PIN after wallet creation
+          await walletProvider.setTransactionPin(
+            _transactionPinController.text,
+            _confirmPinController.text,
+          );
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Wallet created successfully!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(walletProvider.error ?? 'Failed to create wallet'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       }
     }
   }

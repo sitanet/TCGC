@@ -129,7 +129,12 @@ class _CreateWalletView extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: walletProvider.isLoading 
                           ? null 
-                          : () => _createWallet(context),
+                          : () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Creating wallet...'), duration: Duration(seconds: 1)),
+                              );
+                              _createWallet(context);
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryGold,
                         foregroundColor: Colors.white,
@@ -167,8 +172,11 @@ class _CreateWalletView extends StatelessWidget {
   }
 
   Future<void> _createWallet(BuildContext context) async {
+    print('Create wallet button pressed!'); // Debug
     final walletProvider = context.read<WalletProvider>();
+    print('isLoading: ${walletProvider.isLoading}'); // Debug
     final success = await walletProvider.createWallet();
+    print('Create wallet result: $success'); // Debug
     
     if (success && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

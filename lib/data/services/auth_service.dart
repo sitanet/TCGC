@@ -14,6 +14,9 @@ class AuthService {
       'password': password,
     });
 
+    // Debug: temporarily enabled to diagnose login issue
+    print('Login API response: ${response.statusCode} - ${response.body}');
+
     if (response.isSuccess) {
       final data = response.data;
       await _api.saveTokens(data['access'], data['refresh']);
@@ -83,6 +86,8 @@ class AuthService {
 
   String _parseErrorMessage(ApiResponse response) {
     try {
+      // Debug: temporarily enabled to diagnose login issue
+      print('Error response: ${response.statusCode} - ${response.body}');
       final data = response.data;
       
       // Handle detail message (common in DRF)

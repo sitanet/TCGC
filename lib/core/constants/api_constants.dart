@@ -45,6 +45,8 @@ class ApiConstants {
   static const String transactions = '/wallet/transactions/';
   static const String walletReport = '/wallet/report/';
   static const String givingReport = '/wallet/giving-report/';
+  static const String addMoney = '/wallet/add-money/';
+  static const String sendMoney = '/wallet/send-money/';
   
   // Giving
   static const String giveOptions = '/give-options/';
