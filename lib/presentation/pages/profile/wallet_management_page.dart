@@ -636,7 +636,7 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
         'nin': _ninController.text,
         'bvn': _bvnController.text,
         'phone_number': user?.phoneNumber,
-        'date_of_birth': user?.dateOfBirth,
+        'date_of_birth': user?.dateOfBirth?.toIso8601String().split('T').first, // Format as YYYY-MM-DD
         'address': user?.address,
         'gender': user?.gender,
       };

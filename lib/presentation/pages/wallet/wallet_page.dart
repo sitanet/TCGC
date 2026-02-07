@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
@@ -129,12 +130,7 @@ class _CreateWalletView extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: walletProvider.isLoading 
                           ? null 
-                          : () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Creating wallet...'), duration: Duration(seconds: 1)),
-                              );
-                              _createWallet(context);
-                            },
+                          : () => _createWallet(context),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryGold,
                         foregroundColor: Colors.white,
@@ -172,19 +168,66 @@ class _CreateWalletView extends StatelessWidget {
   }
 
   Future<void> _createWallet(BuildContext context) async {
-    print('Create wallet button pressed!'); // Debug
     final walletProvider = context.read<WalletProvider>();
-    print('isLoading: ${walletProvider.isLoading}'); // Debug
-    final success = await walletProvider.createWallet();
-    print('Create wallet result: $success'); // Debug
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.user;
     
-    if (success && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Wallet created successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+    // Check if user has required fields
+    if (user?.dateOfBirth == null || user?.phoneNumber == null || user?.address == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please update your profile with date of birth, phone number, and address before creating a wallet.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+    
+    // Check if user has NIN or BVN
+    if (user?.nin == null && user?.bvn == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please provide your NIN or BVN in your profile to create a wallet.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+    
+    // Pass user data to wallet creation
+    final userData = {
+      'phone_number': user!.phoneNumber,
+      'date_of_birth': user.dateOfBirth?.toIso8601String().split('T').first, // Format as YYYY-MM-DD
+      'address': user.address,
+      'gender': user.gender,
+      'nin': user.nin,
+      'bvn': user.bvn,
+    };
+    
+    final success = await walletProvider.openWallet(userData);
+    
+    if (context.mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Wallet created successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(walletProvider.error ?? 'Failed to create wallet'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

@@ -61,6 +61,8 @@ class AppUser {
       kcc: json['kcc'],
       department: json['department'],
       membershipStatus: json['membership_status'],
+      nin: json['nin'],
+      bvn: json['bvn'],
       address: json['address'],
       isOnline: json['is_online'] ?? false,
       role: json['role'] ?? 'user',
