@@ -61,15 +61,21 @@ class DataService {
     return [];
   }
 
-  // Get all unique speakers
-  Future<List<String>> getSpeakers() async {
+  // Get all speakers
+  Future<List<SpeakerModel>> getSpeakers() async {
     final response = await _api.get('${ApiConstants.messages}speakers/');
     if (response.isSuccess) {
       final data = response.data;
       final List<dynamic> speakers = data['speakers'] ?? [];
-      return speakers.map((s) => s.toString()).toList();
+      return speakers.map((s) => SpeakerModel.fromJson(s)).toList();
     }
     return [];
+  }
+  
+  // Get speaker names only (for filtering)
+  Future<List<String>> getSpeakerNames() async {
+    final speakers = await getSpeakers();
+    return speakers.map((s) => s.fullName).toList();
   }
 
   // Events
@@ -302,6 +308,38 @@ class AppUpdateInfo {
       minimumVersion: json['minimum_version'] ?? '',
       updateMessage: json['update_message'] ?? '',
       updateUrl: json['update_url'],
+    );
+  }
+}
+
+class SpeakerModel {
+  final int id;
+  final String name;
+  final String? title;
+  final String fullName;
+  final String? bio;
+  final String? photoUrl;
+  final bool isActive;
+
+  SpeakerModel({
+    required this.id,
+    required this.name,
+    this.title,
+    required this.fullName,
+    this.bio,
+    this.photoUrl,
+    this.isActive = true,
+  });
+
+  factory SpeakerModel.fromJson(Map<String, dynamic> json) {
+    return SpeakerModel(
+      id: json['id'],
+      name: json['name'] ?? '',
+      title: json['title'],
+      fullName: json['full_name'] ?? json['name'] ?? '',
+      bio: json['bio'],
+      photoUrl: json['photo_url'],
+      isActive: json['is_active'] ?? true,
     );
   }
 }
