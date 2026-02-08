@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../domain/entities/sermon.dart';
 
 AudioHandler? _audioHandler;
@@ -48,6 +50,9 @@ class AudioPlayerProvider extends ChangeNotifier {
   // Fallback player when audio_service fails
   AudioPlayer? _fallbackPlayer;
   bool _usingFallback = false;
+  
+  // Audio caching
+  Directory? _cacheDir;
 
   Sermon? get currentSermon => _currentSermon;
   Duration get duration => _duration;
@@ -59,6 +64,24 @@ class AudioPlayerProvider extends ChangeNotifier {
 
   AudioPlayerProvider() {
     _setupListeners();
+    _initCacheDir();
+  }
+  
+  Future<void> _initCacheDir() async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      _cacheDir = Directory('${appDir.path}/audio_cache');
+      if (!await _cacheDir!.exists()) {
+        await _cacheDir!.create(recursive: true);
+      }
+      debugPrint('Audio cache directory: ${_cacheDir!.path}');
+    } catch (e) {
+      debugPrint('Failed to create cache directory: $e');
+    }
+  }
+  
+  String _sanitizeFileName(String id) {
+    return id.replaceAll(RegExp(r'[^\w\-]'), '_');
   }
 
   void _setupListeners() {
@@ -144,8 +167,25 @@ class AudioPlayerProvider extends ChangeNotifier {
 
     try {
       if (_usingFallback && _fallbackPlayer != null) {
-        // Use fallback player
-        await _fallbackPlayer!.setUrl(audioUrl);
+        // Use fallback player with caching
+        if (_cacheDir != null) {
+          final fileName = _sanitizeFileName(sermon.id);
+          final cacheFile = File('${_cacheDir!.path}/$fileName.mp3');
+          
+          if (await cacheFile.exists()) {
+            debugPrint('Playing from cache: ${cacheFile.path}');
+            await _fallbackPlayer!.setFilePath(cacheFile.path);
+          } else {
+            debugPrint('Streaming with caching: $audioUrl');
+            final source = LockCachingAudioSource(
+              Uri.parse(audioUrl),
+              cacheFile: cacheFile,
+            );
+            await _fallbackPlayer!.setAudioSource(source);
+          }
+        } else {
+          await _fallbackPlayer!.setUrl(audioUrl);
+        }
         await _fallbackPlayer!.play();
       } else if (_audioHandler != null) {
         // Use audio_service
@@ -224,6 +264,60 @@ class AudioPlayerProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> isSermonCached(String sermonId) async {
+    if (_cacheDir == null) return false;
+    final fileName = _sanitizeFileName(sermonId);
+    final cacheFile = File('${_cacheDir!.path}/$fileName.mp3');
+    return cacheFile.exists();
+  }
+  
+  Future<int> getCacheSize() async {
+    if (_cacheDir == null) return 0;
+    int totalSize = 0;
+    try {
+      if (await _cacheDir!.exists()) {
+        await for (var entity in _cacheDir!.list()) {
+          if (entity is File) {
+            totalSize += await entity.length();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error calculating cache size: $e');
+    }
+    return totalSize;
+  }
+  
+  Future<void> clearCache() async {
+    if (_cacheDir == null) return;
+    try {
+      if (await _cacheDir!.exists()) {
+        await for (var entity in _cacheDir!.list()) {
+          if (entity is File) {
+            await entity.delete();
+          }
+        }
+      }
+      debugPrint('Audio cache cleared');
+    } catch (e) {
+      debugPrint('Error clearing cache: $e');
+    }
+  }
+  
+  Future<void> deleteCachedSermon(String sermonId) async {
+    if (_cacheDir == null) return;
+    try {
+      final fileName = _sanitizeFileName(sermonId);
+      final cacheFile = File('${_cacheDir!.path}/$fileName.mp3');
+      if (await cacheFile.exists()) {
+        await cacheFile.delete();
+        debugPrint('Deleted cached sermon: $sermonId');
+      }
+    } catch (e) {
+      debugPrint('Error deleting cached sermon: $e');
+    }
+  }
+
   @override
   void dispose() {
     if (_usingFallback && _fallbackPlayer != null) {
@@ -237,8 +331,10 @@ class AudioPlayerProvider extends ChangeNotifier {
 
 class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   final _player = AudioPlayer();
+  Directory? _cacheDir;
 
   AudioPlayerHandler() {
+    _initCacheDir();
     _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
     
     _player.durationStream.listen((duration) {
@@ -247,6 +343,18 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
         mediaItem.add(item.copyWith(duration: duration));
       }
     });
+  }
+  
+  Future<void> _initCacheDir() async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      _cacheDir = Directory('${appDir.path}/audio_cache');
+      if (!await _cacheDir!.exists()) {
+        await _cacheDir!.create(recursive: true);
+      }
+    } catch (e) {
+      debugPrint('Failed to create cache directory: $e');
+    }
   }
 
   PlaybackState _transformEvent(PlaybackEvent event) {
@@ -283,9 +391,39 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     mediaItem.add(item);
     final url = item.extras?['url'] as String?;
     if (url != null) {
-      await _player.setUrl(url);
-      await _player.play();
+      try {
+        // Use caching audio source for faster playback and offline support
+        if (_cacheDir != null) {
+          final fileName = _sanitizeFileName(item.id);
+          final cacheFile = File('${_cacheDir!.path}/$fileName.mp3');
+          
+          // Check if already cached
+          if (await cacheFile.exists()) {
+            debugPrint('Playing from cache: ${cacheFile.path}');
+            await _player.setFilePath(cacheFile.path);
+          } else {
+            debugPrint('Streaming with caching: $url');
+            final source = LockCachingAudioSource(
+              Uri.parse(url),
+              cacheFile: cacheFile,
+            );
+            await _player.setAudioSource(source);
+          }
+        } else {
+          await _player.setUrl(url);
+        }
+        await _player.play();
+      } catch (e) {
+        debugPrint('Error setting audio source: $e');
+        // Fallback to direct URL
+        await _player.setUrl(url);
+        await _player.play();
+      }
     }
+  }
+  
+  String _sanitizeFileName(String id) {
+    return id.replaceAll(RegExp(r'[^\w\-]'), '_');
   }
 
   @override
