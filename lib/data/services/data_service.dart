@@ -51,6 +51,27 @@ class DataService {
     return [];
   }
 
+  // Get messages by speaker
+  Future<List<Sermon>> getMessagesBySpeaker(String speaker) async {
+    final response = await _api.get('${ApiConstants.messages}by_speaker/?speaker=$speaker');
+    if (response.isSuccess) {
+      final List<dynamic> data = response.dataList;
+      return data.map((json) => Sermon.fromJson(json)).toList();
+    }
+    return [];
+  }
+
+  // Get all unique speakers
+  Future<List<String>> getSpeakers() async {
+    final response = await _api.get('${ApiConstants.messages}speakers/');
+    if (response.isSuccess) {
+      final data = response.data;
+      final List<dynamic> speakers = data['speakers'] ?? [];
+      return speakers.map((s) => s.toString()).toList();
+    }
+    return [];
+  }
+
   // Events
   Future<List<Event>> getEvents() async {
     final response = await _api.get(ApiConstants.events);

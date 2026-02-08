@@ -1,9 +1,10 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_player_page.dart';
+
+enum FilterType { category, speaker }
 
 class AudioListPage extends StatefulWidget {
   final String category;
@@ -11,6 +12,8 @@ class AudioListPage extends StatefulWidget {
   final List<Sermon> audioItems;
   final List<String> categories;
   final Map<String, String>? categoryNameToId;
+  final FilterType initialFilterType;
+  final String? initialSpeaker;
 
   const AudioListPage({
     super.key,
@@ -19,6 +22,8 @@ class AudioListPage extends StatefulWidget {
     required this.audioItems,
     required this.categories,
     this.categoryNameToId,
+    this.initialFilterType = FilterType.category,
+    this.initialSpeaker,
   });
 
   @override
@@ -30,14 +35,30 @@ class _AudioListPageState extends State<AudioListPage> {
   List<Sermon> _filteredItems = [];
   late String _selectedCategory;
   late String? _selectedCategoryId;
+  late FilterType _filterType;
+  String? _selectedSpeaker;
+  List<String> _speakers = [];
 
   @override
   void initState() {
     super.initState();
     _selectedCategory = widget.category;
     _selectedCategoryId = widget.categoryId;
+    _filterType = widget.initialFilterType;
+    _selectedSpeaker = widget.initialSpeaker;
+    _extractSpeakers();
     _filteredItems = _getFilteredItems('');
     _searchController.addListener(_filterAudio);
+  }
+
+  void _extractSpeakers() {
+    final speakerSet = <String>{};
+    for (var audio in widget.audioItems) {
+      if (audio.speaker != null && audio.speaker!.isNotEmpty) {
+        speakerSet.add(audio.speaker!);
+      }
+    }
+    _speakers = speakerSet.toList()..sort();
   }
 
   @override
@@ -54,32 +75,45 @@ class _AudioListPageState extends State<AudioListPage> {
   }
 
   List<Sermon> _getFilteredItems(String query) {
-    debugPrint('Filtering: category=$_selectedCategory, categoryId=$_selectedCategoryId');
+    debugPrint('Filtering: filterType=$_filterType, category=$_selectedCategory, speaker=$_selectedSpeaker');
     debugPrint('Total audio items: ${widget.audioItems.length}');
     
     final filtered = widget.audioItems.where((audio) {
-      bool matchesCategory = _selectedCategory == 'All';
+      bool matchesFilter = false;
       
-      if (!matchesCategory) {
-        // Try matching by category ID first
-        if (_selectedCategoryId != null && _selectedCategoryId!.isNotEmpty) {
-          matchesCategory = audio.category == _selectedCategoryId;
+      if (_filterType == FilterType.speaker) {
+        // Filter by speaker
+        if (_selectedSpeaker == null || _selectedSpeaker == 'All') {
+          matchesFilter = true;
+        } else {
+          matchesFilter = audio.speaker?.toLowerCase() == _selectedSpeaker?.toLowerCase();
         }
-        // Also try matching by category name
-        if (!matchesCategory && audio.categoryName.isNotEmpty) {
-          matchesCategory = audio.categoryName.toLowerCase() == _selectedCategory.toLowerCase();
-        }
-        // Last resort: try matching category field against name
-        if (!matchesCategory) {
-          matchesCategory = audio.category.toLowerCase() == _selectedCategory.toLowerCase();
+      } else {
+        // Filter by category
+        matchesFilter = _selectedCategory == 'All';
+        
+        if (!matchesFilter) {
+          // Try matching by category ID first
+          if (_selectedCategoryId != null && _selectedCategoryId!.isNotEmpty) {
+            matchesFilter = audio.category == _selectedCategoryId;
+          }
+          // Also try matching by category name
+          if (!matchesFilter && audio.categoryName.isNotEmpty) {
+            matchesFilter = audio.categoryName.toLowerCase() == _selectedCategory.toLowerCase();
+          }
+          // Last resort: try matching category field against name
+          if (!matchesFilter) {
+            matchesFilter = audio.category.toLowerCase() == _selectedCategory.toLowerCase();
+          }
         }
       }
       
       final matchesSearch = query.isEmpty ||
           audio.title.toLowerCase().contains(query) ||
-          audio.description.toLowerCase().contains(query);
+          audio.description.toLowerCase().contains(query) ||
+          (audio.speaker?.toLowerCase().contains(query) ?? false);
       
-      return matchesCategory && matchesSearch;
+      return matchesFilter && matchesSearch;
     }).toList();
     
     debugPrint('Filtered items: ${filtered.length}');
@@ -89,8 +123,21 @@ class _AudioListPageState extends State<AudioListPage> {
   void _selectCategory(String category) {
     final query = _searchController.text.toLowerCase();
     setState(() {
+      _filterType = FilterType.category;
       _selectedCategory = category;
       _selectedCategoryId = widget.categoryNameToId?[category];
+      _selectedSpeaker = null;
+      _filteredItems = _getFilteredItems(query);
+    });
+  }
+
+  void _selectSpeaker(String speaker) {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filterType = FilterType.speaker;
+      _selectedSpeaker = speaker == 'All' ? null : speaker;
+      _selectedCategory = 'All';
+      _selectedCategoryId = null;
       _filteredItems = _getFilteredItems(query);
     });
   }
@@ -117,7 +164,7 @@ class _AudioListPageState extends State<AudioListPage> {
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: '',
+                  hintText: 'Search by title or speaker...',
                   prefixIcon: Icon(
                     Icons.search,
                     color: isDark
@@ -131,34 +178,24 @@ class _AudioListPageState extends State<AudioListPage> {
               ),
             ),
           ),
+          // Filter type toggle
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                _buildFilterToggle('Category', FilterType.category, isDark),
+                const SizedBox(width: 12),
+                _buildFilterToggle('Speaker', FilterType.speaker, isDark),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Category or Speaker filter list
           SizedBox(
             height: 32,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: widget.categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 16),
-              itemBuilder: (context, index) {
-                final category = widget.categories[index];
-                final isSelected = category == _selectedCategory;
-                return GestureDetector(
-                  onTap: () => _selectCategory(category),
-                  child: Text(
-                    category,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.w400,
-                      color: isSelected
-                          ? AppColors.maroon
-                          : (isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight),
-                    ),
-                  ),
-                );
-              },
-            ),
+            child: _filterType == FilterType.category
+                ? _buildCategoryFilterList(isDark)
+                : _buildSpeakerFilterList(isDark),
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -193,6 +230,117 @@ class _AudioListPageState extends State<AudioListPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFilterToggle(String label, FilterType type, bool isDark) {
+    final isSelected = _filterType == type;
+    return GestureDetector(
+      onTap: () {
+        if (_filterType != type) {
+          setState(() {
+            _filterType = type;
+            if (type == FilterType.speaker) {
+              _selectedSpeaker = null;
+            } else {
+              _selectedCategory = widget.category;
+              _selectedCategoryId = widget.categoryId;
+            }
+            _filteredItems = _getFilteredItems(_searchController.text.toLowerCase());
+          });
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? AppColors.primaryGold 
+              : (isDark ? AppColors.cardDark : Colors.white),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected 
+                ? AppColors.primaryGold 
+                : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            color: isSelected 
+                ? Colors.white 
+                : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryFilterList(bool isDark) {
+    return ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: widget.categories.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 16),
+      itemBuilder: (context, index) {
+        final category = widget.categories[index];
+        final isSelected = category == _selectedCategory && _filterType == FilterType.category;
+        return GestureDetector(
+          onTap: () => _selectCategory(category),
+          child: Text(
+            category,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: isSelected
+                  ? AppColors.maroon
+                  : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSpeakerFilterList(bool isDark) {
+    if (_speakers.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Text(
+          'No speakers available',
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          ),
+        ),
+      );
+    }
+
+    final speakersWithAll = ['All', ..._speakers];
+    return ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: speakersWithAll.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 16),
+      itemBuilder: (context, index) {
+        final speaker = speakersWithAll[index];
+        final isSelected = (speaker == 'All' && _selectedSpeaker == null) ||
+            speaker == _selectedSpeaker;
+        return GestureDetector(
+          onTap: () => _selectSpeaker(speaker == 'All' ? 'All' : speaker),
+          child: Text(
+            speaker,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: isSelected
+                  ? AppColors.maroon
+                  : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+            ),
+          ),
+        );
+      },
     );
   }
 }
