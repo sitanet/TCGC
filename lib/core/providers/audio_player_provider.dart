@@ -176,11 +176,14 @@ class AudioPlayerProvider extends ChangeNotifier {
       return;
     }
     
-    debugPrint('Playing audio from: $audioUrl');
+    debugPrint('=== AUDIO DEBUG ===');
+    debugPrint('Audio URL: $audioUrl');
+    debugPrint('Sermon ID: ${sermon.id}');
+    debugPrint('Using fallback: $_usingFallback');
 
     try {
       if (_usingFallback && _fallbackPlayer != null) {
-        // Use fallback player with caching
+        // Use caching for faster subsequent plays
         if (_cacheDir != null) {
           final fileName = _sanitizeFileName(sermon.id);
           final ext = _getFileExtension(audioUrl);
@@ -190,7 +193,7 @@ class AudioPlayerProvider extends ChangeNotifier {
             debugPrint('Playing from cache: ${cacheFile.path}');
             await _fallbackPlayer!.setFilePath(cacheFile.path);
           } else {
-            debugPrint('Streaming with caching: $audioUrl');
+            debugPrint('Streaming and caching: $audioUrl');
             final source = LockCachingAudioSource(
               Uri.parse(audioUrl),
               cacheFile: cacheFile,
@@ -216,10 +219,13 @@ class AudioPlayerProvider extends ChangeNotifier {
       }
       _isLoading = false;
       notifyListeners();
-    } catch (e) {
+    } catch (e, stackTrace) {
       _isLoading = false;
       _errorMessage = 'Failed to load audio: $e';
-      debugPrint('Audio playback error: $e');
+      debugPrint('=== AUDIO ERROR ===');
+      debugPrint('Error: $e');
+      debugPrint('Stack: $stackTrace');
+      debugPrint('URL was: $audioUrl');
       notifyListeners();
     }
   }
@@ -420,6 +426,10 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     }
     return '.audio';
   }
+  
+  String _sanitizeFileName(String id) {
+    return id.replaceAll(RegExp(r'[^\w\-]'), '_');
+  }
 
   @override
   Future<void> playMediaItem(MediaItem item) async {
@@ -427,18 +437,16 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     final url = item.extras?['url'] as String?;
     if (url != null) {
       try {
-        // Use caching audio source for faster playback and offline support
         if (_cacheDir != null) {
           final fileName = _sanitizeFileName(item.id);
           final ext = _getFileExtension(url);
           final cacheFile = File('${_cacheDir!.path}/$fileName$ext');
           
-          // Check if already cached
           if (await cacheFile.exists()) {
             debugPrint('Playing from cache: ${cacheFile.path}');
             await _player.setFilePath(cacheFile.path);
           } else {
-            debugPrint('Streaming with caching: $url');
+            debugPrint('Streaming and caching: $url');
             final source = LockCachingAudioSource(
               Uri.parse(url),
               cacheFile: cacheFile,
@@ -451,15 +459,9 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
         await _player.play();
       } catch (e) {
         debugPrint('Error setting audio source: $e');
-        // Fallback to direct URL
-        await _player.setUrl(url);
-        await _player.play();
+        rethrow;
       }
     }
-  }
-  
-  String _sanitizeFileName(String id) {
-    return id.replaceAll(RegExp(r'[^\w\-]'), '_');
   }
 
   @override
