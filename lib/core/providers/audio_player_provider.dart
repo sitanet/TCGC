@@ -83,6 +83,19 @@ class AudioPlayerProvider extends ChangeNotifier {
   String _sanitizeFileName(String id) {
     return id.replaceAll(RegExp(r'[^\w\-]'), '_');
   }
+  
+  String _getFileExtension(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri != null && uri.path.isNotEmpty) {
+      final path = uri.path.toLowerCase();
+      if (path.endsWith('.ogg')) return '.ogg';
+      if (path.endsWith('.mp3')) return '.mp3';
+      if (path.endsWith('.wav')) return '.wav';
+      if (path.endsWith('.m4a')) return '.m4a';
+      if (path.endsWith('.aac')) return '.aac';
+    }
+    return '.audio';
+  }
 
   void _setupListeners() {
     if (_audioServiceInitialized && _audioHandler != null && !_listenersSetup) {
@@ -170,7 +183,8 @@ class AudioPlayerProvider extends ChangeNotifier {
         // Use fallback player with caching
         if (_cacheDir != null) {
           final fileName = _sanitizeFileName(sermon.id);
-          final cacheFile = File('${_cacheDir!.path}/$fileName.mp3');
+          final ext = _getFileExtension(audioUrl);
+          final cacheFile = File('${_cacheDir!.path}/$fileName$ext');
           
           if (await cacheFile.exists()) {
             debugPrint('Playing from cache: ${cacheFile.path}');
@@ -267,8 +281,13 @@ class AudioPlayerProvider extends ChangeNotifier {
   Future<bool> isSermonCached(String sermonId) async {
     if (_cacheDir == null) return false;
     final fileName = _sanitizeFileName(sermonId);
-    final cacheFile = File('${_cacheDir!.path}/$fileName.mp3');
-    return cacheFile.exists();
+    // Check for any audio extension
+    final extensions = ['.ogg', '.mp3', '.wav', '.m4a', '.aac', '.audio'];
+    for (final ext in extensions) {
+      final cacheFile = File('${_cacheDir!.path}/$fileName$ext');
+      if (await cacheFile.exists()) return true;
+    }
+    return false;
   }
   
   Future<int> getCacheSize() async {
@@ -308,10 +327,13 @@ class AudioPlayerProvider extends ChangeNotifier {
     if (_cacheDir == null) return;
     try {
       final fileName = _sanitizeFileName(sermonId);
-      final cacheFile = File('${_cacheDir!.path}/$fileName.mp3');
-      if (await cacheFile.exists()) {
-        await cacheFile.delete();
-        debugPrint('Deleted cached sermon: $sermonId');
+      final extensions = ['.ogg', '.mp3', '.wav', '.m4a', '.aac', '.audio'];
+      for (final ext in extensions) {
+        final cacheFile = File('${_cacheDir!.path}/$fileName$ext');
+        if (await cacheFile.exists()) {
+          await cacheFile.delete();
+          debugPrint('Deleted cached sermon: $sermonId');
+        }
       }
     } catch (e) {
       debugPrint('Error deleting cached sermon: $e');
@@ -386,6 +408,19 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     );
   }
 
+  String _getFileExtension(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri != null && uri.path.isNotEmpty) {
+      final path = uri.path.toLowerCase();
+      if (path.endsWith('.ogg')) return '.ogg';
+      if (path.endsWith('.mp3')) return '.mp3';
+      if (path.endsWith('.wav')) return '.wav';
+      if (path.endsWith('.m4a')) return '.m4a';
+      if (path.endsWith('.aac')) return '.aac';
+    }
+    return '.audio';
+  }
+
   @override
   Future<void> playMediaItem(MediaItem item) async {
     mediaItem.add(item);
@@ -395,7 +430,8 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
         // Use caching audio source for faster playback and offline support
         if (_cacheDir != null) {
           final fileName = _sanitizeFileName(item.id);
-          final cacheFile = File('${_cacheDir!.path}/$fileName.mp3');
+          final ext = _getFileExtension(url);
+          final cacheFile = File('${_cacheDir!.path}/$fileName$ext');
           
           // Check if already cached
           if (await cacheFile.exists()) {
