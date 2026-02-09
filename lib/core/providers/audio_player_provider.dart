@@ -19,9 +19,10 @@ Future<void> initAudioService() async {
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.tcgc.app.audio',
         androidNotificationChannelName: 'TCGC Audio',
-        androidNotificationOngoing: true,
-        androidStopForegroundOnPause: true,
-        androidNotificationIcon: 'mipmap/ic_launcher',
+        androidNotificationOngoing: false,
+        androidStopForegroundOnPause: false,
+        androidNotificationIcon: 'drawable/ic_notification',
+        androidResumeOnClick: true,
         androidShowNotificationBadge: true,
         notificationColor: Color(0xFFD4A84B),
       ),
@@ -183,6 +184,11 @@ class AudioPlayerProvider extends ChangeNotifier {
 
     try {
       if (_usingFallback && _fallbackPlayer != null) {
+        // Ensure cache dir is ready
+        if (_cacheDir == null) {
+          await _initCacheDir();
+        }
+        
         // Use caching for faster subsequent plays
         if (_cacheDir != null) {
           final fileName = _sanitizeFileName(sermon.id);
@@ -194,11 +200,16 @@ class AudioPlayerProvider extends ChangeNotifier {
             await _fallbackPlayer!.setFilePath(cacheFile.path);
           } else {
             debugPrint('Streaming and caching: $audioUrl');
-            final source = LockCachingAudioSource(
-              Uri.parse(audioUrl),
-              cacheFile: cacheFile,
-            );
-            await _fallbackPlayer!.setAudioSource(source);
+            try {
+              final source = LockCachingAudioSource(
+                Uri.parse(audioUrl),
+                cacheFile: cacheFile,
+              );
+              await _fallbackPlayer!.setAudioSource(source);
+            } catch (cacheError) {
+              debugPrint('Cache error, falling back to direct URL: $cacheError');
+              await _fallbackPlayer!.setUrl(audioUrl);
+            }
           }
         } else {
           await _fallbackPlayer!.setUrl(audioUrl);
@@ -437,6 +448,11 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     final url = item.extras?['url'] as String?;
     if (url != null) {
       try {
+        // Ensure cache dir is ready
+        if (_cacheDir == null) {
+          await _initCacheDir();
+        }
+        
         if (_cacheDir != null) {
           final fileName = _sanitizeFileName(item.id);
           final ext = _getFileExtension(url);
@@ -454,12 +470,21 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
             await _player.setAudioSource(source);
           }
         } else {
+          debugPrint('No cache dir, streaming directly: $url');
           await _player.setUrl(url);
         }
         await _player.play();
       } catch (e) {
         debugPrint('Error setting audio source: $e');
-        rethrow;
+        // Fallback to direct URL if caching fails
+        try {
+          debugPrint('Fallback: trying direct URL without caching');
+          await _player.setUrl(url);
+          await _player.play();
+        } catch (e2) {
+          debugPrint('Fallback also failed: $e2');
+          rethrow;
+        }
       }
     }
   }

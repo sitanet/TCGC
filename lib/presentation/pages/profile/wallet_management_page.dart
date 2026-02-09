@@ -334,7 +334,7 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
               _buildSectionTitle(context, 'Verification Information'),
               const SizedBox(height: 8),
               Text(
-                'Required for wallet creation in Nigeria',
+                'Provide either NIN or BVN for wallet creation',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: isDark
                           ? AppColors.textSecondaryDark
@@ -357,16 +357,28 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'NIN is required';
+                  if ((value == null || value.isEmpty) && 
+                      (_bvnController.text.isEmpty)) {
+                    return 'Either NIN or BVN is required';
                   }
-                  if (value.length != 11) {
+                  if (value != null && value.isNotEmpty && value.length != 11) {
                     return 'NIN must be 11 digits';
                   }
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
+              Text(
+                'OR',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                      fontWeight: FontWeight.w600,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
               _buildSecureTextField(
                 controller: _bvnController,
                 label: 'BVN (Bank Verification Number)',
@@ -382,10 +394,11 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'BVN is required';
+                  if ((value == null || value.isEmpty) && 
+                      (_ninController.text.isEmpty)) {
+                    return 'Either NIN or BVN is required';
                   }
-                  if (value.length != 11) {
+                  if (value != null && value.isNotEmpty && value.length != 11) {
                     return 'BVN must be 11 digits';
                   }
                   return null;
