@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/audio_player_provider.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_player_page.dart';
@@ -32,12 +34,14 @@ class AudioListPage extends StatefulWidget {
 
 class _AudioListPageState extends State<AudioListPage> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   List<Sermon> _filteredItems = [];
   late String _selectedCategory;
   late String? _selectedCategoryId;
   late FilterType _filterType;
   String? _selectedSpeaker;
   List<String> _speakers = [];
+  int _preBufferedUpTo = 0; // Track how many items have been pre-buffered
 
   @override
   void initState() {
@@ -49,6 +53,36 @@ class _AudioListPageState extends State<AudioListPage> {
     _extractSpeakers();
     _filteredItems = _getFilteredItems('');
     _searchController.addListener(_filterAudio);
+    _scrollController.addListener(_onScroll);
+    
+    // Pre-buffer audio files for instant playback immediately
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _preBufferInitial();
+    });
+  }
+  
+  void _preBufferInitial() {
+    final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+    // Pre-buffer first 20 items (~3 min each) for instant playback
+    audioProvider.preBufferSermons(_filteredItems, count: 20);
+    _preBufferedUpTo = 20;
+  }
+  
+  void _onScroll() {
+    // Check if we're near the end of the list
+    if (_scrollController.position.pixels >= 
+        _scrollController.position.maxScrollExtent - 200) {
+      _preBufferMore();
+    }
+  }
+  
+  void _preBufferMore() {
+    if (_preBufferedUpTo >= _filteredItems.length) return;
+    
+    final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+    // Pre-buffer next 10 items when user scrolls near the end
+    audioProvider.preBufferMore(_filteredItems, _preBufferedUpTo, count: 10);
+    _preBufferedUpTo += 10;
   }
 
   void _extractSpeakers() {
@@ -64,6 +98,7 @@ class _AudioListPageState extends State<AudioListPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -210,20 +245,31 @@ class _AudioListPageState extends State<AudioListPage> {
                           ),
                     ),
                   )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: _filteredItems.length,
-                    itemBuilder: (context, index) {
-                      final audio = _filteredItems[index];
-                      return _AudioListItem(
-                        sermon: audio,
-                        isDark: isDark,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => AudioPlayerPage(sermon: audio),
-                          ),
-                        ),
+                : Consumer<AudioPlayerProvider>(
+                    builder: (context, audioProvider, child) {
+                      return ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: _filteredItems.length,
+                        itemBuilder: (context, index) {
+                          final audio = _filteredItems[index];
+                          final isPreBuffered = audioProvider.isPreBuffered(audio.id);
+                          final isBuffering = audioProvider.isBuffering(audio.id);
+                          final bufferProgress = audioProvider.getBufferProgress(audio.id);
+                          return _AudioListItem(
+                            sermon: audio,
+                            isDark: isDark,
+                            isPreBuffered: isPreBuffered,
+                            isBuffering: isBuffering,
+                            bufferProgress: bufferProgress,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AudioPlayerPage(sermon: audio),
+                              ),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -349,11 +395,17 @@ class _AudioListItem extends StatelessWidget {
   final Sermon sermon;
   final bool isDark;
   final VoidCallback? onTap;
+  final bool isPreBuffered;
+  final bool isBuffering;
+  final double bufferProgress;
 
   const _AudioListItem({
     required this.sermon,
     required this.isDark,
     this.onTap,
+    this.isPreBuffered = false,
+    this.isBuffering = false,
+    this.bufferProgress = 0.0,
   });
 
   Widget _buildImage(bool isDark) {
@@ -407,14 +459,65 @@ class _AudioListItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                width: 50,
-                height: 50,
-                color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-                child: _buildImage(isDark),
-              ),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 50,
+                    height: 50,
+                    color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                    child: _buildImage(isDark),
+                  ),
+                ),
+                // Buffering progress indicator
+                if (isBuffering && !isPreBuffered)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.3),
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(8),
+                          bottomRight: Radius.circular(8),
+                        ),
+                      ),
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: bufferProgress,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGold,
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                // Ready indicator for pre-buffered audio (3 min ready)
+                if (isPreBuffered)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(
+                        Icons.bolt,
+                        size: 10,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 16),
             Expanded(

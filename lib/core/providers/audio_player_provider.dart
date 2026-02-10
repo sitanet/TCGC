@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../domain/entities/sermon.dart';
+import '../../data/services/audio_cache_service.dart';
 
 AudioHandler? _audioHandler;
 bool _audioServiceInitialized = false;
@@ -54,6 +55,9 @@ class AudioPlayerProvider extends ChangeNotifier {
   
   // Audio caching
   Directory? _cacheDir;
+  
+  // Pre-buffering service for instant playback
+  final AudioCacheService _audioCacheService = AudioCacheService();
 
   Sermon? get currentSermon => _currentSermon;
   Duration get duration => _duration;
@@ -66,6 +70,32 @@ class AudioPlayerProvider extends ChangeNotifier {
   AudioPlayerProvider() {
     _setupListeners();
     _initCacheDir();
+    _audioCacheService.initialize();
+  }
+  
+  /// Pre-buffer sermons for instant playback when user opens a category
+  Future<void> preBufferSermons(List<Sermon> sermons, {int count = 20}) async {
+    await _audioCacheService.preBufferCategory(sermons, count: count);
+  }
+  
+  /// Pre-buffer more sermons when user scrolls (infinite scroll)
+  Future<void> preBufferMore(List<Sermon> sermons, int startIndex, {int count = 10}) async {
+    await _audioCacheService.preBufferMore(sermons, startIndex, count: count);
+  }
+  
+  /// Check if a sermon is pre-buffered for instant playback
+  bool isPreBuffered(String sermonId) {
+    return _audioCacheService.isPreBuffered(sermonId);
+  }
+  
+  /// Get buffering progress for a sermon (0.0 to 1.0)
+  double getBufferProgress(String sermonId) {
+    return _audioCacheService.getBufferProgress(sermonId);
+  }
+  
+  /// Check if buffering is in progress for a sermon
+  bool isBuffering(String sermonId) {
+    return _audioCacheService.isBuffering(sermonId);
   }
   
   Future<void> _initCacheDir() async {
@@ -189,17 +219,19 @@ class AudioPlayerProvider extends ChangeNotifier {
           await _initCacheDir();
         }
         
-        // Use caching for faster subsequent plays
+        // Use streaming with progressive download for instant playback
         if (_cacheDir != null) {
           final fileName = _sanitizeFileName(sermon.id);
           final ext = _getFileExtension(audioUrl);
           final cacheFile = File('${_cacheDir!.path}/$fileName$ext');
           
           if (await cacheFile.exists()) {
-            debugPrint('Playing from cache: ${cacheFile.path}');
+            debugPrint('Playing from full cache: ${cacheFile.path}');
             await _fallbackPlayer!.setFilePath(cacheFile.path);
           } else {
-            debugPrint('Streaming and caching: $audioUrl');
+            // Use LockCachingAudioSource for streaming + caching
+            // This streams audio immediately while downloading in background
+            debugPrint('Streaming with progressive cache: $audioUrl');
             try {
               final source = LockCachingAudioSource(
                 Uri.parse(audioUrl),
@@ -207,11 +239,13 @@ class AudioPlayerProvider extends ChangeNotifier {
               );
               await _fallbackPlayer!.setAudioSource(source);
             } catch (cacheError) {
-              debugPrint('Cache error, falling back to direct URL: $cacheError');
+              debugPrint('Cache error, falling back to direct streaming: $cacheError');
+              // Direct streaming - starts immediately
               await _fallbackPlayer!.setUrl(audioUrl);
             }
           }
         } else {
+          // Direct streaming without caching
           await _fallbackPlayer!.setUrl(audioUrl);
         }
         await _fallbackPlayer!.play();

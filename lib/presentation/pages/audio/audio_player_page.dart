@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/audio_player_provider.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../wallet/give_page.dart';
 
 class AudioPlayerPage extends StatefulWidget {
   final Sermon sermon;
@@ -39,6 +40,16 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
             title: widget.sermon.categoryName.isNotEmpty
                 ? widget.sermon.categoryName
                 : widget.sermon.category,
+            actions: [
+              IconButton(
+                onPressed: () => _showGivingBottomSheet(context, isDark),
+                icon: Icon(
+                  Icons.volunteer_activism,
+                  color: AppColors.primaryGold,
+                ),
+                tooltip: 'Give an Offering',
+              ),
+            ],
           ),
           body: errorMessage != null
               ? Center(
@@ -79,6 +90,8 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                       _buildProgressBar(isDark, audioProvider),
                       const SizedBox(height: 24),
                       _buildControls(isDark, audioProvider),
+                      const SizedBox(height: 32),
+                      _buildGivingButton(context, isDark),
                       const Spacer(flex: 2),
                     ],
                   ),
@@ -304,5 +317,120 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
+  }
+
+  Widget _buildGivingButton(BuildContext context, bool isDark) {
+    return TextButton.icon(
+      onPressed: () => _showGivingBottomSheet(context, isDark),
+      icon: Icon(
+        Icons.volunteer_activism,
+        color: AppColors.primaryGold,
+        size: 20,
+      ),
+      label: Text(
+        'Blessed? Give an Offering',
+        style: TextStyle(
+          color: AppColors.primaryGold,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  void _showGivingBottomSheet(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 24),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Icon(
+              Icons.volunteer_activism,
+              size: 64,
+              color: AppColors.primaryGold,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Are you blessed by this ministration?',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Give an offering by clicking below',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const GivePage()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGold,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.favorite, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Give Special Offering',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Maybe Later',
+                style: TextStyle(
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 }

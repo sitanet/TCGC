@@ -52,6 +52,23 @@ class Sermon {
       duration: Duration(minutes: json['duration_minutes'] ?? 0),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'speaker': speaker,
+      'image_url': imageUrl,
+      'audio_url': audioUrl,
+      'video_url': videoUrl,
+      'transcript': transcript,
+      'category': category,
+      'category_name': categoryName,
+      'date': date.toIso8601String(),
+      'duration_minutes': duration.inMinutes,
+    };
+  }
 }
 
 class MessageCategory {
@@ -105,5 +122,17 @@ class MessageCategory {
       latestMessageDate: latestMessageDate ?? this.latestMessageDate,
       hasNewMessage: hasNewMessage ?? this.hasNewMessage,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'image_url': imageUrl,
+      'is_active': isActive,
+      'latest_message_date': latestMessageDate?.toIso8601String(),
+      'has_new_message': hasNewMessage,
+    };
   }
 }

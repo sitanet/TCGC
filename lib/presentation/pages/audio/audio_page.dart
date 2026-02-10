@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/services/data_service.dart';
+import '../../../data/services/audio_cache_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_list_page.dart';
@@ -18,6 +19,7 @@ class _AudioPageState extends State<AudioPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final DataService _dataService = DataService();
+  final AudioCacheService _audioCacheService = AudioCacheService();
   
   List<MessageCategory> _categories = [];
   List<Sermon> _sermons = [];
@@ -27,14 +29,32 @@ class _AudioPageState extends State<AudioPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _audioCacheService.initialize();
     _loadData();
   }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
+      // Try to load from cache first for instant display
+      final cachedCategories = await _audioCacheService.getCachedCategories();
+      final cachedSermons = await _audioCacheService.getCachedSermons();
+      
+      if (cachedCategories != null && cachedSermons != null && mounted) {
+        setState(() {
+          _categories = cachedCategories;
+          _sermons = cachedSermons;
+          _isLoading = false;
+        });
+        debugPrint('Loaded from cache: ${cachedCategories.length} categories, ${cachedSermons.length} sermons');
+      }
+      
+      // Fetch fresh data from API
       final categories = await _dataService.getMessageCategories();
       final sermons = await _dataService.getMessages();
+      
+      // Cache the metadata for next time
+      _audioCacheService.cacheMetadata(categories: categories, sermons: sermons);
       
       debugPrint('=== Audio Page Data ===');
       debugPrint('Categories loaded: ${categories.length}');
