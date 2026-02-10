@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/utils/responsive.dart';
@@ -70,11 +71,27 @@ class _HomePageState extends State<HomePage> {
           _events = events;
           _isLoading = false;
         });
+        
+        // Pre-cache images in background
+        _preCacheImages(sermons, events);
       }
     } catch (e) {
       print('Error loading home data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+  
+  void _preCacheImages(List<Sermon> sermons, List<Event> events) {
+    for (final sermon in sermons) {
+      if (sermon.imageUrl != null && sermon.imageUrl!.isNotEmpty) {
+        CachedNetworkImageProvider(sermon.imageUrl!).resolve(ImageConfiguration.empty);
+      }
+    }
+    for (final event in events) {
+      if (event.imageUrl != null && event.imageUrl!.isNotEmpty) {
+        CachedNetworkImageProvider(event.imageUrl!).resolve(ImageConfiguration.empty);
       }
     }
   }

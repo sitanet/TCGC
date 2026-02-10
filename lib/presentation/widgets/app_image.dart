@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_colors.dart';
 
 class AppImage extends StatelessWidget {
@@ -51,16 +52,15 @@ class AppImage extends StatelessWidget {
 
     Widget image;
     if (_isNetworkImage) {
-      image = Image.network(
-        imagePath!,
+      image = CachedNetworkImage(
+        imageUrl: imagePath!,
         width: width,
         height: height,
         fit: fit,
-        errorBuilder: (context, error, stackTrace) => placeholder,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return placeholder;
-        },
+        placeholder: (context, url) => placeholder,
+        errorWidget: (context, url, error) => placeholder,
+        fadeInDuration: const Duration(milliseconds: 200),
+        fadeOutDuration: const Duration(milliseconds: 200),
       );
     } else {
       image = Image.asset(

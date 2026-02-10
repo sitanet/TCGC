@@ -22,7 +22,7 @@ Future<void> initAudioService() async {
         androidNotificationChannelDescription: 'Audio playback controls',
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: false,
-        androidNotificationIcon: 'mipmap/ic_launcher',
+        androidNotificationIcon: 'drawable/ic_notification',
         androidResumeOnClick: true,
         androidShowNotificationBadge: true,
         notificationColor: const Color(0xFFD4A84B),
@@ -169,8 +169,12 @@ class AudioPlayerProvider extends ChangeNotifier {
     // Always prefer audio_service for notification support
     // Only use fallback if audio_service truly failed to initialize
     if (!_audioServiceInitialized || _audioHandler == null) {
-      debugPrint('Using fallback audio player (no notification support)');
+      debugPrint('Audio service not available, using fallback player (no notification support)');
+      debugPrint('  _audioServiceInitialized: $_audioServiceInitialized');
+      debugPrint('  _audioHandler: $_audioHandler');
       _setupFallbackPlayer();
+    } else {
+      debugPrint('Audio service available, will use notification player');
     }
 
     // If same sermon, just toggle play/pause
@@ -200,17 +204,19 @@ class AudioPlayerProvider extends ChangeNotifier {
     debugPrint('=== AUDIO DEBUG ===');
     debugPrint('Audio URL: $audioUrl');
     debugPrint('Sermon ID: ${sermon.id}');
-    debugPrint('Using audio_service: ${!_usingFallback}');
+    debugPrint('Sermon Title: ${sermon.title}');
+    debugPrint('Sermon Image: ${sermon.imageUrl}');
+    debugPrint('Using audio_service: ${_audioServiceInitialized && _audioHandler != null && !_usingFallback}');
 
     try {
       if (_usingFallback && _fallbackPlayer != null) {
         // Fallback player - no notification support
         debugPrint('Streaming with fallback player: $audioUrl');
-        // Use direct URL for fastest startup
         await _fallbackPlayer!.setUrl(audioUrl);
         _fallbackPlayer!.play();
       } else if (_audioHandler != null) {
         // Use audio_service for notification support
+        debugPrint('Creating MediaItem for notification...');
         final mediaItem = MediaItem(
           id: sermon.id,
           title: sermon.title,
@@ -220,8 +226,16 @@ class AudioPlayerProvider extends ChangeNotifier {
           artUri: sermon.imageUrl != null ? Uri.parse(sermon.imageUrl!) : null,
           extras: {'url': audioUrl},
         );
+        debugPrint('MediaItem created: ${mediaItem.title} by ${mediaItem.artist}');
+        debugPrint('Calling playMediaItem...');
         // This sets media item and starts playback with notification
         await _audioHandler!.playMediaItem(mediaItem);
+        debugPrint('playMediaItem completed');
+      } else {
+        debugPrint('ERROR: No audio handler available!');
+        _errorMessage = 'Audio player not initialized';
+        notifyListeners();
+        return;
       }
       _isLoading = false;
       notifyListeners();
@@ -367,14 +381,28 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   final _player = AudioPlayer();
 
   AudioPlayerHandler() {
+    debugPrint('AudioPlayerHandler: Initializing...');
+    
+    // Listen to playback events and transform to audio_service format
     _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
     
+    // Update media item duration when available
     _player.durationStream.listen((duration) {
       final item = mediaItem.value;
       if (item != null && duration != null) {
         mediaItem.add(item.copyWith(duration: duration));
       }
     });
+    
+    // Handle playback completion
+    _player.processingStateStream.listen((state) {
+      if (state == ProcessingState.completed) {
+        debugPrint('AudioPlayerHandler: Playback completed');
+        stop();
+      }
+    });
+    
+    debugPrint('AudioPlayerHandler: Initialized successfully');
   }
 
   PlaybackState _transformEvent(PlaybackEvent event) {

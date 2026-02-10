@@ -9,6 +9,7 @@ import '../../../data/services/playlist_service.dart';
 import '../../../data/services/download_service.dart';
 import '../../../data/services/data_service.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../../widgets/animated_play_button.dart';
 import '../wallet/give_page.dart';
 
 class AudioPlayerPage extends StatefulWidget {
@@ -286,42 +287,17 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
           ),
         ),
         const SizedBox(width: 24),
-        GestureDetector(
-          onTap: isLoading ? null : () {
+        AnimatedPlayButton(
+          isPlaying: isPlaying,
+          isLoading: isLoading,
+          size: 70,
+          onTap: () {
             if (isPlaying) {
               audioProvider.pause();
             } else {
               audioProvider.play();
             }
           },
-          child: Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              color: AppColors.primaryGold,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primaryGold.withOpacity(0.4),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: isLoading
-                ? const Padding(
-                    padding: EdgeInsets.all(18),
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 3,
-                    ),
-                  )
-                : Icon(
-                    isPlaying ? Icons.pause : Icons.play_arrow,
-                    color: Colors.white,
-                    size: 36,
-                  ),
-          ),
         ),
         const SizedBox(width: 24),
         IconButton(

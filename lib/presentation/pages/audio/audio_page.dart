@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/audio_cache_service.dart';
+import '../../../data/services/image_cache_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_list_page.dart';
@@ -23,6 +24,7 @@ class _AudioPageState extends State<AudioPage>
   late TabController _tabController;
   final DataService _dataService = DataService();
   final AudioCacheService _audioCacheService = AudioCacheService();
+  final ImageCacheService _imageCacheService = ImageCacheService();
   
   List<MessageCategory> _categories = [];
   List<Sermon> _sermons = [];
@@ -58,6 +60,9 @@ class _AudioPageState extends State<AudioPage>
       
       // Cache the metadata for next time
       _audioCacheService.cacheMetadata(categories: categories, sermons: sermons);
+      
+      // Pre-cache images in background
+      _imageCacheService.preCacheImages(categories: categories, sermons: sermons);
       
       debugPrint('=== Audio Page Data ===');
       debugPrint('Categories loaded: ${categories.length}');
