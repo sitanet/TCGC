@@ -7,6 +7,9 @@ import '../../../data/services/audio_cache_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_list_page.dart';
+import 'favorites_page.dart';
+import 'playlists_page.dart';
+import 'downloads_page.dart';
 
 class AudioPage extends StatefulWidget {
   const AudioPage({super.key});
@@ -136,9 +139,35 @@ class _AudioPageState extends State<AudioPage>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: const CustomAppBar(
+      appBar: CustomAppBar(
         title: '',
         showBackButton: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.favorite_border),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FavoritesPage()),
+            ),
+            tooltip: 'Favorites',
+          ),
+          IconButton(
+            icon: const Icon(Icons.playlist_play),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PlaylistsPage()),
+            ),
+            tooltip: 'Playlists',
+          ),
+          IconButton(
+            icon: const Icon(Icons.download),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DownloadsPage()),
+            ),
+            tooltip: 'Downloads',
+          ),
+        ],
       ),
       body: Column(
         children: [

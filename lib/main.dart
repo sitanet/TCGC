@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/theme_provider.dart';
@@ -209,13 +210,15 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   bool _showPromotion = false;
   bool _showUpdateDialog = false;
   List<Promotion> _activePromotions = [];
   final DataService _dataService = DataService();
   AppUpdateInfo? _updateInfo;
+  
+  static const String _lastTabKey = 'last_tab_index';
 
   final List<Widget> _pages = const [
     HomePage(),
@@ -228,9 +231,48 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _restoreLastTab();
     _initializeWallet();
     _checkForAppUpdate();
     _checkForPromotion();
+  }
+  
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || 
+        state == AppLifecycleState.inactive) {
+      _saveCurrentTab();
+    }
+  }
+  
+  Future<void> _restoreLastTab() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastIndex = prefs.getInt(_lastTabKey) ?? 0;
+      if (lastIndex >= 0 && lastIndex < _pages.length && mounted) {
+        setState(() {
+          _currentIndex = lastIndex;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error restoring last tab: $e');
+    }
+  }
+  
+  Future<void> _saveCurrentTab() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_lastTabKey, _currentIndex);
+    } catch (e) {
+      debugPrint('Error saving current tab: $e');
+    }
   }
 
   Future<void> _initializeWallet() async {
@@ -409,6 +451,7 @@ class _MainScreenState extends State<MainScreen> {
               setState(() {
                 _currentIndex = index;
               });
+              _saveCurrentTab();
             },
           ),
         ],

@@ -8,7 +8,6 @@ import '../../data/services/audio_cache_service.dart';
 
 AudioHandler? _audioHandler;
 bool _audioServiceInitialized = false;
-String? _initError;
 
 Future<void> initAudioService() async {
   if (_audioServiceInitialized) return;
@@ -17,21 +16,23 @@ Future<void> initAudioService() async {
     debugPrint('Initializing audio service...');
     _audioHandler = await AudioService.init(
       builder: () => AudioPlayerHandler(),
-      config: const AudioServiceConfig(
+      config: AudioServiceConfig(
         androidNotificationChannelId: 'com.tcgc.app.audio',
         androidNotificationChannelName: 'TCGC Audio',
-        androidNotificationOngoing: false,
+        androidNotificationOngoing: true,
         androidStopForegroundOnPause: false,
         androidNotificationIcon: 'drawable/ic_notification',
         androidResumeOnClick: true,
         androidShowNotificationBadge: true,
-        notificationColor: Color(0xFFD4A84B),
+        notificationColor: const Color(0xFFD4A84B),
+        preloadArtwork: true,
+        fastForwardInterval: const Duration(seconds: 10),
+        rewindInterval: const Duration(seconds: 10),
       ),
     );
     _audioServiceInitialized = true;
     debugPrint('Audio service initialized successfully');
   } catch (e, stack) {
-    _initError = e.toString();
     debugPrint('Audio service init error: $e');
     debugPrint('Stack trace: $stack');
     // Continue without audio_service - use fallback player
@@ -114,19 +115,6 @@ class AudioPlayerProvider extends ChangeNotifier {
   String _sanitizeFileName(String id) {
     return id.replaceAll(RegExp(r'[^\w\-]'), '_');
   }
-  
-  String _getFileExtension(String url) {
-    final uri = Uri.tryParse(url);
-    if (uri != null && uri.path.isNotEmpty) {
-      final path = uri.path.toLowerCase();
-      if (path.endsWith('.ogg')) return '.ogg';
-      if (path.endsWith('.mp3')) return '.mp3';
-      if (path.endsWith('.wav')) return '.wav';
-      if (path.endsWith('.m4a')) return '.m4a';
-      if (path.endsWith('.aac')) return '.aac';
-    }
-    return '.audio';
-  }
 
   void _setupListeners() {
     if (_audioServiceInitialized && _audioHandler != null && !_listenersSetup) {
@@ -177,9 +165,10 @@ class AudioPlayerProvider extends ChangeNotifier {
     // Try to setup audio service listeners
     _setupListeners();
     
-    // If audio_service failed, use fallback player
+    // Always prefer audio_service for notification support
+    // Only use fallback if audio_service truly failed to initialize
     if (!_audioServiceInitialized || _audioHandler == null) {
-      debugPrint('Using fallback audio player');
+      debugPrint('Using fallback audio player (no notification support)');
       _setupFallbackPlayer();
     }
 
@@ -210,56 +199,27 @@ class AudioPlayerProvider extends ChangeNotifier {
     debugPrint('=== AUDIO DEBUG ===');
     debugPrint('Audio URL: $audioUrl');
     debugPrint('Sermon ID: ${sermon.id}');
-    debugPrint('Using fallback: $_usingFallback');
+    debugPrint('Using audio_service: ${!_usingFallback}');
 
     try {
       if (_usingFallback && _fallbackPlayer != null) {
-        // Ensure cache dir is ready
-        if (_cacheDir == null) {
-          await _initCacheDir();
-        }
-        
-        // Use streaming with progressive download for instant playback
-        if (_cacheDir != null) {
-          final fileName = _sanitizeFileName(sermon.id);
-          final ext = _getFileExtension(audioUrl);
-          final cacheFile = File('${_cacheDir!.path}/$fileName$ext');
-          
-          if (await cacheFile.exists()) {
-            debugPrint('Playing from full cache: ${cacheFile.path}');
-            await _fallbackPlayer!.setFilePath(cacheFile.path);
-          } else {
-            // Use LockCachingAudioSource for streaming + caching
-            // This streams audio immediately while downloading in background
-            debugPrint('Streaming with progressive cache: $audioUrl');
-            try {
-              final source = LockCachingAudioSource(
-                Uri.parse(audioUrl),
-                cacheFile: cacheFile,
-              );
-              await _fallbackPlayer!.setAudioSource(source);
-            } catch (cacheError) {
-              debugPrint('Cache error, falling back to direct streaming: $cacheError');
-              // Direct streaming - starts immediately
-              await _fallbackPlayer!.setUrl(audioUrl);
-            }
-          }
-        } else {
-          // Direct streaming without caching
-          await _fallbackPlayer!.setUrl(audioUrl);
-        }
-        await _fallbackPlayer!.play();
+        // Fallback player - no notification support
+        debugPrint('Streaming with fallback player: $audioUrl');
+        // Use direct URL for fastest startup
+        await _fallbackPlayer!.setUrl(audioUrl);
+        _fallbackPlayer!.play();
       } else if (_audioHandler != null) {
-        // Use audio_service
+        // Use audio_service for notification support
         final mediaItem = MediaItem(
           id: sermon.id,
           title: sermon.title,
-          artist: 'TCGC',
+          artist: sermon.speaker ?? 'TCGC',
           album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Sermons',
           duration: sermon.duration,
           artUri: sermon.imageUrl != null ? Uri.parse(sermon.imageUrl!) : null,
           extras: {'url': audioUrl},
         );
+        // This sets media item and starts playback with notification
         await _audioHandler!.playMediaItem(mediaItem);
       }
       _isLoading = false;
@@ -404,10 +364,8 @@ class AudioPlayerProvider extends ChangeNotifier {
 
 class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   final _player = AudioPlayer();
-  Directory? _cacheDir;
 
   AudioPlayerHandler() {
-    _initCacheDir();
     _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
     
     _player.durationStream.listen((duration) {
@@ -416,18 +374,6 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
         mediaItem.add(item.copyWith(duration: duration));
       }
     });
-  }
-  
-  Future<void> _initCacheDir() async {
-    try {
-      final appDir = await getApplicationDocumentsDirectory();
-      _cacheDir = Directory('${appDir.path}/audio_cache');
-      if (!await _cacheDir!.exists()) {
-        await _cacheDir!.create(recursive: true);
-      }
-    } catch (e) {
-      debugPrint('Failed to create cache directory: $e');
-    }
   }
 
   PlaybackState _transformEvent(PlaybackEvent event) {
@@ -459,66 +405,24 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     );
   }
 
-  String _getFileExtension(String url) {
-    final uri = Uri.tryParse(url);
-    if (uri != null && uri.path.isNotEmpty) {
-      final path = uri.path.toLowerCase();
-      if (path.endsWith('.ogg')) return '.ogg';
-      if (path.endsWith('.mp3')) return '.mp3';
-      if (path.endsWith('.wav')) return '.wav';
-      if (path.endsWith('.m4a')) return '.m4a';
-      if (path.endsWith('.aac')) return '.aac';
-    }
-    return '.audio';
-  }
-  
-  String _sanitizeFileName(String id) {
-    return id.replaceAll(RegExp(r'[^\w\-]'), '_');
-  }
-
   @override
-  Future<void> playMediaItem(MediaItem item) async {
-    mediaItem.add(item);
-    final url = item.extras?['url'] as String?;
+  // ignore: avoid_renaming_method_parameters
+  Future<void> playMediaItem(MediaItem newMediaItem) async {
+    // Add media item immediately so notification appears
+    mediaItem.add(newMediaItem);
+    
+    final url = newMediaItem.extras?['url'] as String?;
     if (url != null) {
       try {
-        // Ensure cache dir is ready
-        if (_cacheDir == null) {
-          await _initCacheDir();
-        }
-        
-        if (_cacheDir != null) {
-          final fileName = _sanitizeFileName(item.id);
-          final ext = _getFileExtension(url);
-          final cacheFile = File('${_cacheDir!.path}/$fileName$ext');
-          
-          if (await cacheFile.exists()) {
-            debugPrint('Playing from cache: ${cacheFile.path}');
-            await _player.setFilePath(cacheFile.path);
-          } else {
-            debugPrint('Streaming and caching: $url');
-            final source = LockCachingAudioSource(
-              Uri.parse(url),
-              cacheFile: cacheFile,
-            );
-            await _player.setAudioSource(source);
-          }
-        } else {
-          debugPrint('No cache dir, streaming directly: $url');
-          await _player.setUrl(url);
-        }
+        debugPrint('AudioPlayerHandler: Playing $url');
+        // Use direct URL streaming for fastest startup
+        // This ensures notification works and audio starts immediately
+        await _player.setUrl(url);
         await _player.play();
+        debugPrint('AudioPlayerHandler: Playback started');
       } catch (e) {
-        debugPrint('Error setting audio source: $e');
-        // Fallback to direct URL if caching fails
-        try {
-          debugPrint('Fallback: trying direct URL without caching');
-          await _player.setUrl(url);
-          await _player.play();
-        } catch (e2) {
-          debugPrint('Fallback also failed: $e2');
-          rethrow;
-        }
+        debugPrint('AudioPlayerHandler error: $e');
+        rethrow;
       }
     }
   }

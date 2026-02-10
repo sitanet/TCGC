@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/audio_player_provider.dart';
 import '../../../domain/entities/sermon.dart';
+import '../../../data/services/favorites_service.dart';
+import '../../../data/services/playlist_service.dart';
+import '../../../data/services/download_service.dart';
+import '../../../data/services/data_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../wallet/give_page.dart';
 
@@ -16,15 +21,28 @@ class AudioPlayerPage extends StatefulWidget {
 }
 
 class _AudioPlayerPageState extends State<AudioPlayerPage> {
+  final FavoritesService _favoritesService = FavoritesService();
+  final PlaylistService _playlistService = PlaylistService();
+  final DownloadService _downloadService = DownloadService();
+  final DataService _dataService = DataService();
+
   @override
   void initState() {
     super.initState();
+    _initializeServices();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
       if (audioProvider.currentSermon?.id != widget.sermon.id) {
         audioProvider.playSermon(widget.sermon);
       }
     });
+  }
+
+  Future<void> _initializeServices() async {
+    await _favoritesService.initialize();
+    await _playlistService.initialize();
+    await _downloadService.initialize();
+    if (mounted) setState(() {});
   }
 
   @override
@@ -48,6 +66,11 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                   color: AppColors.primaryGold,
                 ),
                 tooltip: 'Give an Offering',
+              ),
+              IconButton(
+                onPressed: () => _showActionsBottomSheet(context, isDark),
+                icon: const Icon(Icons.more_vert),
+                tooltip: 'More options',
               ),
             ],
           ),
@@ -317,6 +340,365 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
+  }
+
+  void _showActionsBottomSheet(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final isFavorite = _favoritesService.isFavorite(widget.sermon.id);
+          final isDownloaded = _downloadService.isDownloaded(widget.sermon.id);
+          final isDownloading = _downloadService.isDownloading(widget.sermon.id);
+          final downloadProgress = _downloadService.getProgress(widget.sermon.id);
+
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    widget.sermon.title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const Divider(),
+                // Favorite
+                ListTile(
+                  leading: Icon(
+                    isFavorite ? Icons.favorite : Icons.favorite_border,
+                    color: isFavorite ? Colors.red : null,
+                  ),
+                  title: Text(isFavorite ? 'Remove from Favorites' : 'Add to Favorites'),
+                  onTap: () async {
+                    await _favoritesService.toggleFavorite(widget.sermon);
+                    // Track favorite action to backend
+                    _trackMessageStat('favorite', !isFavorite);
+                    setModalState(() {});
+                    setState(() {});
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isFavorite ? 'Removed from favorites' : 'Added to favorites',
+                          ),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                // Playlist
+                ListTile(
+                  leading: const Icon(Icons.playlist_add),
+                  title: const Text('Add to Playlist'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showPlaylistBottomSheet(context, isDark);
+                  },
+                ),
+                // Download
+                ListTile(
+                  leading: Icon(
+                    isDownloaded
+                        ? Icons.download_done
+                        : (isDownloading ? Icons.downloading : Icons.download),
+                    color: isDownloaded ? Colors.green : null,
+                  ),
+                  title: Text(
+                    isDownloaded
+                        ? 'Downloaded'
+                        : (isDownloading
+                            ? 'Downloading ${(downloadProgress * 100).toInt()}%'
+                            : 'Download'),
+                  ),
+                  onTap: isDownloading
+                      ? null
+                      : () async {
+                          if (isDownloaded) {
+                            Navigator.pop(context);
+                            _showDeleteDownloadDialog(context, isDark);
+                          } else {
+                            Navigator.pop(context);
+                            final success = await _downloadService.downloadSermon(widget.sermon);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    success ? 'Download started' : 'Download failed',
+                                  ),
+                                ),
+                              );
+                              setState(() {});
+                            }
+                          }
+                        },
+                ),
+                // Share
+                ListTile(
+                  leading: const Icon(Icons.share),
+                  title: const Text('Share'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _shareSermon();
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _trackMessageStat(String action, bool added) async {
+    try {
+      await _dataService.trackMessageStat(
+        messageId: widget.sermon.id,
+        action: action,
+        added: added,
+      );
+    } catch (e) {
+      debugPrint('Failed to track message stat: $e');
+    }
+  }
+
+  void _shareSermon() {
+    final sermon = widget.sermon;
+    final shareText = '''
+Check out this message: "${sermon.title}"
+
+${sermon.description}
+
+Listen on TCGC App
+''';
+    Share.share(shareText, subject: sermon.title);
+    // Track share action to backend
+    _trackMessageStat('share', true);
+  }
+
+  void _showDeleteDownloadDialog(BuildContext context, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Download?'),
+        content: const Text('This will remove the downloaded file from your device.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await _downloadService.deleteDownload(widget.sermon.id);
+              if (mounted) {
+                Navigator.pop(context);
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Download deleted')),
+                );
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPlaylistBottomSheet(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Add to Playlist',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _showCreatePlaylistDialog(context, isDark, setModalState),
+                    icon: const Icon(Icons.add),
+                    label: const Text('New'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (_playlistService.playlists.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.playlist_play,
+                          size: 48,
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No playlists yet',
+                          style: TextStyle(
+                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => _showCreatePlaylistDialog(context, isDark, setModalState),
+                          child: const Text('Create your first playlist'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.4,
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _playlistService.playlists.length,
+                    itemBuilder: (context, index) {
+                      final playlist = _playlistService.playlists[index];
+                      final isInPlaylist = _playlistService.isInPlaylist(
+                        playlist.id, 
+                        widget.sermon.id,
+                      );
+                      return ListTile(
+                        leading: Icon(
+                          isInPlaylist ? Icons.playlist_add_check : Icons.playlist_play,
+                          color: isInPlaylist ? AppColors.primaryGold : null,
+                        ),
+                        title: Text(playlist.name),
+                        subtitle: Text('${playlist.count} songs'),
+                        trailing: isInPlaylist
+                            ? const Icon(Icons.check, color: Colors.green)
+                            : null,
+                        onTap: () async {
+                          if (isInPlaylist) {
+                            await _playlistService.removeFromPlaylist(
+                              playlist.id, 
+                              widget.sermon.id,
+                            );
+                          } else {
+                            await _playlistService.addToPlaylist(
+                              playlist.id, 
+                              widget.sermon,
+                            );
+                          }
+                          setModalState(() {});
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  isInPlaylist 
+                                      ? 'Removed from ${playlist.name}'
+                                      : 'Added to ${playlist.name}',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCreatePlaylistDialog(BuildContext context, bool isDark, StateSetter setModalState) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Create Playlist'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Playlist name',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                final playlist = await _playlistService.createPlaylist(name);
+                await _playlistService.addToPlaylist(playlist.id, widget.sermon);
+                if (mounted) {
+                  Navigator.pop(dialogContext);
+                  setModalState(() {});
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Added to "$name"')),
+                  );
+                }
+              }
+            },
+            child: const Text('Create & Add'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildGivingButton(BuildContext context, bool isDark) {

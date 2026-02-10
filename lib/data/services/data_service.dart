@@ -78,6 +78,27 @@ class DataService {
     return speakers.map((s) => s.fullName).toList();
   }
 
+  // Track message statistics (favorite, share)
+  Future<bool> trackMessageStat({
+    required String messageId,
+    required String action,
+    required bool added,
+  }) async {
+    try {
+      final response = await _api.post(
+        ApiConstants.messageStats,
+        {
+          'message_id': messageId,
+          'action': action,
+          'added': added,
+        },
+      );
+      return response.isSuccess;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Events
   Future<List<Event>> getEvents() async {
     final response = await _api.get(ApiConstants.events);

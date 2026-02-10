@@ -18,10 +18,13 @@ class AudioCacheService {
   
   static const String _metadataCacheKey = 'audio_metadata_cache';
   static const String _categoriesCacheKey = 'categories_cache';
-  // Pre-buffer 3 minutes of audio at 64kbps = ~1.5MB
-  // 64kbps = 8KB/s, 3 min = 180s, 180 * 8KB = 1.44MB
-  static const int _preBufferBytes = 1536 * 1024; // 1.5MB = ~3 minutes at 64kbps
+  // Pre-buffer enough for instant start - 500KB should be enough for ~30-45 seconds
+  // This allows quick buffering of more items while still enabling instant playback
+  static const int _preBufferBytes = 512 * 1024; // 512KB for instant start
   static const int _maxPreBufferItems = 20;
+  
+  // Store full URLs for pre-buffered content
+  final Map<String, String> _audioUrls = {};
 
   Future<void> initialize() async {
     try {
@@ -144,11 +147,13 @@ class AudioCacheService {
         }
         
         _audioBuffers[sermonId] = bytes;
+        _audioUrls[sermonId] = url;
         _bufferProgress[sermonId] = 1.0;
         debugPrint('Pre-buffered ${bytes.length ~/ 1024}KB for sermon: $sermonId');
         
         // Also save to disk for persistence
         await _saveBufferToDisk(sermonId, bytes);
+        await _saveUrlToDisk(sermonId, url);
       }
     } catch (e) {
       debugPrint('Pre-buffer error for $sermonId: $e');
@@ -165,6 +170,29 @@ class AudioCacheService {
     } catch (e) {
       debugPrint('Error saving buffer to disk: $e');
     }
+  }
+
+  Future<void> _saveUrlToDisk(String sermonId, String url) async {
+    if (_cacheDir == null) return;
+    try {
+      final file = File('${_cacheDir!.path}/${_sanitizeFileName(sermonId)}.url');
+      await file.writeAsString(url);
+    } catch (e) {
+      debugPrint('Error saving URL to disk: $e');
+    }
+  }
+
+  Future<String?> _loadUrlFromDisk(String sermonId) async {
+    if (_cacheDir == null) return null;
+    try {
+      final file = File('${_cacheDir!.path}/${_sanitizeFileName(sermonId)}.url');
+      if (await file.exists()) {
+        return await file.readAsString();
+      }
+    } catch (e) {
+      debugPrint('Error loading URL from disk: $e');
+    }
+    return null;
   }
 
   Future<List<int>?> _loadBufferFromDisk(String sermonId) async {
@@ -194,9 +222,19 @@ class AudioCacheService {
     final diskBuffer = await _loadBufferFromDisk(sermonId);
     if (diskBuffer != null) {
       _audioBuffers[sermonId] = diskBuffer;
+      // Also load the URL
+      final url = await _loadUrlFromDisk(sermonId);
+      if (url != null) {
+        _audioUrls[sermonId] = url;
+      }
       return diskBuffer;
     }
     return null;
+  }
+
+  /// Get the URL for a pre-buffered sermon
+  String? getPreBufferedUrl(String sermonId) {
+    return _audioUrls[sermonId];
   }
 
   /// Get buffer progress (0.0 to 1.0)
