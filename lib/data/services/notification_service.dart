@@ -96,6 +96,7 @@ class NotificationService {
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
+      onDidReceiveBackgroundNotificationResponse: _onBackgroundNotificationTapped,
     );
 
     if (Platform.isAndroid) {
@@ -136,8 +137,31 @@ class NotificationService {
     }
   }
 
+  static Function(Map<String, dynamic> data)? onNotificationTapped;
+
   void _onNotificationTapped(NotificationResponse response) {
     debugPrint('Notification tapped: ${response.payload}');
+    _handleNotificationAction(response);
+  }
+
+  void _handleNotificationAction(NotificationResponse response) {
+    if (response.payload == null) return;
+    
+    try {
+      final data = jsonDecode(response.payload!) as Map<String, dynamic>;
+      debugPrint('Notification action: ${response.actionId}, data: $data');
+      
+      if (onNotificationTapped != null) {
+        onNotificationTapped!(data);
+      }
+    } catch (e) {
+      debugPrint('Error parsing notification payload: $e');
+    }
+  }
+  
+  @pragma('vm:entry-point')
+  static void _onBackgroundNotificationTapped(NotificationResponse response) {
+    debugPrint('Background notification tapped: ${response.payload}');
   }
 
   Future<void> _configureFCM() async {
@@ -197,6 +221,18 @@ class NotificationService {
         );
       }
       
+      // Add action buttons for message notifications
+      List<AndroidNotificationAction>? actions;
+      if (notificationType == 'new_message' || notificationType == 'message') {
+        actions = [
+          const AndroidNotificationAction(
+            'play',
+            '▶ Play',
+            showsUserInterface: true,
+          ),
+        ];
+      }
+
       _localNotifications.show(
         notification.hashCode,
         notification.title,
@@ -216,6 +252,7 @@ class NotificationService {
             enableVibration: true,
             playSound: true,
             ticker: notification.title,
+            actions: actions,
           ),
           iOS: DarwinNotificationDetails(
             presentAlert: true,

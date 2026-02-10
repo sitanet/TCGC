@@ -33,6 +33,14 @@ class DataService {
     return [];
   }
 
+  Future<Sermon?> getMessageById(String messageId) async {
+    final response = await _api.get('${ApiConstants.messages}$messageId/');
+    if (response.isSuccess) {
+      return Sermon.fromJson(response.data);
+    }
+    return null;
+  }
+
   Future<List<Sermon>> getMessagesByCategory(String categoryId) async {
     final response = await _api.get('${ApiConstants.messagesByCategory}?category_id=$categoryId');
     if (response.isSuccess) {

@@ -19,9 +19,10 @@ Future<void> initAudioService() async {
       config: AudioServiceConfig(
         androidNotificationChannelId: 'com.tcgc.app.audio',
         androidNotificationChannelName: 'TCGC Audio',
+        androidNotificationChannelDescription: 'Audio playback controls',
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: false,
-        androidNotificationIcon: 'drawable/ic_notification',
+        androidNotificationIcon: 'mipmap/ic_launcher',
         androidResumeOnClick: true,
         androidShowNotificationBadge: true,
         notificationColor: const Color(0xFFD4A84B),
@@ -381,15 +382,18 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
       controls: [
         MediaControl.rewind,
         if (_player.playing) MediaControl.pause else MediaControl.play,
-        MediaControl.stop,
         MediaControl.fastForward,
+        MediaControl.stop,
       ],
       systemActions: const {
         MediaAction.seek,
         MediaAction.seekForward,
         MediaAction.seekBackward,
+        MediaAction.play,
+        MediaAction.pause,
+        MediaAction.stop,
       },
-      androidCompactActionIndices: const [0, 1, 3],
+      androidCompactActionIndices: const [0, 1, 2],
       processingState: const {
         ProcessingState.idle: AudioProcessingState.idle,
         ProcessingState.loading: AudioProcessingState.loading,

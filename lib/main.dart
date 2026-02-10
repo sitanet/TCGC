@@ -26,6 +26,8 @@ import 'presentation/widgets/bottom_nav_bar.dart';
 import 'presentation/widgets/mini_player.dart';
 import 'presentation/widgets/promotion_popup.dart';
 import 'data/services/data_service.dart' show DataService, AppUpdateInfo;
+import 'data/services/notification_service.dart';
+import 'presentation/pages/audio/audio_player_page.dart';
 import 'domain/entities/promotion.dart';
 
 const String appVersion = '1.0.0';
@@ -236,10 +238,36 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _initializeWallet();
     _checkForAppUpdate();
     _checkForPromotion();
+    _setupNotificationHandler();
+  }
+  
+  void _setupNotificationHandler() {
+    NotificationService.onNotificationTapped = (data) {
+      _handleNotificationNavigation(data);
+    };
+  }
+  
+  Future<void> _handleNotificationNavigation(Map<String, dynamic> data) async {
+    final type = data['type'];
+    
+    if (type == 'new_message' || type == 'message') {
+      final messageId = data['message_id'];
+      if (messageId != null) {
+        final sermon = await _dataService.getMessageById(messageId.toString());
+        if (sermon != null && mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => AudioPlayerPage(sermon: sermon),
+            ),
+          );
+        }
+      }
+    }
   }
   
   @override
   void dispose() {
+    NotificationService.onNotificationTapped = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
