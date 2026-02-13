@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/biometric_provider.dart';
 import '../../../core/utils/responsive.dart';
 
 class SignInPage extends StatefulWidget {
@@ -21,11 +22,72 @@ class _SignInPageState extends State<SignInPage> {
   bool _obscurePassword = true;
   bool _isEmailValid = false;
   bool _isLoading = false;
+  bool _biometricAvailable = false;
 
   @override
   void initState() {
     super.initState();
     _emailController.addListener(_validateEmail);
+    _initBiometric();
+  }
+
+  Future<void> _initBiometric() async {
+    final biometricProvider = Provider.of<BiometricProvider>(context, listen: false);
+    await biometricProvider.initialize();
+    if (mounted) {
+      setState(() {
+        _biometricAvailable = biometricProvider.isAvailable && 
+                              biometricProvider.biometricLoginEnabled &&
+                              biometricProvider.hasSavedCredentials;
+      });
+    }
+  }
+
+  Future<void> _handleBiometricLogin() async {
+    final biometricProvider = Provider.of<BiometricProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    final authenticated = await biometricProvider.authenticateForLogin();
+    if (!authenticated) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Authentication failed')),
+        );
+      }
+      return;
+    }
+
+    final credentials = await biometricProvider.getSavedCredentials();
+    if (credentials == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No saved credentials found')),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final success = await authProvider.login(
+      credentials['email']!,
+      credentials['password']!,
+    );
+
+    setState(() => _isLoading = false);
+
+    if (success) {
+      widget.onSignIn();
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.error ?? 'Login failed'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _validateEmail() {
@@ -375,6 +437,45 @@ class _SignInPageState extends State<SignInPage> {
                               ),
                       ),
                     ),
+                    if (_biometricAvailable) ...[
+                      SizedBox(height: spacing),
+                      Center(
+                        child: Text(
+                          'or',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: smallFontSize,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: spacing),
+                      SizedBox(
+                        width: double.infinity,
+                        height: buttonHeight,
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoading ? null : _handleBiometricLogin,
+                          icon: Icon(
+                            Icons.fingerprint,
+                            color: AppColors.primaryGold,
+                            size: Responsive.iconSize(context),
+                          ),
+                          label: Text(
+                            'Sign in with Biometrics',
+                            style: TextStyle(
+                              color: AppColors.primaryGold,
+                              fontSize: bodyFontSize,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.primaryGold),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(borderRadius),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     SizedBox(height: spacing * 2),
                     // Sign Up Link
                     Row(

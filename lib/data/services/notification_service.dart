@@ -45,13 +45,13 @@ class NotificationService {
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
 
-  static const String _prefsKeyPush = 'notification_push';
-  static const String _prefsKeyEmail = 'notification_email';
-  static const String _prefsKeyEvents = 'notification_events';
-  static const String _prefsKeyMessages = 'notification_messages';
-  static const String _prefsKeyWallet = 'notification_wallet';
-  static const String _prefsKeyTeens = 'notification_teens';
-  static const String _prefsKeyAnnouncements = 'notification_announcements';
+  static const String _prefsKeyPush = 'notification_push_enabled';
+  static const String _prefsKeyEmail = 'notification_email_enabled';
+  static const String _prefsKeyEvents = 'notification_events_enabled';
+  static const String _prefsKeyMessages = 'notification_messages_enabled';
+  static const String _prefsKeyWallet = 'notification_wallet_enabled';
+  static const String _prefsKeyTeens = 'notification_teens_enabled';
+  static const String _prefsKeyAnnouncements = 'notification_announcements_enabled';
 
   Future<void> initialize() async {
     try {
@@ -444,6 +444,22 @@ class NotificationService {
   }
 
   Future<NotificationPreferences> getPreferences() async {
+    // Try to fetch from backend first if authenticated
+    if (_apiService.isAuthenticated) {
+      try {
+        final response = await _apiService.get(ApiConstants.notificationPreferences);
+        if (response.isSuccess) {
+          final prefs = NotificationPreferences.fromJson(response.data);
+          // Save to local storage
+          await _savePreferencesLocally(prefs);
+          return prefs;
+        }
+      } catch (e) {
+        debugPrint('Error fetching preferences from backend: $e');
+      }
+    }
+    
+    // Fall back to local storage
     final prefs = await SharedPreferences.getInstance();
     return NotificationPreferences(
       pushEnabled: prefs.getBool(_prefsKeyPush) ?? true,
@@ -455,8 +471,8 @@ class NotificationService {
       announcementsEnabled: prefs.getBool(_prefsKeyAnnouncements) ?? true,
     );
   }
-
-  Future<void> savePreferences(NotificationPreferences preferences) async {
+  
+  Future<void> _savePreferencesLocally(NotificationPreferences preferences) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_prefsKeyPush, preferences.pushEnabled);
     await prefs.setBool(_prefsKeyEmail, preferences.emailEnabled);
@@ -465,13 +481,24 @@ class NotificationService {
     await prefs.setBool(_prefsKeyWallet, preferences.walletEnabled);
     await prefs.setBool(_prefsKeyTeens, preferences.teensEnabled);
     await prefs.setBool(_prefsKeyAnnouncements, preferences.announcementsEnabled);
+  }
 
+  Future<void> savePreferences(NotificationPreferences preferences) async {
+    // Save locally first
+    await _savePreferencesLocally(preferences);
+
+    // Sync to backend if authenticated
     if (_apiService.isAuthenticated) {
       try {
-        await _apiService.patch(
+        final response = await _apiService.patch(
           ApiConstants.notificationPreferences,
           preferences.toJson(),
         );
+        if (response.isSuccess) {
+          debugPrint('Preferences synced to backend successfully');
+        } else {
+          debugPrint('Failed to sync preferences: ${response.errorMessage}');
+        }
       } catch (e) {
         debugPrint('Error syncing preferences to backend: $e');
       }

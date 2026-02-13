@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/audio_player_provider.dart';
+import '../../../core/providers/wallet_provider.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../data/services/favorites_service.dart';
 import '../../../data/services/playlist_service.dart';
@@ -12,6 +13,7 @@ import '../../../data/services/data_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/animated_play_button.dart';
 import '../wallet/give_page.dart';
+import '../wallet/wallet_page.dart';
 
 class AudioPlayerPage extends StatefulWidget {
   final Sermon sermon;
@@ -751,6 +753,8 @@ Listen on TCGC App
   }
 
   void _showGivingBottomSheet(BuildContext context, bool isDark) {
+    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+    
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -800,10 +804,18 @@ Listen on TCGC App
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const GivePage()),
-                  );
+                  // Navigate based on wallet status
+                  if (walletProvider.hasWallet) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const GivePage()),
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const WalletPage()),
+                    );
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryGold,

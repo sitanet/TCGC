@@ -390,6 +390,40 @@ class WalletProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  Future<bool> giveWithBiometric(int giveOptionId, double amount) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.post(ApiConstants.walletGive, {
+        'give_option': giveOptionId,
+        'amount': amount,
+        'biometric_auth': true,
+      });
+      
+      if (response.isSuccess) {
+        _balance = double.tryParse(response.data['new_balance']?.toString() ?? '0') ?? _balance;
+        await fetchTransactions();
+        await fetchGivings();
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+      
+      _error = response.errorMessage;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      debugPrint('Error giving with biometric: $e');
+      _error = 'Failed to process giving';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
   
   Future<bool> checkHasPin() async {
     try {

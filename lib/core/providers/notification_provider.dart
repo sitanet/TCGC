@@ -67,7 +67,13 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> loadPreferences() async {
-    _preferences = await _notificationService.getPreferences();
+    try {
+      _preferences = await _notificationService.getPreferences();
+    } catch (e) {
+      debugPrint('Error loading preferences: $e');
+      // Use default preferences on error
+      _preferences = NotificationPreferences();
+    }
     notifyListeners();
   }
 
@@ -85,20 +91,24 @@ class NotificationProvider extends ChangeNotifier {
     await updatePreferences(_preferences.copyWith(emailEnabled: enabled));
   }
 
-  Future<void> setSmsEnabled(bool enabled) async {
-    await updatePreferences(_preferences.copyWith(smsEnabled: enabled));
-  }
-
   Future<void> setEventsEnabled(bool enabled) async {
     await updatePreferences(_preferences.copyWith(eventsEnabled: enabled));
   }
 
-  Future<void> setSermonsEnabled(bool enabled) async {
-    await updatePreferences(_preferences.copyWith(sermonsEnabled: enabled));
+  Future<void> setMessagesEnabled(bool enabled) async {
+    await updatePreferences(_preferences.copyWith(messagesEnabled: enabled));
   }
 
   Future<void> setWalletEnabled(bool enabled) async {
     await updatePreferences(_preferences.copyWith(walletEnabled: enabled));
+  }
+
+  Future<void> setTeensEnabled(bool enabled) async {
+    await updatePreferences(_preferences.copyWith(teensEnabled: enabled));
+  }
+
+  Future<void> setAnnouncementsEnabled(bool enabled) async {
+    await updatePreferences(_preferences.copyWith(announcementsEnabled: enabled));
   }
 
   void clearNotifications() {

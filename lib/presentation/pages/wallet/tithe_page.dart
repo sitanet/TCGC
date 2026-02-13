@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/wallet_provider.dart';
+import '../../../core/providers/biometric_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'success_page.dart';
@@ -34,6 +35,7 @@ class _TithePageState extends State<TithePage> {
     }
     
     final walletProvider = context.read<WalletProvider>();
+    final biometricProvider = context.read<BiometricProvider>();
     
     if (walletProvider.balance < amountValue) {
       if (mounted) {
@@ -43,6 +45,18 @@ class _TithePageState extends State<TithePage> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+      return;
+    }
+    
+    // Check if biometric is enabled for transactions
+    if (biometricProvider.biometricTransactionEnabled) {
+      final authenticated = await biometricProvider.authenticateForTransaction();
+      if (authenticated && mounted) {
+        await _executePaymentWithBiometric(amountValue);
+      } else if (mounted) {
+        // Fall back to PIN if biometric fails
+        _showPinDialog(amountValue);
       }
       return;
     }
@@ -57,6 +71,34 @@ class _TithePageState extends State<TithePage> {
     // Show PIN input dialog
     if (mounted) {
       _showPinDialog(amountValue);
+    }
+  }
+  
+  Future<void> _executePaymentWithBiometric(double amountValue) async {
+    setState(() => _isProcessing = true);
+    
+    final walletProvider = context.read<WalletProvider>();
+    final success = await walletProvider.giveWithBiometric(widget.giveOptionId, amountValue);
+    
+    setState(() => _isProcessing = false);
+    
+    if (success && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SuccessPage(
+            title: widget.title,
+            amount: amount,
+          ),
+        ),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(walletProvider.error ?? 'Failed to process payment'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
   

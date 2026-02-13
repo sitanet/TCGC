@@ -33,6 +33,9 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
   Map<String, dynamic>? _ninVerifiedData;
   Map<String, dynamic>? _bvnVerifiedData;
 
+  // Multi-step flow
+  int _currentStep = 0; // 0 = NIN, 1 = PIN, etc.
+
   // Simulated wallet status - in real app, this would come from a backend/state
   bool _hasWallet = false;
   String? _walletAccountNumber;
@@ -337,162 +340,173 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
             children: [
               _buildCreateWalletHeader(context, isDark),
               const SizedBox(height: 32),
-              _buildSectionTitle(context, 'Verification Information'),
-              const SizedBox(height: 8),
-              Text(
-                'Provide either NIN or BVN for wallet creation',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              _buildVerifiableTextField(
-                controller: _ninController,
-                label: 'NIN (National Identification Number)',
-                hint: 'Enter your 11-digit NIN',
-                isDark: isDark,
-                obscure: _obscureNin,
-                onToggle: () {
-                  setState(() {
-                    _obscureNin = !_obscureNin;
-                  });
-                },
-                isVerifying: _isVerifyingNin,
-                isVerified: _ninVerified,
-                onVerify: _verifyNin,
-                maxLength: 11,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (value) {
-                  if ((value == null || value.isEmpty) && 
-                      (_bvnController.text.isEmpty)) {
-                    return 'Either NIN or BVN is required';
-                  }
-                  if (value != null && value.isNotEmpty && value.length != 11) {
-                    return 'NIN must be 11 digits';
-                  }
-                  return null;
-                },
-              ),
-              if (_ninVerified && _ninVerifiedData != null) ...[
+              if (_currentStep == 0) ...[
+                // Step 1: NIN Verification
+                _buildSectionTitle(context, 'Verification'),
                 const SizedBox(height: 8),
-                _buildVerifiedDataCard(context, isDark, 'NIN', _ninVerifiedData!),
-              ],
-              const SizedBox(height: 8),
-              Text(
-                'OR',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
-                      fontWeight: FontWeight.w600,
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              _buildVerifiableTextField(
-                controller: _bvnController,
-                label: 'BVN (Bank Verification Number)',
-                hint: 'Enter your 11-digit BVN',
-                isDark: isDark,
-                obscure: _obscureBvn,
-                onToggle: () {
-                  setState(() {
-                    _obscureBvn = !_obscureBvn;
-                  });
-                },
-                isVerifying: _isVerifyingBvn,
-                isVerified: _bvnVerified,
-                onVerify: _verifyBvn,
-                maxLength: 11,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (value) {
-                  if ((value == null || value.isEmpty) && 
-                      (_ninController.text.isEmpty)) {
-                    return 'Either NIN or BVN is required';
-                  }
-                  if (value != null && value.isNotEmpty && value.length != 11) {
-                    return 'BVN must be 11 digits';
-                  }
-                  return null;
-                },
-              ),
-              if (_bvnVerified && _bvnVerifiedData != null) ...[
+                Text(
+                  'Enter your NIN to verify your identity',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                _buildVerifiableTextField(
+                  controller: _ninController,
+                  label: 'NIN (National Identification Number)',
+                  hint: 'Enter your 11-digit NIN',
+                  isDark: isDark,
+                  obscure: _obscureNin,
+                  onToggle: () {
+                    setState(() {
+                      _obscureNin = !_obscureNin;
+                    });
+                  },
+                  isVerifying: _isVerifyingNin,
+                  isVerified: _ninVerified,
+                  onVerify: _verifyNin,
+                  maxLength: 11,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'NIN is required';
+                    }
+                    if (value.length != 11) {
+                      return 'NIN must be 11 digits';
+                    }
+                    return null;
+                  },
+                ),
+                if (_ninVerified && _ninVerifiedData != null) ...[
+                  const SizedBox(height: 8),
+                  _buildVerifiedDataCard(context, isDark, 'NIN', _ninVerifiedData!),
+                ],
+                const SizedBox(height: 32),
+                _buildNextButton(context),
+              ] else if (_currentStep == 1) ...[
+                // Step 2: Transaction PIN
+                _buildSectionTitle(context, 'Transaction PIN'),
                 const SizedBox(height: 8),
-                _buildVerifiedDataCard(context, isDark, 'BVN', _bvnVerifiedData!),
+                Text(
+                  'Create a 4-digit PIN for securing your transactions',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                _buildSecureTextField(
+                  controller: _transactionPinController,
+                  label: 'Transaction PIN',
+                  hint: 'Enter your 4-digit PIN',
+                  isDark: isDark,
+                  obscure: _obscurePin,
+                  onToggle: () {
+                    setState(() {
+                      _obscurePin = !_obscurePin;
+                    });
+                  },
+                  maxLength: 4,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'PIN is required';
+                    }
+                    if (value.length != 4) {
+                      return 'PIN must be 4 digits';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildSecureTextField(
+                  controller: _confirmPinController,
+                  label: 'Confirm Transaction PIN',
+                  hint: 'Re-enter your 4-digit PIN',
+                  isDark: isDark,
+                  obscure: _obscureConfirmPin,
+                  onToggle: () {
+                    setState(() {
+                      _obscureConfirmPin = !_obscureConfirmPin;
+                    });
+                  },
+                  maxLength: 4,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please confirm your PIN';
+                    }
+                    if (value != _transactionPinController.text) {
+                      return 'PINs do not match';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 32),
+                _buildCreateWalletButton(context),
               ],
-              const SizedBox(height: 32),
-              _buildSectionTitle(context, 'Transaction PIN'),
-              const SizedBox(height: 8),
-              Text(
-                'Create a 4-digit PIN for securing your transactions',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              _buildSecureTextField(
-                controller: _transactionPinController,
-                label: 'Transaction PIN',
-                hint: 'Enter your 4-digit PIN',
-                isDark: isDark,
-                obscure: _obscurePin,
-                onToggle: () {
-                  setState(() {
-                    _obscurePin = !_obscurePin;
-                  });
-                },
-                maxLength: 4,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'PIN is required';
-                  }
-                  if (value.length != 4) {
-                    return 'PIN must be 4 digits';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              _buildSecureTextField(
-                controller: _confirmPinController,
-                label: 'Confirm Transaction PIN',
-                hint: 'Re-enter your 4-digit PIN',
-                isDark: isDark,
-                obscure: _obscureConfirmPin,
-                onToggle: () {
-                  setState(() {
-                    _obscureConfirmPin = !_obscureConfirmPin;
-                  });
-                },
-                maxLength: 4,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please confirm your PIN';
-                  }
-                  if (value != _transactionPinController.text) {
-                    return 'PINs do not match';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-              _buildCreateWalletButton(context),
               const SizedBox(height: 100),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildNextButton(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _isVerifyingNin ? null : _goToNextStep,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryGold,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Text(
+          'Next',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _goToNextStep() {
+    if (_ninController.text.length != 11) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid 11-digit NIN'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (!_ninVerified) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please verify your NIN before proceeding'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _currentStep = 1;
+    });
   }
 
   Widget _buildCreateWalletHeader(BuildContext context, bool isDark) {
@@ -918,70 +932,77 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
   }
 
   void _createWallet() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      // Check if at least one verification is done
-      if (!_ninVerified && !_bvnVerified) {
+    // Validate PIN fields
+    if (_transactionPinController.text.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a 4-digit PIN'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (_transactionPinController.text != _confirmPinController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('PINs do not match'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    final user = context.read<AuthProvider>().user;
+    final walletProvider = context.read<WalletProvider>();
+    
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Call the actual API with verified user data
+    final userData = {
+      'nin': _ninController.text,
+      'phone_number': user?.phoneNumber,
+      'date_of_birth': user?.dateOfBirth?.toIso8601String().split('T').first,
+      'address': user?.address,
+      'gender': user?.gender,
+    };
+
+    final success = await walletProvider.openWallet(userData);
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (mounted) {
+      if (success) {
+        setState(() {
+          _hasWallet = true;
+          _walletAccountNumber = walletProvider.accountNumber;
+          _walletAccountName = walletProvider.accountName;
+          _walletBalance = walletProvider.balance;
+        });
+        
+        // Set transaction PIN after wallet creation
+        await walletProvider.setTransactionPin(
+          _transactionPinController.text,
+          _confirmPinController.text,
+        );
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please verify your NIN or BVN before creating a wallet'),
-            backgroundColor: AppColors.warning,
+            content: Text('Wallet created successfully!'),
+            backgroundColor: AppColors.success,
           ),
         );
-        return;
-      }
-
-      final user = context.read<AuthProvider>().user;
-      final walletProvider = context.read<WalletProvider>();
-      
-      setState(() {
-        _isLoading = true;
-      });
-
-      // Call the actual API with verified user data
-      final userData = {
-        if (_ninVerified) 'nin': _ninController.text,
-        if (_bvnVerified) 'bvn': _bvnController.text,
-        'phone_number': user?.phoneNumber,
-        'date_of_birth': user?.dateOfBirth?.toIso8601String().split('T').first,
-        'address': user?.address,
-        'gender': user?.gender,
-      };
-
-      final success = await walletProvider.openWallet(userData);
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (mounted) {
-        if (success) {
-          setState(() {
-            _hasWallet = true;
-            _walletAccountNumber = walletProvider.accountNumber;
-            _walletAccountName = walletProvider.accountName;
-            _walletBalance = walletProvider.balance;
-          });
-          
-          // Set transaction PIN after wallet creation
-          await walletProvider.setTransactionPin(
-            _transactionPinController.text,
-            _confirmPinController.text,
-          );
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Wallet created successfully!'),
-              backgroundColor: AppColors.success,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(walletProvider.error ?? 'Failed to create wallet'),
-              backgroundColor: AppColors.error,
-            ),
-          );
-        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(walletProvider.error ?? 'Failed to create wallet'),
+            backgroundColor: AppColors.error,
+          ),
+        );
       }
     }
   }

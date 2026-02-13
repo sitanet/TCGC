@@ -77,10 +77,8 @@ class AppNotification {
 class NotificationPreferences {
   final bool pushEnabled;
   final bool emailEnabled;
-  final bool smsEnabled;
   final bool eventsEnabled;
-  final bool sermonsEnabled;
-  final bool messagesEnabled;
+  final bool messagesEnabled; // Sermons/messages
   final bool walletEnabled;
   final bool teensEnabled;
   final bool announcementsEnabled;
@@ -88,9 +86,7 @@ class NotificationPreferences {
   NotificationPreferences({
     this.pushEnabled = true,
     this.emailEnabled = true,
-    this.smsEnabled = true,
     this.eventsEnabled = true,
-    this.sermonsEnabled = true,
     this.messagesEnabled = true,
     this.walletEnabled = true,
     this.teensEnabled = true,
@@ -101,9 +97,7 @@ class NotificationPreferences {
     return NotificationPreferences(
       pushEnabled: json['push_enabled'] ?? true,
       emailEnabled: json['email_enabled'] ?? true,
-      smsEnabled: json['sms_enabled'] ?? true,
       eventsEnabled: json['events_enabled'] ?? true,
-      sermonsEnabled: json['sermons_enabled'] ?? true,
       messagesEnabled: json['messages_enabled'] ?? true,
       walletEnabled: json['wallet_enabled'] ?? true,
       teensEnabled: json['teens_enabled'] ?? true,
@@ -115,9 +109,7 @@ class NotificationPreferences {
     return {
       'push_enabled': pushEnabled,
       'email_enabled': emailEnabled,
-      'sms_enabled': smsEnabled,
       'events_enabled': eventsEnabled,
-      'sermons_enabled': sermonsEnabled,
       'messages_enabled': messagesEnabled,
       'wallet_enabled': walletEnabled,
       'teens_enabled': teensEnabled,
@@ -128,9 +120,7 @@ class NotificationPreferences {
   NotificationPreferences copyWith({
     bool? pushEnabled,
     bool? emailEnabled,
-    bool? smsEnabled,
     bool? eventsEnabled,
-    bool? sermonsEnabled,
     bool? messagesEnabled,
     bool? walletEnabled,
     bool? teensEnabled,
@@ -139,9 +129,7 @@ class NotificationPreferences {
     return NotificationPreferences(
       pushEnabled: pushEnabled ?? this.pushEnabled,
       emailEnabled: emailEnabled ?? this.emailEnabled,
-      smsEnabled: smsEnabled ?? this.smsEnabled,
       eventsEnabled: eventsEnabled ?? this.eventsEnabled,
-      sermonsEnabled: sermonsEnabled ?? this.sermonsEnabled,
       messagesEnabled: messagesEnabled ?? this.messagesEnabled,
       walletEnabled: walletEnabled ?? this.walletEnabled,
       teensEnabled: teensEnabled ?? this.teensEnabled,

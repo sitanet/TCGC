@@ -13,6 +13,7 @@ import 'core/providers/auth_provider.dart';
 import 'core/providers/notification_provider.dart';
 import 'core/providers/audio_player_provider.dart' show AudioPlayerProvider, initAudioService;
 import 'core/providers/wallet_provider.dart';
+import 'core/providers/biometric_provider.dart';
 import 'presentation/pages/home/home_page.dart';
 import 'presentation/pages/audio/audio_page.dart';
 import 'presentation/pages/livestream/livestream_page.dart';
@@ -53,6 +54,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => WalletProvider()),
         ChangeNotifierProvider(create: (_) => AudioPlayerProvider()),
+        ChangeNotifierProvider(create: (_) => BiometricProvider()),
       ],
       child: const MyApp(),
     ),
