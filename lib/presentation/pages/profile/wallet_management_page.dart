@@ -26,6 +26,12 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
   bool _obscurePin = true;
   bool _obscureConfirmPin = true;
   bool _isLoading = false;
+  bool _isVerifyingNin = false;
+  bool _isVerifyingBvn = false;
+  bool _ninVerified = false;
+  bool _bvnVerified = false;
+  Map<String, dynamic>? _ninVerifiedData;
+  Map<String, dynamic>? _bvnVerifiedData;
 
   // Simulated wallet status - in real app, this would come from a backend/state
   bool _hasWallet = false;
@@ -342,7 +348,7 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                     ),
               ),
               const SizedBox(height: 16),
-              _buildSecureTextField(
+              _buildVerifiableTextField(
                 controller: _ninController,
                 label: 'NIN (National Identification Number)',
                 hint: 'Enter your 11-digit NIN',
@@ -353,6 +359,9 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                     _obscureNin = !_obscureNin;
                   });
                 },
+                isVerifying: _isVerifyingNin,
+                isVerified: _ninVerified,
+                onVerify: _verifyNin,
                 maxLength: 11,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -367,6 +376,10 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                   return null;
                 },
               ),
+              if (_ninVerified && _ninVerifiedData != null) ...[
+                const SizedBox(height: 8),
+                _buildVerifiedDataCard(context, isDark, 'NIN', _ninVerifiedData!),
+              ],
               const SizedBox(height: 8),
               Text(
                 'OR',
@@ -379,7 +392,7 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
-              _buildSecureTextField(
+              _buildVerifiableTextField(
                 controller: _bvnController,
                 label: 'BVN (Bank Verification Number)',
                 hint: 'Enter your 11-digit BVN',
@@ -390,6 +403,9 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                     _obscureBvn = !_obscureBvn;
                   });
                 },
+                isVerifying: _isVerifyingBvn,
+                isVerified: _bvnVerified,
+                onVerify: _verifyBvn,
                 maxLength: 11,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -404,6 +420,10 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                   return null;
                 },
               ),
+              if (_bvnVerified && _bvnVerifiedData != null) ...[
+                const SizedBox(height: 8),
+                _buildVerifiedDataCard(context, isDark, 'BVN', _bvnVerifiedData!),
+              ],
               const SizedBox(height: 32),
               _buildSectionTitle(context, 'Transaction PIN'),
               const SizedBox(height: 8),
@@ -602,6 +622,268 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
     );
   }
 
+  Widget _buildVerifiableTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required bool isDark,
+    required bool obscure,
+    required VoidCallback onToggle,
+    required bool isVerifying,
+    required bool isVerified,
+    required VoidCallback onVerify,
+    int? maxLength,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? AppColors.textSecondaryDark : Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: controller,
+                obscureText: obscure,
+                keyboardType: keyboardType,
+                maxLength: maxLength,
+                inputFormatters: inputFormatters,
+                validator: validator,
+                enabled: !isVerified,
+                onChanged: (_) {
+                  if (isVerified) {
+                    setState(() {
+                      if (label.contains('NIN')) {
+                        _ninVerified = false;
+                        _ninVerifiedData = null;
+                      } else {
+                        _bvnVerified = false;
+                        _bvnVerifiedData = null;
+                      }
+                    });
+                  }
+                },
+                decoration: InputDecoration(
+                  hintText: hint,
+                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  filled: true,
+                  fillColor: isDark ? AppColors.cardDark : Colors.grey[100],
+                  counterText: '',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: isVerified 
+                        ? const BorderSide(color: AppColors.success, width: 1.5)
+                        : BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.error),
+                  ),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isVerified)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 8),
+                          child: Icon(Icons.check_circle, color: AppColors.success, size: 20),
+                        ),
+                      IconButton(
+                        icon: Icon(
+                          obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                          color: Colors.grey[600],
+                        ),
+                        onPressed: onToggle,
+                      ),
+                    ],
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: isVerifying || isVerified || controller.text.length != 11
+                    ? null
+                    : onVerify,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isVerified ? AppColors.success : AppColors.primaryGold,
+                  disabledBackgroundColor: Colors.grey[300],
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: isVerifying
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        isVerified ? 'Verified' : 'Verify',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVerifiedDataCard(BuildContext context, bool isDark, String type, Map<String, dynamic> data) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.success.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.success.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.verified, color: AppColors.success, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                '$type Verified Successfully',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (data['first_name'] != null || data['last_name'] != null)
+            _buildVerifiedRow('Name', '${data['first_name'] ?? ''} ${data['last_name'] ?? ''}'.trim()),
+          if (data['phone'] != null && data['phone'].toString().isNotEmpty)
+            _buildVerifiedRow('Phone', data['phone']),
+          if (data['gender'] != null && data['gender'].toString().isNotEmpty)
+            _buildVerifiedRow('Gender', data['gender'].toString().toUpperCase()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerifiedRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.grey,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _verifyNin() async {
+    if (_ninController.text.length != 11) return;
+
+    setState(() => _isVerifyingNin = true);
+
+    final authProvider = context.read<AuthProvider>();
+    final result = await authProvider.verifyNin(_ninController.text, updateProfile: true);
+
+    setState(() {
+      _isVerifyingNin = false;
+      _ninVerified = result.success;
+      _ninVerifiedData = result.verifiedData;
+    });
+
+    if (mounted) {
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('NIN verified successfully!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'NIN verification failed'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _verifyBvn() async {
+    if (_bvnController.text.length != 11) return;
+
+    setState(() => _isVerifyingBvn = true);
+
+    final authProvider = context.read<AuthProvider>();
+    final result = await authProvider.verifyBvn(_bvnController.text, updateProfile: true);
+
+    setState(() {
+      _isVerifyingBvn = false;
+      _bvnVerified = result.success;
+      _bvnVerifiedData = result.verifiedData;
+    });
+
+    if (mounted) {
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('BVN verified successfully!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'BVN verification failed'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildCreateWalletButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
@@ -637,6 +919,17 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
 
   void _createWallet() async {
     if (_formKey.currentState?.validate() ?? false) {
+      // Check if at least one verification is done
+      if (!_ninVerified && !_bvnVerified) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please verify your NIN or BVN before creating a wallet'),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+        return;
+      }
+
       final user = context.read<AuthProvider>().user;
       final walletProvider = context.read<WalletProvider>();
       
@@ -644,12 +937,12 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
         _isLoading = true;
       });
 
-      // Call the actual API with user data
+      // Call the actual API with verified user data
       final userData = {
-        'nin': _ninController.text,
-        'bvn': _bvnController.text,
+        if (_ninVerified) 'nin': _ninController.text,
+        if (_bvnVerified) 'bvn': _bvnController.text,
         'phone_number': user?.phoneNumber,
-        'date_of_birth': user?.dateOfBirth?.toIso8601String().split('T').first, // Format as YYYY-MM-DD
+        'date_of_birth': user?.dateOfBirth?.toIso8601String().split('T').first,
         'address': user?.address,
         'gender': user?.gender,
       };

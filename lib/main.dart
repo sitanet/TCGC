@@ -34,17 +34,16 @@ const String appVersion = '1.0.0';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  await initAudioService();
   
-  // Set default status bar style (dark icons for light theme)
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      statusBarBrightness: Brightness.light,
-    ),
-  );
+  // Don't block app startup if audio service fails
+  try {
+    await initAudioService().timeout(
+      const Duration(seconds: 3),
+      onTimeout: () => debugPrint('Audio service init timed out'),
+    );
+  } catch (e) {
+    debugPrint('Audio service init failed: $e');
+  }
   
   runApp(
     MultiProvider(
@@ -52,8 +51,8 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
-        ChangeNotifierProvider(create: (_) => AudioPlayerProvider()),
         ChangeNotifierProvider(create: (_) => WalletProvider()),
+        ChangeNotifierProvider(create: (_) => AudioPlayerProvider()),
       ],
       child: const MyApp(),
     ),

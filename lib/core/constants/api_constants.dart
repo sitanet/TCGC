@@ -73,4 +73,9 @@ class ApiConstants {
   
   // App Version
   static const String checkAppUpdate = '/app/check-update/';
+  
+  // KYC Verification
+  static const String verifyNin = '/kyc/verify-nin/';
+  static const String verifyBvn = '/kyc/verify-bvn/';
+  static const String validateIdentity = '/kyc/validate-identity/';
 }

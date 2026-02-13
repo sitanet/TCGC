@@ -63,8 +63,15 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final sermons = await _dataService.getMessages();
-      final events = await _dataService.getEvents();
+      // Load sermons and events in parallel for faster loading
+      final results = await Future.wait([
+        _dataService.getMessages(),
+        _dataService.getEvents(),
+      ]);
+      
+      final sermons = results[0] as List<Sermon>;
+      final events = results[1] as List<Event>;
+      
       if (mounted) {
         setState(() {
           _sermons = sermons;
@@ -509,10 +516,25 @@ class _HomePageState extends State<HomePage> {
     }
 
     if (imageUrl.startsWith('http')) {
-      return Image.network(
-        imageUrl,
+      return CachedNetworkImage(
+        imageUrl: imageUrl,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => placeholder,
+        placeholder: (context, url) => Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF1A2744), Color(0xFF0D1522)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.primaryGold,
+            ),
+          ),
+        ),
+        errorWidget: (context, url, error) => placeholder,
       );
     }
 
@@ -576,10 +598,23 @@ class _HomePageState extends State<HomePage> {
       return placeholder;
     }
     if (sermon.imageUrl!.startsWith('http')) {
-      return Image.network(
-        sermon.imageUrl!,
+      return CachedNetworkImage(
+        imageUrl: sermon.imageUrl!,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => placeholder,
+        placeholder: (context, url) => Container(
+          color: AppColors.primaryGold.withValues(alpha: 0.15),
+          child: const Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.primaryGold,
+              ),
+            ),
+          ),
+        ),
+        errorWidget: (context, url, error) => placeholder,
       );
     }
     return Image.asset(

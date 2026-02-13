@@ -11,32 +11,32 @@ bool _audioServiceInitialized = false;
 
 Future<void> initAudioService() async {
   if (_audioServiceInitialized) return;
-  
+
   try {
-    debugPrint('Initializing audio service...');
+    // Skip audio_service on desktop platforms - use fallback player instead
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      debugPrint('Skipping audio_service on desktop platform');
+      _audioServiceInitialized = true;
+      return;
+    }
+    
     _audioHandler = await AudioService.init(
       builder: () => AudioPlayerHandler(),
       config: AudioServiceConfig(
         androidNotificationChannelId: 'com.tcgc.app.audio',
         androidNotificationChannelName: 'TCGC Audio',
-        androidNotificationChannelDescription: 'Audio playback controls',
+        androidNotificationChannelDescription: 'Sermon playback',
+        androidNotificationIcon: 'drawable/ic_notification',
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: false,
-        androidNotificationIcon: 'drawable/ic_notification',
         androidResumeOnClick: true,
-        androidShowNotificationBadge: true,
-        notificationColor: const Color(0xFFD4A84B),
         preloadArtwork: true,
-        fastForwardInterval: const Duration(seconds: 10),
-        rewindInterval: const Duration(seconds: 10),
       ),
     );
     _audioServiceInitialized = true;
-    debugPrint('Audio service initialized successfully');
-  } catch (e, stack) {
-    debugPrint('Audio service init error: $e');
-    debugPrint('Stack trace: $stack');
-    // Continue without audio_service - use fallback player
+  } catch (e) {
+    debugPrint('Audio service initialization failed: $e');
+    _audioServiceInitialized = true; // Mark as initialized to use fallback
   }
 }
 
@@ -58,6 +58,10 @@ class AudioPlayerProvider extends ChangeNotifier {
   // Audio caching
   Directory? _cacheDir;
   
+  // Playlist/Queue management for Next/Previous
+  List<Sermon> _queue = [];
+  int _currentIndex = -1;
+  
   // Pre-buffering service for instant playback
   final AudioCacheService _audioCacheService = AudioCacheService();
 
@@ -68,6 +72,12 @@ class AudioPlayerProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get hasAudio => _currentSermon != null;
+  
+  // Queue getters
+  List<Sermon> get queue => _queue;
+  int get currentIndex => _currentIndex;
+  bool get hasNext => _currentIndex < _queue.length - 1;
+  bool get hasPrevious => _currentIndex > 0;
 
   AudioPlayerProvider() {
     _setupListeners();
@@ -120,6 +130,15 @@ class AudioPlayerProvider extends ChangeNotifier {
   void _setupListeners() {
     if (_audioServiceInitialized && _audioHandler != null && !_listenersSetup) {
       _listenersSetup = true;
+      
+      final handler = _audioHandler as AudioPlayerHandler;
+      
+      // Handle track completion for auto-advance
+      handler.onTrackCompleted = () {
+        if (hasNext) {
+          skipToNext();
+        }
+      };
       
       _audioHandler!.playbackState.listen((state) {
         _isPlaying = state.playing;
@@ -304,6 +323,47 @@ class AudioPlayerProvider extends ChangeNotifier {
     }
   }
 
+  /// Set the playback queue and start playing from the given index
+  Future<void> playFromQueue(List<Sermon> sermons, int startIndex) async {
+    if (sermons.isEmpty || startIndex < 0 || startIndex >= sermons.length) return;
+    
+    _queue = List.from(sermons);
+    _currentIndex = startIndex;
+    await playSermon(sermons[startIndex]);
+  }
+  
+  /// Play next track in queue
+  Future<void> skipToNext() async {
+    if (!hasNext) return;
+    _currentIndex++;
+    await playSermon(_queue[_currentIndex]);
+  }
+  
+  /// Play previous track in queue
+  Future<void> skipToPrevious() async {
+    // If more than 3 seconds into the track, restart it instead
+    if (_position.inSeconds > 3) {
+      await seek(Duration.zero);
+      return;
+    }
+    if (!hasPrevious) return;
+    _currentIndex--;
+    await playSermon(_queue[_currentIndex]);
+  }
+  
+  /// Add sermon to end of queue
+  void addToQueue(Sermon sermon) {
+    _queue.add(sermon);
+    notifyListeners();
+  }
+  
+  /// Clear the queue
+  void clearQueue() {
+    _queue.clear();
+    _currentIndex = -1;
+    notifyListeners();
+  }
+
   Future<bool> isSermonCached(String sermonId) async {
     if (_cacheDir == null) return false;
     final fileName = _sanitizeFileName(sermonId);
@@ -379,14 +439,12 @@ class AudioPlayerProvider extends ChangeNotifier {
 
 class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   final _player = AudioPlayer();
+  
+  // Callback for track completion (for auto-advance)
+  void Function()? onTrackCompleted;
 
   AudioPlayerHandler() {
-    debugPrint('AudioPlayerHandler: Initializing...');
-    
-    // Listen to playback events and transform to audio_service format
-    _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
-    
-    // Update media item duration when available
+    _player.playbackEventStream.map(_transform).pipe(playbackState);
     _player.durationStream.listen((duration) {
       final item = mediaItem.value;
       if (item != null && duration != null) {
@@ -394,32 +452,26 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
       }
     });
     
-    // Handle playback completion
+    // Listen for track completion
     _player.processingStateStream.listen((state) {
       if (state == ProcessingState.completed) {
-        debugPrint('AudioPlayerHandler: Playback completed');
-        stop();
+        onTrackCompleted?.call();
       }
     });
-    
-    debugPrint('AudioPlayerHandler: Initialized successfully');
   }
 
-  PlaybackState _transformEvent(PlaybackEvent event) {
+  PlaybackState _transform(PlaybackEvent event) {
     return PlaybackState(
       controls: [
-        MediaControl.rewind,
+        MediaControl.skipToPrevious,
         if (_player.playing) MediaControl.pause else MediaControl.play,
-        MediaControl.fastForward,
+        MediaControl.skipToNext,
         MediaControl.stop,
       ],
       systemActions: const {
         MediaAction.seek,
         MediaAction.seekForward,
         MediaAction.seekBackward,
-        MediaAction.play,
-        MediaAction.pause,
-        MediaAction.stop,
       },
       androidCompactActionIndices: const [0, 1, 2],
       processingState: const {
@@ -433,30 +485,15 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
       updatePosition: _player.position,
       bufferedPosition: _player.bufferedPosition,
       speed: _player.speed,
-      queueIndex: event.currentIndex,
     );
   }
 
   @override
-  // ignore: avoid_renaming_method_parameters
-  Future<void> playMediaItem(MediaItem newMediaItem) async {
-    // Add media item immediately so notification appears
-    mediaItem.add(newMediaItem);
-    
-    final url = newMediaItem.extras?['url'] as String?;
-    if (url != null) {
-      try {
-        debugPrint('AudioPlayerHandler: Playing $url');
-        // Use direct URL streaming for fastest startup
-        // This ensures notification works and audio starts immediately
-        await _player.setUrl(url);
-        await _player.play();
-        debugPrint('AudioPlayerHandler: Playback started');
-      } catch (e) {
-        debugPrint('AudioPlayerHandler error: $e');
-        rethrow;
-      }
-    }
+  Future<void> playMediaItem(MediaItem mediaItem) async {
+    this.mediaItem.add(mediaItem);
+    final url = mediaItem.extras?['url'] as String;
+    await _player.setUrl(url);
+    await _player.play();
   }
 
   @override
@@ -466,19 +503,27 @@ class AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
   Future<void> pause() => _player.pause();
 
   @override
+  Future<void> seek(Duration position) => _player.seek(position);
+
+  @override
   Future<void> stop() async {
     await _player.stop();
     return super.stop();
   }
-
+  
   @override
-  Future<void> seek(Duration position) => _player.seek(position);
-
+  Future<void> skipToNext() async {
+    // This will be handled by the provider
+  }
+  
   @override
-  Future<void> fastForward() => 
-      _player.seek(_player.position + const Duration(seconds: 10));
-
+  Future<void> skipToPrevious() async {
+    // This will be handled by the provider
+  }
+  
   @override
-  Future<void> rewind() => 
-      _player.seek(_player.position - const Duration(seconds: 10));
+  Future<void> fastForward() => seek(_player.position + const Duration(seconds: 10));
+  
+  @override
+  Future<void> rewind() => seek(_player.position - const Duration(seconds: 10));
 }

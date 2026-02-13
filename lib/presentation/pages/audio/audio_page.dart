@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/services/data_service.dart';
@@ -413,12 +414,13 @@ class _AudioPageState extends State<AudioPage>
     }
 
     if (category.imageUrl!.startsWith('http')) {
-      return Image.network(
-        category.imageUrl!,
+      return CachedNetworkImage(
+        imageUrl: category.imageUrl!,
         width: 80,
         height: 80,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => placeholder,
+        placeholder: (context, url) => placeholder,
+        errorWidget: (context, url, error) => placeholder,
       );
     }
 

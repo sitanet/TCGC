@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/favorites_service.dart';
 import '../../../domain/entities/sermon.dart';
@@ -113,10 +114,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
             height: 50,
             color: isDark ? AppColors.cardDark : AppColors.dividerLight,
             child: sermon.imageUrl != null && sermon.imageUrl!.startsWith('http')
-                ? Image.network(
-                    sermon.imageUrl!,
+                ? CachedNetworkImage(
+                    imageUrl: sermon.imageUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _buildPlaceholder(isDark),
+                    placeholder: (_, __) => _buildPlaceholder(isDark),
+                    errorWidget: (_, __, ___) => _buildPlaceholder(isDark),
                   )
                 : _buildPlaceholder(isDark),
           ),

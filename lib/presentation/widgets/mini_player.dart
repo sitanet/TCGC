@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/providers/audio_player_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../pages/audio/audio_player_page.dart';
@@ -166,10 +167,11 @@ class MiniPlayer extends StatelessWidget {
     }
 
     if (imageUrl.startsWith('http')) {
-      return Image.network(
-        imageUrl,
+      return CachedNetworkImage(
+        imageUrl: imageUrl,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => placeholder,
+        placeholder: (context, url) => placeholder,
+        errorWidget: (context, url, error) => placeholder,
       );
     }
 

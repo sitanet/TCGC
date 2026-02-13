@@ -258,6 +258,68 @@ class AuthService {
   Future<void> loadSession() async {
     await _api.loadTokens();
   }
+
+  // KYC Verification Methods
+  Future<KycResult> verifyNin(String nin, {bool updateProfile = false}) async {
+    final response = await _api.post(ApiConstants.verifyNin, {
+      'nin': nin,
+      'update_profile': updateProfile,
+    });
+
+    if (response.isSuccess) {
+      return KycResult(
+        success: true,
+        message: response.data['message'],
+        verifiedData: response.data['data'],
+      );
+    }
+    return KycResult(
+      success: false,
+      error: response.data?['error'] ?? _parseErrorMessage(response),
+    );
+  }
+
+  Future<KycResult> verifyBvn(String bvn, {bool updateProfile = false}) async {
+    final response = await _api.post(ApiConstants.verifyBvn, {
+      'bvn': bvn,
+      'update_profile': updateProfile,
+    });
+
+    if (response.isSuccess) {
+      return KycResult(
+        success: true,
+        message: response.data['message'],
+        verifiedData: response.data['data'],
+      );
+    }
+    return KycResult(
+      success: false,
+      error: response.data?['error'] ?? _parseErrorMessage(response),
+    );
+  }
+
+  Future<KycResult> validateIdentity({String? nin, String? bvn}) async {
+    final response = await _api.post(ApiConstants.validateIdentity, {
+      if (nin != null) 'nin': nin,
+      if (bvn != null) 'bvn': bvn,
+    });
+
+    if (response.isSuccess) {
+      return KycResult(
+        success: true,
+        message: response.data['message'],
+        ninVerified: response.data['nin_verified'] ?? false,
+        bvnVerified: response.data['bvn_verified'] ?? false,
+        mismatches: List<String>.from(response.data['mismatches'] ?? []),
+      );
+    }
+    return KycResult(
+      success: false,
+      error: response.data?['error'] ?? _parseErrorMessage(response),
+      ninError: response.data?['nin_error'],
+      bvnError: response.data?['bvn_error'],
+    );
+  }
 }
 
 class AuthResult {
@@ -271,5 +333,29 @@ class AuthResult {
     this.error, 
     this.message,
     this.requiresEmailConfirmation = false,
+  });
+}
+
+class KycResult {
+  final bool success;
+  final String? error;
+  final String? message;
+  final Map<String, dynamic>? verifiedData;
+  final bool ninVerified;
+  final bool bvnVerified;
+  final List<String> mismatches;
+  final String? ninError;
+  final String? bvnError;
+
+  KycResult({
+    required this.success,
+    this.error,
+    this.message,
+    this.verifiedData,
+    this.ninVerified = false,
+    this.bvnVerified = false,
+    this.mismatches = const [],
+    this.ninError,
+    this.bvnError,
   });
 }

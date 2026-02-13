@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/audio_player_provider.dart';
 import '../../../domain/entities/sermon.dart';
@@ -152,12 +153,13 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
       return _buildPlaceholderArt(isDark);
     }
     if (widget.sermon.imageUrl!.startsWith('http')) {
-      return Image.network(
-        widget.sermon.imageUrl!,
+      return CachedNetworkImage(
+        imageUrl: widget.sermon.imageUrl!,
         fit: BoxFit.cover,
         width: 280,
         height: 280,
-        errorBuilder: (context, error, stackTrace) => _buildPlaceholderArt(isDark),
+        placeholder: (context, url) => _buildPlaceholderArt(isDark),
+        errorWidget: (context, url, error) => _buildPlaceholderArt(isDark),
       );
     }
     return Image.asset(
@@ -274,19 +276,47 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
   Widget _buildControls(bool isDark, AudioPlayerProvider audioProvider) {
     final isPlaying = audioProvider.isPlaying;
     final isLoading = audioProvider.isLoading;
+    final hasNext = audioProvider.hasNext;
+    final hasPrevious = audioProvider.hasPrevious || audioProvider.position.inSeconds > 3;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        // Skip to Previous
+        IconButton(
+          onPressed: isLoading || !hasPrevious
+              ? null
+              : () async {
+                  await audioProvider.skipToPrevious();
+                  // Update the page if we switched to a different sermon
+                  if (mounted && audioProvider.currentSermon != null &&
+                      audioProvider.currentSermon!.id != widget.sermon.id) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AudioPlayerPage(sermon: audioProvider.currentSermon!),
+                      ),
+                    );
+                  }
+                },
+          icon: Icon(
+            Icons.skip_previous,
+            size: 36,
+            color: hasPrevious
+                ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
+                : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+          ),
+        ),
+        const SizedBox(width: 8),
         IconButton(
           onPressed: isLoading ? null : () => audioProvider.seekBackward(),
           icon: Icon(
             Icons.replay_10,
-            size: 36,
+            size: 32,
             color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
           ),
         ),
-        const SizedBox(width: 24),
+        const SizedBox(width: 16),
         AnimatedPlayButton(
           isPlaying: isPlaying,
           isLoading: isLoading,
@@ -299,13 +329,38 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
             }
           },
         ),
-        const SizedBox(width: 24),
+        const SizedBox(width: 16),
         IconButton(
           onPressed: isLoading ? null : () => audioProvider.seekForward(),
           icon: Icon(
             Icons.forward_10,
-            size: 36,
+            size: 32,
             color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Skip to Next
+        IconButton(
+          onPressed: isLoading || !hasNext
+              ? null
+              : () async {
+                  await audioProvider.skipToNext();
+                  // Update the page to show the new sermon
+                  if (mounted && audioProvider.currentSermon != null) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AudioPlayerPage(sermon: audioProvider.currentSermon!),
+                      ),
+                    );
+                  }
+                },
+          icon: Icon(
+            Icons.skip_next,
+            size: 36,
+            color: hasNext
+                ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
+                : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
           ),
         ),
       ],

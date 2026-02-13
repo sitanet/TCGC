@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/audio_player_provider.dart';
 import '../../../domain/entities/sermon.dart';
@@ -262,12 +263,16 @@ class _AudioListPageState extends State<AudioListPage> {
                             isPreBuffered: isPreBuffered,
                             isBuffering: isBuffering,
                             bufferProgress: bufferProgress,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => AudioPlayerPage(sermon: audio),
-                              ),
-                            ),
+                            onTap: () {
+                              // Set the queue for Next/Previous functionality
+                              audioProvider.playFromQueue(_filteredItems, index);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AudioPlayerPage(sermon: audio),
+                                ),
+                              );
+                            },
                           );
                         },
                       );
@@ -419,10 +424,13 @@ class _AudioListItem extends StatelessWidget {
       );
     }
     if (sermon.imageUrl!.startsWith('http')) {
-      return Image.network(
-        sermon.imageUrl!,
+      return CachedNetworkImage(
+        imageUrl: sermon.imageUrl!,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Container(
+        placeholder: (context, url) => Container(
+          color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+        ),
+        errorWidget: (context, url, error) => Container(
           color: isDark ? AppColors.cardDark : AppColors.dividerLight,
         ),
       );

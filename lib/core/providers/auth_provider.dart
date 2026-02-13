@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import '../../data/services/auth_service.dart';
 import '../../domain/entities/user.dart';
 
+export '../../data/services/auth_service.dart' show KycResult;
+
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
   
@@ -240,5 +242,59 @@ class AuthProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  // KYC Verification Methods
+  Future<KycResult> verifyNin(String nin, {bool updateProfile = false}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    final result = await _authService.verifyNin(nin, updateProfile: updateProfile);
+    
+    _isLoading = false;
+    if (result.success && updateProfile) {
+      // Refresh user profile to get updated data
+      _user = await _authService.getProfile();
+    }
+    if (!result.success) {
+      _error = result.error;
+    }
+    notifyListeners();
+    return result;
+  }
+
+  Future<KycResult> verifyBvn(String bvn, {bool updateProfile = false}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    final result = await _authService.verifyBvn(bvn, updateProfile: updateProfile);
+    
+    _isLoading = false;
+    if (result.success && updateProfile) {
+      // Refresh user profile to get updated data
+      _user = await _authService.getProfile();
+    }
+    if (!result.success) {
+      _error = result.error;
+    }
+    notifyListeners();
+    return result;
+  }
+
+  Future<KycResult> validateIdentity({String? nin, String? bvn}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    final result = await _authService.validateIdentity(nin: nin, bvn: bvn);
+    
+    _isLoading = false;
+    if (!result.success) {
+      _error = result.error;
+    }
+    notifyListeners();
+    return result;
   }
 }

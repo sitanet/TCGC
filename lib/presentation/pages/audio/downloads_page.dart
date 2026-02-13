@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/download_service.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -175,10 +176,11 @@ class _DownloadsPageState extends State<DownloadsPage> {
             height: 50,
             color: isDark ? AppColors.cardDark : AppColors.dividerLight,
             child: sermon.imageUrl != null && sermon.imageUrl!.startsWith('http')
-                ? Image.network(
-                    sermon.imageUrl!,
+                ? CachedNetworkImage(
+                    imageUrl: sermon.imageUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _buildPlaceholder(isDark),
+                    placeholder: (_, __) => _buildPlaceholder(isDark),
+                    errorWidget: (_, __, ___) => _buildPlaceholder(isDark),
                   )
                 : _buildPlaceholder(isDark),
           ),

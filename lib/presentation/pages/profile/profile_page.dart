@@ -8,7 +8,7 @@ import '../legal/privacy_policy_page.dart';
 import '../support/complaint_page.dart';
 import 'edit_profile_page.dart';
 import 'settings_page.dart';
-import 'wallet_management_page.dart';
+import '../wallet/wallet_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -248,7 +248,7 @@ class ProfilePage extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const WalletManagementPage(),
+                    builder: (_) => const WalletPage(),
                   ),
                 );
               },
