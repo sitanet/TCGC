@@ -15,30 +15,38 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  bool _isInitialized = false;
-
   @override
   void initState() {
     super.initState();
+    // Fire and forget - providers will notify listeners when ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeSettings();
     });
   }
 
   Future<void> _initializeSettings() async {
-    final notificationProvider = context.read<NotificationProvider>();
-    final biometricProvider = context.read<BiometricProvider>();
-    
     try {
-      await notificationProvider.loadPreferences();
-      await biometricProvider.initialize();
+      final notificationProvider = context.read<NotificationProvider>();
+      await notificationProvider.loadPreferences().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('Notification preferences timed out');
+        },
+      );
     } catch (e) {
-      debugPrint('Error initializing settings: $e');
+      debugPrint('Error loading notification preferences: $e');
     }
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-      });
+
+    try {
+      final biometricProvider = context.read<BiometricProvider>();
+      await biometricProvider.initialize().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('Biometric initialization timed out');
+        },
+      );
+    } catch (e) {
+      debugPrint('Error initializing biometric: $e');
     }
   }
 
@@ -48,11 +56,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     return Scaffold(
       appBar: const CustomAppBar(title: 'Settings', showBackButton: true),
-      body: !_isInitialized
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primaryGold),
-            )
-          : Consumer<NotificationProvider>(
+      body: Consumer<NotificationProvider>(
         builder: (context, notificationProvider, _) {
           final prefs = notificationProvider.preferences;
 
@@ -328,14 +332,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _handleBiometricLoginToggle(bool value, BiometricProvider biometricProvider) async {
     if (value) {
-      // Need to get current credentials to save
       final authProvider = context.read<AuthProvider>();
       final user = authProvider.user;
-      
+
       final email = user?.email;
       if (email != null) {
-        // Show dialog to confirm and enter password
-        _showEnablebiometricLoginDialog(biometricProvider, email);
+        _showEnableBiometricLoginDialog(biometricProvider, email);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Unable to enable biometric login. Please try again later.')),
@@ -346,7 +348,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  void _showEnablebiometricLoginDialog(BiometricProvider biometricProvider, String email) {
+  void _showEnableBiometricLoginDialog(BiometricProvider biometricProvider, String email) {
     final passwordController = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -384,15 +386,15 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
                 return;
               }
-              
+
               Navigator.pop(dialogContext);
-              
+
               await biometricProvider.setBiometricLoginEnabled(
                 true,
                 email: email,
                 password: passwordController.text,
               );
-              
+
               if (biometricProvider.biometricLoginEnabled && mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Biometric login enabled')),
