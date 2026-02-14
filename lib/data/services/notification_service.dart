@@ -444,6 +444,9 @@ class NotificationService {
   }
 
   Future<NotificationPreferences> getPreferences() async {
+    // Ensure tokens are loaded before checking authentication
+    await _apiService.loadTokens();
+    
     // Try to fetch from backend first if authenticated
     if (_apiService.isAuthenticated) {
       try {
@@ -483,10 +486,14 @@ class NotificationService {
     await prefs.setBool(_prefsKeyAnnouncements, preferences.announcementsEnabled);
   }
 
-  Future<void> savePreferences(NotificationPreferences preferences) async {
-    // Save locally first
+  /// Returns true if saved successfully (locally and to backend if authenticated)
+  Future<bool> savePreferences(NotificationPreferences preferences) async {
+    // Save locally first - this always works
     await _savePreferencesLocally(preferences);
 
+    // Ensure tokens are loaded before checking authentication
+    await _apiService.loadTokens();
+    
     // Sync to backend if authenticated
     if (_apiService.isAuthenticated) {
       try {
@@ -496,13 +503,23 @@ class NotificationService {
         );
         if (response.isSuccess) {
           debugPrint('Preferences synced to backend successfully');
+          return true;
         } else {
           debugPrint('Failed to sync preferences: ${response.errorMessage}');
+          // Still return true since local save worked
+          return true;
         }
       } catch (e) {
         debugPrint('Error syncing preferences to backend: $e');
+        // Still return true since local save worked
+        return true;
       }
+    } else {
+      debugPrint('User not authenticated - preferences saved locally only');
     }
+    
+    // Not authenticated - local save is enough
+    return true;
   }
 
   Future<void> showLocalNotification({

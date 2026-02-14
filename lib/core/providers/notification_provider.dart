@@ -77,38 +77,38 @@ class NotificationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updatePreferences(NotificationPreferences newPreferences) async {
+  Future<bool> updatePreferences(NotificationPreferences newPreferences) async {
     _preferences = newPreferences;
     notifyListeners();
-    await _notificationService.savePreferences(newPreferences);
+    return await _notificationService.savePreferences(newPreferences);
   }
 
-  Future<void> setPushEnabled(bool enabled) async {
-    await updatePreferences(_preferences.copyWith(pushEnabled: enabled));
+  Future<bool> setPushEnabled(bool enabled) async {
+    return await updatePreferences(_preferences.copyWith(pushEnabled: enabled));
   }
 
-  Future<void> setEmailEnabled(bool enabled) async {
-    await updatePreferences(_preferences.copyWith(emailEnabled: enabled));
+  Future<bool> setEmailEnabled(bool enabled) async {
+    return await updatePreferences(_preferences.copyWith(emailEnabled: enabled));
   }
 
-  Future<void> setEventsEnabled(bool enabled) async {
-    await updatePreferences(_preferences.copyWith(eventsEnabled: enabled));
+  Future<bool> setEventsEnabled(bool enabled) async {
+    return await updatePreferences(_preferences.copyWith(eventsEnabled: enabled));
   }
 
-  Future<void> setMessagesEnabled(bool enabled) async {
-    await updatePreferences(_preferences.copyWith(messagesEnabled: enabled));
+  Future<bool> setMessagesEnabled(bool enabled) async {
+    return await updatePreferences(_preferences.copyWith(messagesEnabled: enabled));
   }
 
-  Future<void> setWalletEnabled(bool enabled) async {
-    await updatePreferences(_preferences.copyWith(walletEnabled: enabled));
+  Future<bool> setWalletEnabled(bool enabled) async {
+    return await updatePreferences(_preferences.copyWith(walletEnabled: enabled));
   }
 
-  Future<void> setTeensEnabled(bool enabled) async {
-    await updatePreferences(_preferences.copyWith(teensEnabled: enabled));
+  Future<bool> setTeensEnabled(bool enabled) async {
+    return await updatePreferences(_preferences.copyWith(teensEnabled: enabled));
   }
 
-  Future<void> setAnnouncementsEnabled(bool enabled) async {
-    await updatePreferences(_preferences.copyWith(announcementsEnabled: enabled));
+  Future<bool> setAnnouncementsEnabled(bool enabled) async {
+    return await updatePreferences(_preferences.copyWith(announcementsEnabled: enabled));
   }
 
   void clearNotifications() {

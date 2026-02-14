@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/biometric_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/user.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -72,12 +73,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
     'inactive': 'Inactive',
   };
 
-  bool _biometricEnabled = false;
-
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BiometricProvider>().initialize();
+    });
   }
 
   void _loadUserData() {
@@ -839,66 +841,150 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Widget _buildBiometricToggle(BuildContext context, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.primaryGold.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.fingerprint,
-              color: AppColors.primaryGold,
-              size: 28,
-            ),
+    return Consumer<BiometricProvider>(
+      builder: (context, biometricProvider, _) {
+        final isAvailable = biometricProvider.isAvailable;
+        final biometricName = biometricProvider.biometricTypeName;
+        
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Biometric Authentication',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withAlpha(25),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Use fingerprint or face ID to login',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
+                child: const Icon(
+                  Icons.fingerprint,
+                  color: AppColors.primaryGold,
+                  size: 28,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Biometric Authentication',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isAvailable
+                          ? 'Use $biometricName to login'
+                          : 'Biometric not available on this device',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: biometricProvider.biometricLoginEnabled,
+                onChanged: isAvailable
+                    ? (value) => _handleBiometricToggle(value, biometricProvider)
+                    : null,
+                activeColor: AppColors.primaryGold,
+              ),
+            ],
           ),
-          Switch(
-            value: _biometricEnabled,
-            onChanged: (value) {
-              setState(() {
-                _biometricEnabled = value;
-              });
-              if (value) {
+        );
+      },
+    );
+  }
+
+  Future<void> _handleBiometricToggle(bool value, BiometricProvider biometricProvider) async {
+    if (value) {
+      final authProvider = context.read<AuthProvider>();
+      final user = authProvider.user;
+      final email = user?.email;
+      
+      if (email != null) {
+        _showEnableBiometricDialog(biometricProvider, email);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to enable biometric login. Please try again later.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } else {
+      await biometricProvider.setBiometricLoginEnabled(false);
+    }
+  }
+
+  void _showEnableBiometricDialog(BiometricProvider biometricProvider, String email) {
+    final passwordController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+        title: const Text('Enable Biometric Login'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Enter your password to enable biometric login:'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (passwordController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter your password')),
+                );
+                return;
+              }
+
+              Navigator.pop(dialogContext);
+
+              await biometricProvider.setBiometricLoginEnabled(
+                true,
+                email: email,
+                password: passwordController.text,
+              );
+
+              if (biometricProvider.biometricLoginEnabled && mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Biometric authentication enabled'),
+                    content: Text('Biometric login enabled'),
                     backgroundColor: AppColors.success,
                   ),
                 );
               }
             },
-            activeColor: AppColors.primaryGold,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
+            child: const Text('Enable', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
