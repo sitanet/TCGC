@@ -42,8 +42,8 @@ dependencies:
   share_plus: ^10.1.4
   shared_preferences: ^2.2.2
   cached_network_image: ^3.3.1
-  audio_service: ^0.18.12
   just_audio: ^0.9.36
+  just_audio_background: ^0.0.1-beta.13
   permission_handler: ^11.0.1
   flutter_html: ^3.0.0-beta.2
   image_picker: ^1.0.7

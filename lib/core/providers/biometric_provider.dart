@@ -53,15 +53,27 @@ class BiometricProvider extends ChangeNotifier {
   }
 
   Future<void> setBiometricLoginEnabled(bool enabled, {String? email, String? password}) async {
-    if (enabled && !_isAvailable) return;
+    debugPrint('setBiometricLoginEnabled called: enabled=$enabled, isAvailable=$_isAvailable');
+    
+    if (enabled && !_isAvailable) {
+      debugPrint('Biometric not available, returning');
+      return;
+    }
     
     if (enabled) {
+      debugPrint('Attempting biometric authentication...');
       final authenticated = await _biometricService.authenticate(
         reason: 'Authenticate to enable biometric login',
       );
-      if (!authenticated) return;
+      debugPrint('Authentication result: $authenticated');
+      
+      if (!authenticated) {
+        debugPrint('Authentication failed, returning without enabling');
+        return;
+      }
       
       if (email != null && password != null) {
+        debugPrint('Saving credentials for email: $email');
         await _biometricService.saveCredentials(email, password);
         _hasSavedCredentials = true;
       }
@@ -72,6 +84,7 @@ class BiometricProvider extends ChangeNotifier {
     
     await _biometricService.setBiometricLoginEnabled(enabled);
     _biometricLoginEnabled = enabled;
+    debugPrint('Biometric login enabled set to: $_biometricLoginEnabled');
     notifyListeners();
   }
 

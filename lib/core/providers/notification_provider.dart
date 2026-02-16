@@ -111,6 +111,10 @@ class NotificationProvider extends ChangeNotifier {
     return await updatePreferences(_preferences.copyWith(announcementsEnabled: enabled));
   }
 
+  Future<bool> setPromotionsEnabled(bool enabled) async {
+    return await updatePreferences(_preferences.copyWith(promotionsEnabled: enabled));
+  }
+
   void clearNotifications() {
     _notifications = [];
     notifyListeners();

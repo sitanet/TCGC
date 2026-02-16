@@ -17,11 +17,22 @@ class BiometricService {
 
   Future<bool> isBiometricAvailable() async {
     try {
-      final canAuthenticateWithBiometrics = await _localAuth.canCheckBiometrics;
-      final canAuthenticate = canAuthenticateWithBiometrics || await _localAuth.isDeviceSupported();
+      final canCheckBiometrics = await _localAuth.canCheckBiometrics;
+      final isDeviceSupported = await _localAuth.isDeviceSupported();
+      final availableBiometrics = await _localAuth.getAvailableBiometrics();
+      
+      debugPrint('Biometric check: canCheckBiometrics=$canCheckBiometrics, isDeviceSupported=$isDeviceSupported');
+      debugPrint('Available biometrics: $availableBiometrics');
+      
+      final canAuthenticate = canCheckBiometrics || isDeviceSupported;
+      debugPrint('Final canAuthenticate: $canAuthenticate');
+      
       return canAuthenticate;
     } on PlatformException catch (e) {
       debugPrint('Biometric availability check failed: $e');
+      return false;
+    } catch (e) {
+      debugPrint('Unexpected error checking biometrics: $e');
       return false;
     }
   }

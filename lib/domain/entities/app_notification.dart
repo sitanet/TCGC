@@ -82,6 +82,7 @@ class NotificationPreferences {
   final bool walletEnabled;
   final bool teensEnabled;
   final bool announcementsEnabled;
+  final bool promotionsEnabled;
 
   NotificationPreferences({
     this.pushEnabled = true,
@@ -91,6 +92,7 @@ class NotificationPreferences {
     this.walletEnabled = true,
     this.teensEnabled = true,
     this.announcementsEnabled = true,
+    this.promotionsEnabled = true,
   });
 
   factory NotificationPreferences.fromJson(Map<String, dynamic> json) {
@@ -102,6 +104,7 @@ class NotificationPreferences {
       walletEnabled: json['wallet_enabled'] ?? true,
       teensEnabled: json['teens_enabled'] ?? true,
       announcementsEnabled: json['announcements_enabled'] ?? true,
+      promotionsEnabled: json['promotions_enabled'] ?? true,
     );
   }
 
@@ -114,6 +117,7 @@ class NotificationPreferences {
       'wallet_enabled': walletEnabled,
       'teens_enabled': teensEnabled,
       'announcements_enabled': announcementsEnabled,
+      'promotions_enabled': promotionsEnabled,
     };
   }
 
@@ -125,6 +129,7 @@ class NotificationPreferences {
     bool? walletEnabled,
     bool? teensEnabled,
     bool? announcementsEnabled,
+    bool? promotionsEnabled,
   }) {
     return NotificationPreferences(
       pushEnabled: pushEnabled ?? this.pushEnabled,
@@ -134,6 +139,7 @@ class NotificationPreferences {
       walletEnabled: walletEnabled ?? this.walletEnabled,
       teensEnabled: teensEnabled ?? this.teensEnabled,
       announcementsEnabled: announcementsEnabled ?? this.announcementsEnabled,
+      promotionsEnabled: promotionsEnabled ?? this.promotionsEnabled,
     );
   }
 }

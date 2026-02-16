@@ -52,6 +52,7 @@ class NotificationService {
   static const String _prefsKeyWallet = 'notification_wallet_enabled';
   static const String _prefsKeyTeens = 'notification_teens_enabled';
   static const String _prefsKeyAnnouncements = 'notification_announcements_enabled';
+  static const String _prefsKeyPromotions = 'notification_promotions_enabled';
 
   Future<void> initialize() async {
     try {
@@ -472,6 +473,7 @@ class NotificationService {
       walletEnabled: prefs.getBool(_prefsKeyWallet) ?? true,
       teensEnabled: prefs.getBool(_prefsKeyTeens) ?? true,
       announcementsEnabled: prefs.getBool(_prefsKeyAnnouncements) ?? true,
+      promotionsEnabled: prefs.getBool(_prefsKeyPromotions) ?? true,
     );
   }
   
@@ -484,6 +486,7 @@ class NotificationService {
     await prefs.setBool(_prefsKeyWallet, preferences.walletEnabled);
     await prefs.setBool(_prefsKeyTeens, preferences.teensEnabled);
     await prefs.setBool(_prefsKeyAnnouncements, preferences.announcementsEnabled);
+    await prefs.setBool(_prefsKeyPromotions, preferences.promotionsEnabled);
   }
 
   /// Returns true if saved successfully (locally and to backend if authenticated)

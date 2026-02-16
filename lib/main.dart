@@ -36,10 +36,10 @@ const String appVersion = '1.0.0';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Don't block app startup if audio service fails
+  // Initialize audio service - allow more time for notification setup
   try {
     await initAudioService().timeout(
-      const Duration(seconds: 3),
+      const Duration(seconds: 10),
       onTimeout: () => debugPrint('Audio service init timed out'),
     );
   } catch (e) {
@@ -338,6 +338,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Future<void> _checkForPromotion() async {
     try {
+      // Check if user has promotions enabled in their preferences
+      final notificationProvider = context.read<NotificationProvider>();
+      if (!notificationProvider.preferences.promotionsEnabled) {
+        return;
+      }
+
       final promotions = await _dataService.getActivePromotions();
       if (promotions.isNotEmpty && mounted) {
         setState(() {

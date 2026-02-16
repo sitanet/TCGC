@@ -15,13 +15,8 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  bool _pushNotifications = false;
   bool _emailNotifications = false;
-  bool _events = false;
-  bool _newSermons = false;
-  bool _walletActivity = false;
-  bool _teensContent = false;
-  bool _announcements = false;
+  bool _promotionsEnabled = true;
   bool _biometricLogin = false;
   bool _biometricTransactions = false;
   bool _isSaving = false;
@@ -34,28 +29,60 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
-  Future<void> _updateNotificationSetting(
-    bool value,
-    String settingName,
-    VoidCallback updateState,
-    Future<bool> Function() saveToProvider,
-    VoidCallback revertState,
-  ) async {
+  Future<void> _loadPreferences() async {
+    if (!mounted) return;
+
+    final notificationProvider = context.read<NotificationProvider>();
+    final biometricProvider = context.read<BiometricProvider>();
+
+    // Load notification preferences from backend
+    try {
+      await notificationProvider.loadPreferences();
+      if (mounted) {
+        final prefs = notificationProvider.preferences;
+        setState(() {
+          _emailNotifications = prefs.emailEnabled;
+          _promotionsEnabled = prefs.promotionsEnabled;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading notification preferences: $e');
+    }
+
+    // Load biometric preferences
+    try {
+      await biometricProvider.initialize();
+      if (mounted) {
+        setState(() {
+          _biometricLogin = biometricProvider.biometricLoginEnabled;
+          _biometricTransactions = biometricProvider.biometricTransactionEnabled;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error initializing biometric: $e');
+    }
+  }
+
+  Future<void> _updateEmailNotificationSetting(bool value) async {
     if (_isSaving) return;
     _isSaving = true;
-    updateState();
-    
+
+    final previousValue = _emailNotifications;
+    setState(() => _emailNotifications = value);
+
     try {
-      final success = await saveToProvider();
+      final success =
+          await context.read<NotificationProvider>().setEmailEnabled(value);
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('$settingName ${value ? "enabled" : "disabled"}'),
+            content: Text(
+                'Email notifications ${value ? "enabled" : "disabled"}'),
             duration: const Duration(seconds: 1),
           ),
         );
       } else if (mounted) {
-        revertState();
+        setState(() => _emailNotifications = previousValue);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to save setting. Please try again.'),
@@ -64,9 +91,9 @@ class _SettingsPageState extends State<SettingsPage> {
         );
       }
     } catch (e) {
-      debugPrint('Error saving notification setting: $e');
+      debugPrint('Error saving email notification setting: $e');
       if (mounted) {
-        revertState();
+        setState(() => _emailNotifications = previousValue);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to save setting. Please try again.'),
@@ -79,40 +106,46 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  Future<void> _loadPreferences() async {
-    if (!mounted) return;
-    
-    final notificationProvider = context.read<NotificationProvider>();
-    final biometricProvider = context.read<BiometricProvider>();
-    
-    try {
-      await notificationProvider.loadPreferences();
-      if (mounted) {
-        final prefs = notificationProvider.preferences;
-        setState(() {
-          _pushNotifications = prefs.pushEnabled;
-          _emailNotifications = prefs.emailEnabled;
-          _events = prefs.eventsEnabled;
-          _newSermons = prefs.messagesEnabled;
-          _walletActivity = prefs.walletEnabled;
-          _teensContent = prefs.teensEnabled;
-          _announcements = prefs.announcementsEnabled;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading notification preferences: $e');
-    }
+  Future<void> _updatePromotionsSetting(bool value) async {
+    if (_isSaving) return;
+    _isSaving = true;
+
+    final previousValue = _promotionsEnabled;
+    setState(() => _promotionsEnabled = value);
 
     try {
-      await biometricProvider.initialize();
-      if (mounted) {
-        setState(() {
-          _biometricLogin = biometricProvider.biometricLoginEnabled;
-          _biometricTransactions = biometricProvider.biometricTransactionEnabled;
-        });
+      final success =
+          await context.read<NotificationProvider>().setPromotionsEnabled(value);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('Promotions ${value ? "enabled" : "disabled"}'),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      } else if (mounted) {
+        setState(() => _promotionsEnabled = previousValue);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to save setting. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
-      debugPrint('Error initializing biometric: $e');
+      debugPrint('Error saving promotions setting: $e');
+      if (mounted) {
+        setState(() => _promotionsEnabled = previousValue);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to save setting. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      _isSaving = false;
     }
   }
 
@@ -133,104 +166,29 @@ class _SettingsPageState extends State<SettingsPage> {
                 isDark,
                 'Notifications',
                 [
-                  _buildSwitchTile(
-                    context,
-                    isDark,
-                    'Push Notifications',
-                    _pushNotifications,
-                    (value) => _updateNotificationSetting(
-                      value,
-                      'Push Notifications',
-                      () => setState(() => _pushNotifications = value),
-                      () => context.read<NotificationProvider>().setPushEnabled(value),
-                      () => setState(() => _pushNotifications = !value),
-                    ),
-                  ),
-                  _buildSwitchTile(
+                  _buildSwitchTileWithSubtitle(
                     context,
                     isDark,
                     'Email Notifications',
+                    'Receive email updates and alerts',
                     _emailNotifications,
-                    (value) => _updateNotificationSetting(
-                      value,
-                      'Email Notifications',
-                      () => setState(() => _emailNotifications = value),
-                      () => context.read<NotificationProvider>().setEmailEnabled(value),
-                      () => setState(() => _emailNotifications = !value),
-                    ),
+                    (value) => _updateEmailNotificationSetting(value),
                   ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              _buildSettingsSection(
-                context,
-                isDark,
-                'Notification Categories',
-                [
-                  _buildSwitchTile(
+                  Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: isDark
+                        ? Colors.white.withAlpha(25)
+                        : Colors.black.withAlpha(13),
+                  ),
+                  _buildSwitchTileWithSubtitle(
                     context,
                     isDark,
-                    'Events',
-                    _events,
-                    (value) => _updateNotificationSetting(
-                      value,
-                      'Events notifications',
-                      () => setState(() => _events = value),
-                      () => context.read<NotificationProvider>().setEventsEnabled(value),
-                      () => setState(() => _events = !value),
-                    ),
-                  ),
-                  _buildSwitchTile(
-                    context,
-                    isDark,
-                    'New Sermons',
-                    _newSermons,
-                    (value) => _updateNotificationSetting(
-                      value,
-                      'Sermons notifications',
-                      () => setState(() => _newSermons = value),
-                      () => context.read<NotificationProvider>().setMessagesEnabled(value),
-                      () => setState(() => _newSermons = !value),
-                    ),
-                  ),
-                  _buildSwitchTile(
-                    context,
-                    isDark,
-                    'Wallet Activity',
-                    _walletActivity,
-                    (value) => _updateNotificationSetting(
-                      value,
-                      'Wallet notifications',
-                      () => setState(() => _walletActivity = value),
-                      () => context.read<NotificationProvider>().setWalletEnabled(value),
-                      () => setState(() => _walletActivity = !value),
-                    ),
-                  ),
-                  _buildSwitchTile(
-                    context,
-                    isDark,
-                    'Teens Content',
-                    _teensContent,
-                    (value) => _updateNotificationSetting(
-                      value,
-                      'Teens notifications',
-                      () => setState(() => _teensContent = value),
-                      () => context.read<NotificationProvider>().setTeensEnabled(value),
-                      () => setState(() => _teensContent = !value),
-                    ),
-                  ),
-                  _buildSwitchTile(
-                    context,
-                    isDark,
-                    'Announcements',
-                    _announcements,
-                    (value) => _updateNotificationSetting(
-                      value,
-                      'Announcements',
-                      () => setState(() => _announcements = value),
-                      () => context.read<NotificationProvider>().setAnnouncementsEnabled(value),
-                      () => setState(() => _announcements = !value),
-                    ),
+                    'Promotions',
+                    'Show promotional popups in the app',
+                    _promotionsEnabled,
+                    (value) => _updatePromotionsSetting(value),
                   ),
                 ],
               ),
@@ -243,16 +201,24 @@ class _SettingsPageState extends State<SettingsPage> {
                   _buildSwitchTileWithSubtitle(
                     context,
                     isDark,
-                    'Biometric Login',
-                    'Use biometric to sign in',
+                    'Fingerprint Login',
+                    'Use fingerprint to sign in',
                     _biometricLogin,
                     (value) => _handleBiometricLoginToggle(value),
+                  ),
+                  Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: isDark
+                        ? Colors.white.withAlpha(25)
+                        : Colors.black.withAlpha(13),
                   ),
                   _buildSwitchTileWithSubtitle(
                     context,
                     isDark,
-                    'Biometric for Transactions',
-                    'Use biometric instead of PIN for transactions',
+                    'Fingerprint for Transactions',
+                    'Use fingerprint instead of PIN for transactions',
                     _biometricTransactions,
                     (value) => _handleBiometricTransactionToggle(value),
                   ),
@@ -264,16 +230,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 isDark,
                 'Account',
                 [
-                  _buildNavigationTile(context, isDark, 'Change Password', Icons.lock_outline),
-                ],
-              ),
-              const SizedBox(height: 24),
-              _buildSettingsSection(
-                context,
-                isDark,
-                'About',
-                [
-                  _buildInfoTile(context, isDark, 'App Version', '1.0.0'),
+                  _buildNavigationTile(
+                      context, isDark, 'Change Password', Icons.lock_outline),
                 ],
               ),
               const SizedBox(height: 100),
@@ -286,18 +244,22 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _handleBiometricLoginToggle(bool value) async {
     final biometricProvider = context.read<BiometricProvider>();
-    
-    // Check if biometrics are available on device
+
+    // Re-initialize to get fresh status
+    await biometricProvider.initialize();
+
     if (!biometricProvider.isAvailable) {
+      debugPrint('Biometric not available after re-check');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Biometrics not available. Please set up fingerprint or face unlock on your device first.'),
+          content: Text(
+              'Biometrics not available. Please set up fingerprint on your device first.'),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
-    
+
     if (value) {
       final authProvider = context.read<AuthProvider>();
       final email = authProvider.user?.email;
@@ -306,7 +268,8 @@ class _SettingsPageState extends State<SettingsPage> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Unable to enable biometric login. Please log in first.'),
+            content: Text(
+                'Unable to enable fingerprint login. Please log in first.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -316,7 +279,7 @@ class _SettingsPageState extends State<SettingsPage> {
       await biometricProvider.setBiometricLoginEnabled(false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Biometric login disabled')),
+          const SnackBar(content: Text('Fingerprint login disabled')),
         );
       }
     }
@@ -324,39 +287,44 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _handleBiometricTransactionToggle(bool value) async {
     final biometricProvider = context.read<BiometricProvider>();
-    
+
     if (!biometricProvider.isAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Biometrics not available. Please set up fingerprint or face unlock on your device first.'),
+          content: Text(
+              'Biometrics not available. Please set up fingerprint on your device first.'),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
-    
+
     final previousValue = _biometricTransactions;
     setState(() => _biometricTransactions = value);
-    
+
     await biometricProvider.setBiometricTransactionEnabled(value);
-    
-    // Check if it actually changed (authentication might have failed)
+
     if (biometricProvider.biometricTransactionEnabled != value && mounted) {
       setState(() => _biometricTransactions = previousValue);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Failed to change biometric setting. Authentication required.'),
+          content: Text(
+              'Failed to change fingerprint setting. Authentication required.'),
           backgroundColor: Colors.red,
         ),
       );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(value ? 'Biometric for transactions enabled' : 'Biometric for transactions disabled')),
+        SnackBar(
+            content: Text(value
+                ? 'Fingerprint for transactions enabled'
+                : 'Fingerprint for transactions disabled')),
       );
     }
   }
 
-  void _showEnableBiometricLoginDialog(BiometricProvider biometricProvider, String email) {
+  void _showEnableBiometricLoginDialog(
+      BiometricProvider biometricProvider, String email) {
     final passwordController = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -364,7 +332,7 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-        title: const Text('Enable Biometric Login'),
+        title: const Text('Enable Fingerprint Login'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,25 +361,41 @@ class _SettingsPageState extends State<SettingsPage> {
             onPressed: () async {
               if (passwordController.text.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter your password')),
+                  const SnackBar(
+                      content: Text('Please enter your password')),
                 );
                 return;
               }
+              final password = passwordController.text;
               Navigator.pop(dialogContext);
+              
               await biometricProvider.setBiometricLoginEnabled(
                 true,
                 email: email,
-                password: passwordController.text,
+                password: password,
               );
-              if (biometricProvider.biometricLoginEnabled && mounted) {
+              
+              if (!mounted) return;
+              
+              if (biometricProvider.biometricLoginEnabled) {
                 setState(() => _biometricLogin = true);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Biometric login enabled')),
+                  const SnackBar(
+                      content: Text('Fingerprint login enabled')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Fingerprint authentication failed or was cancelled. Please try again.'),
+                    backgroundColor: Colors.red,
+                  ),
                 );
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
-            child: const Text('Enable', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGold),
+            child:
+                const Text('Enable', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -453,32 +437,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildSwitchTile(
-    BuildContext context,
-    bool isDark,
-    String title,
-    bool value,
-    ValueChanged<bool> onChanged,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: AppColors.primaryGold,
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSwitchTileWithSubtitle(
     BuildContext context,
     bool isDark,
@@ -499,11 +457,11 @@ class _SettingsPageState extends State<SettingsPage> {
                   title,
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   subtitle,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
                       ),
                 ),
               ],
@@ -530,20 +488,18 @@ class _SettingsPageState extends State<SettingsPage> {
         if (title == 'Change Password') {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const ChangePasswordPage()),
+            MaterialPageRoute(
+                builder: (context) => const ChangePasswordPage()),
           );
         }
       },
+      borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-              size: 24,
-            ),
-            const SizedBox(width: 16),
+            Icon(icon, size: 22, color: AppColors.primaryGold),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 title,
@@ -551,38 +507,11 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             Icon(
-              Icons.arrow_forward_ios,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              size: 16,
+              Icons.chevron_right,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildInfoTile(
-    BuildContext context,
-    bool isDark,
-    String title,
-    String value,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
-          ),
-        ],
       ),
     );
   }
