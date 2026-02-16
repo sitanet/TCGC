@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../widgets/custom_app_bar.dart';
 
 class TransactionsPage extends StatefulWidget {
@@ -40,24 +41,32 @@ class _TransactionsPageState extends State<TransactionsPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final maxWidth = Responsive.maxContentWidth(context);
 
     return Scaffold(
       appBar: const CustomAppBar(title: 'Transactions'),
       body: Consumer<WalletProvider>(
         builder: (context, walletProvider, child) {
           return SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSummaryCard(context, isDark, walletProvider),
-                  const SizedBox(height: 24),
-                  _buildFilterSelector(isDark),
-                  const SizedBox(height: 24),
-                  _buildTransactionsList(context, isDark, walletProvider),
-                  const SizedBox(height: 100),
-                ],
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: Padding(
+                  padding: EdgeInsets.all(horizontalPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSummaryCard(context, isDark, walletProvider),
+                      SizedBox(height: spacing * 1.5),
+                      _buildFilterSelector(isDark),
+                      SizedBox(height: spacing * 1.5),
+                      _buildTransactionsList(context, isDark, walletProvider),
+                      SizedBox(height: spacing * 6),
+                    ],
+                  ),
+                ),
               ),
             ),
           );
@@ -67,11 +76,18 @@ class _TransactionsPageState extends State<TransactionsPage> {
   }
 
   Widget _buildSummaryCard(BuildContext context, bool isDark, WalletProvider walletProvider) {
+    final spacing = Responsive.verticalSpacing(context);
+    final borderRadius = Responsive.largeBorderRadius(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    final smallFontSize = Responsive.smallFontSize(context);
+    final balanceFontSize = Responsive.value(context, mobile: 32.0, tablet: 38.0, desktop: 44.0);
+    final subtitleFontSize = Responsive.subtitleFontSize(context);
+    
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(spacing * 1.5),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(borderRadius),
         gradient: const LinearGradient(
           colors: [
             Color(0xFF1A1A2E),
@@ -88,56 +104,56 @@ class _TransactionsPageState extends State<TransactionsPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Transaction Summary',
                 style: TextStyle(
                   color: Colors.white70,
-                  fontSize: 14,
+                  fontSize: bodyFontSize,
                 ),
               ),
               Text(
                 _formatDate(DateTime.now()),
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.6),
-                  fontSize: 12,
+                  fontSize: smallFontSize,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          const Text(
+          SizedBox(height: spacing * 1.25),
+          Text(
             'Current Balance:',
             style: TextStyle(
               color: Colors.white70,
-              fontSize: 12,
+              fontSize: smallFontSize,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: spacing * 0.25),
           Text(
             _formatCurrency(walletProvider.balance, walletProvider.currency),
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 32,
+              fontSize: balanceFontSize,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: spacing),
           Row(
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Total Transactions',
-                      style: TextStyle(color: Colors.white70, fontSize: 11),
+                      style: TextStyle(color: Colors.white70, fontSize: smallFontSize),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: spacing * 0.25),
                     Text(
                       '${walletProvider.transactions.length}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 18,
+                        fontSize: subtitleFontSize * 0.9,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -152,43 +168,46 @@ class _TransactionsPageState extends State<TransactionsPage> {
   }
 
   Widget _buildFilterSelector(bool isDark) {
+    final spacing = Responsive.verticalSpacing(context);
+    final borderRadius = Responsive.borderRadius(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(spacing),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(borderRadius),
       ),
-      child: Row(
+      child: Wrap(
+        spacing: spacing * 0.5,
+        runSpacing: spacing * 0.5,
         children: filters.map((filter) {
           final isSelected = filter == selectedFilter;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  selectedFilter = filter;
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primaryGold : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected
-                        ? AppColors.primaryGold
-                        : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
-                  ),
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                selectedFilter = filter;
+              });
+            },
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: spacing, vertical: spacing * 0.5),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.primaryGold : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? AppColors.primaryGold
+                      : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
                 ),
-                child: Text(
-                  filter,
-                  style: TextStyle(
-                    color: isSelected
-                        ? Colors.white
-                        : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
-                  ),
+              ),
+              child: Text(
+                filter,
+                style: TextStyle(
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+                  fontWeight: FontWeight.w500,
+                  fontSize: bodyFontSize * 0.93,
                 ),
               ),
             ),
@@ -200,6 +219,12 @@ class _TransactionsPageState extends State<TransactionsPage> {
 
   Widget _buildTransactionsList(BuildContext context, bool isDark, WalletProvider walletProvider) {
     var transactions = walletProvider.transactions;
+    final spacing = Responsive.verticalSpacing(context);
+    final borderRadius = Responsive.borderRadius(context);
+    final iconSize = Responsive.iconSize(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    final smallFontSize = Responsive.smallFontSize(context);
+    final iconContainerSize = Responsive.value(context, mobile: 44.0, tablet: 52.0, desktop: 60.0);
     
     if (selectedFilter == 'Money In') {
       transactions = transactions.where((t) => t.isMoneyIn).toList();
@@ -209,21 +234,21 @@ class _TransactionsPageState extends State<TransactionsPage> {
 
     if (transactions.isEmpty) {
       return Container(
-        padding: const EdgeInsets.all(40),
+        padding: EdgeInsets.all(spacing * 2.5),
         child: Center(
           child: Column(
             children: [
               Icon(
                 Icons.receipt_long_outlined,
-                size: 64,
+                size: iconSize * 2.5,
                 color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: spacing),
               Text(
                 'No transactions yet',
                 style: TextStyle(
                   color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  fontSize: 16,
+                  fontSize: bodyFontSize,
                 ),
               ),
             ],
@@ -235,7 +260,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(borderRadius),
       ),
       child: ListView.separated(
         shrinkWrap: true,
@@ -250,27 +275,28 @@ class _TransactionsPageState extends State<TransactionsPage> {
           final isMoneyIn = transaction.isMoneyIn;
           
           return ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            contentPadding: EdgeInsets.symmetric(horizontal: spacing, vertical: spacing * 0.5),
             leading: Container(
-              width: 44,
-              height: 44,
+              width: iconContainerSize,
+              height: iconContainerSize,
               decoration: BoxDecoration(
                 color: (isMoneyIn ? Colors.green : Colors.red).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(borderRadius),
               ),
               child: Icon(
                 isMoneyIn ? Icons.arrow_downward : Icons.arrow_upward,
                 color: isMoneyIn ? Colors.green : Colors.red,
+                size: iconSize,
               ),
             ),
             title: Text(
               transaction.title,
-              style: const TextStyle(fontWeight: FontWeight.w500),
+              style: TextStyle(fontWeight: FontWeight.w500, fontSize: bodyFontSize),
             ),
             subtitle: Text(
               _formatDate(transaction.date),
               style: TextStyle(
-                fontSize: 12,
+                fontSize: smallFontSize,
                 color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
               ),
             ),
@@ -279,6 +305,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 color: isMoneyIn ? Colors.green : Colors.red,
+                fontSize: bodyFontSize,
               ),
             ),
           );

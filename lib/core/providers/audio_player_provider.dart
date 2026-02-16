@@ -5,6 +5,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../domain/entities/sermon.dart';
 import '../../data/services/audio_cache_service.dart';
+import '../../data/services/playback_position_service.dart';
 
 bool _audioServiceInitialized = false;
 
@@ -28,7 +29,7 @@ Future<void> initAudioService() async {
   }
 }
 
-class AudioPlayerProvider extends ChangeNotifier {
+class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   final AudioPlayer _player = AudioPlayer();
   
   Sermon? _currentSermon;
@@ -47,6 +48,9 @@ class AudioPlayerProvider extends ChangeNotifier {
   
   // Pre-buffering service
   final AudioCacheService _audioCacheService = AudioCacheService();
+  
+  // Playback position service
+  final PlaybackPositionService _positionService = PlaybackPositionService();
 
   Sermon? get currentSermon => _currentSermon;
   Duration get duration => _duration;
@@ -66,6 +70,17 @@ class AudioPlayerProvider extends ChangeNotifier {
     _setupListeners();
     _initCacheDir();
     _audioCacheService.initialize();
+    _positionService.initialize();
+    WidgetsBinding.instance.addObserver(this);
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || 
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _saveCurrentPosition();
+    }
   }
   
   void _setupListeners() {
@@ -198,9 +213,17 @@ class AudioPlayerProvider extends ChangeNotifier {
 
   Future<void> pause() async {
     await _player.pause();
+    await _saveCurrentPosition();
+  }
+  
+  Future<void> _saveCurrentPosition() async {
+    if (_currentSermon != null && _position.inMilliseconds > 0 && _duration.inMilliseconds > 0) {
+      await _positionService.savePosition(_currentSermon!.id, _position, _duration);
+    }
   }
 
   Future<void> stop() async {
+    await _saveCurrentPosition();
     await _player.stop();
     _currentSermon = null;
     _position = Duration.zero;
@@ -227,6 +250,62 @@ class AudioPlayerProvider extends ChangeNotifier {
       await seek(newPosition);
     } else {
       await seek(Duration.zero);
+    }
+  }
+  
+  PlaybackPosition? getSavedPosition(String sermonId) {
+    return _positionService.getPosition(sermonId);
+  }
+  
+  bool hasSavedPosition(String sermonId) {
+    return _positionService.hasPosition(sermonId);
+  }
+  
+  Future<void> clearSavedPosition(String sermonId) async {
+    await _positionService.clearPosition(sermonId);
+  }
+  
+  Future<void> playSermonFromPosition(Sermon sermon, Duration startPosition) async {
+    if (!_audioServiceInitialized) {
+      await initAudioService();
+    }
+
+    _isLoading = true;
+    _errorMessage = null;
+    _currentSermon = sermon;
+    notifyListeners();
+
+    final audioUrl = sermon.audioUrl;
+    if (audioUrl == null || audioUrl.isEmpty) {
+      _isLoading = false;
+      _errorMessage = 'No audio URL available for this sermon';
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final audioSource = AudioSource.uri(
+        Uri.parse(audioUrl),
+        tag: MediaItem(
+          id: sermon.id,
+          title: sermon.title,
+          artist: sermon.speaker ?? 'TCGC',
+          album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Sermons',
+          artUri: sermon.imageUrl != null ? Uri.parse(sermon.imageUrl!) : null,
+        ),
+      );
+      
+      await _player.setAudioSource(audioSource, initialPosition: startPosition);
+      await _player.play();
+      
+      _isLoading = false;
+      notifyListeners();
+    } catch (e, stackTrace) {
+      _isLoading = false;
+      _errorMessage = 'Failed to load audio: $e';
+      debugPrint('Audio error: $e');
+      debugPrint('Stack: $stackTrace');
+      notifyListeners();
     }
   }
 
@@ -327,6 +406,8 @@ class AudioPlayerProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _saveCurrentPosition();
     _player.dispose();
     super.dispose();
   }

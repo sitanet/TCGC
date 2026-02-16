@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'success_page.dart';
 
@@ -61,139 +62,156 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final walletProvider = context.watch<WalletProvider>();
+    final spacing = Responsive.verticalSpacing(context);
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final maxWidth = Responsive.maxContentWidth(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    final smallFontSize = Responsive.smallFontSize(context);
+    final amountFontSize = Responsive.value(context, mobile: 40.0, tablet: 48.0, desktop: 56.0);
+    final borderRadius = Responsive.borderRadius(context);
+    final buttonHeight = Responsive.buttonHeight(context);
 
     return Scaffold(
       appBar: const CustomAppBar(title: 'Add Money'),
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Enter Amount',
-                    style: TextStyle(
-                      color: AppColors.primaryGold,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '₦$amount',
-                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 40,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'To',
-                    style: TextStyle(
-                      color: AppColors.primaryGold,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Your Wallet',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Column(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Enter Amount',
+                        style: TextStyle(
+                          color: AppColors.primaryGold,
+                          fontSize: bodyFontSize,
                           fontWeight: FontWeight.w500,
                         ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Current Balance: ₦${walletProvider.balance.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            _buildNumpad(isDark),
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isProcessing ? null : _addMoney,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGold,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _isProcessing
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Text(
-                          'Add Money',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      ),
+                      SizedBox(height: spacing),
+                      Text(
+                        '₦$amount',
+                        style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: amountFontSize,
+                            ),
+                      ),
+                      SizedBox(height: spacing * 0.5),
+                      Text(
+                        'To',
+                        style: TextStyle(
+                          color: AppColors.primaryGold,
+                          fontSize: smallFontSize,
                         ),
+                      ),
+                      SizedBox(height: spacing * 0.5),
+                      Text(
+                        'Your Wallet',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w500,
+                              fontSize: bodyFontSize,
+                            ),
+                      ),
+                      SizedBox(height: spacing),
+                      Text(
+                        'Current Balance: ₦${walletProvider.balance.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          fontSize: bodyFontSize,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                _buildNumpad(isDark),
+                SizedBox(height: spacing * 1.25),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: buttonHeight,
+                    child: ElevatedButton(
+                      onPressed: _isProcessing ? null : _addMoney,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryGold,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(borderRadius),
+                        ),
+                      ),
+                      child: _isProcessing
+                          ? SizedBox(
+                              width: Responsive.iconSize(context),
+                              height: Responsive.iconSize(context),
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              'Add Money',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: bodyFontSize,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: spacing * 2),
+              ],
             ),
-            const SizedBox(height: 30),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildNumpad(bool isDark) {
+    final spacing = Responsive.verticalSpacing(context);
+    final keySize = Responsive.value(context, mobile: 70.0, tablet: 80.0, desktop: 90.0);
+    
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
+      padding: EdgeInsets.symmetric(horizontal: Responsive.wp(context, 10)),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildNumKey('1', isDark),
-              _buildNumKey('2', isDark),
-              _buildNumKey('3', isDark),
+              _buildNumKey('1', isDark, keySize),
+              _buildNumKey('2', isDark, keySize),
+              _buildNumKey('3', isDark, keySize),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: spacing),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildNumKey('4', isDark),
-              _buildNumKey('5', isDark),
-              _buildNumKey('6', isDark),
+              _buildNumKey('4', isDark, keySize),
+              _buildNumKey('5', isDark, keySize),
+              _buildNumKey('6', isDark, keySize),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: spacing),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildNumKey('7', isDark),
-              _buildNumKey('8', isDark),
-              _buildNumKey('9', isDark),
+              _buildNumKey('7', isDark, keySize),
+              _buildNumKey('8', isDark, keySize),
+              _buildNumKey('9', isDark, keySize),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: spacing),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              const SizedBox(width: 70),
-              _buildNumKey('0', isDark),
-              _buildBackspaceKey(isDark),
+              SizedBox(width: keySize),
+              _buildNumKey('0', isDark, keySize),
+              _buildBackspaceKey(isDark, keySize),
             ],
           ),
         ],
@@ -201,7 +219,10 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
     );
   }
 
-  Widget _buildNumKey(String num, bool isDark) {
+  Widget _buildNumKey(String num, bool isDark, double keySize) {
+    final fontSize = Responsive.value(context, mobile: 24.0, tablet: 28.0, desktop: 32.0);
+    final borderRadius = Responsive.borderRadius(context);
+    
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -211,17 +232,17 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
         });
       },
       child: Container(
-        width: 70,
-        height: 70,
+        width: keySize,
+        height: keySize,
         decoration: BoxDecoration(
           color: isDark ? AppColors.cardDark : AppColors.dividerLight.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(borderRadius),
         ),
         child: Center(
           child: Text(
             num,
             style: TextStyle(
-              fontSize: 24,
+              fontSize: fontSize,
               fontWeight: FontWeight.w500,
               color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
             ),
@@ -231,7 +252,10 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
     );
   }
 
-  Widget _buildBackspaceKey(bool isDark) {
+  Widget _buildBackspaceKey(bool isDark, double keySize) {
+    final borderRadius = Responsive.borderRadius(context);
+    final iconSize = Responsive.iconSize(context);
+    
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -243,16 +267,17 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
         });
       },
       child: Container(
-        width: 70,
-        height: 70,
+        width: keySize,
+        height: keySize,
         decoration: BoxDecoration(
           color: Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(borderRadius),
         ),
         child: Center(
           child: Icon(
             Icons.backspace_outlined,
             color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            size: iconSize,
           ),
         ),
       ),

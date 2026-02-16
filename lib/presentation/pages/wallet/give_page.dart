@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'tithe_page.dart';
 import 'transactions_page.dart';
@@ -47,28 +48,36 @@ class _GivePageState extends State<GivePage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final maxWidth = Responsive.maxContentWidth(context);
 
     return Scaffold(
       appBar: const CustomAppBar(title: ''),
       body: Consumer<WalletProvider>(
         builder: (context, walletProvider, child) {
           return SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildPortfolioCard(context, isDark, walletProvider),
-                  const SizedBox(height: 24),
-                  _buildCurrencySelector(isDark),
-                  const SizedBox(height: 24),
-                  _buildGiveSection(context, isDark, walletProvider),
-                  const SizedBox(height: 16),
-                  _buildTransactionsItem(context, isDark),
-                  const SizedBox(height: 16),
-                  _buildAddMoneyItem(context, isDark),
-                  const SizedBox(height: 100),
-                ],
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: Padding(
+                  padding: EdgeInsets.all(horizontalPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildPortfolioCard(context, isDark, walletProvider),
+                      SizedBox(height: spacing * 1.5),
+                      _buildCurrencySelector(isDark),
+                      SizedBox(height: spacing * 1.5),
+                      _buildGiveSection(context, isDark, walletProvider),
+                      SizedBox(height: spacing),
+                      _buildTransactionsItem(context, isDark),
+                      SizedBox(height: spacing),
+                      _buildAddMoneyItem(context, isDark),
+                      SizedBox(height: spacing * 6),
+                    ],
+                  ),
+                ),
               ),
             ),
           );
@@ -79,12 +88,18 @@ class _GivePageState extends State<GivePage> {
 
   Widget _buildPortfolioCard(BuildContext context, bool isDark, WalletProvider walletProvider) {
     final now = DateTime.now();
+    final spacing = Responsive.verticalSpacing(context);
+    final borderRadius = Responsive.largeBorderRadius(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    final smallFontSize = Responsive.smallFontSize(context);
+    final balanceFontSize = Responsive.value(context, mobile: 36.0, tablet: 42.0, desktop: 48.0);
+    final iconSize = Responsive.iconSize(context);
     
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(spacing * 1.5),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(borderRadius),
         gradient: const LinearGradient(
           colors: [
             Color(0xFF1A1A2E),
@@ -101,66 +116,66 @@ class _GivePageState extends State<GivePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Your Portfolio',
                 style: TextStyle(
                   color: Colors.white70,
-                  fontSize: 14,
+                  fontSize: bodyFontSize,
                 ),
               ),
               Text(
                 _formatDate(now),
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 12,
+                  fontSize: smallFontSize,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          const Text(
+          SizedBox(height: spacing * 1.25),
+          Text(
             'Your Balance:',
             style: TextStyle(
               color: Colors.white70,
-              fontSize: 12,
+              fontSize: smallFontSize,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: spacing * 0.25),
           Text(
             _formatCurrency(walletProvider.balance, walletProvider.currency),
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 36,
+              fontSize: balanceFontSize,
               fontWeight: FontWeight.bold,
             ),
           ),
           if (walletProvider.accountNumber != null) ...[
-            const SizedBox(height: 16),
+            SizedBox(height: spacing),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: EdgeInsets.symmetric(horizontal: spacing * 0.75, vertical: spacing * 0.5),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(Responsive.borderRadius(context) * 0.67),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.account_balance,
                     color: Colors.white70,
-                    size: 16,
+                    size: iconSize * 0.67,
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: spacing * 0.5),
                   Text(
                     walletProvider.accountNumber!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 14,
+                      fontSize: bodyFontSize,
                       fontWeight: FontWeight.w500,
                       letterSpacing: 1,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: spacing * 0.5),
                   GestureDetector(
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: walletProvider.accountNumber!));
@@ -173,15 +188,15 @@ class _GivePageState extends State<GivePage> {
                       );
                     },
                     child: Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: EdgeInsets.all(spacing * 0.25),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.copy,
                         color: Colors.white,
-                        size: 16,
+                        size: iconSize * 0.67,
                       ),
                     ),
                   ),
@@ -195,11 +210,16 @@ class _GivePageState extends State<GivePage> {
   }
 
   Widget _buildCurrencySelector(bool isDark) {
+    final spacing = Responsive.verticalSpacing(context);
+    final borderRadius = Responsive.borderRadius(context);
+    final smallFontSize = Responsive.smallFontSize(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(spacing),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -215,43 +235,42 @@ class _GivePageState extends State<GivePage> {
             'Your Wallet',
             style: TextStyle(
               color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              fontSize: 12,
+              fontSize: smallFontSize,
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
+          SizedBox(height: spacing * 0.75),
+          Wrap(
+            spacing: spacing * 0.5,
+            runSpacing: spacing * 0.5,
             children: currencies.map((currency) {
               final isSelected = currency == selectedCurrency;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      selectedCurrency = currency;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    selectedCurrency = currency;
+                  });
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: spacing, vertical: spacing * 0.5),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.textPrimaryLight
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
                       color: isSelected
                           ? AppColors.textPrimaryLight
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.textPrimaryLight
-                            : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
-                      ),
+                          : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
                     ),
-                    child: Text(
-                      currency,
-                      style: TextStyle(
-                        color: isSelected
-                            ? Colors.white
-                            : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
-                        fontWeight: FontWeight.w500,
-                        fontSize: 13,
-                      ),
+                  ),
+                  child: Text(
+                    currency,
+                    style: TextStyle(
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+                      fontWeight: FontWeight.w500,
+                      fontSize: bodyFontSize * 0.93,
                     ),
                   ),
                 ),
@@ -265,11 +284,15 @@ class _GivePageState extends State<GivePage> {
 
   Widget _buildGiveSection(BuildContext context, bool isDark, WalletProvider walletProvider) {
     final giveOptions = walletProvider.giveOptions;
+    final spacing = Responsive.verticalSpacing(context);
+    final borderRadius = Responsive.borderRadius(context);
+    final iconSize = Responsive.iconSize(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
 
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -286,26 +309,29 @@ class _GivePageState extends State<GivePage> {
                 isGiveExpanded = !isGiveExpanded;
               });
             },
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(borderRadius),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(spacing),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.monetization_on_outlined,
                     color: AppColors.primaryGold,
-                    size: 24,
+                    size: iconSize,
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: spacing),
                   Expanded(
                     child: Text(
                       'Give',
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontSize: bodyFontSize,
+                      ),
                     ),
                   ),
                   Icon(
                     isGiveExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                     color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    size: iconSize,
                   ),
                 ],
               ),
@@ -325,13 +351,15 @@ class _GivePageState extends State<GivePage> {
                     );
                   },
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 12),
+                    padding: EdgeInsets.symmetric(horizontal: spacing * 3.5, vertical: spacing * 0.75),
                     child: Row(
                       children: [
                         Expanded(
                           child: Text(
                             option.name,
-                            style: Theme.of(context).textTheme.bodyMedium,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontSize: bodyFontSize,
+                            ),
                           ),
                         ),
                       ],
@@ -344,10 +372,15 @@ class _GivePageState extends State<GivePage> {
   }
 
   Widget _buildTransactionsItem(BuildContext context, bool isDark) {
+    final spacing = Responsive.verticalSpacing(context);
+    final borderRadius = Responsive.borderRadius(context);
+    final iconSize = Responsive.iconSize(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -361,26 +394,29 @@ class _GivePageState extends State<GivePage> {
           context,
           MaterialPageRoute(builder: (_) => const TransactionsPage()),
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(borderRadius),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(spacing),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.swap_horiz,
                 color: AppColors.primaryGold,
-                size: 24,
+                size: iconSize,
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: spacing),
               Expanded(
                 child: Text(
                   'Transactions',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontSize: bodyFontSize,
+                  ),
                 ),
               ),
               Icon(
                 Icons.chevron_right,
                 color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                size: iconSize,
               ),
             ],
           ),
@@ -390,10 +426,15 @@ class _GivePageState extends State<GivePage> {
   }
 
   Widget _buildAddMoneyItem(BuildContext context, bool isDark) {
+    final spacing = Responsive.verticalSpacing(context);
+    final borderRadius = Responsive.borderRadius(context);
+    final iconSize = Responsive.iconSize(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -407,26 +448,29 @@ class _GivePageState extends State<GivePage> {
           context,
           MaterialPageRoute(builder: (_) => const AddMoneyPage()),
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(borderRadius),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(spacing),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.add_circle_outline,
                 color: AppColors.primaryGold,
-                size: 24,
+                size: iconSize,
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: spacing),
               Expanded(
                 child: Text(
                   'Add Money',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontSize: bodyFontSize,
+                  ),
                 ),
               ),
               Icon(
                 Icons.chevron_right,
                 color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                size: iconSize,
               ),
             ],
           ),

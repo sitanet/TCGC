@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/services/data_service.dart';
+import '../../../data/services/interests_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/event.dart';
 import '../audio/audio_player_page.dart';
@@ -32,18 +33,26 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final DataService _dataService = DataService();
+  final InterestsService _interestsService = InterestsService();
   final PageController _eventsPageController = PageController();
   
   List<Sermon> _sermons = [];
   List<Event> _events = [];
+  List<Sermon> _pickedInterestSermons = [];
+  List<Sermon> _recommendedSermons = [];
   bool _isLoading = true;
   int _currentEventIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _initServices();
     _loadData();
     _startEventAutoSlide();
+  }
+  
+  Future<void> _initServices() async {
+    await _interestsService.initialize();
   }
 
   void _startEventAutoSlide() {
@@ -63,19 +72,26 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      // Load sermons and events in parallel for faster loading
+      // Load sermons, events, and recommended in parallel for faster loading
       final results = await Future.wait([
         _dataService.getMessages(),
         _dataService.getEvents(),
+        _dataService.getRecommendedMessages(),
       ]);
       
       final sermons = results[0] as List<Sermon>;
       final events = results[1] as List<Event>;
+      final recommended = results[2] as List<Sermon>;
       
       if (mounted) {
+        // Get random messages from user's interests
+        final pickedInterests = _interestsService.getRandomMessagesFromInterests(sermons, count: 3);
+        
         setState(() {
           _sermons = sermons;
           _events = events;
+          _recommendedSermons = recommended;
+          _pickedInterestSermons = pickedInterests;
           _isLoading = false;
         });
         
@@ -126,6 +142,14 @@ class _HomePageState extends State<HomePage> {
               _buildHeaderBanner(context, isDark),
               SizedBox(height: spacing * 1.5),
               _buildUpcomingEvents(context, isDark),
+              if (_pickedInterestSermons.isNotEmpty) ...[
+                SizedBox(height: spacing * 1.5),
+                _buildPickedInterests(context, isDark),
+              ],
+              if (_recommendedSermons.isNotEmpty) ...[
+                SizedBox(height: spacing * 1.5),
+                _buildRecommendedMessages(context, isDark),
+              ],
               SizedBox(height: spacing * 1.5),
               _buildRecentActivities(context, isDark),
               SizedBox(height: spacing * 6),
@@ -545,6 +569,94 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildPickedInterests(BuildContext context, bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final subtitleFontSize = Responsive.subtitleFontSize(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: Row(
+            children: [
+              Icon(
+                Icons.star,
+                color: AppColors.primaryGold,
+                size: Responsive.iconSize(context) * 0.9,
+              ),
+              SizedBox(width: spacing * 0.5),
+              Text(
+                'Picked for You',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: AppColors.primaryGold,
+                      fontWeight: FontWeight.w600,
+                      fontSize: subtitleFontSize,
+                    ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: spacing),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: Column(
+            children: _pickedInterestSermons.map((sermon) => _buildActivityTile(
+              context,
+              isDark,
+              sermon,
+            )).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecommendedMessages(BuildContext context, bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final subtitleFontSize = Responsive.subtitleFontSize(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: Row(
+            children: [
+              Icon(
+                Icons.thumb_up,
+                color: AppColors.primaryGold,
+                size: Responsive.iconSize(context) * 0.9,
+              ),
+              SizedBox(width: spacing * 0.5),
+              Text(
+                'Recommended',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: AppColors.primaryGold,
+                      fontWeight: FontWeight.w600,
+                      fontSize: subtitleFontSize,
+                    ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: spacing),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: Column(
+            children: _recommendedSermons.map((sermon) => _buildActivityTile(
+              context,
+              isDark,
+              sermon,
+            )).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildRecentActivities(BuildContext context, bool isDark) {
     final recentSermons = _sermons.take(10).toList();
 
@@ -667,19 +779,11 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  RichText(
-                    text: TextSpan(
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                      children: [
-                        TextSpan(text: sermon.title),
-                        TextSpan(
-                          text: ' - ${sermon.category}',
-                          style: Theme.of(context).textTheme.bodySmall,
+                  Text(
+                    sermon.title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
-                      ],
-                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(

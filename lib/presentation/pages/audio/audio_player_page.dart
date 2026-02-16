@@ -10,6 +10,7 @@ import '../../../data/services/favorites_service.dart';
 import '../../../data/services/playlist_service.dart';
 import '../../../data/services/download_service.dart';
 import '../../../data/services/data_service.dart';
+import '../../../data/services/playback_position_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/animated_play_button.dart';
 import '../wallet/give_page.dart';
@@ -35,11 +36,91 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     super.initState();
     _initializeServices();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
-      if (audioProvider.currentSermon?.id != widget.sermon.id) {
-        audioProvider.playSermon(widget.sermon);
-      }
+      _handlePlayback();
     });
+  }
+  
+  Future<void> _handlePlayback() async {
+    final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+    
+    if (audioProvider.currentSermon?.id == widget.sermon.id) {
+      return;
+    }
+    
+    final savedPosition = audioProvider.getSavedPosition(widget.sermon.id);
+    
+    if (savedPosition != null && savedPosition.isSignificant) {
+      _showResumeDialog(savedPosition);
+    } else {
+      audioProvider.playSermon(widget.sermon);
+    }
+  }
+  
+  void _showResumeDialog(PlaybackPosition savedPosition) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Resume Playback'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.play_circle_outline,
+              size: 48,
+              color: AppColors.primaryGold,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'You were at ${savedPosition.formattedPosition} of ${savedPosition.formattedDuration}',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Would you like to continue where you left off?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+              audioProvider.clearSavedPosition(widget.sermon.id);
+              audioProvider.playSermon(widget.sermon);
+            },
+            child: Text(
+              'Start Over',
+              style: TextStyle(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+              audioProvider.playSermonFromPosition(widget.sermon, savedPosition.position);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGold,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Resume'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _initializeServices() async {

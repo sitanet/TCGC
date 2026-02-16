@@ -11,6 +11,7 @@ class Sermon {
   final String categoryName;
   final DateTime date;
   final Duration duration;
+  final bool isRecommended;
 
   const Sermon({
     required this.id,
@@ -25,6 +26,7 @@ class Sermon {
     this.categoryName = '',
     required this.date,
     required this.duration,
+    this.isRecommended = false,
   });
 
   factory Sermon.fromJson(Map<String, dynamic> json) {
@@ -50,6 +52,7 @@ class Sermon {
           ? DateTime.parse(json['date']) 
           : DateTime.now(),
       duration: Duration(minutes: json['duration_minutes'] ?? 0),
+      isRecommended: json['is_recommended'] ?? false,
     );
   }
 
@@ -67,6 +70,7 @@ class Sermon {
       'category_name': categoryName,
       'date': date.toIso8601String(),
       'duration_minutes': duration.inMinutes,
+      'is_recommended': isRecommended,
     };
   }
 }

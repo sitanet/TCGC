@@ -23,6 +23,8 @@ import 'presentation/pages/teens/teens_page.dart';
 import 'presentation/pages/get_started/get_started_page.dart';
 import 'presentation/pages/auth/sign_in_page.dart';
 import 'presentation/pages/auth/sign_up_page.dart';
+import 'presentation/pages/interests/interests_page.dart';
+import 'data/services/interests_service.dart';
 import 'presentation/widgets/bottom_nav_bar.dart';
 import 'presentation/widgets/mini_player.dart';
 import 'presentation/widgets/promotion_popup.dart';
@@ -71,7 +73,9 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   bool _showGetStarted = true;
   bool _showSignUp = false;
+  bool _showInterests = false;
   bool _initialized = false;
+  final InterestsService _interestsService = InterestsService();
 
   @override
   void initState() {
@@ -93,6 +97,9 @@ class _MyAppState extends State<MyApp> {
         },
       );
       
+      // Initialize interests service
+      await _interestsService.initialize();
+      
       // Initialize notifications in background (don't block the app)
       _initializeNotifications();
       
@@ -101,6 +108,10 @@ class _MyAppState extends State<MyApp> {
           _initialized = true;
           if (authProvider.isAuthenticated) {
             _showGetStarted = false;
+            // Check if user needs to complete interests
+            if (!_interestsService.interestsCompleted) {
+              _showInterests = true;
+            }
           }
         });
       }
@@ -127,6 +138,16 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _showGetStarted = false;
       _showSignUp = false;
+      // Show interests page for first-time users
+      if (!_interestsService.interestsCompleted) {
+        _showInterests = true;
+      }
+    });
+  }
+  
+  void _onInterestsComplete() {
+    setState(() {
+      _showInterests = false;
     });
   }
 
@@ -149,7 +170,11 @@ class _MyAppState extends State<MyApp> {
 
     Widget homeWidget;
     if (authProvider.isAuthenticated) {
-      homeWidget = const MainScreen();
+      if (_showInterests) {
+        homeWidget = InterestsPage(onComplete: _onInterestsComplete);
+      } else {
+        homeWidget = const MainScreen();
+      }
     } else if (_showGetStarted) {
       homeWidget = GetStartedPage(
         onSignIn: () {

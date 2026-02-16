@@ -79,6 +79,16 @@ class DataService {
     }
     return [];
   }
+
+  // Get recommended messages
+  Future<List<Sermon>> getRecommendedMessages() async {
+    final response = await _api.get('${ApiConstants.messages}recommended/');
+    if (response.isSuccess) {
+      final List<dynamic> data = response.dataList;
+      return data.map((json) => Sermon.fromJson(json)).toList();
+    }
+    return [];
+  }
   
   // Get speaker names only (for filtering)
   Future<List<String>> getSpeakerNames() async {
