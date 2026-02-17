@@ -38,12 +38,10 @@ const String appVersion = '1.0.0';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize audio service - allow more time for notification setup
+  // Initialize audio service BEFORE creating providers - this is required for notifications
   try {
-    await initAudioService().timeout(
-      const Duration(seconds: 10),
-      onTimeout: () => debugPrint('Audio service init timed out'),
-    );
+    await initAudioService();
+    debugPrint('Audio service initialized in main');
   } catch (e) {
     debugPrint('Audio service init failed: $e');
   }

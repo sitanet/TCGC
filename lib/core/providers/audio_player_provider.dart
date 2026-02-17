@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../domain/entities/sermon.dart';
 import '../../data/services/audio_cache_service.dart';
 import '../../data/services/playback_position_service.dart';
@@ -13,6 +14,14 @@ Future<void> initAudioService() async {
   if (_audioServiceInitialized) return;
 
   try {
+    // Request notification permission on Android 13+
+    if (Platform.isAndroid) {
+      final status = await Permission.notification.status;
+      if (!status.isGranted) {
+        await Permission.notification.request();
+      }
+    }
+    
     await JustAudioBackground.init(
       androidNotificationChannelId: 'com.tcgc.app.audio',
       androidNotificationChannelName: 'TCGC Audio',
@@ -30,7 +39,7 @@ Future<void> initAudioService() async {
 }
 
 class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
-  final AudioPlayer _player = AudioPlayer();
+  AudioPlayer? _player;
   
   Sermon? _currentSermon;
   Duration _duration = Duration.zero;
@@ -67,11 +76,29 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool get hasPrevious => _currentIndex > 0;
 
   AudioPlayerProvider() {
-    _setupListeners();
     _initCacheDir();
     _audioCacheService.initialize();
-    _positionService.initialize();
+    _initPositionService();
     WidgetsBinding.instance.addObserver(this);
+  }
+  
+  bool _positionServiceInitialized = false;
+  
+  Future<void> _initPositionService() async {
+    await _positionService.initialize();
+    _positionServiceInitialized = true;
+  }
+  
+  Future<AudioPlayer> _getPlayer() async {
+    if (_player == null) {
+      // Ensure audio service is initialized first
+      if (!_audioServiceInitialized) {
+        await initAudioService();
+      }
+      _player = AudioPlayer();
+      _setupListeners();
+    }
+    return _player!;
   }
   
   @override
@@ -84,7 +111,9 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
   
   void _setupListeners() {
-    _player.playerStateStream.listen((state) {
+    if (_player == null) return;
+    
+    _player!.playerStateStream.listen((state) {
       _isPlaying = state.playing;
       _isLoading = state.processingState == ProcessingState.loading ||
                    state.processingState == ProcessingState.buffering;
@@ -98,12 +127,12 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
     });
     
-    _player.positionStream.listen((pos) {
+    _player!.positionStream.listen((pos) {
       _position = pos;
       notifyListeners();
     });
     
-    _player.durationStream.listen((dur) {
+    _player!.durationStream.listen((dur) {
       _duration = dur ?? Duration.zero;
       notifyListeners();
     });
@@ -148,10 +177,8 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> playSermon(Sermon sermon) async {
-    // Ensure audio service is initialized
-    if (!_audioServiceInitialized) {
-      await initAudioService();
-    }
+    // Ensure player is initialized (this also initializes audio service)
+    final player = await _getPlayer();
 
     // If same sermon, toggle play/pause
     if (_currentSermon?.id == sermon.id) {
@@ -193,8 +220,8 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
         ),
       );
       
-      await _player.setAudioSource(audioSource);
-      await _player.play();
+      await player.setAudioSource(audioSource);
+      await player.play();
       
       _isLoading = false;
       notifyListeners();
@@ -208,11 +235,12 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> play() async {
-    await _player.play();
+    final player = await _getPlayer();
+    await player.play();
   }
 
   Future<void> pause() async {
-    await _player.pause();
+    await _player?.pause();
     await _saveCurrentPosition();
   }
   
@@ -224,7 +252,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> stop() async {
     await _saveCurrentPosition();
-    await _player.stop();
+    await _player?.stop();
     _currentSermon = null;
     _position = Duration.zero;
     _duration = Duration.zero;
@@ -232,7 +260,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> seek(Duration position) async {
-    await _player.seek(position);
+    await _player?.seek(position);
   }
 
   Future<void> seekForward() async {
@@ -254,10 +282,12 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
   
   PlaybackPosition? getSavedPosition(String sermonId) {
+    if (!_positionServiceInitialized) return null;
     return _positionService.getPosition(sermonId);
   }
   
   bool hasSavedPosition(String sermonId) {
+    if (!_positionServiceInitialized) return false;
     return _positionService.hasPosition(sermonId);
   }
   
@@ -266,9 +296,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
   
   Future<void> playSermonFromPosition(Sermon sermon, Duration startPosition) async {
-    if (!_audioServiceInitialized) {
-      await initAudioService();
-    }
+    final player = await _getPlayer();
 
     _isLoading = true;
     _errorMessage = null;
@@ -295,8 +323,8 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
         ),
       );
       
-      await _player.setAudioSource(audioSource, initialPosition: startPosition);
-      await _player.play();
+      await player.setAudioSource(audioSource, initialPosition: startPosition);
+      await player.play();
       
       _isLoading = false;
       notifyListeners();
@@ -408,7 +436,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _saveCurrentPosition();
-    _player.dispose();
+    _player?.dispose();
     super.dispose();
   }
 }

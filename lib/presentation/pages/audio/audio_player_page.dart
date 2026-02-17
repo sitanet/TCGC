@@ -41,11 +41,17 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
   }
   
   Future<void> _handlePlayback() async {
+    if (!mounted) return;
+    
     final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
     
     if (audioProvider.currentSermon?.id == widget.sermon.id) {
       return;
     }
+    
+    // Small delay to allow position service to initialize
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
     
     final savedPosition = audioProvider.getSavedPosition(widget.sermon.id);
     
