@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'tithe_page.dart';
 import 'transactions_page.dart';
 import 'add_money_page.dart';
 
-class GivePage extends StatefulWidget {
+class GivePage extends ConsumerStatefulWidget {
   const GivePage({super.key});
 
   @override
-  State<GivePage> createState() => _GivePageState();
+  ConsumerState<GivePage> createState() => _GivePageState();
 }
 
-class _GivePageState extends State<GivePage> {
+class _GivePageState extends ConsumerState<GivePage> {
   String selectedCurrency = 'NGN';
   final currencies = ['NGN', 'USD', 'EUR', 'GBP'];
   bool isGiveExpanded = true;
@@ -25,7 +26,7 @@ class _GivePageState extends State<GivePage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = context.read<WalletProvider>();
+      final provider = ref.read(walletChangeNotifierProvider);
       provider.fetchTransactions();
       provider.fetchGivings();
     });
@@ -52,36 +53,34 @@ class _GivePageState extends State<GivePage> {
     final spacing = Responsive.verticalSpacing(context);
     final maxWidth = Responsive.maxContentWidth(context);
 
+    final walletProvider = ref.watch(walletChangeNotifierProvider);
+    
     return Scaffold(
       appBar: const CustomAppBar(title: ''),
-      body: Consumer<WalletProvider>(
-        builder: (context, walletProvider, child) {
-          return SingleChildScrollView(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxWidth),
-                child: Padding(
-                  padding: EdgeInsets.all(horizontalPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildPortfolioCard(context, isDark, walletProvider),
-                      SizedBox(height: spacing * 1.5),
-                      _buildCurrencySelector(isDark),
-                      SizedBox(height: spacing * 1.5),
-                      _buildGiveSection(context, isDark, walletProvider),
-                      SizedBox(height: spacing),
-                      _buildTransactionsItem(context, isDark),
-                      SizedBox(height: spacing),
-                      _buildAddMoneyItem(context, isDark),
-                      SizedBox(height: spacing * 6),
-                    ],
-                  ),
-                ),
+      body: SingleChildScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Padding(
+              padding: EdgeInsets.all(horizontalPadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildPortfolioCard(context, isDark, walletProvider),
+                  SizedBox(height: spacing * 1.5),
+                  _buildCurrencySelector(isDark),
+                  SizedBox(height: spacing * 1.5),
+                  _buildGiveSection(context, isDark, walletProvider),
+                  SizedBox(height: spacing),
+                  _buildTransactionsItem(context, isDark),
+                  SizedBox(height: spacing),
+                  _buildAddMoneyItem(context, isDark),
+                  SizedBox(height: spacing * 6),
+                ],
               ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }

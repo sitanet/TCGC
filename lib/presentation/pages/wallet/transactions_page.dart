@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 
-class TransactionsPage extends StatefulWidget {
+class TransactionsPage extends ConsumerStatefulWidget {
   const TransactionsPage({super.key});
 
   @override
-  State<TransactionsPage> createState() => _TransactionsPageState();
+  ConsumerState<TransactionsPage> createState() => _TransactionsPageState();
 }
 
-class _TransactionsPageState extends State<TransactionsPage> {
+class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   String selectedFilter = 'All';
   final filters = ['All', 'Money In', 'Money Out'];
 
@@ -20,7 +21,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<WalletProvider>().fetchTransactions();
+      ref.read(walletChangeNotifierProvider).fetchTransactions();
     });
   }
 
@@ -45,32 +46,30 @@ class _TransactionsPageState extends State<TransactionsPage> {
     final spacing = Responsive.verticalSpacing(context);
     final maxWidth = Responsive.maxContentWidth(context);
 
+    final walletProvider = ref.watch(walletChangeNotifierProvider);
+    
     return Scaffold(
       appBar: const CustomAppBar(title: 'Transactions'),
-      body: Consumer<WalletProvider>(
-        builder: (context, walletProvider, child) {
-          return SingleChildScrollView(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxWidth),
-                child: Padding(
-                  padding: EdgeInsets.all(horizontalPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSummaryCard(context, isDark, walletProvider),
-                      SizedBox(height: spacing * 1.5),
-                      _buildFilterSelector(isDark),
-                      SizedBox(height: spacing * 1.5),
-                      _buildTransactionsList(context, isDark, walletProvider),
-                      SizedBox(height: spacing * 6),
-                    ],
-                  ),
-                ),
+      body: SingleChildScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Padding(
+              padding: EdgeInsets.all(horizontalPadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSummaryCard(context, isDark, walletProvider),
+                  SizedBox(height: spacing * 1.5),
+                  _buildFilterSelector(isDark),
+                  SizedBox(height: spacing * 1.5),
+                  _buildTransactionsList(context, isDark, walletProvider),
+                  SizedBox(height: spacing * 6),
+                ],
               ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }

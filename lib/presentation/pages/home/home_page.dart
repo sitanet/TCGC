@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/providers/auth_provider.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../main.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/interests_service.dart';
 import '../../../domain/entities/sermon.dart';
@@ -24,14 +24,14 @@ String _stripHtmlTags(String htmlText) {
       .trim();
 }
 
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends ConsumerState<HomePage> {
   final DataService _dataService = DataService();
   final InterestsService _interestsService = InterestsService();
   final PageController _eventsPageController = PageController();
@@ -129,6 +129,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final spacing = Responsive.verticalSpacing(context);
+    final statusBarHeight = MediaQuery.of(context).padding.top;
 
     return Scaffold(
       body: RefreshIndicator(
@@ -139,6 +140,11 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Status bar background
+              Container(
+                height: statusBarHeight,
+                color: isDark ? AppColors.backgroundDark : Colors.white,
+              ),
               _buildHeaderBanner(context, isDark),
               SizedBox(height: spacing * 1.5),
               _buildUpcomingEvents(context, isDark),
@@ -213,115 +219,113 @@ class _HomePageState extends State<HomePage> {
           bottomRight: Radius.circular(borderRadius),
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: EdgeInsets.only(bottom: bottomPadding),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Centered logo and text
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: isMobile ? 30.0 : 40.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset(
-                      'assets/images/tcgc_logo.png',
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomPadding, top: 8.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Centered logo and text
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: isMobile ? 30.0 : 40.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/images/tcgc_logo.png',
+                    width: logoSize,
+                    height: logoSize,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Container(
                       width: logoSize,
                       height: logoSize,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        width: logoSize,
-                        height: logoSize,
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryGold,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(Icons.church, color: Colors.white, size: logoSize * 0.5),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGold,
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      child: Icon(Icons.church, color: Colors.white, size: logoSize * 0.5),
                     ),
-                    SizedBox(width: isMobile ? 16 : 24),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Welcome to',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.white70,
-                                  fontSize: welcomeFontSize,
-                                ),
-                          ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'The CityGate Church',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: titleFontSize,
-                              ),
+                  ),
+                  SizedBox(width: isMobile ? 16 : 24),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome to',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white70,
+                          fontSize: welcomeFontSize,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Where sons are raised',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Colors.white54,
-                                fontSize: subtitleFontSize,
-                              ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'The CityGate Church',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: titleFontSize,
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Where sons are raised',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white54,
+                          fontSize: subtitleFontSize,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              // Bottom row with name and profile picture
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                child: Consumer<AuthProvider>(
-                  builder: (context, authProvider, child) {
-                    final user = authProvider.user;
-                    final displayName = user != null
-                        ? '${user.firstName} ${user.lastName}'.trim()
-                        : 'Guest';
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          displayName.isNotEmpty ? displayName : 'Welcome',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                                fontSize: nameFontSize,
-                              ),
+            ),
+            // Bottom row with name and profile picture
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              child: Builder(
+                builder: (context) {
+                  final authProvider = ref.watch(authChangeNotifierProvider);
+                  final user = authProvider.user;
+                  final displayName = user != null
+                      ? '${user.firstName} ${user.lastName}'.trim()
+                      : 'Guest';
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        displayName.isNotEmpty ? displayName : 'Welcome',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                          fontSize: nameFontSize,
                         ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const ProfilePage(),
-                              ),
-                            );
-                          },
-                          child: CircleAvatar(
-                            radius: avatarRadius,
-                            backgroundColor: AppColors.primaryGold,
-                            backgroundImage: user?.photoUrl != null && user!.photoUrl!.isNotEmpty
-                                ? NetworkImage(user.photoUrl!)
-                                : null,
-                            child: user?.photoUrl == null || user!.photoUrl!.isEmpty
-                                ? Icon(Icons.person, color: Colors.white, size: avatarRadius * 1.2)
-                                : null,
-                          ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ProfilePage(),
+                            ),
+                          );
+                        },
+                        child: CircleAvatar(
+                          radius: avatarRadius,
+                          backgroundColor: AppColors.primaryGold,
+                          backgroundImage: user?.photoUrl != null && user!.photoUrl!.isNotEmpty
+                              ? NetworkImage(user.photoUrl!)
+                              : null,
+                          child: user?.photoUrl == null || user!.photoUrl!.isEmpty
+                              ? Icon(Icons.person, color: Colors.white, size: avatarRadius * 1.2)
+                              : null,
                         ),
-                      ],
-                    );
-                  },
-                ),
+                      ),
+                    ],
+                  );
+                },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

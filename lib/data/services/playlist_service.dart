@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/entities/sermon.dart';
+import '../../core/constants/api_constants.dart';
+import 'api_service.dart';
 
 class Playlist {
   final String id;
@@ -28,13 +30,24 @@ class Playlist {
   }
 
   factory Playlist.fromJson(Map<String, dynamic> json) {
+    List<Sermon> sermonsList = [];
+    if (json['sermons'] != null) {
+      sermonsList = (json['sermons'] as List<dynamic>)
+          .map((s) => Sermon.fromJson(s['message'] ?? s))
+          .toList();
+    } else if (json['messages'] != null) {
+      sermonsList = (json['messages'] as List<dynamic>)
+          .map((s) => Sermon.fromJson(s['message'] ?? s))
+          .toList();
+    }
+    
     return Playlist(
-      id: json['id'],
-      name: json['name'],
-      createdAt: DateTime.parse(json['created_at']),
-      sermons: (json['sermons'] as List<dynamic>?)
-          ?.map((s) => Sermon.fromJson(s))
-          .toList(),
+      id: json['id']?.toString() ?? '',
+      name: json['name'] ?? '',
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at']) 
+          : DateTime.now(),
+      sermons: sermonsList,
     );
   }
 
@@ -59,16 +72,21 @@ class PlaylistService extends ChangeNotifier {
   PlaylistService._internal();
 
   static const String _playlistsKey = 'user_playlists';
+  final ApiService _api = ApiService();
   List<Playlist> _playlists = [];
   bool _isLoaded = false;
+  bool _isSyncing = false;
 
   List<Playlist> get playlists => List.unmodifiable(_playlists);
   int get count => _playlists.length;
+  bool get isSyncing => _isSyncing;
 
   Future<void> initialize() async {
     if (_isLoaded) return;
     await _loadPlaylists();
     _isLoaded = true;
+    // Sync with backend in background
+    _syncWithBackend();
   }
 
   Future<void> _loadPlaylists() async {
@@ -78,7 +96,7 @@ class PlaylistService extends ChangeNotifier {
       if (data != null) {
         final List<dynamic> json = jsonDecode(data);
         _playlists = json.map((j) => Playlist.fromJson(j)).toList();
-        debugPrint('Loaded ${_playlists.length} playlists');
+        debugPrint('Loaded ${_playlists.length} playlists from local storage');
       }
     } catch (e) {
       debugPrint('Error loading playlists: $e');
@@ -95,6 +113,113 @@ class PlaylistService extends ChangeNotifier {
     }
   }
 
+  Future<void> _syncWithBackend() async {
+    if (_isSyncing) return;
+    _isSyncing = true;
+    notifyListeners();
+
+    try {
+      // Fetch playlists from backend
+      final response = await _api.get(ApiConstants.playlists);
+      if (response.isSuccess) {
+        final List<dynamic> data = response.dataList;
+        final backendPlaylists = data.map((j) => Playlist.fromJson(j)).toList();
+        
+        // Merge strategy: Backend is source of truth after first sync
+        // Replace local with backend data
+        if (backendPlaylists.isNotEmpty) {
+          _playlists = backendPlaylists;
+        } else if (_playlists.isNotEmpty) {
+          // If backend is empty but we have local playlists, upload them
+          for (final playlist in _playlists) {
+            await _createOnBackend(playlist);
+          }
+        }
+        
+        await _savePlaylists();
+        notifyListeners();
+        debugPrint('Synced playlists with backend: ${_playlists.length} total');
+      }
+    } catch (e) {
+      debugPrint('Error syncing playlists with backend: $e');
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
+    }
+  }
+
+  Future<String?> _createOnBackend(Playlist playlist) async {
+    try {
+      final response = await _api.post(
+        ApiConstants.playlists,
+        {
+          'name': playlist.name,
+          'message_ids': playlist.sermons.map((s) => s.id).toList(),
+        },
+      );
+      if (response.isSuccess) {
+        return response.data['id']?.toString();
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error creating playlist on backend: $e');
+      return null;
+    }
+  }
+
+  Future<bool> _updateOnBackend(String playlistId, {String? name, List<String>? messageIds}) async {
+    try {
+      final Map<String, dynamic> data = {};
+      if (name != null) data['name'] = name;
+      if (messageIds != null) data['message_ids'] = messageIds;
+      
+      final response = await _api.patch(
+        '${ApiConstants.playlists}$playlistId/',
+        data,
+      );
+      return response.isSuccess;
+    } catch (e) {
+      debugPrint('Error updating playlist on backend: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _deleteFromBackend(String playlistId) async {
+    try {
+      final response = await _api.delete('${ApiConstants.playlists}$playlistId/');
+      return response.isSuccess;
+    } catch (e) {
+      debugPrint('Error deleting playlist from backend: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _addMessageToBackend(String playlistId, String messageId) async {
+    try {
+      final response = await _api.post(
+        '${ApiConstants.playlists}$playlistId/add_message/',
+        {'message_id': messageId},
+      );
+      return response.isSuccess;
+    } catch (e) {
+      debugPrint('Error adding message to playlist on backend: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _removeMessageFromBackend(String playlistId, String messageId) async {
+    try {
+      final response = await _api.post(
+        '${ApiConstants.playlists}$playlistId/remove_message/',
+        {'message_id': messageId},
+      );
+      return response.isSuccess;
+    } catch (e) {
+      debugPrint('Error removing message from playlist on backend: $e');
+      return false;
+    }
+  }
+
   Playlist? getPlaylist(String playlistId) {
     try {
       return _playlists.firstWhere((p) => p.id == playlistId);
@@ -104,15 +229,31 @@ class PlaylistService extends ChangeNotifier {
   }
 
   Future<Playlist> createPlaylist(String name) async {
-    final playlist = Playlist(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+    // Create locally first with temporary ID
+    final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+    var playlist = Playlist(
+      id: tempId,
       name: name,
       createdAt: DateTime.now(),
     );
+    
     _playlists.insert(0, playlist);
     await _savePlaylists();
     notifyListeners();
-    debugPrint('Created playlist: $name');
+    debugPrint('Created playlist locally: $name');
+    
+    // Create on backend and update ID
+    final backendId = await _createOnBackend(playlist);
+    if (backendId != null && backendId != tempId) {
+      final index = _playlists.indexWhere((p) => p.id == tempId);
+      if (index != -1) {
+        playlist = playlist.copyWith(id: backendId);
+        _playlists[index] = playlist;
+        await _savePlaylists();
+        notifyListeners();
+      }
+    }
+    
     return playlist;
   }
 
@@ -121,6 +262,9 @@ class PlaylistService extends ChangeNotifier {
     await _savePlaylists();
     notifyListeners();
     debugPrint('Deleted playlist: $playlistId');
+    
+    // Delete from backend
+    _deleteFromBackend(playlistId);
   }
 
   Future<void> renamePlaylist(String playlistId, String newName) async {
@@ -129,6 +273,9 @@ class PlaylistService extends ChangeNotifier {
       _playlists[index] = _playlists[index].copyWith(name: newName);
       await _savePlaylists();
       notifyListeners();
+      
+      // Update on backend
+      _updateOnBackend(playlistId, name: newName);
     }
   }
 
@@ -142,6 +289,9 @@ class PlaylistService extends ChangeNotifier {
         await _savePlaylists();
         notifyListeners();
         debugPrint('Added ${sermon.title} to playlist ${playlist.name}');
+        
+        // Sync to backend
+        _addMessageToBackend(playlistId, sermon.id);
       }
     }
   }
@@ -154,6 +304,9 @@ class PlaylistService extends ChangeNotifier {
       _playlists[index] = playlist.copyWith(sermons: updatedSermons);
       await _savePlaylists();
       notifyListeners();
+      
+      // Sync to backend
+      _removeMessageFromBackend(playlistId, sermonId);
     }
   }
 
@@ -166,7 +319,19 @@ class PlaylistService extends ChangeNotifier {
     return _playlists.where((p) => p.sermons.any((s) => s.id == sermonId)).toList();
   }
 
+  Future<void> refreshFromBackend() async {
+    _isLoaded = false;
+    _playlists.clear();
+    await _loadPlaylists();
+    _isLoaded = true;
+    await _syncWithBackend();
+  }
+
   Future<void> clearAll() async {
+    // Delete all from backend
+    for (final playlist in _playlists) {
+      await _deleteFromBackend(playlist.id);
+    }
     _playlists.clear();
     await _savePlaylists();
     notifyListeners();

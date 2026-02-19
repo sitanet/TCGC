@@ -3,7 +3,8 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- Church building icon -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M12,3v10.55c-0.59,-0.34 -1.27,-0.55 -2,-0.55c-2.21,0 -4,1.79 -4,4s1.79,4 4,4s4,-1.79 4,-4V7h4V3h-6z"/>
+        android:pathData="M12,2L6,7v1H4v2h2v10h12V10h2V8h-2V7L12,2zM12,4.5L16,8v1H8V8L12,4.5zM11,11h2v2h-2V11zM8,12h2v6H8V12zM14,12h2v6h-2V12z"/>
 </vector>

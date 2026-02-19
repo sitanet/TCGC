@@ -1,160 +1,156 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/notification_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../domain/entities/app_notification.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 
-class NotificationsPage extends StatefulWidget {
+class NotificationsPage extends ConsumerStatefulWidget {
   const NotificationsPage({super.key});
 
   @override
-  State<NotificationsPage> createState() => _NotificationsPageState();
+  ConsumerState<NotificationsPage> createState() => _NotificationsPageState();
 }
 
-class _NotificationsPageState extends State<NotificationsPage> {
+class _NotificationsPageState extends ConsumerState<NotificationsPage> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<NotificationProvider>().loadNotifications();
+      ref.read(notificationChangeNotifierProvider).loadNotifications();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final provider = ref.watch(notificationChangeNotifierProvider);
 
     return Scaffold(
       appBar: CustomAppBar(
         title: 'Notifications',
         showBackButton: true,
         actions: [
-          Consumer<NotificationProvider>(
-            builder: (context, provider, _) {
-              if (provider.unreadCount > 0) {
-                return TextButton(
-                  onPressed: () => provider.markAllAsRead(),
-                  child: const Text(
-                    'Mark all read',
-                    style: TextStyle(
-                      color: AppColors.primaryGold,
-                      fontSize: 14,
-                    ),
-                  ),
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
+          if (provider.unreadCount > 0)
+            TextButton(
+              onPressed: () => provider.markAllAsRead(),
+              child: const Text(
+                'Mark all read',
+                style: TextStyle(
+                  color: AppColors.primaryGold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
         ],
       ),
-      body: Consumer<NotificationProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: _buildBody(context, isDark, provider),
+    );
+  }
 
-          if (provider.error != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.error_outline,
-                      size: 48,
-                      color: Colors.red,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    provider.error!,
-                    style: TextStyle(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => provider.loadNotifications(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryGold,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Retry'),
-                  ),
-                ],
+  Widget _buildBody(BuildContext context, bool isDark, NotificationProvider provider) {
+    if (provider.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (provider.error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
-            );
-          }
-
-          if (provider.notifications.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.primaryGold.withOpacity(0.2),
-                          AppColors.primaryGold.withOpacity(0.05),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.notifications_none_rounded,
-                      size: 64,
-                      color: AppColors.primaryGold,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'No notifications yet',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'You\'ll see your notifications here\nwhen you receive them',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                        ),
-                  ),
-                ],
+              child: const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Colors.red,
               ),
-            );
-          }
-
-          final horizontalPadding = Responsive.horizontalPadding(context);
-          final spacing = Responsive.verticalSpacing(context);
-
-          return RefreshIndicator(
-            onRefresh: () => provider.loadNotifications(),
-            color: AppColors.primaryGold,
-            child: ListView.builder(
-              padding: EdgeInsets.symmetric(vertical: spacing * 0.75, horizontal: horizontalPadding),
-              itemCount: provider.notifications.length,
-              itemBuilder: (context, index) {
-                final notification = provider.notifications[index];
-                return _NotificationCard(
-                  notification: notification,
-                  onTap: () => _onNotificationTap(notification, provider),
-                );
-              },
             ),
+            const SizedBox(height: 16),
+            Text(
+              provider.error!,
+              style: TextStyle(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => provider.loadNotifications(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGold,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (provider.notifications.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primaryGold.withOpacity(0.2),
+                    AppColors.primaryGold.withOpacity(0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.notifications_none_rounded,
+                size: 64,
+                color: AppColors.primaryGold,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No notifications yet',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You\'ll see your notifications here\nwhen you receive them',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+
+    return RefreshIndicator(
+      onRefresh: () => provider.loadNotifications(),
+      color: AppColors.primaryGold,
+      child: ListView.builder(
+        padding: EdgeInsets.symmetric(vertical: spacing * 0.75, horizontal: horizontalPadding),
+        itemCount: provider.notifications.length,
+        itemBuilder: (context, index) {
+          final notification = provider.notifications[index];
+          return _NotificationCard(
+            notification: notification,
+            onTap: () => _onNotificationTap(notification, provider),
           );
         },
       ),

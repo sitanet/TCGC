@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../core/providers/audio_player_provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../main.dart';
 import '../pages/audio/audio_player_page.dart';
 
-class MiniPlayer extends StatelessWidget {
+class MiniPlayer extends ConsumerWidget {
   const MiniPlayer({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Consumer<AudioPlayerProvider>(
-      builder: (context, audioProvider, child) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
         if (!audioProvider.hasAudio) {
           return const SizedBox.shrink();
         }
@@ -148,8 +147,6 @@ class MiniPlayer extends StatelessWidget {
             ),
           ),
         );
-      },
-    );
   }
 
   Widget _buildImage(String? imageUrl, bool isDark) {

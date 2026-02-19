@@ -1,31 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/audio_player_provider.dart';
-import '../../../core/providers/wallet_provider.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../data/services/favorites_service.dart';
 import '../../../data/services/playlist_service.dart';
 import '../../../data/services/download_service.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/playback_position_service.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/animated_play_button.dart';
 import '../wallet/give_page.dart';
 import '../wallet/wallet_page.dart';
 
-class AudioPlayerPage extends StatefulWidget {
+class AudioPlayerPage extends ConsumerStatefulWidget {
   final Sermon sermon;
 
   const AudioPlayerPage({super.key, required this.sermon});
 
   @override
-  State<AudioPlayerPage> createState() => _AudioPlayerPageState();
+  ConsumerState<AudioPlayerPage> createState() => _AudioPlayerPageState();
 }
 
-class _AudioPlayerPageState extends State<AudioPlayerPage> {
+class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   final FavoritesService _favoritesService = FavoritesService();
   final PlaylistService _playlistService = PlaylistService();
   final DownloadService _downloadService = DownloadService();
@@ -43,22 +43,20 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
   Future<void> _handlePlayback() async {
     if (!mounted) return;
     
-    final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+    final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
     
-    if (audioProvider.currentSermon?.id == widget.sermon.id) {
+    // If this sermon is already playing, don't restart
+    if (audioProvider.currentSermon?.id == widget.sermon.id && 
+        (audioProvider.isPlaying || audioProvider.isLoading)) {
       return;
     }
-    
-    // Small delay to allow position service to initialize
-    await Future.delayed(const Duration(milliseconds: 100));
-    if (!mounted) return;
     
     final savedPosition = audioProvider.getSavedPosition(widget.sermon.id);
     
     if (savedPosition != null && savedPosition.isSignificant) {
       _showResumeDialog(savedPosition);
     } else {
-      audioProvider.playSermon(widget.sermon);
+      await audioProvider.playSermon(widget.sermon);
     }
   }
   
@@ -100,7 +98,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
           TextButton(
             onPressed: () {
               Navigator.pop(dialogContext);
-              final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+              final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
               audioProvider.clearSavedPosition(widget.sermon.id);
               audioProvider.playSermon(widget.sermon);
             },
@@ -114,7 +112,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(dialogContext);
-              final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+              final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
               audioProvider.playSermonFromPosition(widget.sermon, savedPosition.position);
             },
             style: ElevatedButton.styleFrom(
@@ -139,10 +137,11 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+    final errorMessage = audioProvider.errorMessage;
 
-    return Consumer<AudioPlayerProvider>(
-      builder: (context, audioProvider, child) {
-        final errorMessage = audioProvider.errorMessage;
+    return Builder(
+      builder: (context) {
 
         return Scaffold(
           appBar: CustomAppBar(
@@ -192,11 +191,11 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                     ),
                   ),
                 )
-              : Padding(
+              : SingleChildScrollView(
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
-                      const Spacer(),
+                      const SizedBox(height: 16),
                       _buildAlbumArt(isDark),
                       const SizedBox(height: 32),
                       _buildSongInfo(context),
@@ -204,9 +203,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                       _buildProgressBar(isDark, audioProvider),
                       const SizedBox(height: 24),
                       _buildControls(isDark, audioProvider),
-                      const SizedBox(height: 32),
-                      _buildGivingButton(context, isDark),
-                      const Spacer(flex: 2),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
@@ -369,7 +366,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
     final hasPrevious = audioProvider.hasPrevious || audioProvider.position.inSeconds > 3;
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         // Skip to Previous
         IconButton(
@@ -377,7 +374,6 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
               ? null
               : () async {
                   await audioProvider.skipToPrevious();
-                  // Update the page if we switched to a different sermon
                   if (mounted && audioProvider.currentSermon != null &&
                       audioProvider.currentSermon!.id != widget.sermon.id) {
                     Navigator.pushReplacement(
@@ -390,26 +386,24 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                 },
           icon: Icon(
             Icons.skip_previous,
-            size: 36,
+            size: 32,
             color: hasPrevious
                 ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
                 : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
           ),
         ),
-        const SizedBox(width: 8),
         IconButton(
           onPressed: isLoading ? null : () => audioProvider.seekBackward(),
           icon: Icon(
             Icons.replay_10,
-            size: 32,
+            size: 28,
             color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
           ),
         ),
-        const SizedBox(width: 16),
         AnimatedPlayButton(
           isPlaying: isPlaying,
           isLoading: isLoading,
-          size: 70,
+          size: 64,
           onTap: () {
             if (isPlaying) {
               audioProvider.pause();
@@ -418,23 +412,20 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
             }
           },
         ),
-        const SizedBox(width: 16),
         IconButton(
           onPressed: isLoading ? null : () => audioProvider.seekForward(),
           icon: Icon(
             Icons.forward_10,
-            size: 32,
+            size: 28,
             color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
           ),
         ),
-        const SizedBox(width: 8),
         // Skip to Next
         IconButton(
           onPressed: isLoading || !hasNext
               ? null
               : () async {
                   await audioProvider.skipToNext();
-                  // Update the page to show the new sermon
                   if (mounted && audioProvider.currentSermon != null) {
                     Navigator.pushReplacement(
                       context,
@@ -446,7 +437,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                 },
           icon: Icon(
             Icons.skip_next,
-            size: 36,
+            size: 32,
             color: hasNext
                 ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
                 : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
@@ -821,26 +812,8 @@ Listen on TCGC App
     );
   }
 
-  Widget _buildGivingButton(BuildContext context, bool isDark) {
-    return TextButton.icon(
-      onPressed: () => _showGivingBottomSheet(context, isDark),
-      icon: Icon(
-        Icons.volunteer_activism,
-        color: AppColors.primaryGold,
-        size: 20,
-      ),
-      label: Text(
-        'Blessed? Give an Offering',
-        style: TextStyle(
-          color: AppColors.primaryGold,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-
   void _showGivingBottomSheet(BuildContext context, bool isDark) {
-    final walletProvider = Provider.of<WalletProvider>(context, listen: false);
+    final walletProvider = ref.read(walletChangeNotifierProvider);
     
     showModalBottomSheet(
       context: context,
@@ -891,7 +864,6 @@ Listen on TCGC App
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  // Navigate based on wallet status
                   if (walletProvider.hasWallet) {
                     Navigator.push(
                       context,

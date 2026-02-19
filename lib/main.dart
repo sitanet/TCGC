@@ -1,9 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/theme/app_theme.dart';
@@ -11,14 +9,13 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/theme_provider.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/notification_provider.dart';
-import 'core/providers/audio_player_provider.dart' show AudioPlayerProvider, initAudioService;
+import 'core/providers/audio_player_provider.dart';
 import 'core/providers/wallet_provider.dart';
 import 'core/providers/biometric_provider.dart';
 import 'presentation/pages/home/home_page.dart';
 import 'presentation/pages/audio/audio_page.dart';
 import 'presentation/pages/livestream/livestream_page.dart';
 import 'presentation/pages/wallet/wallet_page.dart';
-
 import 'presentation/pages/teens/teens_page.dart';
 import 'presentation/pages/get_started/get_started_page.dart';
 import 'presentation/pages/auth/sign_in_page.dart';
@@ -35,40 +32,35 @@ import 'domain/entities/promotion.dart';
 
 const String appVersion = '1.0.0';
 
+// Riverpod providers wrapping ChangeNotifier classes
+final themeChangeNotifierProvider = ChangeNotifierProvider<ThemeProvider>((ref) => ThemeProvider());
+final authChangeNotifierProvider = ChangeNotifierProvider<AuthProvider>((ref) => AuthProvider());
+final notificationChangeNotifierProvider = ChangeNotifierProvider<NotificationProvider>((ref) => NotificationProvider());
+final walletChangeNotifierProvider = ChangeNotifierProvider<WalletProvider>((ref) => WalletProvider());
+final audioPlayerChangeNotifierProvider = ChangeNotifierProvider<AudioPlayerProvider>((ref) => AudioPlayerProvider());
+final biometricChangeNotifierProvider = ChangeNotifierProvider<BiometricProvider>((ref) => BiometricProvider());
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize audio service BEFORE creating providers - this is required for notifications
-  try {
-    await initAudioService();
-    debugPrint('Audio service initialized in main');
-  } catch (e) {
-    debugPrint('Audio service init failed: $e');
-  }
+  // Initialize audio service for background playback
+  await initAudioService();
   
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => NotificationProvider()),
-        ChangeNotifierProvider(create: (_) => WalletProvider()),
-        ChangeNotifierProvider(create: (_) => AudioPlayerProvider()),
-        ChangeNotifierProvider(create: (_) => BiometricProvider()),
-      ],
-      child: const MyApp(),
+    const ProviderScope(
+      child: MyApp(),
     ),
   );
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  ConsumerState<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends ConsumerState<MyApp> {
   bool _showGetStarted = true;
   bool _showSignUp = false;
   bool _showInterests = false;
@@ -85,20 +77,23 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _initializeApp() async {
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final authProvider = ref.read(authChangeNotifierProvider);
       
-      // Initialize auth first (this is quick - just loads tokens from storage)
-      await authProvider.initialize().timeout(
-        const Duration(seconds: 5),
-        onTimeout: () {
-          debugPrint('Auth initialization timed out');
-        },
-      );
+      await Future.wait([
+        authProvider.initialize().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            debugPrint('Auth initialization timed out');
+          },
+        ),
+        _interestsService.initialize().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            debugPrint('Interests initialization timed out');
+          },
+        ),
+      ]);
       
-      // Initialize interests service
-      await _interestsService.initialize();
-      
-      // Initialize notifications in background (don't block the app)
       _initializeNotifications();
       
       if (mounted) {
@@ -106,7 +101,6 @@ class _MyAppState extends State<MyApp> {
           _initialized = true;
           if (authProvider.isAuthenticated) {
             _showGetStarted = false;
-            // Check if user needs to complete interests
             if (!_interestsService.interestsCompleted) {
               _showInterests = true;
             }
@@ -125,8 +119,7 @@ class _MyAppState extends State<MyApp> {
   
   Future<void> _initializeNotifications() async {
     try {
-      final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
-      await notificationProvider.initialize();
+      await ref.read(notificationChangeNotifierProvider).initialize();
     } catch (e) {
       debugPrint('Notification initialization error: $e');
     }
@@ -136,7 +129,6 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _showGetStarted = false;
       _showSignUp = false;
-      // Show interests page for first-time users
       if (!_interestsService.interestsCompleted) {
         _showInterests = true;
       }
@@ -151,8 +143,8 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final authProvider = Provider.of<AuthProvider>(context);
+    final themeProvider = ref.watch(themeChangeNotifierProvider);
+    final authProvider = ref.watch(authChangeNotifierProvider);
 
     if (!_initialized) {
       return MaterialApp(
@@ -229,14 +221,14 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-class MainScreen extends StatefulWidget {
+class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
 
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
+class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   bool _showPromotion = false;
   bool _showUpdateDialog = false;
@@ -329,8 +321,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Future<void> _initializeWallet() async {
     try {
-      final walletProvider = Provider.of<WalletProvider>(context, listen: false);
-      await walletProvider.initialize();
+      await ref.read(walletChangeNotifierProvider).initialize();
     } catch (e) {
       debugPrint('Wallet initialization error: $e');
     }
@@ -361,8 +352,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Future<void> _checkForPromotion() async {
     try {
-      // Check if user has promotions enabled in their preferences
-      final notificationProvider = context.read<NotificationProvider>();
+      final notificationProvider = ref.read(notificationChangeNotifierProvider);
       if (!notificationProvider.preferences.promotionsEnabled) {
         return;
       }
@@ -408,7 +398,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    // Show update dialog if available
     if (_showUpdateDialog && _updateInfo != null) {
       return Scaffold(
         body: Center(
@@ -486,7 +475,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       );
     }
     
-    // Show promotion popup if active
     if (_showPromotion && _activePromotions.isNotEmpty) {
       return PromotionPopup(
         promotions: _activePromotions,

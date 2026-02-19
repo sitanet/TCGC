@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../../core/providers/notification_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/biometric_provider.dart';
-import '../../../core/providers/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'change_password_page.dart';
 
-class SettingsPage extends StatefulWidget {
+class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
+class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _emailNotifications = false;
   bool _promotionsEnabled = true;
   bool _biometricLogin = false;
@@ -32,8 +31,8 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _loadPreferences() async {
     if (!mounted) return;
 
-    final notificationProvider = context.read<NotificationProvider>();
-    final biometricProvider = context.read<BiometricProvider>();
+    final notificationProvider = ref.read(notificationChangeNotifierProvider);
+    final biometricProvider = ref.read(biometricChangeNotifierProvider);
 
     // Load notification preferences from backend
     try {
@@ -72,7 +71,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     try {
       final success =
-          await context.read<NotificationProvider>().setEmailEnabled(value);
+          await ref.read(notificationChangeNotifierProvider).setEmailEnabled(value);
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -115,7 +114,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     try {
       final success =
-          await context.read<NotificationProvider>().setPromotionsEnabled(value);
+          await ref.read(notificationChangeNotifierProvider).setPromotionsEnabled(value);
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -243,7 +242,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _handleBiometricLoginToggle(bool value) async {
-    final biometricProvider = context.read<BiometricProvider>();
+    final biometricProvider = ref.read(biometricChangeNotifierProvider);
 
     // Re-initialize to get fresh status
     await biometricProvider.initialize();
@@ -261,7 +260,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     if (value) {
-      final authProvider = context.read<AuthProvider>();
+      final authProvider = ref.read(authChangeNotifierProvider);
       final email = authProvider.user?.email;
       if (email != null) {
         _showEnableBiometricLoginDialog(biometricProvider, email);
@@ -286,7 +285,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _handleBiometricTransactionToggle(bool value) async {
-    final biometricProvider = context.read<BiometricProvider>();
+    final biometricProvider = ref.read(biometricChangeNotifierProvider);
 
     if (!biometricProvider.isAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(

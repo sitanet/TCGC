@@ -1,6 +1,6 @@
 class ApiConstants {
   static const String baseUrl = 'https://tcgc.thecitygatechurch.org/api'; // Production server
-  // static const String baseUrl = 'http://192.168.43.57:8000/api'; // Your local network IP
+  // static const String baseUrl = 'http://192.168.43.57:8000/api'; // Local development
   
   // Auth
   static const String register = '/auth/register/';
@@ -23,6 +23,14 @@ class ApiConstants {
   static const String messageStats = '/messages/stats/'; // Track favorite/share stats
   static const String topFavorites = '/messages/top_favorites/'; // Get most favorited messages
   static const String topShares = '/messages/top_shares/'; // Get most shared messages
+  
+  // Favorites (synced to backend)
+  static const String favorites = '/favorites/';
+  static const String favoritesSync = '/favorites/sync/';
+  
+  // Playlists (synced to backend)
+  static const String playlists = '/playlists/';
+  static const String playlistsSync = '/playlists/sync/';
   
   // Events
   static const String events = '/events/';

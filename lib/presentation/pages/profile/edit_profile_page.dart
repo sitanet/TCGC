@@ -2,21 +2,21 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
-import '../../../core/providers/auth_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/biometric_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/user.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 
-class EditProfilePage extends StatefulWidget {
+class EditProfilePage extends ConsumerStatefulWidget {
   const EditProfilePage({super.key});
 
   @override
-  State<EditProfilePage> createState() => _EditProfilePageState();
+  ConsumerState<EditProfilePage> createState() => _EditProfilePageState();
 }
 
-class _EditProfilePageState extends State<EditProfilePage> {
+class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
   
   final _firstNameController = TextEditingController();
@@ -78,12 +78,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
     super.initState();
     _loadUserData();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<BiometricProvider>().initialize();
+      ref.read(biometricChangeNotifierProvider).initialize();
     });
   }
 
   void _loadUserData() {
-    final user = context.read<AuthProvider>().user;
+    final user = ref.read(authChangeNotifierProvider).user;
     if (user != null) {
       _firstNameController.text = user.firstName;
       _middleNameController.text = user.middleName ?? '';
@@ -416,7 +416,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       _isUploadingPhoto = true;
     });
 
-    final authProvider = context.read<AuthProvider>();
+    final authProvider = ref.read(authChangeNotifierProvider);
     final success = await authProvider.uploadProfilePhoto(imageFile);
 
     if (mounted) {
@@ -841,74 +841,71 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Widget _buildBiometricToggle(BuildContext context, bool isDark) {
-    return Consumer<BiometricProvider>(
-      builder: (context, biometricProvider, _) {
-        final isAvailable = biometricProvider.isAvailable;
-        final biometricName = biometricProvider.biometricTypeName;
-        
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.cardDark : Colors.grey[100],
-            borderRadius: BorderRadius.circular(12),
+    final biometricProvider = ref.watch(biometricChangeNotifierProvider);
+    final isAvailable = biometricProvider.isAvailable;
+    final biometricName = biometricProvider.biometricTypeName;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.primaryGold.withAlpha(25),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.fingerprint,
+              color: AppColors.primaryGold,
+              size: 28,
+            ),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGold.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Biometric Authentication',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
-                child: const Icon(
-                  Icons.fingerprint,
-                  color: AppColors.primaryGold,
-                  size: 28,
+                const SizedBox(height: 4),
+                Text(
+                  isAvailable
+                      ? 'Use $biometricName to login'
+                      : 'Biometric not available on this device',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Biometric Authentication',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isAvailable
-                          ? 'Use $biometricName to login'
-                          : 'Biometric not available on this device',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: biometricProvider.biometricLoginEnabled,
-                onChanged: isAvailable
-                    ? (value) => _handleBiometricToggle(value, biometricProvider)
-                    : null,
-                activeColor: AppColors.primaryGold,
-              ),
-            ],
+              ],
+            ),
           ),
-        );
-      },
+          Switch(
+            value: biometricProvider.biometricLoginEnabled,
+            onChanged: isAvailable
+                ? (value) => _handleBiometricToggle(value, biometricProvider)
+                : null,
+            activeColor: AppColors.primaryGold,
+          ),
+        ],
+      ),
     );
   }
 
   Future<void> _handleBiometricToggle(bool value, BiometricProvider biometricProvider) async {
     if (value) {
-      final authProvider = context.read<AuthProvider>();
+      final authProvider = ref.read(authChangeNotifierProvider);
       final user = authProvider.user;
       final email = user?.email;
       
@@ -1017,7 +1014,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _saveProfile() async {
     if (_formKey.currentState?.validate() ?? false) {
-      final authProvider = context.read<AuthProvider>();
+      final authProvider = ref.read(authChangeNotifierProvider);
       
       // Build profile data - only editable fields
       // Note: first_name, middle_name, last_name, email, and phone_number are not editable for security

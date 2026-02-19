@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../../core/providers/wallet_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'give_page.dart';
 import 'nin_verification_page.dart';
 
-class WalletPage extends StatefulWidget {
+class WalletPage extends ConsumerStatefulWidget {
   const WalletPage({super.key});
 
   @override
-  State<WalletPage> createState() => _WalletPageState();
+  ConsumerState<WalletPage> createState() => _WalletPageState();
 }
 
-class _WalletPageState extends State<WalletPage> {
+class _WalletPageState extends ConsumerState<WalletPage> {
   bool _isCheckingStatus = true;
 
   @override
@@ -53,17 +53,14 @@ class _WalletPageState extends State<WalletPage> {
       );
     }
 
-    return Consumer<WalletProvider>(
-      builder: (context, walletProvider, child) {
-        // If user has wallet, go to GivePage (wallet details)
-        if (walletProvider.hasWallet) {
-          return const GivePage();
-        }
-        
-        // If user doesn't have wallet, show welcome page
-        return _buildWalletWelcomePage(context);
-      },
-    );
+    final walletProvider = ref.watch(walletChangeNotifierProvider);
+    // If user has wallet, go to GivePage (wallet details)
+    if (walletProvider.hasWallet) {
+      return const GivePage();
+    }
+    
+    // If user doesn't have wallet, show welcome page
+    return _buildWalletWelcomePage(context);
   }
 
   Widget _buildWalletWelcomePage(BuildContext context) {

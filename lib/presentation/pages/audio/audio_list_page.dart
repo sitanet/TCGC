@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/providers/audio_player_provider.dart';
 import '../../../domain/entities/sermon.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_player_page.dart';
 
 enum FilterType { category, speaker }
 
-class AudioListPage extends StatefulWidget {
+class AudioListPage extends ConsumerStatefulWidget {
   final String category;
   final String? categoryId;
   final List<Sermon> audioItems;
@@ -30,10 +30,10 @@ class AudioListPage extends StatefulWidget {
   });
 
   @override
-  State<AudioListPage> createState() => _AudioListPageState();
+  ConsumerState<AudioListPage> createState() => _AudioListPageState();
 }
 
-class _AudioListPageState extends State<AudioListPage> {
+class _AudioListPageState extends ConsumerState<AudioListPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   List<Sermon> _filteredItems = [];
@@ -63,7 +63,7 @@ class _AudioListPageState extends State<AudioListPage> {
   }
   
   void _preBufferInitial() {
-    final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+    final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
     // Pre-buffer first 20 items (~3 min each) for instant playback
     audioProvider.preBufferSermons(_filteredItems, count: 20);
     _preBufferedUpTo = 20;
@@ -80,7 +80,7 @@ class _AudioListPageState extends State<AudioListPage> {
   void _preBufferMore() {
     if (_preBufferedUpTo >= _filteredItems.length) return;
     
-    final audioProvider = Provider.of<AudioPlayerProvider>(context, listen: false);
+    final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
     // Pre-buffer next 10 items when user scrolls near the end
     audioProvider.preBufferMore(_filteredItems, _preBufferedUpTo, count: 10);
     _preBufferedUpTo += 10;
@@ -246,8 +246,9 @@ class _AudioListPageState extends State<AudioListPage> {
                           ),
                     ),
                   )
-                : Consumer<AudioPlayerProvider>(
-                    builder: (context, audioProvider, child) {
+                : Builder(
+                    builder: (context) {
+                      final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
                       return ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -264,8 +265,8 @@ class _AudioListPageState extends State<AudioListPage> {
                             isBuffering: isBuffering,
                             bufferProgress: bufferProgress,
                             onTap: () {
-                              // Set the queue for Next/Previous functionality
-                              audioProvider.playFromQueue(_filteredItems, index);
+                              // Set the queue for Next/Previous functionality (without starting playback)
+                              audioProvider.setQueue(_filteredItems, index);
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(

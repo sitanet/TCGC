@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/providers/auth_provider.dart';
-import '../../../core/providers/biometric_provider.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../main.dart';
 
-class SignInPage extends StatefulWidget {
+class SignInPage extends ConsumerStatefulWidget {
   final VoidCallback onSignIn;
   final VoidCallback onBack;
   final VoidCallback? onGoToSignUp;
@@ -13,10 +12,10 @@ class SignInPage extends StatefulWidget {
   const SignInPage({super.key, required this.onSignIn, required this.onBack, this.onGoToSignUp});
 
   @override
-  State<SignInPage> createState() => _SignInPageState();
+  ConsumerState<SignInPage> createState() => _SignInPageState();
 }
 
-class _SignInPageState extends State<SignInPage> {
+class _SignInPageState extends ConsumerState<SignInPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
@@ -32,7 +31,7 @@ class _SignInPageState extends State<SignInPage> {
   }
 
   Future<void> _initBiometric() async {
-    final biometricProvider = Provider.of<BiometricProvider>(context, listen: false);
+    final biometricProvider = ref.read(biometricChangeNotifierProvider);
     await biometricProvider.initialize();
     if (mounted) {
       setState(() {
@@ -44,8 +43,8 @@ class _SignInPageState extends State<SignInPage> {
   }
 
   Future<void> _handleBiometricLogin() async {
-    final biometricProvider = Provider.of<BiometricProvider>(context, listen: false);
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final biometricProvider = ref.read(biometricChangeNotifierProvider);
+    final authProvider = ref.read(authChangeNotifierProvider);
 
     final authenticated = await biometricProvider.authenticateForLogin();
     if (!authenticated) {
@@ -115,7 +114,7 @@ class _SignInPageState extends State<SignInPage> {
 
     setState(() => _isLoading = true);
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final authProvider = ref.read(authChangeNotifierProvider);
     final success = await authProvider.login(
       _emailController.text.trim(),
       _passwordController.text,
@@ -187,7 +186,7 @@ class _SignInPageState extends State<SignInPage> {
                 
                 setDialogState(() => isLoading = true);
                 
-                final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                final authProvider = ref.read(authChangeNotifierProvider);
                 final success = await authProvider.forgotPassword(resetEmailController.text.trim());
                 
                 setDialogState(() => isLoading = false);

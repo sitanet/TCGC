@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/providers/auth_provider.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'my_messages_page.dart';
 
-class ComplaintPage extends StatefulWidget {
+class ComplaintPage extends ConsumerStatefulWidget {
   const ComplaintPage({super.key});
 
   @override
-  State<ComplaintPage> createState() => _ComplaintPageState();
+  ConsumerState<ComplaintPage> createState() => _ComplaintPageState();
 }
 
-class _ComplaintPageState extends State<ComplaintPage> {
+class _ComplaintPageState extends ConsumerState<ComplaintPage> {
   final _formKey = GlobalKey<FormState>();
   final _subjectController = TextEditingController();
   final _messageController = TextEditingController();
@@ -24,11 +24,13 @@ class _ComplaintPageState extends State<ComplaintPage> {
   @override
   void initState() {
     super.initState();
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.user != null) {
-      _emailController.text = authProvider.user!.email;
-      _nameController.text = authProvider.user!.fullName;
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = ref.read(authChangeNotifierProvider);
+      if (authProvider.user != null) {
+        _emailController.text = authProvider.user!.email;
+        _nameController.text = authProvider.user!.fullName;
+      }
+    });
   }
 
   final List<String> _categories = [
@@ -459,7 +461,7 @@ class _ComplaintPageState extends State<ComplaintPage> {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() => _isLoading = true);
       
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final authProvider = ref.read(authChangeNotifierProvider);
       final success = await authProvider.sendContactMessage(
         email: _emailController.text.trim(),
         subject: _subjectController.text.trim(),

@@ -1,46 +1,44 @@
 import 'dart:io';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../../domain/entities/sermon.dart';
 import '../../data/services/audio_cache_service.dart';
 import '../../data/services/playback_position_service.dart';
+import '../services/audio_handler.dart';
 
+MyAudioHandler? _audioHandler;
+AudioPlayer? _fallbackPlayer;
 bool _audioServiceInitialized = false;
+bool _useAudioService = false;
 
 Future<void> initAudioService() async {
   if (_audioServiceInitialized) return;
-
+  _audioServiceInitialized = true;
+  
   try {
-    // Request notification permission on Android 13+
-    if (Platform.isAndroid) {
-      final status = await Permission.notification.status;
-      if (!status.isGranted) {
-        await Permission.notification.request();
-      }
-    }
-    
-    await JustAudioBackground.init(
-      androidNotificationChannelId: 'com.tcgc.app.audio',
-      androidNotificationChannelName: 'TCGC Audio',
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
-      androidNotificationIcon: 'drawable/ic_notification',
-      preloadArtwork: true,
+    _audioHandler = await AudioService.init(
+      builder: () => MyAudioHandler(),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.tcgc.tcgc.audio',
+        androidNotificationChannelName: 'TCGC Audio',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: true,
+        androidNotificationIcon: 'mipmap/ic_launcher',
+      ),
     );
-    _audioServiceInitialized = true;
-    debugPrint('JustAudioBackground initialized successfully');
+    _useAudioService = true;
+    debugPrint('AudioService initialized successfully');
   } catch (e) {
-    debugPrint('JustAudioBackground initialization failed: $e');
-    _audioServiceInitialized = true; // Mark as done to avoid retrying
+    debugPrint('AudioService init failed: $e');
+    debugPrint('Using fallback audio player');
+    _fallbackPlayer = AudioPlayer();
+    _useAudioService = false;
   }
 }
 
 class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
-  AudioPlayer? _player;
-  
   Sermon? _currentSermon;
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
@@ -48,17 +46,11 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool _isLoading = false;
   String? _errorMessage;
   
-  // Audio caching
   Directory? _cacheDir;
-  
-  // Playlist/Queue management
   List<Sermon> _queue = [];
   int _currentIndex = -1;
   
-  // Pre-buffering service
   final AudioCacheService _audioCacheService = AudioCacheService();
-  
-  // Playback position service
   final PlaybackPositionService _positionService = PlaybackPositionService();
 
   Sermon? get currentSermon => _currentSermon;
@@ -69,7 +61,6 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   String? get errorMessage => _errorMessage;
   bool get hasAudio => _currentSermon != null;
   
-  // Queue getters
   List<Sermon> get queue => _queue;
   int get currentIndex => _currentIndex;
   bool get hasNext => _currentIndex < _queue.length - 1;
@@ -80,25 +71,22 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
     _audioCacheService.initialize();
     _initPositionService();
     WidgetsBinding.instance.addObserver(this);
+    _initProvider();
   }
   
   bool _positionServiceInitialized = false;
+  bool _listenersSetup = false;
+  
+  Future<void> _initProvider() async {
+    if (!_audioServiceInitialized) {
+      await initAudioService();
+    }
+    _setupListeners();
+  }
   
   Future<void> _initPositionService() async {
     await _positionService.initialize();
     _positionServiceInitialized = true;
-  }
-  
-  Future<AudioPlayer> _getPlayer() async {
-    if (_player == null) {
-      // Ensure audio service is initialized first
-      if (!_audioServiceInitialized) {
-        await initAudioService();
-      }
-      _player = AudioPlayer();
-      _setupListeners();
-    }
-    return _player!;
   }
   
   @override
@@ -111,54 +99,90 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
   
   void _setupListeners() {
-    if (_player == null) return;
+    if (_listenersSetup) return;
+    _listenersSetup = true;
     
-    _player!.playerStateStream.listen((state) {
+    if (_useAudioService && _audioHandler != null) {
+      _setupAudioServiceListeners();
+    } else if (_fallbackPlayer != null) {
+      _setupFallbackListeners();
+    }
+  }
+  
+  void _setupAudioServiceListeners() {
+    _audioHandler!.playerStateStream.listen((state) {
       _isPlaying = state.playing;
       _isLoading = state.processingState == ProcessingState.loading ||
                    state.processingState == ProcessingState.buffering;
       
-      // Auto-advance on completion
-      if (state.processingState == ProcessingState.completed) {
-        if (hasNext) {
-          skipToNext();
-        }
+      if (state.processingState == ProcessingState.ready ||
+          state.processingState == ProcessingState.idle) {
+        _isLoading = false;
       }
+      
+      if (state.processingState == ProcessingState.completed) {
+        _isLoading = false;
+        if (hasNext) skipToNext();
+      }
+      notifyListeners();
+    }, onError: (error) {
+      debugPrint('Player state stream error: $error');
+      _isLoading = false;
+      _errorMessage = 'Playback error: $error';
       notifyListeners();
     });
     
-    _player!.positionStream.listen((pos) {
+    _audioHandler!.positionStream.listen((pos) {
       _position = pos;
       notifyListeners();
     });
     
-    _player!.durationStream.listen((dur) {
+    _audioHandler!.durationStream.listen((dur) {
       _duration = dur ?? Duration.zero;
       notifyListeners();
     });
   }
   
-  /// Pre-buffer sermons for instant playback
+  void _setupFallbackListeners() {
+    _fallbackPlayer!.playerStateStream.listen((state) {
+      _isPlaying = state.playing;
+      _isLoading = state.processingState == ProcessingState.loading ||
+                   state.processingState == ProcessingState.buffering;
+      
+      if (state.processingState == ProcessingState.ready ||
+          state.processingState == ProcessingState.idle) {
+        _isLoading = false;
+      }
+      
+      if (state.processingState == ProcessingState.completed) {
+        _isLoading = false;
+        if (hasNext) skipToNext();
+      }
+      notifyListeners();
+    });
+    
+    _fallbackPlayer!.positionStream.listen((pos) {
+      _position = pos;
+      notifyListeners();
+    });
+    
+    _fallbackPlayer!.durationStream.listen((dur) {
+      _duration = dur ?? Duration.zero;
+      notifyListeners();
+    });
+  }
+  
   Future<void> preBufferSermons(List<Sermon> sermons, {int count = 20}) async {
     await _audioCacheService.preBufferCategory(sermons, count: count);
   }
   
-  /// Pre-buffer more sermons when user scrolls
   Future<void> preBufferMore(List<Sermon> sermons, int startIndex, {int count = 10}) async {
     await _audioCacheService.preBufferMore(sermons, startIndex, count: count);
   }
   
-  bool isPreBuffered(String sermonId) {
-    return _audioCacheService.isPreBuffered(sermonId);
-  }
-  
-  double getBufferProgress(String sermonId) {
-    return _audioCacheService.getBufferProgress(sermonId);
-  }
-  
-  bool isBuffering(String sermonId) {
-    return _audioCacheService.isBuffering(sermonId);
-  }
+  bool isPreBuffered(String sermonId) => _audioCacheService.isPreBuffered(sermonId);
+  double getBufferProgress(String sermonId) => _audioCacheService.getBufferProgress(sermonId);
+  bool isBuffering(String sermonId) => _audioCacheService.isBuffering(sermonId);
   
   Future<void> _initCacheDir() async {
     try {
@@ -172,15 +196,14 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
   
-  String _sanitizeFileName(String id) {
-    return id.replaceAll(RegExp(r'[^\w\-]'), '_');
-  }
+  String _sanitizeFileName(String id) => id.replaceAll(RegExp(r'[^\w\-]'), '_');
 
   Future<void> playSermon(Sermon sermon) async {
-    // Ensure player is initialized (this also initializes audio service)
-    final player = await _getPlayer();
+    if (!_audioServiceInitialized) {
+      await initAudioService();
+      _setupListeners();
+    }
 
-    // If same sermon, toggle play/pause
     if (_currentSermon?.id == sermon.id) {
       if (_isPlaying) {
         await pause();
@@ -190,7 +213,6 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
 
-    // New sermon - load and play
     _isLoading = true;
     _errorMessage = null;
     _currentSermon = sermon;
@@ -208,23 +230,22 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
     debugPrint('Audio URL: $audioUrl');
 
     try {
-      // Create AudioSource with metadata for notification
-      final audioSource = AudioSource.uri(
-        Uri.parse(audioUrl),
-        tag: MediaItem(
+      if (_useAudioService && _audioHandler != null) {
+        await _audioHandler!.stop();
+        final mediaItem = MediaItem(
           id: sermon.id,
           title: sermon.title,
           artist: sermon.speaker ?? 'TCGC',
           album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Sermons',
           artUri: sermon.imageUrl != null ? Uri.parse(sermon.imageUrl!) : null,
-        ),
-      );
-      
-      await player.setAudioSource(audioSource);
-      await player.play();
-      
-      _isLoading = false;
-      notifyListeners();
+        );
+        await _audioHandler!.setAudioSource(audioUrl, mediaItem);
+        await _audioHandler!.play();
+      } else if (_fallbackPlayer != null) {
+        await _fallbackPlayer!.stop();
+        await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(audioUrl)));
+        await _fallbackPlayer!.play();
+      }
     } catch (e, stackTrace) {
       _isLoading = false;
       _errorMessage = 'Failed to load audio: $e';
@@ -235,12 +256,19 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> play() async {
-    final player = await _getPlayer();
-    await player.play();
+    if (_useAudioService && _audioHandler != null) {
+      await _audioHandler!.play();
+    } else {
+      await _fallbackPlayer?.play();
+    }
   }
 
   Future<void> pause() async {
-    await _player?.pause();
+    if (_useAudioService && _audioHandler != null) {
+      await _audioHandler!.pause();
+    } else {
+      await _fallbackPlayer?.pause();
+    }
     await _saveCurrentPosition();
   }
   
@@ -252,7 +280,11 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> stop() async {
     await _saveCurrentPosition();
-    await _player?.stop();
+    if (_useAudioService && _audioHandler != null) {
+      await _audioHandler!.stop();
+    } else {
+      await _fallbackPlayer?.stop();
+    }
     _currentSermon = null;
     _position = Duration.zero;
     _duration = Duration.zero;
@@ -260,25 +292,21 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> seek(Duration position) async {
-    await _player?.seek(position);
+    if (_useAudioService && _audioHandler != null) {
+      await _audioHandler!.seek(position);
+    } else {
+      await _fallbackPlayer?.seek(position);
+    }
   }
 
   Future<void> seekForward() async {
     final newPosition = _position + const Duration(seconds: 10);
-    if (newPosition < _duration) {
-      await seek(newPosition);
-    } else {
-      await seek(_duration);
-    }
+    await seek(newPosition < _duration ? newPosition : _duration);
   }
 
   Future<void> seekBackward() async {
     final newPosition = _position - const Duration(seconds: 10);
-    if (newPosition > Duration.zero) {
-      await seek(newPosition);
-    } else {
-      await seek(Duration.zero);
-    }
+    await seek(newPosition > Duration.zero ? newPosition : Duration.zero);
   }
   
   PlaybackPosition? getSavedPosition(String sermonId) {
@@ -296,7 +324,10 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
   
   Future<void> playSermonFromPosition(Sermon sermon, Duration startPosition) async {
-    final player = await _getPlayer();
+    if (!_audioServiceInitialized) {
+      await initAudioService();
+      _setupListeners();
+    }
 
     _isLoading = true;
     _errorMessage = null;
@@ -312,22 +343,22 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     try {
-      final audioSource = AudioSource.uri(
-        Uri.parse(audioUrl),
-        tag: MediaItem(
+      if (_useAudioService && _audioHandler != null) {
+        await _audioHandler!.stop();
+        final mediaItem = MediaItem(
           id: sermon.id,
           title: sermon.title,
           artist: sermon.speaker ?? 'TCGC',
           album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Sermons',
           artUri: sermon.imageUrl != null ? Uri.parse(sermon.imageUrl!) : null,
-        ),
-      );
-      
-      await player.setAudioSource(audioSource, initialPosition: startPosition);
-      await player.play();
-      
-      _isLoading = false;
-      notifyListeners();
+        );
+        await _audioHandler!.setAudioSourceWithPosition(audioUrl, mediaItem, startPosition);
+        await _audioHandler!.play();
+      } else if (_fallbackPlayer != null) {
+        await _fallbackPlayer!.stop();
+        await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(audioUrl)), initialPosition: startPosition);
+        await _fallbackPlayer!.play();
+      }
     } catch (e, stackTrace) {
       _isLoading = false;
       _errorMessage = 'Failed to load audio: $e';
@@ -337,10 +368,14 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  /// Set the playback queue and start playing from the given index
+  void setQueue(List<Sermon> sermons, int startIndex) {
+    if (sermons.isEmpty || startIndex < 0 || startIndex >= sermons.length) return;
+    _queue = List.from(sermons);
+    _currentIndex = startIndex;
+  }
+  
   Future<void> playFromQueue(List<Sermon> sermons, int startIndex) async {
     if (sermons.isEmpty || startIndex < 0 || startIndex >= sermons.length) return;
-    
     _queue = List.from(sermons);
     _currentIndex = startIndex;
     await playSermon(sermons[startIndex]);
@@ -390,9 +425,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
     try {
       if (await _cacheDir!.exists()) {
         await for (var entity in _cacheDir!.list()) {
-          if (entity is File) {
-            totalSize += await entity.length();
-          }
+          if (entity is File) totalSize += await entity.length();
         }
       }
     } catch (e) {
@@ -406,9 +439,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
     try {
       if (await _cacheDir!.exists()) {
         await for (var entity in _cacheDir!.list()) {
-          if (entity is File) {
-            await entity.delete();
-          }
+          if (entity is File) await entity.delete();
         }
       }
     } catch (e) {
@@ -423,9 +454,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
       final extensions = ['.ogg', '.mp3', '.wav', '.m4a', '.aac', '.audio'];
       for (final ext in extensions) {
         final cacheFile = File('${_cacheDir!.path}/$fileName$ext');
-        if (await cacheFile.exists()) {
-          await cacheFile.delete();
-        }
+        if (await cacheFile.exists()) await cacheFile.delete();
       }
     } catch (e) {
       debugPrint('Error deleting cached sermon: $e');
@@ -436,7 +465,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _saveCurrentPosition();
-    _player?.dispose();
+    _fallbackPlayer?.dispose();
     super.dispose();
   }
 }

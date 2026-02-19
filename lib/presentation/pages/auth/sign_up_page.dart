@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/providers/auth_provider.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../main.dart';
 import 'signup_success_page.dart';
 
-class SignUpPage extends StatefulWidget {
+class SignUpPage extends ConsumerStatefulWidget {
   final VoidCallback onSignUp;
   final VoidCallback onBack;
   final VoidCallback? onGoToSignIn;
@@ -13,10 +13,10 @@ class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key, required this.onSignUp, required this.onBack, this.onGoToSignIn});
 
   @override
-  State<SignUpPage> createState() => _SignUpPageState();
+  ConsumerState<SignUpPage> createState() => _SignUpPageState();
 }
 
-class _SignUpPageState extends State<SignUpPage> {
+class _SignUpPageState extends ConsumerState<SignUpPage> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -81,7 +81,7 @@ class _SignUpPageState extends State<SignUpPage> {
     final lastName = nameParts.length > 1 ? nameParts.last : '';
     final middleName = nameParts.length > 2 ? nameParts.sublist(1, nameParts.length - 1).join(' ') : null;
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final authProvider = ref.read(authChangeNotifierProvider);
     final success = await authProvider.register(
       email: _emailController.text.trim(),
       username: _emailController.text.trim().split('@').first,
@@ -125,7 +125,7 @@ class _SignUpPageState extends State<SignUpPage> {
             }
           },
           onResendEmail: () async {
-            final authProvider = Provider.of<AuthProvider>(context, listen: false);
+            final authProvider = ref.read(authChangeNotifierProvider);
             return await authProvider.resendConfirmationEmail(_emailController.text.trim());
           },
         ),

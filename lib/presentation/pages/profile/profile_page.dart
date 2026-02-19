@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_provider.dart';
-import '../../../core/providers/auth_provider.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../main.dart';
 import '../legal/privacy_policy_page.dart';
 import '../support/complaint_page.dart';
 import 'edit_profile_page.dart';
 import 'settings_page.dart';
 import '../wallet/wallet_page.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final spacing = Responsive.verticalSpacing(context);
     final maxWidth = Responsive.maxContentWidth(context);
@@ -26,11 +26,11 @@ class ProfilePage extends StatelessWidget {
             constraints: BoxConstraints(maxWidth: maxWidth),
             child: Column(
               children: [
-                _buildProfileHeader(context, isDark),
+                _buildProfileHeader(context, isDark, ref),
                 SizedBox(height: spacing * 1.5),
                 _buildMenuItems(context, isDark),
                 SizedBox(height: spacing * 1.5),
-                _buildLogoutButton(context, isDark),
+                _buildLogoutButton(context, isDark, ref),
                 SizedBox(height: spacing * 1.5),
                 _buildPrivacyPolicyLink(context, isDark),
                 SizedBox(height: spacing * 6),
@@ -42,9 +42,9 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileHeader(BuildContext context, bool isDark) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final authProvider = Provider.of<AuthProvider>(context);
+  Widget _buildProfileHeader(BuildContext context, bool isDark, WidgetRef ref) {
+    final themeProvider = ref.watch(themeChangeNotifierProvider);
+    final authProvider = ref.watch(authChangeNotifierProvider);
     final user = authProvider.user;
     final displayName = user?.fullName ?? user?.email ?? 'User';
     final statusBarHeight = MediaQuery.of(context).padding.top;
@@ -336,7 +336,7 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildLogoutButton(BuildContext context, bool isDark) {
+  Widget _buildLogoutButton(BuildContext context, bool isDark, WidgetRef ref) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
     final buttonHeight = Responsive.buttonHeight(context);
@@ -351,7 +351,7 @@ class ProfilePage extends StatelessWidget {
         height: buttonHeight,
         child: ElevatedButton.icon(
           onPressed: () async {
-            final authProvider = Provider.of<AuthProvider>(context, listen: false);
+            final authProvider = ref.read(authChangeNotifierProvider);
             await authProvider.logout();
             if (context.mounted) {
               // Pop all routes and go back to root - the main app will show login page
