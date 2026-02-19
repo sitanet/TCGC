@@ -93,18 +93,21 @@ class ApiService {
 
   Future<ApiResponse> post(String endpoint, Map<String, dynamic> data) async {
     try {
+      print('ApiService POST: ${ApiConstants.baseUrl}$endpoint');
       var response = await http.post(
         Uri.parse('${ApiConstants.baseUrl}$endpoint'),
         headers: _headers,
         body: jsonEncode(data),
-      );
+      ).timeout(const Duration(seconds: 60));
+
+      print('ApiService POST response: ${response.statusCode}');
 
       if (response.statusCode == 401 && await _refreshAccessToken()) {
         response = await http.post(
           Uri.parse('${ApiConstants.baseUrl}$endpoint'),
           headers: _headers,
           body: jsonEncode(data),
-        );
+        ).timeout(const Duration(seconds: 60));
       }
 
       return ApiResponse(
@@ -113,6 +116,7 @@ class ApiService {
         isSuccess: response.statusCode >= 200 && response.statusCode < 300,
       );
     } catch (e) {
+      print('ApiService POST error: $e');
       return ApiResponse(
         statusCode: 0,
         body: jsonEncode({'error': e.toString()}),

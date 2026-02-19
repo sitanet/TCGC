@@ -46,6 +46,8 @@ class AuthService {
     String? countryCode,
   }) async {
     final normalizedEmail = email.toLowerCase();
+    print('Register API: Starting registration for $normalizedEmail');
+    
     final response = await _api.post(ApiConstants.register, {
       'email': normalizedEmail,
       'username': username,
@@ -58,7 +60,10 @@ class AuthService {
       if (countryCode != null) 'country_code': countryCode,
     });
 
+    print('Register API response: ${response.statusCode} - ${response.body}');
+
     if (response.isSuccess) {
+      print('Register API: Success, returning with requiresEmailConfirmation=true');
       return AuthResult(
         success: true, 
         requiresEmailConfirmation: true,
@@ -67,6 +72,7 @@ class AuthService {
     }
     
     String errorMessage = _parseErrorMessage(response);
+    print('Register API: Failed with error: $errorMessage');
     return AuthResult(success: false, error: errorMessage);
   }
 

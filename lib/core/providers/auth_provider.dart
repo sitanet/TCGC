@@ -83,6 +83,8 @@ class AuthProvider extends ChangeNotifier {
     _requiresEmailConfirmation = false;
     notifyListeners();
 
+    print('AuthProvider: Starting registration...');
+    
     final result = await _authService.register(
       email: email,
       username: username,
@@ -94,16 +96,20 @@ class AuthProvider extends ChangeNotifier {
       countryCode: countryCode,
     );
     
+    print('AuthProvider: Registration result - success: ${result.success}, requiresEmailConfirmation: ${result.requiresEmailConfirmation}');
+    
     if (result.success) {
       _requiresEmailConfirmation = result.requiresEmailConfirmation;
       _message = result.message;
       _isLoading = false;
+      print('AuthProvider: Setting _requiresEmailConfirmation=$_requiresEmailConfirmation, returning true');
       notifyListeners();
       return true;
     }
     
     _error = result.error;
     _isLoading = false;
+    print('AuthProvider: Registration failed with error: $_error');
     notifyListeners();
     return false;
   }

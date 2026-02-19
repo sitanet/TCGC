@@ -81,6 +81,8 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
     final lastName = nameParts.length > 1 ? nameParts.last : '';
     final middleName = nameParts.length > 2 ? nameParts.sublist(1, nameParts.length - 1).join(' ') : null;
 
+    print('SignUpPage: Starting registration...');
+    
     final authProvider = ref.read(authChangeNotifierProvider);
     final success = await authProvider.register(
       email: _emailController.text.trim(),
@@ -91,25 +93,32 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       middleName: middleName,
     );
 
+    print('SignUpPage: Registration completed - success: $success, requiresEmailConfirmation: ${authProvider.requiresEmailConfirmation}');
+
+    if (!mounted) {
+      print('SignUpPage: Widget not mounted, returning');
+      return;
+    }
+    
     setState(() => _isLoading = false);
 
     if (success) {
+      print('SignUpPage: Success! Checking requiresEmailConfirmation: ${authProvider.requiresEmailConfirmation}');
       if (authProvider.requiresEmailConfirmation) {
-        if (mounted) {
-          _navigateToSuccessPage();
-        }
+        print('SignUpPage: Navigating to success page...');
+        _navigateToSuccessPage();
       } else {
+        print('SignUpPage: Calling onSignUp callback...');
         widget.onSignUp();
       }
     } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(authProvider.error ?? 'Registration failed'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      print('SignUpPage: Registration failed with error: ${authProvider.error}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.error ?? 'Registration failed'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
