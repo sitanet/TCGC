@@ -23,6 +23,19 @@ class AudioPlayerPage extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<AudioPlayerPage> createState() => _AudioPlayerPageState();
+
+  /// Check if user can access this sermon
+  static bool canAccess(
+    Sermon sermon, {
+    required bool isServiceTeamMember,
+    bool isGeneralMarried = false,
+    bool isInHouseMarried = false,
+  }) {
+    if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
+    if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
+    if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
+    return true;
+  }
 }
 
 class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
@@ -36,8 +49,98 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     super.initState();
     _initializeServices();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _handlePlayback();
+      _checkAccessAndPlay();
     });
+  }
+  
+  void _checkAccessAndPlay() {
+    final authProvider = ref.read(authChangeNotifierProvider);
+    final user = authProvider.user;
+    final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+    final isGeneralMarried = user?.isGeneralMarried ?? false;
+    final isInHouseMarried = user?.isInHouseMarried ?? false;
+    
+    final canAccess = AudioPlayerPage.canAccess(
+      widget.sermon,
+      isServiceTeamMember: isServiceTeamMember,
+      isGeneralMarried: isGeneralMarried,
+      isInHouseMarried: isInHouseMarried,
+    );
+    
+    if (!canAccess) {
+      _showAccessDeniedDialog();
+    } else {
+      _handlePlayback();
+    }
+  }
+  
+  String _getAccessDeniedMessage() {
+    if (widget.sermon.isServiceTeamOnly) {
+      return 'This message is only available for Service Team members.';
+    } else if (widget.sermon.isGeneralMarriedOnly) {
+      return 'This message is only available for General Married members.';
+    } else if (widget.sermon.isInHouseMarriedOnly) {
+      return 'This message is only available for In-House Married members.';
+    }
+    return 'You do not have access to this content.';
+  }
+  
+  void _showAccessDeniedDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.lock, color: AppColors.primaryGold),
+            const SizedBox(width: 8),
+            const Text('Restricted Content'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.lock_outline,
+              size: 64,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _getAccessDeniedMessage(),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Please contact an administrator if you believe you should have access.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGold,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
   
   Future<void> _handlePlayback() async {
@@ -164,34 +267,35 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               ),
             ],
           ),
-          body: errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: Colors.red.withOpacity(0.7),
+          body: Builder(
+            builder: (context) {
+              // Show toast for error instead of error page
+              if (errorMessage != null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          _downloadService.isDownloaded(widget.sermon.id)
+                              ? 'Unable to play. The downloaded file may be corrupted. Try re-downloading.'
+                              : 'Unable to stream audio. Large files may take time to load. Try downloading for offline playback.',
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          errorMessage,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium,
+                        duration: const Duration(seconds: 5),
+                        action: SnackBarAction(
+                          label: _downloadService.isDownloaded(widget.sermon.id) ? 'Re-download' : 'Download',
+                          onPressed: () async {
+                            if (_downloadService.isDownloaded(widget.sermon.id)) {
+                              await _downloadService.deleteDownload(widget.sermon.id);
+                            }
+                            await _downloadService.downloadSermon(widget.sermon);
+                          },
                         ),
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: () => audioProvider.playSermon(widget.sermon),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : SingleChildScrollView(
+                      ),
+                    );
+                  }
+                });
+              }
+              return SingleChildScrollView(
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
@@ -206,7 +310,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                       const SizedBox(height: 24),
                     ],
                   ),
-                ),
+                );
+            },
+          ),
         );
       },
     );

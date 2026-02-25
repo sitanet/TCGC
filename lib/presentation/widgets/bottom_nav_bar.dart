@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/responsive.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -15,85 +14,56 @@ class BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final spacing = Responsive.verticalSpacing(context);
-    final borderRadius = Responsive.largeBorderRadius(context);
     
-    return Container(
-      margin: EdgeInsets.all(spacing),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(
-          color: AppColors.primaryGold.withValues(alpha: 0.3),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+    return Center(
+      child: Container(
+        width: 358,
+        height: 78,
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.white,
+          borderRadius: BorderRadius.circular(52),
+          border: Border.all(
+            color: AppColors.primaryGold.withValues(alpha: 0.5),
+            width: 1.5,
           ),
-        ],
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: spacing, vertical: spacing * 0.875),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildNavItem(context, 0, 'assets/images/nav_home.png'),
-            _buildNavItem(context, 1, 'assets/images/nav_audio.png'),
-            _buildNavItem(context, 2, 'assets/images/nav_streaming.png'),
-            _buildNavItem(context, 3, 'assets/images/nav_wallet.png'),
-            _buildNavItem(context, 4, 'assets/images/nav_teens.png'),
+            _buildNavItem(0, Icons.home_outlined, Icons.home),
+            _buildNavItem(1, Icons.music_note_outlined, Icons.music_note),
+            _buildNavItem(2, Icons.play_circle_outline, Icons.play_circle),
+            _buildNavItem(3, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet),
+            _buildNavItem(4, Icons.groups_outlined, Icons.groups),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(BuildContext context, int index, String iconPath) {
+  Widget _buildNavItem(int index, IconData outlinedIcon, IconData filledIcon) {
     final isSelected = currentIndex == index;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final iconSize = Responsive.navIconSize(context);
-    final spacing = Responsive.verticalSpacing(context);
     
     return GestureDetector(
       onTap: () => onTap(index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(horizontal: spacing * 0.75, vertical: spacing * 0.5),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? AppColors.primaryGold.withValues(alpha: 0.2)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(Responsive.borderRadius(context)),
-          border: isSelected
-              ? Border.all(color: AppColors.primaryGold, width: 1.5)
-              : null,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              iconPath,
-              width: iconSize,
-              height: iconSize,
-              color: isSelected 
-                  ? AppColors.primaryGold 
-                  : (isDark ? Colors.grey[400] : Colors.grey[600]),
-            ),
-            if (isSelected) ...[
-              const SizedBox(height: 4),
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryGold,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ],
-          ],
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: Center(
+          child: Icon(
+            isSelected ? filledIcon : outlinedIcon,
+            size: 28,
+            color: AppColors.primaryGold,
+          ),
         ),
       ),
     );

@@ -144,6 +144,18 @@ class AuthService {
     await _api.clearTokens();
   }
 
+  Future<AuthResult> deleteAccount() async {
+    final response = await _api.delete(ApiConstants.deleteAccount);
+    
+    if (response.isSuccess) {
+      await _api.clearTokens();
+      return AuthResult(success: true, message: 'Account deleted successfully');
+    }
+    
+    String errorMessage = _parseErrorMessage(response);
+    return AuthResult(success: false, error: errorMessage);
+  }
+
   Future<AppUser?> getProfile() async {
     final response = await _api.get(ApiConstants.userProfile);
     
@@ -266,10 +278,18 @@ class AuthService {
   }
 
   // KYC Verification Methods
-  Future<KycResult> verifyNin(String nin, {bool updateProfile = false}) async {
+  Future<KycResult> verifyNin(String nin, {
+    String? phoneNumber,
+    String? address,
+    String? dateOfBirth,
+    bool updateProfile = false,
+  }) async {
     final response = await _api.post(ApiConstants.verifyNin, {
       'nin': nin,
       'update_profile': updateProfile,
+      if (phoneNumber != null) 'phone_number': phoneNumber,
+      if (address != null) 'address': address,
+      if (dateOfBirth != null) 'date_of_birth': dateOfBirth,
     });
 
     if (response.isSuccess) {

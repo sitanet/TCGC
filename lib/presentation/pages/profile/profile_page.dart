@@ -30,9 +30,11 @@ class ProfilePage extends ConsumerWidget {
                 SizedBox(height: spacing * 1.5),
                 _buildMenuItems(context, isDark),
                 SizedBox(height: spacing * 1.5),
-                _buildLogoutButton(context, isDark, ref),
-                SizedBox(height: spacing * 1.5),
                 _buildPrivacyPolicyLink(context, isDark),
+                SizedBox(height: spacing * 1.5),
+                _buildDeleteAccountButton(context, isDark, ref),
+                SizedBox(height: spacing),
+                _buildLogoutButton(context, isDark, ref),
                 SizedBox(height: spacing * 6),
               ],
             ),
@@ -336,6 +338,100 @@ class ProfilePage extends ConsumerWidget {
     );
   }
 
+  Widget _buildDeleteAccountButton(BuildContext context, bool isDark, WidgetRef ref) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final buttonHeight = Responsive.buttonHeight(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    final iconSize = Responsive.iconSize(context);
+    final borderRadius = Responsive.borderRadius(context);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      child: SizedBox(
+        width: double.infinity,
+        height: buttonHeight,
+        child: OutlinedButton.icon(
+          onPressed: () => _showDeleteAccountDialog(context, isDark, ref),
+          icon: Icon(Icons.delete_forever, color: AppColors.error, size: iconSize),
+          label: Text(
+            'Delete Account',
+            style: TextStyle(
+              color: AppColors.error,
+              fontSize: bodyFontSize,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: AppColors.error, width: 1.5),
+            padding: EdgeInsets.symmetric(vertical: spacing),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(borderRadius),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteAccountDialog(BuildContext context, bool isDark, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.error),
+            const SizedBox(width: 8),
+            const Text('Delete Account'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to delete your account?',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'This action is permanent and cannot be undone. All your data, including your profile, wallet, and activity history will be permanently deleted.',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final authProvider = ref.read(authChangeNotifierProvider);
+              await authProvider.deleteAccount();
+              if (context.mounted) {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLogoutButton(BuildContext context, bool isDark, WidgetRef ref) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
@@ -354,7 +450,6 @@ class ProfilePage extends ConsumerWidget {
             final authProvider = ref.read(authChangeNotifierProvider);
             await authProvider.logout();
             if (context.mounted) {
-              // Pop all routes and go back to root - the main app will show login page
               Navigator.of(context).popUntil((route) => route.isFirst);
             }
           },

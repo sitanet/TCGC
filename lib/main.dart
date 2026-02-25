@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,10 +27,16 @@ import 'data/services/interests_service.dart';
 import 'presentation/widgets/bottom_nav_bar.dart';
 import 'presentation/widgets/mini_player.dart';
 import 'presentation/widgets/promotion_popup.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'data/services/data_service.dart' show DataService, AppUpdateInfo;
 import 'data/services/notification_service.dart';
+import 'data/services/audio_cache_service.dart';
 import 'presentation/pages/audio/audio_player_page.dart';
 import 'domain/entities/promotion.dart';
+import 'domain/entities/sermon.dart';
+import 'domain/entities/event.dart';
+import 'core/services/connectivity_service.dart';
+import 'core/widgets/network_aware_widget.dart';
 
 const String appVersion = '1.0.0';
 
@@ -40,17 +48,44 @@ final walletChangeNotifierProvider = ChangeNotifierProvider<WalletProvider>((ref
 final audioPlayerChangeNotifierProvider = ChangeNotifierProvider<AudioPlayerProvider>((ref) => AudioPlayerProvider());
 final biometricChangeNotifierProvider = ChangeNotifierProvider<BiometricProvider>((ref) => BiometricProvider());
 
+// Navigation provider to allow tab pages to navigate to home
+final mainTabIndexProvider = StateProvider<int>((ref) => 0);
+
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // Catch Flutter framework errors
+  FlutterError.onError = (FlutterErrorDetails details) {
+    debugPrint('Flutter error: ${details.exception}');
+    debugPrint('Stack trace: ${details.stack}');
+  };
   
-  // Initialize audio service for background playback
-  await initAudioService();
-  
-  runApp(
-    const ProviderScope(
-      child: MyApp(),
-    ),
-  );
+  // Run the app with error zone for async errors
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    // Initialize Firebase only on supported platforms (Android/iOS)
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      try {
+        await Firebase.initializeApp();
+      } catch (e) {
+        debugPrint('Firebase initialization error: $e');
+      }
+    }
+    
+    // Initialize audio service for background playback
+    await initAudioService();
+    
+    // Initialize connectivity service
+    await ConnectivityService().initialize();
+    
+    runApp(
+      const ProviderScope(
+        child: MyApp(),
+      ),
+    );
+  }, (error, stackTrace) {
+    debugPrint('Uncaught async error: $error');
+    debugPrint('Stack trace: $stackTrace');
+  });
 }
 
 class MyApp extends ConsumerStatefulWidget {
@@ -104,6 +139,8 @@ class _MyAppState extends ConsumerState<MyApp> {
             if (!_interestsService.interestsCompleted) {
               _showInterests = true;
             }
+            // Start pre-buffering for already logged in users
+            _startBackgroundPreBuffering();
           }
         });
       }
@@ -133,6 +170,65 @@ class _MyAppState extends ConsumerState<MyApp> {
         _showInterests = true;
       }
     });
+    // Start pre-buffering all messages in background after login
+    _startBackgroundPreBuffering();
+  }
+  
+  Future<void> _startBackgroundPreBuffering() async {
+    try {
+      final dataService = DataService();
+      final audioCacheService = AudioCacheService();
+      await audioCacheService.initialize();
+      
+      // Fetch all messages - this will cache metadata in local database
+      final sermons = await dataService.getMessages();
+      if (sermons.isNotEmpty) {
+        debugPrint('Caching ${sermons.length} sermons metadata, images, and audio');
+        
+        // Cache sermon metadata is already done by dataService
+        // Pre-cache all sermon images in background
+        _preCacheImages(sermons);
+        
+        // Pre-buffer audio for all sermons
+        audioCacheService.preBufferCategory(sermons, count: sermons.length);
+      }
+      
+      // Also cache events
+      final events = await dataService.getEvents();
+      if (events.isNotEmpty) {
+        debugPrint('Caching ${events.length} events');
+        _preCacheEventImages(events);
+      }
+      
+      // Cache categories
+      final categories = await dataService.getMessageCategories();
+      if (categories.isNotEmpty) {
+        debugPrint('Caching ${categories.length} categories');
+        audioCacheService.cacheMetadata(categories: categories, sermons: sermons);
+      }
+    } catch (e) {
+      debugPrint('Background caching error: $e');
+    }
+  }
+  
+  void _preCacheImages(List<Sermon> sermons) {
+    for (final sermon in sermons) {
+      if (sermon.imageUrl != null && sermon.imageUrl!.isNotEmpty) {
+        try {
+          CachedNetworkImageProvider(sermon.imageUrl!).resolve(ImageConfiguration.empty);
+        } catch (_) {}
+      }
+    }
+  }
+  
+  void _preCacheEventImages(List<Event> events) {
+    for (final event in events) {
+      if (event.imageUrl != null && event.imageUrl!.isNotEmpty) {
+        try {
+          CachedNetworkImageProvider(event.imageUrl!).resolve(ImageConfiguration.empty);
+        } catch (_) {}
+      }
+    }
   }
   
   void _onInterestsComplete() {
@@ -163,7 +259,7 @@ class _MyAppState extends ConsumerState<MyApp> {
       if (_showInterests) {
         homeWidget = InterestsPage(onComplete: _onInterestsComplete);
       } else {
-        homeWidget = const MainScreen();
+        homeWidget = const NetworkAwareWidget(child: MainScreen());
       }
     } else if (_showGetStarted) {
       homeWidget = GetStartedPage(
@@ -229,7 +325,6 @@ class MainScreen extends ConsumerStatefulWidget {
 }
 
 class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObserver {
-  int _currentIndex = 0;
   bool _showPromotion = false;
   bool _showUpdateDialog = false;
   List<Promotion> _activePromotions = [];
@@ -245,6 +340,13 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     WalletPage(),
     TeensPage(),
   ];
+
+  int get _currentIndex => ref.watch(mainTabIndexProvider);
+
+  void _setCurrentIndex(int index) {
+    ref.read(mainTabIndexProvider.notifier).state = index;
+    _saveCurrentTab();
+  }
 
   @override
   void initState() {
@@ -301,9 +403,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       final prefs = await SharedPreferences.getInstance();
       final lastIndex = prefs.getInt(_lastTabKey) ?? 0;
       if (lastIndex >= 0 && lastIndex < _pages.length && mounted) {
-        setState(() {
-          _currentIndex = lastIndex;
-        });
+        ref.read(mainTabIndexProvider.notifier).state = lastIndex;
       }
     } catch (e) {
       debugPrint('Error restoring last tab: $e');
@@ -494,10 +594,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
           BottomNavBar(
             currentIndex: _currentIndex,
             onTap: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
-              _saveCurrentTab();
+              _setCurrentIndex(index);
             },
           ),
         ],

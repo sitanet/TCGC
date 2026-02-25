@@ -5,13 +5,13 @@ class AppColors {
   static const Color jasper = Color(0xFF811A19);      // Dark Red
   static const Color sardine = Color(0xFFE74625);     // Orange-Red
   static const Color urim = Color(0xFFFFFFFF);        // White
-  static const Color thummim = Color(0xFFDCC06C);     // Gold (Primary)
-  static const Color goldVariant1 = Color(0xFFD8A085); // Gold variant
-  static const Color goldVariant2 = Color(0xFFF7D485); // Light Gold
+  static const Color thummim = Color(0xFFC6B36A);     // Gold (Primary) - exact brand gold
+  static const Color goldVariant1 = Color(0xFFD4C484); // Gold variant lighter
+  static const Color goldVariant2 = Color(0xFFDED09A); // Light Gold
 
   // Light Mode Colors
-  static const Color primaryGold = thummim;           // #DCC06C
-  static const Color primaryGoldLight = goldVariant2; // #F7D485
+  static const Color primaryGold = thummim;           // #C6B36A
+  static const Color primaryGoldLight = goldVariant2; // #DED09A
   static const Color backgroundLight = Color(0xFFFAFAFA);
   static const Color surfaceLight = urim;
   static const Color textPrimaryLight = Color(0xFF1A1A1A);

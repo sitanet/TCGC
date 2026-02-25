@@ -6,6 +6,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/interests_service.dart';
+import '../../../data/services/content_cache_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/event.dart';
 import '../audio/audio_player_page.dart';
@@ -34,7 +35,8 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   final DataService _dataService = DataService();
   final InterestsService _interestsService = InterestsService();
-  final PageController _eventsPageController = PageController();
+  final ContentCacheService _cacheService = ContentCacheService();
+  late final PageController _eventsPageController;
   
   List<Sermon> _sermons = [];
   List<Event> _events = [];
@@ -42,10 +44,17 @@ class _HomePageState extends ConsumerState<HomePage> {
   List<Sermon> _recommendedSermons = [];
   bool _isLoading = true;
   int _currentEventIndex = 0;
+  double _currentPage = 0;
 
   @override
   void initState() {
     super.initState();
+    _eventsPageController = PageController(viewportFraction: 0.52, initialPage: 0);
+    _eventsPageController.addListener(() {
+      setState(() {
+        _currentPage = _eventsPageController.page ?? 0;
+      });
+    });
     _initServices();
     _loadData();
     _startEventAutoSlide();
@@ -53,6 +62,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   
   Future<void> _initServices() async {
     await _interestsService.initialize();
+    await _cacheService.initialize();
   }
 
   void _startEventAutoSlide() {
@@ -69,14 +79,15 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     setState(() => _isLoading = true);
     try {
       // Load sermons, events, and recommended in parallel for faster loading
+      // Uses cache-first strategy - returns cached data instantly, syncs in background
       final results = await Future.wait([
-        _dataService.getMessages(),
-        _dataService.getEvents(),
-        _dataService.getRecommendedMessages(),
+        _dataService.getMessages(forceRefresh: forceRefresh),
+        _dataService.getEvents(forceRefresh: forceRefresh),
+        _dataService.getRecommendedMessages(forceRefresh: forceRefresh),
       ]);
       
       final sermons = results[0] as List<Sermon>;
@@ -97,12 +108,22 @@ class _HomePageState extends ConsumerState<HomePage> {
         
         // Pre-cache images in background
         _preCacheImages(sermons, events);
+        
+        // Pre-cache 3 minutes of audio for top sermons in background
+        _preCacheAudio(sermons.take(10).toList());
       }
     } catch (e) {
       print('Error loading home data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+  
+  void _preCacheAudio(List<Sermon> sermons) {
+    // Pre-cache audio in background for instant playback
+    for (final sermon in sermons) {
+      _cacheService.preCacheAudio(sermon);
     }
   }
   
@@ -129,22 +150,16 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final spacing = Responsive.verticalSpacing(context);
-    final statusBarHeight = MediaQuery.of(context).padding.top;
 
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: _loadData,
+        onRefresh: () => _loadData(forceRefresh: true),
         color: AppColors.primaryGold,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Status bar background
-              Container(
-                height: statusBarHeight,
-                color: isDark ? AppColors.backgroundDark : Colors.white,
-              ),
               _buildHeaderBanner(context, isDark),
               SizedBox(height: spacing * 1.5),
               _buildUpcomingEvents(context, isDark),
@@ -181,6 +196,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildHeaderBanner(BuildContext context, bool isDark) {
     final borderRadius = Responsive.largeBorderRadius(context);
     final screenWidth = MediaQuery.of(context).size.width;
+    final statusBarHeight = MediaQuery.of(context).padding.top;
     
     // Responsive sizing
     final isMobile = Responsive.isMobile(context);
@@ -203,7 +219,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final bottomPadding = isMobile ? 20.0 : isTablet ? 25.0 : 30.0;
 
     return Container(
-      width: screenWidth,  // Always full width
+      width: screenWidth,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
@@ -220,7 +236,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       ),
       child: Padding(
-        padding: EdgeInsets.only(bottom: bottomPadding, top: 8.0),
+        padding: EdgeInsets.only(bottom: bottomPadding, top: statusBarHeight + 8.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -334,9 +350,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildUpcomingEvents(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
-    final eventCardHeight = Responsive.eventCardHeight(context);
     final subtitleFontSize = Responsive.subtitleFontSize(context);
     final bodyFontSize = Responsive.bodyFontSize(context);
+    const cardSize = 184.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,18 +371,18 @@ class _HomePageState extends ConsumerState<HomePage> {
         SizedBox(height: spacing),
         if (_isLoading)
           SizedBox(
-            height: eventCardHeight,
+            height: cardSize,
             child: const Center(child: CircularProgressIndicator()),
           )
         else if (_events.isEmpty)
           Padding(
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             child: Container(
-              height: eventCardHeight,
+              height: cardSize,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: isDark ? AppColors.cardDark : Colors.grey[100],
-                borderRadius: BorderRadius.circular(Responsive.borderRadius(context)),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Center(
                 child: Column(
@@ -393,131 +409,106 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           )
         else
-          Column(
-            children: [
-              SizedBox(
-                height: eventCardHeight,
-                child: PageView.builder(
-                  controller: _eventsPageController,
-                  itemCount: _events.length,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _currentEventIndex = index;
-                    });
-                  },
-                  itemBuilder: (context, index) {
-                    final event = _events[index];
-                    return _buildEventCard(context, isDark, event);
-                  },
-                ),
-              ),
-              if (_events.length > 1) ...[
-                SizedBox(height: spacing * 0.75),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    _events.length,
-                    (index) => AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      margin: EdgeInsets.symmetric(horizontal: spacing * 0.25),
-                      width: _currentEventIndex == index ? spacing * 1.5 : spacing * 0.5,
-                      height: spacing * 0.5,
-                      decoration: BoxDecoration(
-                        color: _currentEventIndex == index
-                            ? AppColors.primaryGold
-                            : (isDark ? Colors.grey[700] : Colors.grey[300]),
-                        borderRadius: BorderRadius.circular(spacing * 0.25),
-                      ),
+          SizedBox(
+            height: cardSize + 40,
+            child: PageView.builder(
+              controller: _eventsPageController,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentEventIndex = index;
+                });
+              },
+              itemCount: _events.length,
+              itemBuilder: (context, index) {
+                final event = _events[index];
+                final double distance = (_currentPage - index).abs();
+                final double scale = (1 - (distance * 0.2)).clamp(0.8, 1.0);
+                final double opacity = (1 - (distance * 0.3)).clamp(0.6, 1.0);
+                
+                return Center(
+                  child: Transform.scale(
+                    scale: scale,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: opacity,
+                      child: _buildEventCard(context, isDark, event),
                     ),
                   ),
-                ),
-              ],
-            ],
+                );
+              },
+            ),
           ),
       ],
     );
   }
 
   Widget _buildEventCard(BuildContext context, bool isDark, Event event) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+    const cardSize = 184.0;
+    const cornerRadius = 10.0;
+    
+    return GestureDetector(
+      onTap: () => _showEventImageZoom(context, event),
       child: Container(
-        width: double.infinity,
+        width: cardSize,
+        height: cardSize,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(cornerRadius),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(cornerRadius),
           child: Stack(
             fit: StackFit.expand,
             children: [
               _buildEventImage(event.imageUrl),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.8),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: const [0.3, 1.0],
-                  ),
-                ),
-              ),
+              // Gradient overlay at bottom for text
               Positioned(
-                bottom: 16,
-                left: 16,
-                right: 16,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.schedule,
-                          color: AppColors.primaryGold,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            event.schedule,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
-                              fontSize: 13,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.7),
                       ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
                     ),
-                  ],
+                  ),
+                  child: Text(
+                    event.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+  
+  void _showEventImageZoom(BuildContext context, Event event) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) => _EventImageZoomDialog(event: event),
     );
   }
 
@@ -534,7 +525,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         child: Icon(
           Icons.event,
           size: 48,
-          color: Colors.white.withOpacity(0.3),
+          color: Colors.white.withValues(alpha: 0.3),
         ),
       ),
     );
@@ -740,13 +731,52 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
+  String _getTimeAgo(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    
+    if (difference.inDays > 365) {
+      final years = (difference.inDays / 365).floor();
+      return '$years ${years == 1 ? 'year' : 'years'} ago';
+    } else if (difference.inDays > 30) {
+      final months = (difference.inDays / 30).floor();
+      return '$months ${months == 1 ? 'month' : 'months'} ago';
+    } else if (difference.inDays > 7) {
+      final weeks = (difference.inDays / 7).floor();
+      return '$weeks ${weeks == 1 ? 'week' : 'weeks'} ago';
+    } else if (difference.inDays > 0) {
+      return '${difference.inDays} ${difference.inDays == 1 ? 'day' : 'days'} ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} ${difference.inHours == 1 ? 'hour' : 'hours'} ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} ${difference.inMinutes == 1 ? 'min' : 'mins'} ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
   Widget _buildActivityTile(
     BuildContext context,
     bool isDark,
     Sermon sermon,
   ) {
+    final authProvider = ref.read(authChangeNotifierProvider);
+    final user = authProvider.user;
+    final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+    final isGeneralMarried = user?.isGeneralMarried ?? false;
+    final isInHouseMarried = user?.isInHouseMarried ?? false;
+    final isLocked = (sermon.isServiceTeamOnly && !isServiceTeamMember) ||
+        (sermon.isGeneralMarriedOnly && !isGeneralMarried) ||
+        (sermon.isInHouseMarriedOnly && !isInHouseMarried);
+    
+    final timeAgo = _getTimeAgo(sermon.date);
+    
     return GestureDetector(
       onTap: () {
+        if (isLocked) {
+          _showLockedMessage(context, isDark);
+          return;
+        }
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -770,32 +800,86 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: 50,
-                height: 50,
-                child: _buildSermonImage(sermon, isDark),
-              ),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 50,
+                    height: 50,
+                    child: _buildSermonImage(sermon, isDark),
+                  ),
+                ),
+                if (isLocked)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.lock,
+                          size: 20,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    sermon.title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
+                  // Category name
+                  if (sermon.categoryName.isNotEmpty)
+                    Text(
+                      sermon.categoryName,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.primaryGold,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  const SizedBox(height: 2),
+                  // Title
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          sermon.title,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                      ),
+                      if (isLocked)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: Icon(
+                            Icons.lock,
+                            size: 14,
+                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
+                  // Speaker - Time ago
                   Text(
-                    _stripHtmlTags(sermon.description),
+                    '${sermon.speaker ?? 'Unknown'} • $timeAgo',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: isDark
                               ? AppColors.textSecondaryDark
                               : AppColors.textSecondaryLight,
+                          fontSize: 12,
                         ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -805,6 +889,206 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+  
+  void _showLockedMessage(BuildContext context, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.lock, color: AppColors.primaryGold),
+            const SizedBox(width: 8),
+            const Text('Restricted Content'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.lock_outline,
+              size: 48,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'This message is only available for Service Team members.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGold,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EventImageZoomDialog extends StatefulWidget {
+  final Event event;
+  
+  const _EventImageZoomDialog({required this.event});
+  
+  @override
+  State<_EventImageZoomDialog> createState() => _EventImageZoomDialogState();
+}
+
+class _EventImageZoomDialogState extends State<_EventImageZoomDialog> {
+  final TransformationController _transformationController = TransformationController();
+  
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Close button
+          Align(
+            alignment: Alignment.topRight,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(
+                  Icons.close,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Zoomable image
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: InteractiveViewer(
+              transformationController: _transformationController,
+              minScale: 1.0,
+              maxScale: 4.0,
+              child: widget.event.imageUrl != null && widget.event.imageUrl!.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: widget.event.imageUrl!,
+                      fit: BoxFit.contain,
+                      placeholder: (context, url) => Container(
+                        height: 300,
+                        color: Colors.grey[900],
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primaryGold,
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        height: 300,
+                        color: Colors.grey[900],
+                        child: const Icon(
+                          Icons.event,
+                          size: 64,
+                          color: Colors.white30,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      height: 300,
+                      color: Colors.grey[900],
+                      child: const Icon(
+                        Icons.event,
+                        size: 64,
+                        color: Colors.white30,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Event details
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.black87,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.event.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.schedule,
+                      color: AppColors.primaryGold,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        widget.event.schedule,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (widget.event.location != null && widget.event.location!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        color: AppColors.primaryGold,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          widget.event.location!,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -6,6 +6,7 @@ import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'give_page.dart';
 import 'nin_verification_page.dart';
+import 'set_transaction_pin_page.dart';
 
 class WalletPage extends ConsumerStatefulWidget {
   const WalletPage({super.key});
@@ -16,6 +17,8 @@ class WalletPage extends ConsumerStatefulWidget {
 
 class _WalletPageState extends ConsumerState<WalletPage> {
   bool _isCheckingStatus = true;
+  bool _needsPinSetup = false;
+  bool _acceptedDataPolicy = false;
 
   @override
   void initState() {
@@ -24,8 +27,17 @@ class _WalletPageState extends ConsumerState<WalletPage> {
   }
 
   Future<void> _checkWalletStatus() async {
-    // Small delay to ensure provider is ready
-    await Future.delayed(const Duration(milliseconds: 100));
+    // Fetch wallet status from server
+    final walletProvider = ref.read(walletChangeNotifierProvider);
+    await walletProvider.fetchWallet();
+    
+    // If wallet exists, check if PIN is set
+    if (walletProvider.hasWallet) {
+      final hasPin = await walletProvider.checkHasPin();
+      if (!hasPin && mounted) {
+        setState(() => _needsPinSetup = true);
+      }
+    }
     
     if (mounted) {
       setState(() => _isCheckingStatus = false);
@@ -44,7 +56,11 @@ class _WalletPageState extends ConsumerState<WalletPage> {
   Widget build(BuildContext context) {
     if (_isCheckingStatus) {
       return Scaffold(
-        appBar: const CustomAppBar(title: '', showBackButton: false),
+        appBar: CustomAppBar(
+          title: '',
+          showBackButton: true,
+          onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+        ),
         body: const Center(
           child: CircularProgressIndicator(
             color: AppColors.primaryGold,
@@ -54,7 +70,13 @@ class _WalletPageState extends ConsumerState<WalletPage> {
     }
 
     final walletProvider = ref.watch(walletChangeNotifierProvider);
-    // If user has wallet, go to GivePage (wallet details)
+    
+    // If wallet exists but PIN not set, go to PIN setup
+    if (walletProvider.hasWallet && _needsPinSetup) {
+      return const SetTransactionPinPage(nin: '', verifiedData: null);
+    }
+    
+    // If user has wallet with PIN, go to GivePage (wallet details)
     if (walletProvider.hasWallet) {
       return const GivePage();
     }
@@ -73,7 +95,11 @@ class _WalletPageState extends ConsumerState<WalletPage> {
     final borderRadius = Responsive.borderRadius(context);
 
     return Scaffold(
-      appBar: const CustomAppBar(title: 'Wallet', showBackButton: false),
+      appBar: CustomAppBar(
+        title: 'Wallet',
+        showBackButton: true,
+        onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+      ),
       body: SingleChildScrollView(
         child: Center(
           child: ConstrainedBox(
@@ -157,17 +183,133 @@ class _WalletPageState extends ConsumerState<WalletPage> {
                     'Transaction History',
                     'Track all your giving and transactions',
                   ),
-                  SizedBox(height: spacing * 4),
+                  SizedBox(height: spacing * 2),
+
+                  // Disclaimer Notice
+                  Container(
+                    padding: EdgeInsets.all(horizontalPadding * 0.75),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(borderRadius),
+                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.account_balance_outlined,
+                          color: Colors.blue[700],
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Disclaimer: The CityGate Church is not a bank or financial institution. All wallet transactions are handled by 9 Payment Service Bank (9PSB) through our Technology Platform partner Sitanet Global Orbit.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.blue[800],
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: spacing),
+
+                  // Verification Fee Notice
+                  Container(
+                    padding: EdgeInsets.all(horizontalPadding * 0.75),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(borderRadius),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.orange[700],
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'A one-time fee of ₦150 will be deducted from your first deposit for NIN/BVN verification. This is a one-time charge only.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.orange[800],
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: spacing * 2),
+
+                  // Data Protection Policy Checkbox
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: _acceptedDataPolicy,
+                          onChanged: (value) {
+                            setState(() => _acceptedDataPolicy = value ?? false);
+                          },
+                          activeColor: AppColors.primaryGold,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _acceptedDataPolicy = !_acceptedDataPolicy),
+                          child: Text.rich(
+                            TextSpan(
+                              text: 'I agree to the ',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: 'Data Protection Policy',
+                                  style: TextStyle(
+                                    color: AppColors.primaryGold,
+                                    fontWeight: FontWeight.w600,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                                const TextSpan(
+                                  text: ' and consent to the processing of my personal data for wallet creation and identity verification.',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: spacing * 3),
 
                   // Create Wallet Button
                   SizedBox(
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: _navigateToCreateWallet,
+                      onPressed: _acceptedDataPolicy ? _navigateToCreateWallet : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryGold,
                         foregroundColor: Colors.white,
+                        disabledBackgroundColor: Colors.grey[300],
+                        disabledForegroundColor: Colors.grey[500],
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(borderRadius),
                         ),

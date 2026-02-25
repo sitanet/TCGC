@@ -25,6 +25,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
+  final _ninController = TextEditingController();
 
   String? _selectedGender;
   DateTime? _selectedDateOfBirth;
@@ -91,6 +92,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       _emailController.text = user.email;
       _phoneController.text = user.phoneNumber ?? '';
       _addressController.text = user.address ?? '';
+      _ninController.text = user.nin ?? '';
       _selectedGender = user.gender;
       _selectedDateOfBirth = user.dateOfBirth;
       _selectedKCC = user.kcc;
@@ -118,6 +120,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     _emailController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
+    _ninController.dispose();
     super.dispose();
   }
 
@@ -173,6 +176,14 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 ),
                 const SizedBox(height: 16),
                 _buildPhoneField(isDark, enabled: false),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _ninController,
+                  label: 'NIN (National Identification Number)',
+                  hint: 'Verify NIN in wallet section',
+                  isDark: isDark,
+                  enabled: false,
+                ),
                 const SizedBox(height: 16),
                 _buildMapDropdownField(
                   label: 'Gender',

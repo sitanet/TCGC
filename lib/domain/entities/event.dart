@@ -37,4 +37,19 @@ class Event {
       location: json['location'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'image_url': imageUrl,
+      'schedule': schedule,
+      'icon_color': iconColor,
+      'is_live': isLive,
+      'is_teens_event': isTeensEvent,
+      'youtube_url': youtubeUrl,
+      'location': location,
+    };
+  }
 }

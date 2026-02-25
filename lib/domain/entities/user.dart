@@ -19,6 +19,9 @@ class AppUser {
   final String? address;
   final bool isOnline;
   final String role;
+  final bool isServiceTeamMember;
+  final bool isGeneralMarried;
+  final bool isInHouseMarried;
 
   const AppUser({
     required this.id,
@@ -41,6 +44,9 @@ class AppUser {
     this.address,
     this.isOnline = false,
     this.role = 'user',
+    this.isServiceTeamMember = false,
+    this.isGeneralMarried = false,
+    this.isInHouseMarried = false,
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
@@ -66,6 +72,9 @@ class AppUser {
       address: json['address'],
       isOnline: json['is_online'] ?? false,
       role: json['role'] ?? 'user',
+      isServiceTeamMember: json['is_service_team_member'] ?? false,
+      isGeneralMarried: json['is_general_married'] ?? false,
+      isInHouseMarried: json['is_in_house_married'] ?? false,
     );
   }
 
@@ -116,6 +125,9 @@ class AppUser {
     String? address,
     bool? isOnline,
     String? role,
+    bool? isServiceTeamMember,
+    bool? isGeneralMarried,
+    bool? isInHouseMarried,
   }) {
     return AppUser(
       id: id ?? this.id,
@@ -138,6 +150,9 @@ class AppUser {
       address: address ?? this.address,
       isOnline: isOnline ?? this.isOnline,
       role: role ?? this.role,
+      isServiceTeamMember: isServiceTeamMember ?? this.isServiceTeamMember,
+      isGeneralMarried: isGeneralMarried ?? this.isGeneralMarried,
+      isInHouseMarried: isInHouseMarried ?? this.isInHouseMarried,
     );
   }
 }

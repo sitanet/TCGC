@@ -137,6 +137,26 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> deleteAccount() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    final result = await _authService.deleteAccount();
+    
+    if (result.success) {
+      _user = null;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    }
+    
+    _error = result.error;
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+
   Future<bool> updateProfile(Map<String, dynamic> data) async {
     _isLoading = true;
     _error = null;
@@ -251,12 +271,23 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // KYC Verification Methods
-  Future<KycResult> verifyNin(String nin, {bool updateProfile = false}) async {
+  Future<KycResult> verifyNin(String nin, {
+    String? phoneNumber,
+    String? address,
+    String? dateOfBirth,
+    bool updateProfile = false,
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
-    final result = await _authService.verifyNin(nin, updateProfile: updateProfile);
+    final result = await _authService.verifyNin(
+      nin,
+      phoneNumber: phoneNumber,
+      address: address,
+      dateOfBirth: dateOfBirth,
+      updateProfile: updateProfile,
+    );
     
     _isLoading = false;
     if (result.success && updateProfile) {

@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/services/data_service.dart';
 import '../../../domain/entities/teens_content.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'teens_content_list_page.dart';
 
-class TeensPage extends StatefulWidget {
+class TeensPage extends ConsumerStatefulWidget {
   const TeensPage({super.key});
 
   @override
-  State<TeensPage> createState() => _TeensPageState();
+  ConsumerState<TeensPage> createState() => _TeensPageState();
 }
 
-class _TeensPageState extends State<TeensPage> {
+class _TeensPageState extends ConsumerState<TeensPage> {
   final DataService _dataService = DataService();
   
   List<TeensContent> _devotionals = [];
@@ -57,7 +59,11 @@ class _TeensPageState extends State<TeensPage> {
     final spacing = Responsive.verticalSpacing(context);
 
     return Scaffold(
-      appBar: const CustomAppBar(title: '', showBackButton: false),
+      appBar: CustomAppBar(
+        title: '',
+        showBackButton: true,
+        onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+      ),
       body: RefreshIndicator(
         onRefresh: _loadData,
         color: AppColors.primaryGold,

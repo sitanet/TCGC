@@ -6,12 +6,26 @@ import 'package:path_provider/path_provider.dart';
 import '../../domain/entities/sermon.dart';
 import '../../data/services/audio_cache_service.dart';
 import '../../data/services/playback_position_service.dart';
+import '../../data/services/download_service.dart';
 import '../services/audio_handler.dart';
 
 MyAudioHandler? _audioHandler;
 AudioPlayer? _fallbackPlayer;
 bool _audioServiceInitialized = false;
 bool _useAudioService = false;
+
+/// Fix malformed URLs (missing protocol prefix, etc.)
+String _fixAudioUrl(String url) {
+  if (url.startsWith('ttps://')) {
+    return 'https://${url.substring(7)}';
+  } else if (url.startsWith('ttp://')) {
+    return 'http://${url.substring(6)}';
+  } else if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('file://')) {
+    // Relative path - prepend base URL
+    return 'https://tcgc.thecitygatechurch.org$url';
+  }
+  return url;
+}
 
 Future<void> initAudioService() async {
   if (_audioServiceInitialized) return;
@@ -52,6 +66,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   
   final AudioCacheService _audioCacheService = AudioCacheService();
   final PlaybackPositionService _positionService = PlaybackPositionService();
+  final DownloadService _downloadService = DownloadService();
 
   Sermon? get currentSermon => _currentSermon;
   Duration get duration => _duration;
@@ -159,16 +174,25 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
         if (hasNext) skipToNext();
       }
       notifyListeners();
+    }, onError: (error) {
+      debugPrint('Fallback player state stream error: $error');
+      _isLoading = false;
+      _errorMessage = 'Playback error: $error';
+      notifyListeners();
     });
     
     _fallbackPlayer!.positionStream.listen((pos) {
       _position = pos;
       notifyListeners();
+    }, onError: (error) {
+      debugPrint('Fallback position stream error: $error');
     });
     
     _fallbackPlayer!.durationStream.listen((dur) {
       _duration = dur ?? Duration.zero;
       notifyListeners();
+    }, onError: (error) {
+      debugPrint('Fallback duration stream error: $error');
     });
   }
   
@@ -178,6 +202,11 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   
   Future<void> preBufferMore(List<Sermon> sermons, int startIndex, {int count = 10}) async {
     await _audioCacheService.preBufferMore(sermons, startIndex, count: count);
+  }
+  
+  /// Pre-buffer a single sermon for instant playback (called when user taps)
+  Future<void> preBufferSingle(Sermon sermon) async {
+    await _audioCacheService.preBufferSingle(sermon);
   }
   
   bool isPreBuffered(String sermonId) => _audioCacheService.isPreBuffered(sermonId);
@@ -199,11 +228,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   String _sanitizeFileName(String id) => id.replaceAll(RegExp(r'[^\w\-]'), '_');
 
   Future<void> playSermon(Sermon sermon) async {
-    if (!_audioServiceInitialized) {
-      await initAudioService();
-      _setupListeners();
-    }
-
+    // Toggle play/pause if same sermon
     if (_currentSermon?.id == sermon.id) {
       if (_isPlaying) {
         await pause();
@@ -213,43 +238,120 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
 
-    _isLoading = true;
+    // Update UI immediately - no loading state for pre-buffered content
     _errorMessage = null;
     _currentSermon = sermon;
-    notifyListeners();
-
+    _position = Duration.zero;
+    
     final audioUrl = sermon.audioUrl;
     if (audioUrl == null || audioUrl.isEmpty) {
-      _isLoading = false;
       _errorMessage = 'No audio URL available for this sermon';
       notifyListeners();
       return;
     }
-    
-    debugPrint('Playing sermon: ${sermon.title}');
-    debugPrint('Audio URL: $audioUrl');
+
+    _isLoading = true;
+    notifyListeners();
+
+    // Initialize audio service if needed (should already be done)
+    if (!_audioServiceInitialized) {
+      await initAudioService();
+      _setupListeners();
+    }
+
+    // Fix malformed URLs (e.g., "ttps://" -> "https://")
+    final fixedAudioUrl = _fixAudioUrl(audioUrl);
+    if (fixedAudioUrl != audioUrl) {
+      debugPrint('Fixed malformed URL: $audioUrl -> $fixedAudioUrl');
+    }
 
     try {
-      if (_useAudioService && _audioHandler != null) {
-        await _audioHandler!.stop();
-        final mediaItem = MediaItem(
-          id: sermon.id,
-          title: sermon.title,
-          artist: sermon.speaker ?? 'TCGC',
-          album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Sermons',
-          artUri: sermon.imageUrl != null ? Uri.parse(sermon.imageUrl!) : null,
-        );
-        await _audioHandler!.setAudioSource(audioUrl, mediaItem);
-        await _audioHandler!.play();
-      } else if (_fallbackPlayer != null) {
-        await _fallbackPlayer!.stop();
-        await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(audioUrl)));
-        await _fallbackPlayer!.play();
+      // Check for downloaded audio (local file)
+      String? downloadedPath;
+      if (_downloadService.isDownloaded(sermon.id)) {
+        downloadedPath = _downloadService.getLocalPath(sermon.id);
+        if (downloadedPath != null) {
+          final file = File(downloadedPath);
+          if (!await file.exists()) {
+            downloadedPath = null;
+          }
+        }
       }
+
+      final mediaItem = MediaItem(
+        id: sermon.id,
+        title: sermon.title,
+        artist: sermon.speaker ?? 'TCGC',
+        album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Sermons',
+        artUri: sermon.imageUrl != null ? Uri.parse(sermon.imageUrl!) : null,
+      );
+
+      // Log the audio URL for debugging
+      debugPrint('Attempting to play audio: $fixedAudioUrl');
+      debugPrint('Downloaded path: $downloadedPath');
+
+      if (_useAudioService && _audioHandler != null) {
+        // Stop previous without waiting
+        _audioHandler!.stop();
+        
+        if (downloadedPath != null) {
+          debugPrint('Playing from local file');
+          await _audioHandler!.setAudioSource('file://$downloadedPath', mediaItem);
+        } else {
+          // Stream directly - large files may take time to buffer
+          debugPrint('Streaming from URL');
+          await _audioHandler!.setAudioSource(fixedAudioUrl, mediaItem).timeout(
+            const Duration(seconds: 180), // 3 minutes for large files
+            onTimeout: () {
+              throw Exception('Connection timeout - please check your internet connection or try downloading the audio.');
+            },
+          );
+        }
+        _audioHandler!.play();
+      } else if (_fallbackPlayer != null) {
+        _fallbackPlayer!.stop();
+        
+        if (downloadedPath != null) {
+          debugPrint('Playing from local file (fallback)');
+          await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse('file://$downloadedPath')));
+        } else {
+          // Stream directly - large files may take time to buffer
+          debugPrint('Streaming from URL (fallback)');
+          await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(fixedAudioUrl))).timeout(
+            const Duration(seconds: 180), // 3 minutes for large files
+            onTimeout: () {
+              throw Exception('Connection timeout - please check your internet connection or try downloading the audio.');
+            },
+          );
+        }
+        _fallbackPlayer!.play();
+      }
+      _isLoading = false;
+      notifyListeners();
     } catch (e, stackTrace) {
       _isLoading = false;
-      _errorMessage = 'Failed to load audio: $e';
+      
+      // Provide user-friendly error messages
+      String userMessage;
+      final errorStr = e.toString().toLowerCase();
+      if (errorStr.contains('socketexception') || errorStr.contains('connection')) {
+        userMessage = 'Unable to connect. Please check your internet connection.';
+      } else if (errorStr.contains('404') || errorStr.contains('not found')) {
+        userMessage = 'Audio file not found on server. Please contact support.';
+      } else if (errorStr.contains('403') || errorStr.contains('forbidden')) {
+        userMessage = 'Access denied. Please try again or re-login.';
+      } else if (errorStr.contains('timeout')) {
+        userMessage = 'Connection timeout. Large files may take time to load. Try downloading for offline playback.';
+      } else if (errorStr.contains('format') || errorStr.contains('codec')) {
+        userMessage = 'Audio format not supported.';
+      } else {
+        userMessage = 'Unable to stream audio. Large files may take time to load.';
+      }
+      
+      _errorMessage = userMessage;
       debugPrint('Audio error: $e');
+      debugPrint('Original URL: $audioUrl');
+      debugPrint('Fixed URL: $fixedAudioUrl');
       debugPrint('Stack: $stackTrace');
       notifyListeners();
     }
@@ -324,45 +426,87 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
   
   Future<void> playSermonFromPosition(Sermon sermon, Duration startPosition) async {
-    if (!_audioServiceInitialized) {
-      await initAudioService();
-      _setupListeners();
-    }
-
-    _isLoading = true;
     _errorMessage = null;
     _currentSermon = sermon;
-    notifyListeners();
+    _position = startPosition;
 
     final audioUrl = sermon.audioUrl;
     if (audioUrl == null || audioUrl.isEmpty) {
-      _isLoading = false;
       _errorMessage = 'No audio URL available for this sermon';
       notifyListeners();
       return;
     }
 
+    _isLoading = true;
+    notifyListeners();
+
+    if (!_audioServiceInitialized) {
+      await initAudioService();
+      _setupListeners();
+    }
+
+    // Fix malformed URLs
+    final fixedAudioUrl = _fixAudioUrl(audioUrl);
+
     try {
-      if (_useAudioService && _audioHandler != null) {
-        await _audioHandler!.stop();
-        final mediaItem = MediaItem(
-          id: sermon.id,
-          title: sermon.title,
-          artist: sermon.speaker ?? 'TCGC',
-          album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Sermons',
-          artUri: sermon.imageUrl != null ? Uri.parse(sermon.imageUrl!) : null,
-        );
-        await _audioHandler!.setAudioSourceWithPosition(audioUrl, mediaItem, startPosition);
-        await _audioHandler!.play();
-      } else if (_fallbackPlayer != null) {
-        await _fallbackPlayer!.stop();
-        await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(audioUrl)), initialPosition: startPosition);
-        await _fallbackPlayer!.play();
+      // Check for downloaded audio
+      String? downloadedPath;
+      if (_downloadService.isDownloaded(sermon.id)) {
+        downloadedPath = _downloadService.getLocalPath(sermon.id);
+        if (downloadedPath != null) {
+          final file = File(downloadedPath);
+          if (!await file.exists()) downloadedPath = null;
+        }
       }
+
+      final mediaItem = MediaItem(
+        id: sermon.id,
+        title: sermon.title,
+        artist: sermon.speaker ?? 'TCGC',
+        album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Sermons',
+        artUri: sermon.imageUrl != null ? Uri.parse(sermon.imageUrl!) : null,
+      );
+
+      debugPrint('Playing from position: $fixedAudioUrl');
+
+      if (_useAudioService && _audioHandler != null) {
+        _audioHandler!.stop();
+        
+        if (downloadedPath != null) {
+          await _audioHandler!.setAudioSourceWithPosition('file://$downloadedPath', mediaItem, startPosition);
+        } else {
+          // Stream directly
+          await _audioHandler!.setAudioSourceWithPosition(fixedAudioUrl, mediaItem, startPosition).timeout(
+            const Duration(seconds: 180),
+            onTimeout: () {
+              throw Exception('Connection timeout - please check your internet connection.');
+            },
+          );
+        }
+        _audioHandler!.play();
+      } else if (_fallbackPlayer != null) {
+        _fallbackPlayer!.stop();
+        
+        if (downloadedPath != null) {
+          await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse('file://$downloadedPath')), initialPosition: startPosition);
+        } else {
+          // Stream directly
+          await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(fixedAudioUrl)), initialPosition: startPosition).timeout(
+            const Duration(seconds: 180),
+            onTimeout: () {
+              throw Exception('Connection timeout - please check your internet connection.');
+            },
+          );
+        }
+        _fallbackPlayer!.play();
+      }
+      _isLoading = false;
+      notifyListeners();
     } catch (e, stackTrace) {
       _isLoading = false;
-      _errorMessage = 'Failed to load audio: $e';
+      _errorMessage = 'Unable to stream audio. Please check your connection.';
       debugPrint('Audio error: $e');
+      debugPrint('URL: $fixedAudioUrl');
       debugPrint('Stack: $stackTrace');
       notifyListeners();
     }

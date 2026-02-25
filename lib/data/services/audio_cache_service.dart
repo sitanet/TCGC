@@ -18,10 +18,10 @@ class AudioCacheService {
   
   static const String _metadataCacheKey = 'audio_metadata_cache';
   static const String _categoriesCacheKey = 'categories_cache';
-  // Pre-buffer enough for instant start - 500KB should be enough for ~30-45 seconds
-  // This allows quick buffering of more items while still enabling instant playback
-  static const int _preBufferBytes = 512 * 1024; // 512KB for instant start
-  static const int _maxPreBufferItems = 20;
+  // Pre-buffer ~1 minute of audio for instant playback with seamless transition
+  // At 128kbps (16KB/s), 1 minute = ~960KB. We use 1MB for comfortable buffer.
+  static const int _preBufferBytes = 1 * 1024 * 1024; // 1MB for ~1 minute
+  static const int _maxPreBufferItems = 100; // Buffer all sermons at login
   
   // Store full URLs for pre-buffered content
   final Map<String, String> _audioUrls = {};
@@ -91,17 +91,45 @@ class AudioCacheService {
     return null;
   }
 
-  /// Pre-buffer audio files for a category (first N items)
+  /// Pre-buffer audio files silently in background for instant playback
   Future<void> preBufferCategory(List<Sermon> sermons, {int count = _maxPreBufferItems}) async {
     final toBuffer = sermons.take(count).toList();
-    debugPrint('Pre-buffering ${toBuffer.length} audio files (~3 min each)...');
+    debugPrint('Starting silent background pre-buffer for ${toBuffer.length} sermons (~1 min each)...');
     
-    for (final sermon in toBuffer) {
-      if (sermon.audioUrl != null && sermon.audioUrl!.isNotEmpty) {
-        // Don't wait, buffer in background
-        _preBufferAudio(sermon.id, sermon.audioUrl!);
+    // Buffer in background without blocking
+    Future.microtask(() async {
+      // Process in parallel batches for faster pre-buffering
+      const batchSize = 5;
+      for (var i = 0; i < toBuffer.length; i += batchSize) {
+        final batch = toBuffer.skip(i).take(batchSize).toList();
+        
+        await Future.wait(
+          batch.where((sermon) => 
+            sermon.audioUrl != null && 
+            sermon.audioUrl!.isNotEmpty &&
+            !_audioBuffers.containsKey(sermon.id)
+          ).map((sermon) async {
+            // Check disk cache first
+            final diskBuffer = await _loadBufferFromDisk(sermon.id);
+            if (diskBuffer != null && diskBuffer.length >= _preBufferBytes * 0.9) {
+              _audioBuffers[sermon.id] = diskBuffer;
+              final url = await _loadUrlFromDisk(sermon.id);
+              if (url != null) _audioUrls[sermon.id] = url;
+              return;
+            }
+            
+            // Pre-buffer this sermon
+            await _preBufferAudio(sermon.id, sermon.audioUrl!);
+          }),
+        );
+        
+        // Small delay between batches to be network-friendly
+        if (i + batchSize < toBuffer.length) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
       }
-    }
+      debugPrint('Background pre-buffering completed for ${toBuffer.length} sermons');
+    });
   }
   
   /// Pre-buffer additional items (for infinite scroll)
@@ -119,7 +147,7 @@ class AudioCacheService {
     }
   }
 
-  /// Pre-buffer the initial bytes of an audio file for instant playback
+  /// Pre-buffer ~1 minute of audio for instant playback
   Future<void> _preBufferAudio(String sermonId, String url) async {
     if (_bufferingInProgress[sermonId] == true) return;
     if (_audioBuffers.containsKey(sermonId)) return;
@@ -128,35 +156,50 @@ class AudioCacheService {
     _bufferProgress[sermonId] = 0.0;
     
     try {
+      // First check if server supports range requests
+      final headResponse = await http.head(Uri.parse(url)).timeout(
+        const Duration(seconds: 5),
+      );
+      final contentLength = int.tryParse(headResponse.headers['content-length'] ?? '');
+      final acceptsRanges = headResponse.headers['accept-ranges'] == 'bytes';
+      
+      // Determine how much to buffer (min of 1 minute worth or full file)
+      final bytesToBuffer = contentLength != null 
+          ? (contentLength < _preBufferBytes ? contentLength : _preBufferBytes)
+          : _preBufferBytes;
+      
       final request = http.Request('GET', Uri.parse(url));
-      request.headers['Range'] = 'bytes=0-${_preBufferBytes - 1}';
+      if (acceptsRanges) {
+        request.headers['Range'] = 'bytes=0-${bytesToBuffer - 1}';
+      }
       
       final streamedResponse = await request.send().timeout(
-        const Duration(seconds: 30),
+        const Duration(seconds: 30), // 30s timeout for 1MB
       );
       
       if (streamedResponse.statusCode == 200 || streamedResponse.statusCode == 206) {
         final bytes = <int>[];
-        final contentLength = streamedResponse.contentLength ?? _preBufferBytes;
+        final expectedLength = streamedResponse.contentLength ?? bytesToBuffer;
         
         await for (final chunk in streamedResponse.stream) {
           bytes.addAll(chunk);
-          _bufferProgress[sermonId] = bytes.length / contentLength;
+          _bufferProgress[sermonId] = (bytes.length / expectedLength).clamp(0.0, 1.0);
           
-          if (bytes.length >= _preBufferBytes) break;
+          // Stop if we have enough
+          if (bytes.length >= bytesToBuffer) break;
         }
         
         _audioBuffers[sermonId] = bytes;
         _audioUrls[sermonId] = url;
         _bufferProgress[sermonId] = 1.0;
-        debugPrint('Pre-buffered ${bytes.length ~/ 1024}KB for sermon: $sermonId');
         
-        // Also save to disk for persistence
+        // Save to disk for persistence across app restarts
         await _saveBufferToDisk(sermonId, bytes);
         await _saveUrlToDisk(sermonId, url);
       }
     } catch (e) {
       debugPrint('Pre-buffer error for $sermonId: $e');
+      _bufferProgress[sermonId] = 0.0;
     } finally {
       _bufferingInProgress[sermonId] = false;
     }
@@ -208,12 +251,20 @@ class AudioCacheService {
     return null;
   }
 
-  /// Check if audio is pre-buffered and ready for instant playback
+  /// Check if audio is pre-buffered and ready for instant playback (memory only for speed)
   bool isPreBuffered(String sermonId) {
     return _audioBuffers.containsKey(sermonId);
   }
+  
+  /// Check if audio exists on disk (for when memory cache is cold)
+  Future<bool> isPreBufferedOnDisk(String sermonId) async {
+    if (_audioBuffers.containsKey(sermonId)) return true;
+    if (_cacheDir == null) return false;
+    final file = File('${_cacheDir!.path}/${_sanitizeFileName(sermonId)}.buf');
+    return await file.exists();
+  }
 
-  /// Get pre-buffered bytes for a sermon
+  /// Get pre-buffered bytes for a sermon (checks memory then disk)
   Future<List<int>?> getPreBufferedBytes(String sermonId) async {
     if (_audioBuffers.containsKey(sermonId)) {
       return _audioBuffers[sermonId];

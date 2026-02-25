@@ -12,7 +12,7 @@
 
     <application
         android:name="${applicationName}"
-        android:label="The CityGate Church"
+        android:label="Citygate Mobile"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
 
@@ -32,6 +32,14 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            
+            <!-- Deep Link for tcgc:// scheme -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="tcgc" android:host="app"/>
             </intent-filter>
         </activity>
 

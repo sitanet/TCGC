@@ -87,11 +87,11 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
       padding: EdgeInsets.all(spacing * 1.5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [
-            Color(0xFF1A1A2E),
-            Color(0xFF16213E),
-            Color(0xFF0F3460),
+            AppColors.primaryGold,
+            AppColors.primaryGold.withOpacity(0.85),
+            AppColors.goldVariant1,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -106,14 +106,15 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
               Text(
                 'Transaction Summary',
                 style: TextStyle(
-                  color: Colors.white70,
+                  color: Colors.white.withOpacity(0.9),
                   fontSize: bodyFontSize,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               Text(
                 _formatDate(DateTime.now()),
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withOpacity(0.7),
                   fontSize: smallFontSize,
                 ),
               ),
@@ -123,7 +124,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
           Text(
             'Current Balance:',
             style: TextStyle(
-              color: Colors.white70,
+              color: Colors.white.withOpacity(0.8),
               fontSize: smallFontSize,
             ),
           ),
@@ -134,6 +135,13 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
               color: Colors.white,
               fontSize: balanceFontSize,
               fontWeight: FontWeight.bold,
+              shadows: [
+                Shadow(
+                  color: Colors.black.withOpacity(0.2),
+                  offset: const Offset(1, 1),
+                  blurRadius: 2,
+                ),
+              ],
             ),
           ),
           SizedBox(height: spacing),

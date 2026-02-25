@@ -3,7 +3,10 @@ import 'package:flutter/services.dart';
 import 'app_colors.dart';
 
 class AppTheme {
+  static const String fontFamily = 'ClashDisplay';
+
   static ThemeData lightTheme = ThemeData(
+    fontFamily: fontFamily,
     useMaterial3: true,
     brightness: Brightness.light,
     primaryColor: AppColors.primaryGold,
@@ -25,8 +28,8 @@ class AppTheme {
       ),
       systemOverlayStyle: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
+        statusBarIconBrightness: Brightness.dark, // Dark icons for light background
+        statusBarBrightness: Brightness.light, // iOS: light status bar content
       ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
@@ -112,6 +115,7 @@ class AppTheme {
   );
 
   static ThemeData darkTheme = ThemeData(
+    fontFamily: fontFamily,
     useMaterial3: true,
     brightness: Brightness.dark,
     primaryColor: AppColors.primaryGold,
@@ -133,8 +137,8 @@ class AppTheme {
       ),
       systemOverlayStyle: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.light, // Light icons for dark background
+        statusBarBrightness: Brightness.dark, // iOS: dark status bar content
       ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(

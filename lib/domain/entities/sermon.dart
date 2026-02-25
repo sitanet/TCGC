@@ -12,6 +12,9 @@ class Sermon {
   final DateTime date;
   final Duration duration;
   final bool isRecommended;
+  final bool isServiceTeamOnly;
+  final bool isGeneralMarriedOnly;
+  final bool isInHouseMarriedOnly;
 
   const Sermon({
     required this.id,
@@ -27,6 +30,9 @@ class Sermon {
     required this.date,
     required this.duration,
     this.isRecommended = false,
+    this.isServiceTeamOnly = false,
+    this.isGeneralMarriedOnly = false,
+    this.isInHouseMarriedOnly = false,
   });
 
   factory Sermon.fromJson(Map<String, dynamic> json) {
@@ -53,6 +59,9 @@ class Sermon {
           : DateTime.now(),
       duration: Duration(minutes: json['duration_minutes'] ?? 0),
       isRecommended: json['is_recommended'] ?? false,
+      isServiceTeamOnly: json['is_service_team_only'] ?? false,
+      isGeneralMarriedOnly: json['is_general_married_only'] ?? false,
+      isInHouseMarriedOnly: json['is_in_house_married_only'] ?? false,
     );
   }
 
@@ -71,6 +80,9 @@ class Sermon {
       'date': date.toIso8601String(),
       'duration_minutes': duration.inMinutes,
       'is_recommended': isRecommended,
+      'is_service_team_only': isServiceTeamOnly,
+      'is_general_married_only': isGeneralMarriedOnly,
+      'is_in_house_married_only': isInHouseMarriedOnly,
     };
   }
 }

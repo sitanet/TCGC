@@ -1,5 +1,7 @@
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'seamless_audio_source.dart';
 
 class MyAudioHandler extends BaseAudioHandler with SeekHandler {
   final AudioPlayer _player = AudioPlayer();
@@ -10,10 +12,20 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
     _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
     
     _player.processingStateStream.listen((state) {
+      debugPrint('Audio processing state: $state');
       if (state == ProcessingState.completed) {
         stop();
       }
     });
+    
+    // Listen for errors
+    _player.playbackEventStream.listen(
+      (event) {},
+      onError: (Object e, StackTrace st) {
+        debugPrint('Audio playback error: $e');
+        debugPrint('Stack: $st');
+      },
+    );
   }
 
   PlaybackState _transformEvent(PlaybackEvent event) {
@@ -46,13 +58,56 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   Future<void> setAudioSource(String url, MediaItem item) async {
+    debugPrint('Setting audio source: $url');
     mediaItem.add(item);
-    await _player.setAudioSource(AudioSource.uri(Uri.parse(url)));
+    try {
+      await _player.setAudioSource(
+        AudioSource.uri(
+          Uri.parse(url),
+          headers: {
+            'Accept': 'audio/mpeg, audio/*;q=0.9, */*;q=0.5',
+            'User-Agent': 'TCGC-App/1.0',
+          },
+        ),
+      );
+      debugPrint('Audio source set successfully, duration: ${_player.duration}');
+    } catch (e, st) {
+      debugPrint('Error setting audio source: $e');
+      debugPrint('Stack: $st');
+      rethrow;
+    }
   }
 
   Future<void> setAudioSourceWithPosition(String url, MediaItem item, Duration position) async {
+    debugPrint('Setting audio source with position: $url at $position');
     mediaItem.add(item);
-    await _player.setAudioSource(AudioSource.uri(Uri.parse(url)), initialPosition: position);
+    try {
+      await _player.setAudioSource(
+        AudioSource.uri(
+          Uri.parse(url),
+          headers: {
+            'Accept': 'audio/mpeg, audio/*;q=0.9, */*;q=0.5',
+            'User-Agent': 'TCGC-App/1.0',
+          },
+        ),
+        initialPosition: position,
+      );
+      debugPrint('Audio source set successfully with position');
+    } catch (e, st) {
+      debugPrint('Error setting audio source with position: $e');
+      debugPrint('Stack: $st');
+      rethrow;
+    }
+  }
+
+  Future<void> setSeamlessAudioSource(SeamlessAudioSource source, MediaItem item) async {
+    mediaItem.add(item);
+    await _player.setAudioSource(source);
+  }
+
+  Future<void> setSeamlessAudioSourceWithPosition(SeamlessAudioSource source, MediaItem item, Duration position) async {
+    mediaItem.add(item);
+    await _player.setAudioSource(source, initialPosition: position);
   }
 
   @override

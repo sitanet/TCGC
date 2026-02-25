@@ -28,10 +28,10 @@ class ThemeProvider extends ChangeNotifier {
               statusBarIconBrightness: Brightness.light,
               statusBarBrightness: Brightness.dark,
             )
-          : SystemUiOverlayStyle.dark.copyWith(
+          : SystemUiOverlayStyle.light.copyWith(
               statusBarColor: Colors.transparent,
-              statusBarIconBrightness: Brightness.dark,
-              statusBarBrightness: Brightness.light,
+              statusBarIconBrightness: Brightness.light,
+              statusBarBrightness: Brightness.dark,
             ),
     );
   }

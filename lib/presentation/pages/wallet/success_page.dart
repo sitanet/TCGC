@@ -25,7 +25,7 @@ class SuccessPage extends StatelessWidget {
     final iconSize = Responsive.value(context, mobile: 60.0, tablet: 70.0, desktop: 80.0);
     
     return Scaffold(
-      appBar: CustomAppBar(title: title),
+      appBar: CustomAppBar(title: title, showBackButton: false),
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth),

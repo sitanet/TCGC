@@ -444,22 +444,30 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      debugPrint('WalletProvider: Setting transaction PIN...');
+      debugPrint('WalletProvider: Endpoint: ${ApiConstants.transactionPin}');
+      
       final response = await _api.post(ApiConstants.transactionPin, {
         'pin': pin,
         'confirm_pin': confirmPin,
       });
       
+      debugPrint('WalletProvider: PIN response - success: ${response.isSuccess}, status: ${response.statusCode}');
+      debugPrint('WalletProvider: PIN response body: ${response.body}');
+      
       _isLoading = false;
       if (response.isSuccess) {
+        debugPrint('WalletProvider: PIN set successfully');
         notifyListeners();
         return true;
       }
       
       _error = response.errorMessage;
+      debugPrint('WalletProvider: PIN error: $_error');
       notifyListeners();
       return false;
     } catch (e) {
-      debugPrint('Error setting PIN: $e');
+      debugPrint('WalletProvider: Exception setting PIN: $e');
       _error = 'Failed to set transaction PIN';
       _isLoading = false;
       notifyListeners();

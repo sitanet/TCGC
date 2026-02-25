@@ -1,19 +1,21 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 
-class LiveStreamPage extends StatefulWidget {
+class LiveStreamPage extends ConsumerStatefulWidget {
   const LiveStreamPage({super.key});
 
   @override
-  State<LiveStreamPage> createState() => _LiveStreamPageState();
+  ConsumerState<LiveStreamPage> createState() => _LiveStreamPageState();
 }
 
-class _LiveStreamPageState extends State<LiveStreamPage> with SingleTickerProviderStateMixin {
+class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late WebViewController _webViewController;
   late WebViewController _watchLiveController;
@@ -69,7 +71,11 @@ class _LiveStreamPageState extends State<LiveStreamPage> with SingleTickerProvid
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: const CustomAppBar(title: '', showBackButton: false),
+      appBar: CustomAppBar(
+        title: '',
+        showBackButton: true,
+        onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+      ),
       body: Column(
         children: [
           _buildTabBar(isDark),

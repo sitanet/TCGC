@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
@@ -7,20 +8,21 @@ import '../../../data/services/data_service.dart';
 import '../../../data/services/audio_cache_service.dart';
 import '../../../data/services/image_cache_service.dart';
 import '../../../domain/entities/sermon.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_list_page.dart';
 import 'favorites_page.dart';
 import 'playlists_page.dart';
 import 'downloads_page.dart';
 
-class AudioPage extends StatefulWidget {
+class AudioPage extends ConsumerStatefulWidget {
   const AudioPage({super.key});
 
   @override
-  State<AudioPage> createState() => _AudioPageState();
+  ConsumerState<AudioPage> createState() => _AudioPageState();
 }
 
-class _AudioPageState extends State<AudioPage>
+class _AudioPageState extends ConsumerState<AudioPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final DataService _dataService = DataService();
@@ -125,6 +127,9 @@ class _AudioPageState extends State<AudioPage>
           _sermons = sermons;
           _isLoading = false;
         });
+        
+        // Pre-buffer first 10 sermons for instant playback (~3 min each)
+        _audioCacheService.preBufferCategory(sermons, count: 10);
       }
     } catch (e) {
       debugPrint('Error loading audio data: $e');
@@ -147,7 +152,8 @@ class _AudioPageState extends State<AudioPage>
     return Scaffold(
       appBar: CustomAppBar(
         title: '',
-        showBackButton: false,
+        showBackButton: true,
+        onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.favorite_border),
@@ -298,18 +304,6 @@ class _AudioPageState extends State<AudioPage>
       },
       child: Container(
         margin: Responsive.isMobile(context) ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.cardDark : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
         child: Row(
           children: [
             Stack(
@@ -320,8 +314,8 @@ class _AudioPageState extends State<AudioPage>
                 ),
                 if (category.hasNewMessage)
                   Positioned(
-                    top: 0,
-                    right: 0,
+                    top: 4,
+                    right: 4,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
@@ -346,37 +340,22 @@ class _AudioPageState extends State<AudioPage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          category.name,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                  Text(
+                    category.name,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryGold,
                         ),
-                      ),
-                      if (category.hasNewMessage)
-                        Container(
-                          margin: const EdgeInsets.only(left: 8),
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    category.description ?? 'Listen to messages from this category',
+                    category.description ?? 'It is a time for to come together to worship, hear God\'s word, and fellowship.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: isDark
                               ? AppColors.textSecondaryDark
                               : AppColors.textSecondaryLight,
                         ),
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],

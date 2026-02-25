@@ -1,14 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import '../../../core/providers/auth_provider.dart';
-import '../../../core/providers/wallet_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../main.dart' show walletChangeNotifierProvider;
 import '../../widgets/custom_app_bar.dart';
 import 'give_page.dart';
 
-class SetTransactionPinPage extends StatefulWidget {
+class SetTransactionPinPage extends ConsumerStatefulWidget {
   final String nin;
   final Map<String, dynamic>? verifiedData;
 
@@ -19,10 +19,10 @@ class SetTransactionPinPage extends StatefulWidget {
   });
 
   @override
-  State<SetTransactionPinPage> createState() => _SetTransactionPinPageState();
+  ConsumerState<SetTransactionPinPage> createState() => _SetTransactionPinPageState();
 }
 
-class _SetTransactionPinPageState extends State<SetTransactionPinPage> {
+class _SetTransactionPinPageState extends ConsumerState<SetTransactionPinPage> {
   final _pinController = TextEditingController();
   final _confirmPinController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -42,46 +42,49 @@ class _SetTransactionPinPageState extends State<SetTransactionPinPage> {
 
     setState(() => _isLoading = true);
 
-    final authProvider = context.read<AuthProvider>();
-    final walletProvider = context.read<WalletProvider>();
-    final user = authProvider.user;
+    final walletProvider = ref.read(walletChangeNotifierProvider);
 
-    // Prepare wallet data
-    final userData = {
-      'nin': widget.nin,
-      'phone_number': user?.phoneNumber,
-      'date_of_birth': user?.dateOfBirth?.toIso8601String().split('T').first,
-      'address': user?.address,
-      'gender': user?.gender,
-    };
-
-    // Create wallet first
-    final walletSuccess = await walletProvider.openWallet(userData);
-
-    if (!walletSuccess) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(walletProvider.error ?? 'Failed to create wallet'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-      return;
+    // Wallet should already be created during NIN verification
+    // Just set the transaction PIN directly
+    debugPrint('SetTransactionPinPage: Starting PIN setup...');
+    debugPrint('SetTransactionPinPage: PIN length: ${_pinController.text.length}');
+    
+    bool pinSuccess = false;
+    try {
+      pinSuccess = await walletProvider.setTransactionPin(
+        _pinController.text,
+        _confirmPinController.text,
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          debugPrint('SetTransactionPinPage: PIN setup timed out');
+          return false;
+        },
+      );
+    } catch (e) {
+      debugPrint('SetTransactionPinPage: PIN setup error: $e');
+      pinSuccess = false;
     }
 
-    // Set transaction PIN
-    final pinSuccess = await walletProvider.setTransactionPin(
-      _pinController.text,
-      _confirmPinController.text,
-    );
-
-    setState(() => _isLoading = false);
+    debugPrint('SetTransactionPinPage: PIN setup result: $pinSuccess');
 
     if (!mounted) return;
 
+    setState(() => _isLoading = false);
+    
+    if (!pinSuccess && walletProvider.error == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Request timed out. Please try again.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
     if (pinSuccess) {
+      // Refresh wallet data to ensure state is synced
+      await walletProvider.fetchWallet();
       // Show success popup
       await showDialog(
         context: context,

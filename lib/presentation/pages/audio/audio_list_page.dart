@@ -95,6 +95,49 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
     }
     _speakers = speakerSet.toList()..sort();
   }
+  
+  void _showLockedMessage(BuildContext context, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.lock, color: AppColors.primaryGold),
+            const SizedBox(width: 8),
+            const Text('Restricted Content'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.lock_outline,
+              size: 48,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'This message is only available for Service Team members.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGold,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -249,6 +292,11 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                 : Builder(
                     builder: (context) {
                       final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+                      final authProvider = ref.watch(authChangeNotifierProvider);
+                      final user = authProvider.user;
+                      final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+                      final isGeneralMarried = user?.isGeneralMarried ?? false;
+                      final isInHouseMarried = user?.isInHouseMarried ?? false;
                       return ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -258,13 +306,23 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                           final isPreBuffered = audioProvider.isPreBuffered(audio.id);
                           final isBuffering = audioProvider.isBuffering(audio.id);
                           final bufferProgress = audioProvider.getBufferProgress(audio.id);
+                          final isLocked = (audio.isServiceTeamOnly && !isServiceTeamMember) ||
+                              (audio.isGeneralMarriedOnly && !isGeneralMarried) ||
+                              (audio.isInHouseMarriedOnly && !isInHouseMarried);
                           return _AudioListItem(
                             sermon: audio,
                             isDark: isDark,
                             isPreBuffered: isPreBuffered,
                             isBuffering: isBuffering,
                             bufferProgress: bufferProgress,
+                            isServiceTeamMember: isServiceTeamMember,
+                            isGeneralMarried: isGeneralMarried,
+                            isInHouseMarried: isInHouseMarried,
                             onTap: () {
+                              if (isLocked) {
+                                _showLockedMessage(context, isDark);
+                                return;
+                              }
                               // Set the queue for Next/Previous functionality (without starting playback)
                               audioProvider.setQueue(_filteredItems, index);
                               Navigator.push(
@@ -404,6 +462,9 @@ class _AudioListItem extends StatelessWidget {
   final bool isPreBuffered;
   final bool isBuffering;
   final double bufferProgress;
+  final bool isServiceTeamMember;
+  final bool isGeneralMarried;
+  final bool isInHouseMarried;
 
   const _AudioListItem({
     required this.sermon,
@@ -412,7 +473,54 @@ class _AudioListItem extends StatelessWidget {
     this.isPreBuffered = false,
     this.isBuffering = false,
     this.bufferProgress = 0.0,
+    this.isServiceTeamMember = false,
+    this.isGeneralMarried = false,
+    this.isInHouseMarried = false,
   });
+  
+  bool get _isLocked => 
+      (sermon.isServiceTeamOnly && !isServiceTeamMember) ||
+      (sermon.isGeneralMarriedOnly && !isGeneralMarried) ||
+      (sermon.isInHouseMarriedOnly && !isInHouseMarried);
+
+  String _formatTimeAgo(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays > 0) {
+      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
+  String _buildDisplayTitle() {
+    final parts = <String>[];
+    
+    // Category
+    if (sermon.categoryName.isNotEmpty) {
+      parts.add(sermon.categoryName);
+    } else if (sermon.category.isNotEmpty) {
+      parts.add(sermon.category);
+    }
+    
+    // Title
+    parts.add(sermon.title);
+    
+    // Speaker
+    if (sermon.speaker != null && sermon.speaker!.isNotEmpty) {
+      parts.add(sermon.speaker!);
+    }
+    
+    // Time ago
+    parts.add(_formatTimeAgo(sermon.date));
+    
+    return parts.join(' - ');
+  }
 
   Widget _buildImage(bool isDark) {
     if (sermon.imageUrl == null || sermon.imageUrl!.isEmpty) {
@@ -443,21 +551,6 @@ class _AudioListItem extends StatelessWidget {
         color: isDark ? AppColors.cardDark : AppColors.dividerLight,
       ),
     );
-  }
-
-  String _formatTimeAgo(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays > 0) {
-      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
-    } else {
-      return 'Just now';
-    }
   }
 
   @override
@@ -508,21 +601,20 @@ class _AudioListItem extends StatelessWidget {
                       ),
                     ),
                   ),
-                // Ready indicator for pre-buffered audio (3 min ready)
-                if (isPreBuffered)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
+                // Lock icon for service team only content
+                if (_isLocked)
+                  Positioned.fill(
                     child: Container(
-                      padding: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(4),
+                        color: Colors.black.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(
-                        Icons.bolt,
-                        size: 10,
-                        color: Colors.white,
+                      child: const Center(
+                        child: Icon(
+                          Icons.lock,
+                          size: 20,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -534,24 +626,15 @@ class _AudioListItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    sermon.title,
+                    _buildDisplayTitle(),
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: isDark
                               ? AppColors.textPrimaryDark
                               : AppColors.textPrimaryLight,
                         ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    sermon.speaker != null && sermon.speaker!.isNotEmpty
-                        ? '${sermon.speaker} - ${_formatTimeAgo(sermon.date)}'
-                        : _formatTimeAgo(sermon.date),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
-                        ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

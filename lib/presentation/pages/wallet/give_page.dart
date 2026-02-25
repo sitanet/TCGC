@@ -8,7 +8,7 @@ import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'tithe_page.dart';
 import 'transactions_page.dart';
-import 'add_money_page.dart';
+import 'fund_wallet_page.dart';
 
 class GivePage extends ConsumerStatefulWidget {
   const GivePage({super.key});
@@ -20,7 +20,8 @@ class GivePage extends ConsumerStatefulWidget {
 class _GivePageState extends ConsumerState<GivePage> {
   String selectedCurrency = 'NGN';
   final currencies = ['NGN', 'USD', 'EUR', 'GBP'];
-  bool isGiveExpanded = true;
+  bool isGiveExpanded = false;
+  bool isTransactionsExpanded = false;
 
   @override
   void initState() {
@@ -33,8 +34,8 @@ class _GivePageState extends ConsumerState<GivePage> {
   }
 
   String _formatCurrency(double amount, String currency) {
-    final symbols = {'NGN': '₦', 'USD': '\$', 'EUR': '€', 'GBP': '£'};
-    final formatted = amount.toStringAsFixed(2).replaceAllMapped(
+    final symbols = {'NGN': 'N', 'USD': '\$', 'EUR': '€', 'GBP': '£'};
+    final formatted = amount.toStringAsFixed(0).replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]},',
     );
@@ -43,7 +44,16 @@ class _GivePageState extends ConsumerState<GivePage> {
 
   String _formatDate(DateTime date) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${date.day} ${months[date.month - 1]}, ${date.year}';
+    String daySuffix(int day) {
+      if (day >= 11 && day <= 13) return 'th';
+      switch (day % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+      }
+    }
+    return '${date.day}${daySuffix(date.day)} ${months[date.month - 1]}, ${date.year}';
   }
 
   @override
@@ -56,25 +66,23 @@ class _GivePageState extends ConsumerState<GivePage> {
     final walletProvider = ref.watch(walletChangeNotifierProvider);
     
     return Scaffold(
-      appBar: const CustomAppBar(title: ''),
+      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFFAFAFA),
+      appBar: const CustomAppBar(title: '', showBackButton: true),
       body: SingleChildScrollView(
         child: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
             child: Padding(
-              padding: EdgeInsets.all(horizontalPadding),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  SizedBox(height: spacing),
                   _buildPortfolioCard(context, isDark, walletProvider),
                   SizedBox(height: spacing * 1.5),
                   _buildCurrencySelector(isDark),
                   SizedBox(height: spacing * 1.5),
-                  _buildGiveSection(context, isDark, walletProvider),
-                  SizedBox(height: spacing),
-                  _buildTransactionsItem(context, isDark),
-                  SizedBox(height: spacing),
-                  _buildAddMoneyItem(context, isDark),
+                  _buildMenuItems(context, isDark, walletProvider),
                   SizedBox(height: spacing * 6),
                 ],
               ),
@@ -87,393 +95,450 @@ class _GivePageState extends ConsumerState<GivePage> {
 
   Widget _buildPortfolioCard(BuildContext context, bool isDark, WalletProvider walletProvider) {
     final now = DateTime.now();
-    final spacing = Responsive.verticalSpacing(context);
-    final borderRadius = Responsive.largeBorderRadius(context);
-    final bodyFontSize = Responsive.bodyFontSize(context);
-    final smallFontSize = Responsive.smallFontSize(context);
-    final balanceFontSize = Responsive.value(context, mobile: 36.0, tablet: 42.0, desktop: 48.0);
-    final iconSize = Responsive.iconSize(context);
     
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(spacing * 1.5),
+      height: 180,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(borderRadius),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF1A1A2E),
-            Color(0xFF16213E),
-            Color(0xFF0F3460),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Your Portfolio',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: bodyFontSize,
-                ),
-              ),
-              Text(
-                _formatDate(now),
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: smallFontSize,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: spacing * 1.25),
-          Text(
-            'Your Balance:',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: smallFontSize,
-            ),
-          ),
-          SizedBox(height: spacing * 0.25),
-          Text(
-            _formatCurrency(walletProvider.balance, walletProvider.currency),
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: balanceFontSize,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          if (walletProvider.accountNumber != null) ...[
-            SizedBox(height: spacing),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: spacing * 0.75, vertical: spacing * 0.5),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(Responsive.borderRadius(context) * 0.67),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.account_balance,
-                    color: Colors.white70,
-                    size: iconSize * 0.67,
-                  ),
-                  SizedBox(width: spacing * 0.5),
-                  Text(
-                    walletProvider.accountNumber!,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: bodyFontSize,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  SizedBox(width: spacing * 0.5),
-                  GestureDetector(
-                    onTap: () {
-                      Clipboard.setData(ClipboardData(text: walletProvider.accountNumber!));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Account number copied to clipboard'),
-                          backgroundColor: AppColors.success,
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: EdgeInsets.all(spacing * 0.25),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Icon(
-                        Icons.copy,
-                        color: Colors.white,
-                        size: iconSize * 0.67,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCurrencySelector(bool isDark) {
-    final spacing = Responsive.verticalSpacing(context);
-    final borderRadius = Responsive.borderRadius(context);
-    final smallFontSize = Responsive.smallFontSize(context);
-    final bodyFontSize = Responsive.bodyFontSize(context);
-    
-    return Container(
-      padding: EdgeInsets.all(spacing),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(borderRadius),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Your Wallet',
-            style: TextStyle(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              fontSize: smallFontSize,
-            ),
-          ),
-          SizedBox(height: spacing * 0.75),
-          Wrap(
-            spacing: spacing * 0.5,
-            runSpacing: spacing * 0.5,
-            children: currencies.map((currency) {
-              final isSelected = currency == selectedCurrency;
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    selectedCurrency = currency;
-                  });
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: spacing, vertical: spacing * 0.5),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppColors.textPrimaryLight
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected
-                          ? AppColors.textPrimaryLight
-                          : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
-                    ),
-                  ),
-                  child: Text(
-                    currency,
-                    style: TextStyle(
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
-                      fontWeight: FontWeight.w500,
-                      fontSize: bodyFontSize * 0.93,
-                    ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          children: [
+            // Dark background with gradient
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(0xFF1A1A2E),
+                      Color(0xFF0F0F1A),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                 ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGiveSection(BuildContext context, bool isDark, WalletProvider walletProvider) {
-    final giveOptions = walletProvider.giveOptions;
-    final spacing = Responsive.verticalSpacing(context);
-    final borderRadius = Responsive.borderRadius(context);
-    final iconSize = Responsive.iconSize(context);
-    final bodyFontSize = Responsive.bodyFontSize(context);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: () {
-              setState(() {
-                isGiveExpanded = !isGiveExpanded;
-              });
-            },
-            borderRadius: BorderRadius.circular(borderRadius),
-            child: Padding(
-              padding: EdgeInsets.all(spacing),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.monetization_on_outlined,
-                    color: AppColors.primaryGold,
-                    size: iconSize,
-                  ),
-                  SizedBox(width: spacing),
-                  Expanded(
-                    child: Text(
-                      'Give',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontSize: bodyFontSize,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    isGiveExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    size: iconSize,
-                  ),
-                ],
               ),
             ),
-          ),
-          if (isGiveExpanded)
-            ...giveOptions.map((option) => InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => TithePage(
-                          title: option.name,
-                          giveOptionId: option.id,
+            // Red/maroon accent glow
+            Positioned(
+              right: 20,
+              top: 20,
+              child: Container(
+                width: 120,
+                height: 80,
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFF8B0000).withValues(alpha: 0.6),
+                      const Color(0xFF8B0000).withValues(alpha: 0.2),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Gold accent line
+            Positioned(
+              left: 40,
+              bottom: 60,
+              child: Container(
+                width: 80,
+                height: 3,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primaryGold.withValues(alpha: 0.8),
+                      AppColors.primaryGold.withValues(alpha: 0.2),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Your Portfolio',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
-                    );
-                  },
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: spacing * 3.5, vertical: spacing * 0.75),
-                    child: Row(
+                      Text(
+                        _formatDate(now),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Center(
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: Text(
-                            option.name,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontSize: bodyFontSize,
-                            ),
+                        Text(
+                          'Your Balance:',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _formatCurrency(walletProvider.balance, walletProvider.currency),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ],
                     ),
                   ),
-                )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTransactionsItem(BuildContext context, bool isDark) {
-    final spacing = Responsive.verticalSpacing(context);
-    final borderRadius = Responsive.borderRadius(context);
-    final iconSize = Responsive.iconSize(context);
-    final bodyFontSize = Responsive.bodyFontSize(context);
-    
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const TransactionsPage()),
-        ),
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: Padding(
-          padding: EdgeInsets.all(spacing),
-          child: Row(
-            children: [
-              Icon(
-                Icons.swap_horiz,
-                color: AppColors.primaryGold,
-                size: iconSize,
+                  const Spacer(),
+                ],
               ),
-              SizedBox(width: spacing),
-              Expanded(
-                child: Text(
-                  'Transactions',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontSize: bodyFontSize,
-                  ),
-                ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                size: iconSize,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildAddMoneyItem(BuildContext context, bool isDark) {
-    final spacing = Responsive.verticalSpacing(context);
-    final borderRadius = Responsive.borderRadius(context);
-    final iconSize = Responsive.iconSize(context);
-    final bodyFontSize = Responsive.bodyFontSize(context);
-    
+  Widget _buildCurrencySelector(bool isDark) {
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: AppColors.primaryGold.withValues(alpha: 0.4),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Text(
+            'Your Wallet',
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Row(
+              children: currencies.map((currency) {
+                final isSelected = currency == selectedCurrency;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        selectedCurrency = currency;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primaryGold : Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected 
+                              ? AppColors.primaryGold 
+                              : (isDark ? Colors.grey[600]! : Colors.grey[300]!),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        currency,
+                        style: TextStyle(
+                          color: isSelected 
+                              ? Colors.white 
+                              : (isDark ? Colors.white : Colors.black87),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           ),
         ],
       ),
-      child: InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AddMoneyPage()),
-        ),
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: Padding(
-          padding: EdgeInsets.all(spacing),
-          child: Row(
-            children: [
-              Icon(
-                Icons.add_circle_outline,
-                color: AppColors.primaryGold,
-                size: iconSize,
-              ),
-              SizedBox(width: spacing),
-              Expanded(
-                child: Text(
-                  'Add Money',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontSize: bodyFontSize,
+    );
+  }
+
+  Widget _buildMenuItems(BuildContext context, bool isDark, WalletProvider walletProvider) {
+    final giveOptions = walletProvider.giveOptions;
+    final transactions = walletProvider.transactions;
+    
+    // Calculate money in/out totals
+    double moneyIn = 0;
+    double moneyOut = 0;
+    for (final t in transactions) {
+      if (t.transactionType == 'money_in') {
+        moneyIn += t.amount;
+      } else {
+        moneyOut += t.amount;
+      }
+    }
+    
+    return Column(
+      children: [
+        // Give Section
+        _buildExpandableMenuItem(
+          context: context,
+          isDark: isDark,
+          icon: Icons.monetization_on_outlined,
+          iconColor: AppColors.primaryGold,
+          title: 'Give',
+          isExpanded: isGiveExpanded,
+          onTap: () => setState(() => isGiveExpanded = !isGiveExpanded),
+          expandedContent: Column(
+            children: giveOptions.map((option) => _buildGiveOptionItem(
+              context: context,
+              isDark: isDark,
+              title: option.name,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TithePage(
+                      title: option.name,
+                      giveOptionId: option.id,
+                    ),
                   ),
-                ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                size: iconSize,
-              ),
+                );
+              },
+            )).toList(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        
+        // Transactions Section
+        _buildExpandableMenuItem(
+          context: context,
+          isDark: isDark,
+          icon: Icons.swap_horiz,
+          iconColor: AppColors.primaryGold,
+          title: 'Transactions',
+          isExpanded: isTransactionsExpanded,
+          onTap: () => setState(() => isTransactionsExpanded = !isTransactionsExpanded),
+          trailing: IconButton(
+            icon: const Icon(Icons.chevron_right, color: Colors.grey),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TransactionsPage()),
+            ),
+          ),
+          expandedContent: Column(
+            children: [
+              _buildTransactionSummaryRow('Money In', _formatCurrency(moneyIn, 'NGN'), isDark),
+              _buildTransactionSummaryRow('Money Out', _formatCurrency(moneyOut, 'NGN'), isDark),
             ],
           ),
         ),
+        const SizedBox(height: 12),
+        
+        // My Cards Section
+        _buildMenuItem(
+          context: context,
+          isDark: isDark,
+          icon: Icons.credit_card_outlined,
+          iconColor: AppColors.primaryGold,
+          title: 'My Cards',
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Coming soon')),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        
+        // Savings Section
+        _buildMenuItem(
+          context: context,
+          isDark: isDark,
+          icon: Icons.savings_outlined,
+          iconColor: AppColors.primaryGold,
+          title: 'Savings',
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Coming soon')),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        
+        // Fund Wallet Section
+        _buildMenuItem(
+          context: context,
+          isDark: isDark,
+          icon: Icons.account_balance_wallet_outlined,
+          iconColor: AppColors.primaryGold,
+          title: 'Fund Wallet',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const FundWalletPage()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMenuItem({
+    required BuildContext context,
+    required bool isDark,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 22),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: Colors.grey[400],
+              size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandableMenuItem({
+    required BuildContext context,
+    required bool isDark,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required bool isExpanded,
+    required VoidCallback onTap,
+    required Widget expandedContent,
+    Widget? trailing,
+  }) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+            child: Row(
+              children: [
+                Icon(icon, color: iconColor, size: 22),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ),
+                trailing ?? Icon(
+                  isExpanded ? Icons.keyboard_arrow_down : Icons.chevron_right,
+                  color: Colors.grey[400],
+                  size: 22,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (isExpanded)
+          Padding(
+            padding: const EdgeInsets.only(left: 38),
+            child: expandedContent,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildGiveOptionItem({
+    required BuildContext context,
+    required bool isDark,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? Colors.grey[400] : Colors.grey[600],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransactionSummaryRow(String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.grey[300] : Colors.grey[700],
+            ),
+          ),
+        ],
       ),
     );
   }

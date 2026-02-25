@@ -11,6 +11,10 @@ import '../../core/constants/api_constants.dart';
 import '../../domain/entities/app_notification.dart';
 import 'api_service.dart';
 
+// Check if Firebase Messaging is supported on this platform
+bool get _isFirebaseMessagingSupported =>
+    !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+
 class _NotificationChannelConfig {
   final String channelId;
   final String channelName;
@@ -38,9 +42,15 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  FirebaseMessaging? _firebaseMessaging;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   final ApiService _apiService = ApiService();
+  
+  FirebaseMessaging? get _messaging {
+    if (!_isFirebaseMessagingSupported) return null;
+    _firebaseMessaging ??= FirebaseMessaging.instance;
+    return _firebaseMessaging;
+  }
 
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
@@ -56,19 +66,26 @@ class NotificationService {
 
   Future<void> initialize() async {
     try {
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-      await _requestPermission();
+      // Only initialize Firebase Messaging on supported platforms (Android/iOS)
+      if (_isFirebaseMessagingSupported) {
+        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+        await _requestPermission();
+        await _configureFCM();
+        await _getToken();
+      }
+      
+      // Local notifications work on all platforms
       await _initLocalNotifications();
-      await _configureFCM();
-      await _getToken();
     } catch (e) {
       debugPrint('Notification service initialization error: $e');
     }
   }
 
   Future<void> _requestPermission() async {
-    final settings = await _firebaseMessaging.requestPermission(
+    final messaging = _messaging;
+    if (messaging == null) return;
+    
+    final settings = await messaging.requestPermission(
       alert: true,
       announcement: false,
       badge: true,
@@ -166,11 +183,13 @@ class NotificationService {
   }
 
   Future<void> _configureFCM() async {
+    final messaging = _messaging;
+    if (messaging == null) return;
+    
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
 
-    final initialMessage = await _firebaseMessaging.getInitialMessage();
+    final initialMessage = await messaging.getInitialMessage();
     if (initialMessage != null) {
       _handleMessageOpenedApp(initialMessage);
     }
@@ -338,14 +357,17 @@ class NotificationService {
   }
 
   Future<void> _getToken() async {
+    final messaging = _messaging;
+    if (messaging == null) return;
+    
     try {
-      _fcmToken = await _firebaseMessaging.getToken();
+      _fcmToken = await messaging.getToken();
       debugPrint('FCM Token: $_fcmToken');
 
       // Register device in background (don't block initialization)
       _registerDeviceToken();
 
-      _firebaseMessaging.onTokenRefresh.listen((newToken) {
+      messaging.onTokenRefresh.listen((newToken) {
         _fcmToken = newToken;
         _registerDeviceToken();
       });

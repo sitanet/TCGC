@@ -123,19 +123,23 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
   }
 
   void _navigateToSuccessPage() {
-    Navigator.of(context).pushReplacement(
+    final email = _emailController.text.trim();
+    final goToSignIn = widget.onGoToSignIn;
+    final authProvider = ref.read(authChangeNotifierProvider);
+    
+    Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => SignupSuccessPage(
-          email: _emailController.text.trim(),
+          email: email,
           onGoToLogin: () {
+            // Pop the success page first, then trigger sign in callback
             Navigator.of(context).pop();
-            if (widget.onGoToSignIn != null) {
-              widget.onGoToSignIn!();
+            if (goToSignIn != null) {
+              goToSignIn();
             }
           },
           onResendEmail: () async {
-            final authProvider = ref.read(authChangeNotifierProvider);
-            return await authProvider.resendConfirmationEmail(_emailController.text.trim());
+            return await authProvider.resendConfirmationEmail(email);
           },
         ),
       ),

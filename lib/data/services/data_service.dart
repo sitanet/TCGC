@@ -6,24 +6,35 @@ import '../../domain/entities/wallet.dart';
 import '../../domain/entities/transaction.dart';
 import '../../domain/entities/promotion.dart';
 import 'api_service.dart';
+import 'content_cache_service.dart';
 
 class DataService {
   final ApiService _api = ApiService();
+  final ContentCacheService _cacheService = ContentCacheService();
 
-  // Message Categories
-  Future<List<MessageCategory>> getMessageCategories() async {
+  // Message Categories - Now uses cache-first strategy
+  Future<List<MessageCategory>> getMessageCategories({bool forceRefresh = false}) async {
+    return await _cacheService.getCategories(forceRefresh: forceRefresh);
+  }
+  
+  // Legacy method for backward compatibility (fetches directly from API)
+  Future<List<MessageCategory>> getMessageCategoriesFromServer() async {
     final response = await _api.get(ApiConstants.messageCategories);
     if (response.isSuccess) {
       final decoded = response.data;
-      // Handle both paginated and non-paginated responses
       final List<dynamic> data = decoded is List ? decoded : (decoded['results'] ?? decoded);
       return data.map((json) => MessageCategory.fromJson(json)).toList();
     }
     return [];
   }
 
-  // Messages/Sermons
-  Future<List<Sermon>> getMessages() async {
+  // Messages/Sermons - Now uses cache-first strategy
+  Future<List<Sermon>> getMessages({bool forceRefresh = false}) async {
+    return await _cacheService.getSermons(forceRefresh: forceRefresh);
+  }
+  
+  // Legacy method for backward compatibility (fetches directly from API)
+  Future<List<Sermon>> getMessagesFromServer() async {
     final response = await _api.get(ApiConstants.messages);
     if (response.isSuccess) {
       final data = response.data;
@@ -80,14 +91,9 @@ class DataService {
     return [];
   }
 
-  // Get recommended messages
-  Future<List<Sermon>> getRecommendedMessages() async {
-    final response = await _api.get('${ApiConstants.messages}recommended/');
-    if (response.isSuccess) {
-      final List<dynamic> data = response.dataList;
-      return data.map((json) => Sermon.fromJson(json)).toList();
-    }
-    return [];
+  // Get recommended messages - Now uses cache-first strategy
+  Future<List<Sermon>> getRecommendedMessages({bool forceRefresh = false}) async {
+    return await _cacheService.getRecommendedSermons(forceRefresh: forceRefresh);
   }
   
   // Get speaker names only (for filtering)
@@ -117,8 +123,13 @@ class DataService {
     }
   }
 
-  // Events
-  Future<List<Event>> getEvents() async {
+  // Events - Now uses cache-first strategy
+  Future<List<Event>> getEvents({bool forceRefresh = false}) async {
+    return await _cacheService.getEvents(forceRefresh: forceRefresh);
+  }
+  
+  // Legacy method for backward compatibility
+  Future<List<Event>> getEventsFromServer() async {
     final response = await _api.get(ApiConstants.events);
     if (response.isSuccess) {
       final data = response.data;
