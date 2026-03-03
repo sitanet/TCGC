@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
@@ -16,19 +17,156 @@ class WalletPage extends ConsumerStatefulWidget {
 }
 
 class _WalletPageState extends ConsumerState<WalletPage> {
-  bool _isCheckingStatus = true;
   bool _needsPinSetup = false;
   bool _acceptedDataPolicy = false;
+  bool _isAuthenticated = false;
 
   @override
   void initState() {
     super.initState();
-    _checkWalletStatus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _authenticateUser();
+    });
+  }
+
+  Future<void> _authenticateUser() async {
+    final walletProvider = ref.read(walletChangeNotifierProvider);
+    
+    // Check if wallet exists first
+    if (!walletProvider.isInitialized) {
+      await walletProvider.fetchWallet();
+    }
+    
+    // If no wallet yet, no authentication needed
+    if (!walletProvider.hasWallet) {
+      setState(() => _isAuthenticated = true);
+      return;
+    }
+    
+    // Check if PIN is set
+    final hasPin = await walletProvider.checkHasPin();
+    if (!hasPin) {
+      setState(() {
+        _isAuthenticated = true;
+        _needsPinSetup = true;
+      });
+      return;
+    }
+
+    // Try biometric first
+    final biometricProvider = ref.read(biometricChangeNotifierProvider);
+    await biometricProvider.initialize();
+    
+    if (biometricProvider.biometricTransactionEnabled && biometricProvider.isAvailable) {
+      final authenticated = await biometricProvider.authenticateForTransaction();
+      if (authenticated && mounted) {
+        setState(() => _isAuthenticated = true);
+        _checkWalletStatus();
+        return;
+      }
+    }
+
+    // Fall back to PIN dialog
+    if (mounted) {
+      _showPinDialog();
+    }
+  }
+
+  void _showPinDialog() {
+    final pinController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => PopScope(
+        canPop: true,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) {
+            // Navigate back to home tab when dialog is dismissed
+            ref.read(mainTabIndexProvider.notifier).state = 0;
+          }
+        },
+        child: AlertDialog(
+          backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+          title: const Text('Enter Transaction PIN'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Enter your PIN to access wallet'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: pinController,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                obscureText: true,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'PIN',
+                  counterText: '',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                // Navigate back to home tab
+                ref.read(mainTabIndexProvider.notifier).state = 0;
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (pinController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter your PIN')),
+                  );
+                  return;
+                }
+
+                final walletProvider = ref.read(walletChangeNotifierProvider);
+                final isValid = await walletProvider.verifyPin(pinController.text);
+
+                if (isValid && mounted) {
+                  Navigator.pop(dialogContext);
+                  setState(() => _isAuthenticated = true);
+                  _checkWalletStatus();
+                } else if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(walletProvider.error ?? 'Invalid PIN'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
+              child: const Text('Confirm', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _checkWalletStatus() async {
-    // Fetch wallet status from server
     final walletProvider = ref.read(walletChangeNotifierProvider);
+    
+    // If already initialized, just check PIN status without waiting
+    if (walletProvider.isInitialized && walletProvider.hasWallet) {
+      final hasPin = await walletProvider.checkHasPin();
+      if (!hasPin && mounted) {
+        setState(() => _needsPinSetup = true);
+      }
+      // Refresh in background
+      walletProvider.fetchWallet();
+      return;
+    }
+    
+    // First time - fetch wallet
     await walletProvider.fetchWallet();
     
     // If wallet exists, check if PIN is set
@@ -37,10 +175,6 @@ class _WalletPageState extends ConsumerState<WalletPage> {
       if (!hasPin && mounted) {
         setState(() => _needsPinSetup = true);
       }
-    }
-    
-    if (mounted) {
-      setState(() => _isCheckingStatus = false);
     }
   }
 
@@ -52,13 +186,185 @@ class _WalletPageState extends ConsumerState<WalletPage> {
     );
   }
 
+  void _showDataProtectionPolicy(BuildContext context, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withOpacity(0.1),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.privacy_tip_outlined, color: AppColors.primaryGold, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Data Protection Policy',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: Icon(
+                        Icons.close,
+                        color: isDark ? Colors.white70 : Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildPolicySection(
+                        'Introduction',
+                        'The CityGate Apostolic Kingdom Ministry ("TCGC", "the Church", "we", "us", or "our") is committed to protecting your personal data and ensuring your privacy as a valued member of our congregation. This policy is in accordance with the Nigeria Data Protection Regulation (NDPR) 2019 and other applicable data protection laws.',
+                        isDark,
+                      ),
+                      _buildPolicySection(
+                        'Our Commitment to You',
+                        'As a faith-based organization, we hold your trust sacred. We collect and process your personal data with the utmost care, transparency, and in alignment with biblical principles of stewardship and integrity.',
+                        isDark,
+                      ),
+                      _buildPolicySection(
+                        'Data We Collect',
+                        '• Full Name and Contact Information\n• National Identification Number (NIN)\n• Bank Verification Number (BVN)\n• Date of Birth and Gender\n• Phone Number and Email Address\n• Giving and Transaction History\n• Church Membership Information',
+                        isDark,
+                      ),
+                      _buildPolicySection(
+                        'Purpose of Data Collection',
+                        'Your personal data is collected solely for:\n• Creating and managing your TCGC Wallet\n• Processing your tithes, offerings, seeds, and donations\n• Generating giving receipts and annual statements\n• Communicating church updates and giving confirmations\n• Compliance with Nigerian financial regulations\n• Enhancing your worship and giving experience',
+                        isDark,
+                      ),
+                      _buildPolicySection(
+                        'Financial Services Partner',
+                        'Your wallet services are powered by 9 Payment Service Bank (9PSB), a licensed financial institution regulated by the Central Bank of Nigeria. Our technology partner, Sitanet Global Orbit, facilitates the secure integration of these services. Your data is shared with these partners only as necessary to provide wallet and payment services.',
+                        isDark,
+                      ),
+                      _buildPolicySection(
+                        'Data Security & Protection',
+                        'We implement bank-grade security measures including:\n• End-to-end encryption for all transactions\n• Secure PIN and biometric authentication\n• Regular security audits and monitoring\n• Restricted access to authorized personnel only\n• Secure data storage on protected servers',
+                        isDark,
+                      ),
+                      _buildPolicySection(
+                        'Your Rights as a Member',
+                        'You have the right to:\n• Access your personal data at any time\n• Request correction of any inaccurate information\n• Request deletion of your data (subject to legal requirements)\n• Withdraw your consent at any time\n• Receive a copy of your giving history\n• Lodge a complaint with NITDA if necessary',
+                        isDark,
+                      ),
+                      _buildPolicySection(
+                        'Data Retention',
+                        'Your personal data and giving records will be retained for the duration of your membership and for a minimum of 6 years thereafter, in compliance with Nigerian tax and financial regulations. Transaction records may be retained longer for audit purposes.',
+                        isDark,
+                      ),
+                      _buildPolicySection(
+                        'Third-Party Disclosure',
+                        'We do not sell, trade, or share your personal information with third parties for marketing purposes. Data is only shared with our financial service partners (9PSB) for transaction processing and with regulatory authorities when required by law.',
+                        isDark,
+                      ),
+                      _buildPolicySection(
+                        'Contact Us',
+                        'For questions, concerns, or requests regarding your personal data, please contact the Church Admin through:\n• The app\'s Support section\n• Email: support@thecitygatechurch.org\n• Visit the Church office during working hours',
+                        isDark,
+                      ),
+                      _buildPolicySection(
+                        'Policy Updates',
+                        'This policy may be updated from time to time. We will notify you of any significant changes through the app. Continued use of the TCGC Wallet after changes constitutes acceptance of the updated policy.',
+                        isDark,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Last Updated: February 2026',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          color: isDark ? Colors.grey[500] : Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGold,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Close', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPolicySection(String title, String content, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primaryGold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            content,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_isCheckingStatus) {
+    final walletProvider = ref.watch(walletChangeNotifierProvider);
+    
+    // Show loading while authenticating or loading wallet
+    if (!_isAuthenticated || (walletProvider.isLoading && !walletProvider.isInitialized)) {
       return Scaffold(
         appBar: CustomAppBar(
           title: '',
           showBackButton: true,
+          lightBackground: true,
           onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
         ),
         body: const Center(
@@ -68,8 +374,6 @@ class _WalletPageState extends ConsumerState<WalletPage> {
         ),
       );
     }
-
-    final walletProvider = ref.watch(walletChangeNotifierProvider);
     
     // If wallet exists but PIN not set, go to PIN setup
     if (walletProvider.hasWallet && _needsPinSetup) {
@@ -98,6 +402,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
       appBar: CustomAppBar(
         title: 'Wallet',
         showBackButton: true,
+        lightBackground: true,
         onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
       ),
       body: SingleChildScrollView(
@@ -269,29 +574,28 @@ class _WalletPageState extends ConsumerState<WalletPage> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _acceptedDataPolicy = !_acceptedDataPolicy),
-                          child: Text.rich(
-                            TextSpan(
-                              text: 'I agree to the ',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                              ),
-                              children: [
-                                TextSpan(
-                                  text: 'Data Protection Policy',
-                                  style: TextStyle(
-                                    color: AppColors.primaryGold,
-                                    fontWeight: FontWeight.w600,
-                                    decoration: TextDecoration.underline,
-                                  ),
-                                ),
-                                const TextSpan(
-                                  text: ' and consent to the processing of my personal data for wallet creation and identity verification.',
-                                ),
-                              ],
+                        child: Text.rich(
+                          TextSpan(
+                            text: 'I agree to the ',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                             ),
+                            children: [
+                              TextSpan(
+                                text: 'Data Protection Policy',
+                                style: TextStyle(
+                                  color: AppColors.primaryGold,
+                                  fontWeight: FontWeight.w600,
+                                  decoration: TextDecoration.underline,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () => _showDataProtectionPolicy(context, isDark),
+                              ),
+                              const TextSpan(
+                                text: ' and consent to the processing of my personal data for wallet creation and identity verification.',
+                              ),
+                            ],
                           ),
                         ),
                       ),

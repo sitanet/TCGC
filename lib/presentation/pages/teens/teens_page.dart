@@ -62,6 +62,7 @@ class _TeensPageState extends ConsumerState<TeensPage> {
       appBar: CustomAppBar(
         title: '',
         showBackButton: true,
+        lightBackground: true,
         onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
       ),
       body: RefreshIndicator(
@@ -147,6 +148,7 @@ class _TeensPageState extends ConsumerState<TeensPage> {
         color: AppColors.orange,
         count: _devotionals.length,
         contents: _devotionals,
+        contentType: TeensContentType.devotionals,
       ),
       _CategoryItem(
         title: 'Teens Retreat',
@@ -154,6 +156,7 @@ class _TeensPageState extends ConsumerState<TeensPage> {
         color: const Color(0xFF8B0000),
         count: _retreats.length,
         contents: _retreats,
+        contentType: TeensContentType.retreats,
       ),
       _CategoryItem(
         title: 'The Forge Teens Camp',
@@ -161,6 +164,7 @@ class _TeensPageState extends ConsumerState<TeensPage> {
         color: AppColors.teal,
         count: _forgeCamp.length,
         contents: _forgeCamp,
+        contentType: TeensContentType.forgeCamp,
       ),
     ];
 
@@ -251,6 +255,7 @@ class _TeensPageState extends ConsumerState<TeensPage> {
           title: category.title,
           contents: category.contents,
           accentColor: category.color,
+          contentType: category.contentType,
         ),
       ),
     );
@@ -263,6 +268,7 @@ class _CategoryItem {
   final Color color;
   final int count;
   final List<TeensContent> contents;
+  final TeensContentType contentType;
 
   _CategoryItem({
     required this.title,
@@ -270,5 +276,6 @@ class _CategoryItem {
     required this.color,
     required this.count,
     required this.contents,
+    required this.contentType,
   });
 }

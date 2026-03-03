@@ -6,6 +6,8 @@ import 'api_service.dart';
 class InterestsService {
   static const String _interestsKey = 'user_interests';
   static const String _interestsCompletedKey = 'interests_completed';
+  static const String _dailyPicksKey = 'daily_picks';
+  static const String _dailyPicksDateKey = 'daily_picks_date';
   static InterestsService? _instance;
   
   SharedPreferences? _prefs;
@@ -107,7 +109,52 @@ class InterestsService {
     
     if (interestSermons.isEmpty) return [];
     
+    // Check if we have valid daily picks cached
+    final todayStr = _getTodayString();
+    final cachedDateStr = _prefs?.getString(_dailyPicksDateKey);
+    
+    if (cachedDateStr == todayStr) {
+      // Try to load cached picks
+      final cachedPicksJson = _prefs?.getString(_dailyPicksKey);
+      if (cachedPicksJson != null) {
+        try {
+          final List<dynamic> cachedIds = jsonDecode(cachedPicksJson);
+          final cachedSermons = <Sermon>[];
+          for (final id in cachedIds) {
+            final sermon = interestSermons.where((s) => s.id == id).firstOrNull;
+            if (sermon != null) {
+              cachedSermons.add(sermon);
+            }
+          }
+          // Return cached if we have enough valid sermons
+          if (cachedSermons.length >= count || cachedSermons.length == interestSermons.length) {
+            return cachedSermons.take(count).toList();
+          }
+        } catch (e) {
+          // Invalid cache, will generate new picks
+        }
+      }
+    }
+    
+    // Generate new random picks for today
     interestSermons.shuffle();
-    return interestSermons.take(count).toList();
+    final picks = interestSermons.take(count).toList();
+    
+    // Cache the picks
+    final pickIds = picks.map((s) => s.id).toList();
+    _prefs?.setString(_dailyPicksKey, jsonEncode(pickIds));
+    _prefs?.setString(_dailyPicksDateKey, todayStr);
+    
+    return picks;
+  }
+  
+  String _getTodayString() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+  
+  Future<void> clearDailyPicks() async {
+    await _prefs?.remove(_dailyPicksKey);
+    await _prefs?.remove(_dailyPicksDateKey);
   }
 }

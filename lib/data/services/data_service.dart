@@ -171,8 +171,9 @@ class DataService {
   Future<List<TeensContent>> getDevotionals() async {
     final response = await _api.get(ApiConstants.devotionals);
     if (response.isSuccess) {
-      final List<dynamic> data = response.dataList;
-      return data.map((json) => TeensContent.fromJson(json)).toList();
+      final data = response.data;
+      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
+      return results.map((json) => TeensContent.fromJson(json)).toList();
     }
     return [];
   }
@@ -180,8 +181,9 @@ class DataService {
   Future<List<TeensContent>> getRetreats() async {
     final response = await _api.get(ApiConstants.retreats);
     if (response.isSuccess) {
-      final List<dynamic> data = response.dataList;
-      return data.map((json) => TeensContent.fromJson(json)).toList();
+      final data = response.data;
+      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
+      return results.map((json) => TeensContent.fromJson(json)).toList();
     }
     return [];
   }
@@ -189,8 +191,9 @@ class DataService {
   Future<List<TeensContent>> getForgeCamp() async {
     final response = await _api.get(ApiConstants.forgeCamp);
     if (response.isSuccess) {
-      final List<dynamic> data = response.dataList;
-      return data.map((json) => TeensContent.fromJson(json)).toList();
+      final data = response.data;
+      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
+      return results.map((json) => TeensContent.fromJson(json)).toList();
     }
     return [];
   }

@@ -272,6 +272,7 @@ Account Name: ${walletProvider.accountName ?? 'N/A'}
                     color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
                     letterSpacing: isHighlighted ? 1.5 : 0,
                   ),
+                  softWrap: true,
                 ),
               ],
             ),

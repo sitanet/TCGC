@@ -1,25 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/wallet_provider.dart';
 import '../../../core/providers/biometric_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'success_page.dart';
+import 'transaction_processing_page.dart';
 
-class TithePage extends StatefulWidget {
+class TithePage extends ConsumerStatefulWidget {
   final String title;
   final int giveOptionId;
 
   const TithePage({super.key, required this.title, required this.giveOptionId});
 
   @override
-  State<TithePage> createState() => _TithePageState();
+  ConsumerState<TithePage> createState() => _TithePageState();
 }
 
-class _TithePageState extends State<TithePage> {
+class _TithePageState extends ConsumerState<TithePage> {
   String amount = '1,000';
-  bool _isProcessing = false;
 
   Future<void> _processPayment() async {
     final cleanAmount = amount.replaceAll(',', '');
@@ -35,8 +36,8 @@ class _TithePageState extends State<TithePage> {
       return;
     }
     
-    final walletProvider = context.read<WalletProvider>();
-    final biometricProvider = context.read<BiometricProvider>();
+    final walletProvider = ref.read(walletChangeNotifierProvider);
+    final biometricProvider = ref.read(biometricChangeNotifierProvider);
     
     if (walletProvider.balance < amountValue) {
       if (mounted) {
@@ -76,24 +77,28 @@ class _TithePageState extends State<TithePage> {
   }
   
   Future<void> _executePaymentWithBiometric(double amountValue) async {
-    setState(() => _isProcessing = true);
+    final walletProvider = ref.read(walletChangeNotifierProvider);
+    final currentAmount = amount; // Capture current amount
     
-    final walletProvider = context.read<WalletProvider>();
-    final success = await walletProvider.giveWithBiometric(widget.giveOptionId, amountValue);
-    
-    setState(() => _isProcessing = false);
-    
-    if (success && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => SuccessPage(
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TransactionProcessingPage(
+          title: widget.title,
+          amount: currentAmount,
+          processTransaction: () async {
+            return await walletProvider.giveWithBiometric(widget.giveOptionId, amountValue);
+          },
+          successPage: SuccessPage(
             title: widget.title,
-            amount: amount,
+            amount: currentAmount,
           ),
         ),
-      );
-    } else if (mounted) {
+      ),
+    );
+    
+    // If returned false, show error
+    if (result == false && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(walletProvider.error ?? 'Failed to process payment'),
@@ -162,7 +167,7 @@ class _TithePageState extends State<TithePage> {
                 return;
               }
               
-              final walletProvider = context.read<WalletProvider>();
+              final walletProvider = ref.read(walletChangeNotifierProvider);
               final success = await walletProvider.setTransactionPin(
                 pinController.text,
                 confirmPinController.text,
@@ -241,24 +246,28 @@ class _TithePageState extends State<TithePage> {
   }
   
   Future<void> _executePayment(double amountValue, String pin) async {
-    setState(() => _isProcessing = true);
+    final walletProvider = ref.read(walletChangeNotifierProvider);
+    final currentAmount = amount; // Capture current amount
     
-    final walletProvider = context.read<WalletProvider>();
-    final success = await walletProvider.give(widget.giveOptionId, amountValue, pin);
-    
-    setState(() => _isProcessing = false);
-    
-    if (success && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => SuccessPage(
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TransactionProcessingPage(
+          title: widget.title,
+          amount: currentAmount,
+          processTransaction: () async {
+            return await walletProvider.give(widget.giveOptionId, amountValue, pin);
+          },
+          successPage: SuccessPage(
             title: widget.title,
-            amount: amount,
+            amount: currentAmount,
           ),
         ),
-      );
-    } else if (mounted) {
+      ),
+    );
+    
+    // If returned false, show error
+    if (result == false && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(walletProvider.error ?? 'Failed to process payment'),
@@ -271,7 +280,7 @@ class _TithePageState extends State<TithePage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final walletProvider = context.watch<WalletProvider>();
+    final walletProvider = ref.watch(walletChangeNotifierProvider);
     final spacing = Responsive.verticalSpacing(context);
     final horizontalPadding = Responsive.horizontalPadding(context);
     final maxWidth = Responsive.maxContentWidth(context);
@@ -345,30 +354,21 @@ class _TithePageState extends State<TithePage> {
                     width: double.infinity,
                     height: buttonHeight,
                     child: ElevatedButton(
-                      onPressed: _isProcessing ? null : _processPayment,
+                      onPressed: _processPayment,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryGold,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(borderRadius),
                         ),
                       ),
-                      child: _isProcessing
-                          ? SizedBox(
-                              width: Responsive.iconSize(context),
-                              height: Responsive.iconSize(context),
-                              child: const CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : Text(
-                              'Pay now',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: bodyFontSize,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                      child: Text(
+                        'Pay now',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: bodyFontSize,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 ),

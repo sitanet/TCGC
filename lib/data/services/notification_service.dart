@@ -64,20 +64,38 @@ class NotificationService {
   static const String _prefsKeyAnnouncements = 'notification_announcements_enabled';
   static const String _prefsKeyPromotions = 'notification_promotions_enabled';
 
+  bool _fcmInitialized = false;
+  
   Future<void> initialize() async {
     try {
-      // Only initialize Firebase Messaging on supported platforms (Android/iOS)
-      if (_isFirebaseMessagingSupported) {
-        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-        await _requestPermission();
-        await _configureFCM();
-        await _getToken();
-      }
-      
-      // Local notifications work on all platforms
+      // Local notifications work on all platforms - initialize first
       await _initLocalNotifications();
+      
+      // Defer FCM initialization to avoid creating background engine at startup
+      // This will be done when actually needed or after a delay
+      Future.delayed(const Duration(seconds: 5), () => _initializeFCM());
     } catch (e) {
       debugPrint('Notification service initialization error: $e');
+    }
+  }
+  
+  Future<void> _initializeFCM() async {
+    if (_fcmInitialized || !_isFirebaseMessagingSupported) return;
+    _fcmInitialized = true;
+    
+    try {
+      // Ensure Firebase is initialized
+      try {
+        await Firebase.initializeApp();
+      } catch (_) {}
+      
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      await _requestPermission();
+      await _configureFCM();
+      await _getToken();
+    } catch (e) {
+      debugPrint('FCM initialization error: $e');
+      _fcmInitialized = false;
     }
   }
 

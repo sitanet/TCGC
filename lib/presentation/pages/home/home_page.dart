@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
@@ -6,24 +7,11 @@ import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/interests_service.dart';
-import '../../../data/services/content_cache_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/event.dart';
 import '../audio/audio_player_page.dart';
 import '../profile/profile_page.dart';
 import '../support/complaint_page.dart';
-
-String _stripHtmlTags(String htmlText) {
-  return htmlText
-      .replaceAll(RegExp(r'<[^>]*>'), '')
-      .replaceAll('&nbsp;', ' ')
-      .replaceAll('&amp;', '&')
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&#39;', "'")
-      .trim();
-}
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -35,7 +23,6 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   final DataService _dataService = DataService();
   final InterestsService _interestsService = InterestsService();
-  final ContentCacheService _cacheService = ContentCacheService();
   late final PageController _eventsPageController;
   
   List<Sermon> _sermons = [];
@@ -51,23 +38,27 @@ class _HomePageState extends ConsumerState<HomePage> {
     super.initState();
     _eventsPageController = PageController(viewportFraction: 0.52, initialPage: 0);
     _eventsPageController.addListener(() {
-      setState(() {
-        _currentPage = _eventsPageController.page ?? 0;
-      });
+      if (mounted) {
+        setState(() {
+          _currentPage = _eventsPageController.page ?? 0;
+        });
+      }
     });
-    _initServices();
-    _loadData();
-    _startEventAutoSlide();
+    // Load data after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initServices();
+      _loadData();
+      _startEventAutoSlide();
+    });
   }
   
   Future<void> _initServices() async {
     await _interestsService.initialize();
-    await _cacheService.initialize();
   }
 
   void _startEventAutoSlide() {
     Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && _events.isNotEmpty) {
+      if (mounted && _events.isNotEmpty && _eventsPageController.hasClients) {
         final nextIndex = (_currentEventIndex + 1) % _events.length;
         _eventsPageController.animateToPage(
           nextIndex,
@@ -82,64 +73,69 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _loadData({bool forceRefresh = false}) async {
     setState(() => _isLoading = true);
     try {
-      // Load sermons, events, and recommended in parallel for faster loading
-      // Uses cache-first strategy - returns cached data instantly, syncs in background
-      final results = await Future.wait([
-        _dataService.getMessages(forceRefresh: forceRefresh),
-        _dataService.getEvents(forceRefresh: forceRefresh),
-        _dataService.getRecommendedMessages(forceRefresh: forceRefresh),
-      ]);
+      // Get user permissions for filtering
+      final authProvider = ref.read(authChangeNotifierProvider);
+      final user = authProvider.user;
+      final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+      final isGeneralMarried = user?.isGeneralMarried ?? false;
+      final isInHouseMarried = user?.isInHouseMarried ?? false;
       
-      final sermons = results[0] as List<Sermon>;
-      final events = results[1] as List<Event>;
-      final recommended = results[2] as List<Sermon>;
+      // Load data sequentially to avoid overwhelming the database
+      // This prevents ANR by not doing parallel DB reads
+      final allSermons = await _dataService.getMessages(forceRefresh: forceRefresh);
+      
+      // Filter out restricted messages
+      final sermons = allSermons.where((sermon) {
+        if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
+        if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
+        if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
+        return true;
+      }).toList();
       
       if (mounted) {
-        // Get random messages from user's interests
+        // Update UI with sermons first for faster perceived loading
         final pickedInterests = _interestsService.getRandomMessagesFromInterests(sermons, count: 3);
-        
         setState(() {
           _sermons = sermons;
-          _events = events;
-          _recommendedSermons = recommended;
           _pickedInterestSermons = pickedInterests;
+        });
+      }
+      
+      // Small delay to let UI render
+      await Future.delayed(const Duration(milliseconds: 50));
+      
+      final events = await _dataService.getEvents(forceRefresh: forceRefresh);
+      if (mounted) {
+        setState(() {
+          _events = events;
+        });
+      }
+      
+      await Future.delayed(const Duration(milliseconds: 50));
+      
+      final allRecommended = await _dataService.getRecommendedMessages(forceRefresh: forceRefresh);
+      // Filter recommended messages too
+      final recommended = allRecommended.where((sermon) {
+        if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
+        if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
+        if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
+        return true;
+      }).toList();
+      
+      if (mounted) {
+        setState(() {
+          _recommendedSermons = recommended;
           _isLoading = false;
         });
-        
-        // Pre-cache images in background
-        _preCacheImages(sermons, events);
-        
-        // Pre-cache 3 minutes of audio for top sermons in background
-        _preCacheAudio(sermons.take(10).toList());
       }
     } catch (e) {
-      print('Error loading home data: $e');
+      debugPrint('Error loading home data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
   
-  void _preCacheAudio(List<Sermon> sermons) {
-    // Pre-cache audio in background for instant playback
-    for (final sermon in sermons) {
-      _cacheService.preCacheAudio(sermon);
-    }
-  }
-  
-  void _preCacheImages(List<Sermon> sermons, List<Event> events) {
-    for (final sermon in sermons) {
-      if (sermon.imageUrl != null && sermon.imageUrl!.isNotEmpty) {
-        CachedNetworkImageProvider(sermon.imageUrl!).resolve(ImageConfiguration.empty);
-      }
-    }
-    for (final event in events) {
-      if (event.imageUrl != null && event.imageUrl!.isNotEmpty) {
-        CachedNetworkImageProvider(event.imageUrl!).resolve(ImageConfiguration.empty);
-      }
-    }
-  }
-
   @override
   void dispose() {
     _eventsPageController.dispose();
@@ -151,44 +147,51 @@ class _HomePageState extends ConsumerState<HomePage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final spacing = Responsive.verticalSpacing(context);
 
-    return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: () => _loadData(forceRefresh: true),
-        color: AppColors.primaryGold,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeaderBanner(context, isDark),
-              SizedBox(height: spacing * 1.5),
-              _buildUpcomingEvents(context, isDark),
-              if (_pickedInterestSermons.isNotEmpty) ...[
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light, // White status bar icons
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        body: RefreshIndicator(
+          onRefresh: () => _loadData(forceRefresh: true),
+          color: AppColors.primaryGold,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeaderBanner(context, isDark),
                 SizedBox(height: spacing * 1.5),
-                _buildPickedInterests(context, isDark),
-              ],
-              if (_recommendedSermons.isNotEmpty) ...[
+                _buildUpcomingEvents(context, isDark),
+                if (_pickedInterestSermons.isNotEmpty) ...[
+                  SizedBox(height: spacing * 1.5),
+                  _buildPickedInterests(context, isDark),
+                ],
+                if (_recommendedSermons.isNotEmpty) ...[
+                  SizedBox(height: spacing * 1.5),
+                  _buildRecommendedMessages(context, isDark),
+                ],
                 SizedBox(height: spacing * 1.5),
-                _buildRecommendedMessages(context, isDark),
+                _buildRecentActivities(context, isDark),
+                SizedBox(height: spacing * 6),
               ],
-              SizedBox(height: spacing * 1.5),
-              _buildRecentActivities(context, isDark),
-              SizedBox(height: spacing * 6),
-            ],
+            ),
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const ComplaintPage(),
-            ),
-          );
-        },
-        backgroundColor: AppColors.primaryGold,
-        child: Icon(Icons.chat_bubble_outline, color: Colors.white, size: Responsive.iconSize(context)),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ComplaintPage(),
+              ),
+            );
+          },
+          backgroundColor: AppColors.primaryGold,
+          child: Icon(Icons.chat_bubble_outline, color: Colors.white, size: Responsive.iconSize(context)),
+        ),
       ),
     );
   }
@@ -218,132 +221,137 @@ class _HomePageState extends ConsumerState<HomePage> {
     final horizontalPadding = isMobile ? 20.0 : isTablet ? 30.0 : 40.0;
     final bottomPadding = isMobile ? 20.0 : isTablet ? 25.0 : 30.0;
 
-    return Container(
-      width: screenWidth,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF2D0A0A),
-            Color(0xFF1A0505),
-            Color(0xFF0D0202),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(borderRadius),
-          bottomRight: Radius.circular(borderRadius),
-        ),
+    return ClipRRect(
+      borderRadius: BorderRadius.only(
+        bottomLeft: Radius.circular(borderRadius),
+        bottomRight: Radius.circular(borderRadius),
       ),
-      child: Padding(
-        padding: EdgeInsets.only(bottom: bottomPadding, top: statusBarHeight + 8.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Centered logo and text
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: isMobile ? 30.0 : 40.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset(
-                    'assets/images/tcgc_logo.png',
-                    width: logoSize,
-                    height: logoSize,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: logoSize,
-                      height: logoSize,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGold,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.church, color: Colors.white, size: logoSize * 0.5),
-                    ),
-                  ),
-                  SizedBox(width: isMobile ? 16 : 24),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      child: Container(
+        width: screenWidth,
+        decoration: BoxDecoration(
+          image: const DecorationImage(
+            image: AssetImage('assets/images/home_page.png'),
+            fit: BoxFit.cover,
+          ),
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(borderRadius),
+            bottomRight: Radius.circular(borderRadius),
+          ),
+        ),
+        child: Padding(
+            padding: EdgeInsets.only(bottom: bottomPadding, top: statusBarHeight + 8.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Centered logo and text
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: isMobile ? 30.0 : 40.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        'Welcome to',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white70,
-                          fontSize: welcomeFontSize,
+                      Image.asset(
+                        'assets/images/tcgc_logo.png',
+                        width: logoSize,
+                        height: logoSize,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: logoSize,
+                          height: logoSize,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGold,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.church, color: Colors.white, size: logoSize * 0.5),
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'The CityGate Church',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: titleFontSize,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Where sons are raised',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white54,
-                          fontSize: subtitleFontSize,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // Bottom row with name and profile picture
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              child: Builder(
-                builder: (context) {
-                  final authProvider = ref.watch(authChangeNotifierProvider);
-                  final user = authProvider.user;
-                  final displayName = user != null
-                      ? '${user.firstName} ${user.lastName}'.trim()
-                      : 'Guest';
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        displayName.isNotEmpty ? displayName : 'Welcome',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                          fontSize: nameFontSize,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ProfilePage(),
+                      SizedBox(width: isMobile ? 16 : 24),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Welcome to',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.white70,
+                              fontSize: welcomeFontSize,
                             ),
-                          );
-                        },
-                        child: CircleAvatar(
-                          radius: avatarRadius,
-                          backgroundColor: AppColors.primaryGold,
-                          backgroundImage: user?.photoUrl != null && user!.photoUrl!.isNotEmpty
-                              ? NetworkImage(user.photoUrl!)
-                              : null,
-                          child: user?.photoUrl == null || user!.photoUrl!.isEmpty
-                              ? Icon(Icons.person, color: Colors.white, size: avatarRadius * 1.2)
-                              : null,
-                        ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'The CityGate Church',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: titleFontSize,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Where sons are raised',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.white54,
+                              fontSize: subtitleFontSize,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  );
-                },
-              ),
+                  ),
+                ),
+                // Bottom row with name and profile picture
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  child: Builder(
+                    builder: (context) {
+                      final authProvider = ref.watch(authChangeNotifierProvider);
+                      final user = authProvider.user;
+                      final displayName = user != null
+                          ? '${user.firstName} ${user.lastName}'.trim()
+                          : 'Guest';
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            displayName.isNotEmpty ? displayName : 'Welcome',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                              fontSize: nameFontSize,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ProfilePage(),
+                                ),
+                              );
+                            },
+                            child: CircleAvatar(
+                              radius: avatarRadius,
+                              backgroundColor: AppColors.primaryGold,
+                              backgroundImage: user?.photoUrl != null && user!.photoUrl!.isNotEmpty
+                                  ? CachedNetworkImageProvider(
+                                      user.photoUrl!,
+                                      maxWidth: 200,
+                                      maxHeight: 200,
+                                    )
+                                  : null,
+                              child: user?.photoUrl == null || user!.photoUrl!.isEmpty
+                                  ? Icon(Icons.person, color: Colors.white, size: avatarRadius * 1.2)
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
     );
   }
 
@@ -538,18 +546,16 @@ class _HomePageState extends ConsumerState<HomePage> {
       return CachedNetworkImage(
         imageUrl: imageUrl,
         fit: BoxFit.cover,
+        memCacheWidth: 400,
+        memCacheHeight: 400,
+        fadeInDuration: const Duration(milliseconds: 200),
+        fadeOutDuration: const Duration(milliseconds: 200),
         placeholder: (context, url) => Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [Color(0xFF1A2744), Color(0xFF0D1522)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-            ),
-          ),
-          child: const Center(
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: AppColors.primaryGold,
             ),
           ),
         ),
@@ -708,18 +714,12 @@ class _HomePageState extends ConsumerState<HomePage> {
       return CachedNetworkImage(
         imageUrl: sermon.imageUrl!,
         fit: BoxFit.cover,
+        memCacheWidth: 200,
+        memCacheHeight: 200,
+        fadeInDuration: const Duration(milliseconds: 150),
+        fadeOutDuration: const Duration(milliseconds: 150),
         placeholder: (context, url) => Container(
           color: AppColors.primaryGold.withValues(alpha: 0.15),
-          child: const Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppColors.primaryGold,
-              ),
-            ),
-          ),
         ),
         errorWidget: (context, url, error) => placeholder,
       );
@@ -833,31 +833,44 @@ class _HomePageState extends ConsumerState<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Category name
-                  if (sermon.categoryName.isNotEmpty)
-                    Text(
-                      sermon.categoryName,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.primaryGold,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11,
-                          ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  const SizedBox(height: 2),
-                  // Title
+                  // Category (bold) - Title (regular gray)
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Text(
-                          sermon.title,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 14,
-                              ),
-                          maxLines: 1,
+                        child: RichText(
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
+                          text: TextSpan(
+                            children: [
+                              if (sermon.categoryName.isNotEmpty) ...[
+                                TextSpan(
+                                  text: sermon.categoryName,
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white : Colors.black87,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: ' - ',
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white : Colors.black87,
+                                    fontWeight: FontWeight.normal,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                              TextSpan(
+                                text: sermon.title,
+                                style: TextStyle(
+                                  color: isDark ? Colors.white : Colors.black87,
+                                  fontWeight: FontWeight.normal,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       if (isLocked)
@@ -871,14 +884,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   // Speaker - Time ago
                   Text(
-                    '${sermon.speaker ?? 'Unknown'} • $timeAgo',
+                    '${sermon.speaker ?? 'Unknown'} - $timeAgo',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
+                              ? AppColors.textSecondaryDark.withValues(alpha: 0.7)
+                              : AppColors.textSecondaryLight.withValues(alpha: 0.7),
                           fontSize: 12,
                         ),
                     maxLines: 1,

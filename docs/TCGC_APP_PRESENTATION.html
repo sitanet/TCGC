@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCGC Mobile App - Complete User Journey Presentation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #fff;
+        }
+        h1 {
+            color: #1a1a2e;
+            font-size: 28px;
+            text-align: center;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #d4af37;
+            padding-bottom: 15px;
+        }
+        h2 {
+            color: #16213e;
+            font-size: 22px;
+            margin-top: 40px;
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            background: linear-gradient(90deg, #d4af37 0%, #f4e4bc 100%);
+            border-radius: 5px;
+        }
+        h3 {
+            color: #1a1a2e;
+            font-size: 18px;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            border-left: 4px solid #d4af37;
+            padding-left: 12px;
+        }
+        h4 {
+            color: #333;
+            font-size: 16px;
+            margin-top: 20px;
+            margin-bottom: 8px;
+        }
+        p {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 40px;
+        }
+        .cover-page {
+            text-align: center;
+            padding: 100px 20px;
+            page-break-after: always;
+        }
+        .cover-page h1 {
+            font-size: 36px;
+            border: none;
+            margin-bottom: 20px;
+        }
+        .cover-page .tagline {
+            font-size: 18px;
+            color: #d4af37;
+            margin-top: 30px;
+            font-style: italic;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px 10px;
+            text-align: left;
+        }
+        th {
+            background: #1a1a2e;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        tr:hover {
+            background: #f5f5f5;
+        }
+        ul, ol {
+            margin: 15px 0 15px 25px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .highlight-box {
+            background: #f8f4e8;
+            border-left: 4px solid #d4af37;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .feature-item {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+        .feature-item strong {
+            color: #1a1a2e;
+        }
+        .section-divider {
+            border: none;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #d4af37, transparent);
+            margin: 40px 0;
+        }
+        .flow-diagram {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-green { background: #d4edda; color: #155724; }
+        .badge-red { background: #f8d7da; color: #721c24; }
+        .badge-blue { background: #cce5ff; color: #004085; }
+        .badge-gold { background: #fff3cd; color: #856404; }
+        .page-break {
+            page-break-before: always;
+        }
+        .toc {
+            background: #f9f9f9;
+            padding: 25px 30px;
+            border-radius: 8px;
+            margin: 30px 0;
+        }
+        .toc h3 {
+            border: none;
+            padding: 0;
+            margin-bottom: 15px;
+        }
+        .toc ol {
+            columns: 2;
+            column-gap: 30px;
+        }
+        .toc li {
+            margin-bottom: 6px;
+        }
+        .check { color: #28a745; }
+        .cross { color: #dc3545; }
+        @media print {
+            body { padding: 20px; }
+            h2 { page-break-after: avoid; }
+            table { page-break-inside: avoid; }
+            .highlight-box { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Cover Page -->
+<div class="cover-page">
+    <h1>TCGC MOBILE APP</h1>
+    <p class="subtitle">The CityGate Church Mobile Application</p>
+    <p style="font-size: 20px; margin-top: 50px;">Complete User Journey Presentation</p>
+    <p class="tagline">"Connecting Members. Empowering Faith."</p>
+    <p style="margin-top: 100px; color: #666;">
+        Platforms: Android | iOS | Web | Desktop<br><br>
+        Version 1.0.0
+    </p>
+</div>
+
+<!-- Table of Contents -->
+<div class="toc">
+    <h3>Table of Contents</h3>
+    <ol>
+        <li>Introduction & Onboarding</li>
+        <li>Main App Navigation</li>
+        <li>Home Page</li>
+        <li>Audio/Messages Section</li>
+        <li>Video Content</li>
+        <li>Live Streaming</li>
+        <li>Wallet & Giving</li>
+        <li>Teens Section</li>
+        <li>Notifications</li>
+        <li>User Profile & Settings</li>
+        <li>Support & Contact</li>
+        <li>Offline & Network Handling</li>
+        <li>App Updates</li>
+        <li>Security Features</li>
+        <li>User Journey Summary</li>
+    </ol>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 1 -->
+<h2>1. Introduction & Onboarding</h2>
+
+<h3>1.1 App Launch - Get Started Screen</h3>
+<p>When users first open the app, they are greeted with a <strong>Get Started</strong> screen featuring:</p>
+<ul>
+    <li>Church branding and logo</li>
+    <li>Welcome message</li>
+    <li>Two options: <strong>Sign In</strong> (existing members) and <strong>Sign Up</strong> (new members)</li>
+</ul>
+
+<h3>1.2 User Registration (Sign Up)</h3>
+<h4>Required Information:</h4>
+<table>
+    <tr><th>Field</th><th>Description</th></tr>
+    <tr><td>First Name</td><td>User's first name</td></tr>
+    <tr><td>Last Name</td><td>User's last name</td></tr>
+    <tr><td>Email</td><td>Valid email address (used for login)</td></tr>
+    <tr><td>Password</td><td>Secure password</td></tr>
+    <tr><td>Confirm Password</td><td>Password verification</td></tr>
+</table>
+
+<h4>Registration Process:</h4>
+<ol>
+    <li>User fills in registration form</li>
+    <li>System validates all fields</li>
+    <li>Account is created</li>
+    <li><strong>Email Confirmation</strong> is sent automatically</li>
+    <li>User receives success message</li>
+</ol>
+
+<div class="highlight-box">
+    <strong>Email Confirmation:</strong> User receives email with confirmation link that expires in <strong>24 hours</strong>. Clicking the link activates the account. Users can request "Resend Confirmation" if needed.
+</div>
+
+<h3>1.3 User Sign In</h3>
+<h4>Login Options:</h4>
+<ul>
+    <li><strong>Email + Password</strong> authentication</li>
+    <li><strong>Biometric Login</strong> (Face ID / Fingerprint) - after initial setup</li>
+</ul>
+
+<h4>Sign In Flow:</h4>
+<ol>
+    <li>Enter email address</li>
+    <li>Enter password</li>
+    <li>Tap "Sign In"</li>
+    <li>JWT tokens issued (access + refresh)</li>
+    <li>Redirected to main app</li>
+</ol>
+
+<h4>Forgot Password:</h4>
+<ol>
+    <li>Tap "Forgot Password"</li>
+    <li>Enter registered email</li>
+    <li>Receive password reset link</li>
+    <li>Set new password via secure web form</li>
+    <li>Login with new credentials</li>
+</ol>
+
+<h3>1.4 Interests Selection (First-Time Setup)</h3>
+<p>After first login, users select their <strong>interests</strong> from available message categories for personalized content recommendations:</p>
+<ul>
+    <li>Sunday Service Messages</li>
+    <li>Bible Study</li>
+    <li>Prayer & Worship</li>
+    <li>Family & Marriage</li>
+    <li>Youth & Young Adults</li>
+    <li>Leadership</li>
+    <li>Special Programs</li>
+</ul>
+
+<hr class="section-divider">
+
+<!-- Section 2 -->
+<h2 class="page-break">2. Main App Navigation</h2>
+
+<h3>2.1 Bottom Navigation Bar</h3>
+<p>The app has <strong>5 main tabs</strong>:</p>
+<table>
+    <tr><th>Tab</th><th>Icon</th><th>Description</th></tr>
+    <tr><td><strong>Home</strong></td><td>🏠</td><td>Dashboard with featured content</td></tr>
+    <tr><td><strong>Audio</strong></td><td>🎵</td><td>Sermons & messages library</td></tr>
+    <tr><td><strong>Live</strong></td><td>📺</td><td>Live streaming events</td></tr>
+    <tr><td><strong>Wallet</strong></td><td>💰</td><td>Giving & wallet management</td></tr>
+    <tr><td><strong>Teens</strong></td><td>👦</td><td>Teen-specific content</td></tr>
+</table>
+
+<hr class="section-divider">
+
+<!-- Section 3 -->
+<h2>3. Home Page</h2>
+
+<h3>3.1 Home Dashboard Features</h3>
+
+<div class="feature-grid">
+    <div class="feature-item">
+        <strong>Welcome Section</strong><br>
+        Personalized greeting with user's name and quick access to profile
+    </div>
+    <div class="feature-item">
+        <strong>Featured Content</strong><br>
+        Recommended messages, upcoming events, "Live Now" indicator
+    </div>
+    <div class="feature-item">
+        <strong>Quick Actions</strong><br>
+        Notifications, search functionality, settings access
+    </div>
+    <div class="feature-item">
+        <strong>Content Cards</strong><br>
+        Sermon cards with thumbnail, title, speaker, duration, category
+    </div>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 4 -->
+<h2 class="page-break">4. Audio/Messages Section</h2>
+
+<h3>4.1 Message Categories</h3>
+<p>Browse sermons organized by:</p>
+<ul>
+    <li><strong>Category</strong> (Sunday Service, Bible Study, etc.)</li>
+    <li><strong>Speaker</strong> (Pastor names with photos and bios)</li>
+    <li><strong>Recent</strong> messages</li>
+    <li><strong>Recommended</strong> content</li>
+</ul>
+
+<h3>4.2 Audio Player Page</h3>
+<h4>Full Player Features:</h4>
+
+<table>
+    <tr><th>Feature</th><th>Description</th></tr>
+    <tr><td>Now Playing Display</td><td>Large artwork, title, speaker name, category</td></tr>
+    <tr><td>Playback Controls</td><td>Play/Pause, Skip ±15 seconds, Progress bar, Duration</td></tr>
+    <tr><td>Download</td><td>Save for offline listening</td></tr>
+    <tr><td>Favorite</td><td>Add to favorites list</td></tr>
+    <tr><td>Share</td><td>Share message link</td></tr>
+    <tr><td>Playlist</td><td>Add to custom playlist</td></tr>
+    <tr><td>Background Playback</td><td>Continues when app minimized, lock screen controls</td></tr>
+</table>
+
+<h3>4.3 Mini Player</h3>
+<p>When navigating away from full player, a <strong>persistent mini player</strong> appears at the bottom showing current track info with Play/Pause control. Tap to return to full player.</p>
+
+<h3>4.4 Offline Features</h3>
+<div class="feature-grid">
+    <div class="feature-item">
+        <strong>Downloads Page</strong><br>
+        Downloaded messages, storage usage, delete content, play offline
+    </div>
+    <div class="feature-item">
+        <strong>Favorites Page</strong><br>
+        All favorited messages, quick access, synced across devices
+    </div>
+    <div class="feature-item">
+        <strong>Playlists Page</strong><br>
+        Create custom playlists, organize messages, continuous playback
+    </div>
+    <div class="feature-item">
+        <strong>Playback Memory</strong><br>
+        Remembers position, resume where you stopped, works across restarts
+    </div>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 5 -->
+<h2>5. Video Content</h2>
+
+<h3>5.1 Video Player</h3>
+<p>For messages with video content:</p>
+<ul>
+    <li><strong>YouTube Integration</strong></li>
+    <li>Full-screen playback</li>
+    <li>Quality selection</li>
+    <li>Landscape support</li>
+</ul>
+
+<hr class="section-divider">
+
+<!-- Section 6 -->
+<h2>6. Live Streaming</h2>
+
+<h3>6.1 Live Stream Page</h3>
+<h4>Live Events:</h4>
+<ul>
+    <li>Shows currently live services</li>
+    <li><span class="badge badge-red">LIVE</span> badge indicator</li>
+    <li>One-tap to join stream</li>
+</ul>
+
+<h4>Upcoming Events:</h4>
+<ul>
+    <li>Scheduled live streams</li>
+    <li>Event details: Date & Time, Title, Description, Location</li>
+</ul>
+
+<h4>YouTube Live Integration:</h4>
+<ul>
+    <li>Embedded YouTube player</li>
+    <li>Chat support (if enabled)</li>
+    <li>Full-screen viewing</li>
+</ul>
+
+<hr class="section-divider">
+
+<!-- Section 7 -->
+<h2 class="page-break">7. Wallet & Giving</h2>
+
+<h3>7.1 Wallet Overview</h3>
+<p>Wallet Dashboard displays:</p>
+<ul>
+    <li><strong>Current Balance</strong> (₦ Naira)</li>
+    <li><strong>Account Number</strong> (9PSB Bank)</li>
+    <li><strong>Account Name</strong></li>
+    <li><strong>Wallet Tier</strong> (0-3)</li>
+    <li>Quick action buttons</li>
+</ul>
+
+<h3>7.2 Wallet Setup (First Time)</h3>
+<table>
+    <tr><th>Step</th><th>Action</th><th>Details</th></tr>
+    <tr><td>1</td><td>Create Wallet</td><td>Automatic 9PSB account creation, real bank account number generated</td></tr>
+    <tr><td>2</td><td>Set Transaction PIN</td><td>Create 4-digit PIN, confirm PIN, used for all transactions</td></tr>
+    <tr><td>3</td><td>NIN Verification (Optional)</td><td>Enter NIN, verify phone, auto-fetch details, upgrade to Tier 1</td></tr>
+</table>
+
+<h3>7.3 Wallet Tiers</h3>
+<table>
+    <tr><th>Tier</th><th>Status</th><th>Daily Limit</th><th>Single Limit</th><th>Balance Limit</th></tr>
+    <tr><td>0</td><td>Unverified</td><td>₦0</td><td>₦0</td><td>₦0</td></tr>
+    <tr><td>1</td><td>Basic</td><td>₦50,000</td><td>₦50,000</td><td>₦300,000</td></tr>
+    <tr><td>2</td><td>Standard</td><td>₦500,000</td><td>₦200,000</td><td>₦500,000</td></tr>
+    <tr><td>3</td><td>Premium</td><td>₦5,000,000</td><td>₦5,000,000</td><td>Unlimited</td></tr>
+</table>
+
+<div class="highlight-box">
+    <strong>Upgrade Requirements:</strong><br>
+    • <strong>Tier 1:</strong> NIN verification<br>
+    • <strong>Tier 2:</strong> BVN verification + ID document<br>
+    • <strong>Tier 3:</strong> Full KYC with address proof
+</div>
+
+<h3>7.4 Fund Wallet</h3>
+<p><strong>Funding Method:</strong> Bank Transfer to generated account number</p>
+<ol>
+    <li>View account number and bank name (9PSB)</li>
+    <li>Copy account details</li>
+    <li>Transfer from any bank</li>
+    <li>Auto-credit via webhook</li>
+</ol>
+
+<h3>7.5 Giving/Offering</h3>
+<h4>Give Page Process:</h4>
+<table>
+    <tr><th>Step</th><th>Action</th></tr>
+    <tr><td>1</td><td><strong>Select Giving Type:</strong> Tithe, Offering, Thanksgiving, Seeds, Building Fund, Missions</td></tr>
+    <tr><td>2</td><td><strong>Enter Amount:</strong> Minimum ₦100, shows wallet balance</td></tr>
+    <tr><td>3</td><td><strong>Confirm & Pay:</strong> Review details, enter PIN, confirm, receive success confirmation</td></tr>
+</table>
+
+<h3>7.6 Send Money (Transfer)</h3>
+<p><strong>Person-to-Person Transfer:</strong></p>
+<ol>
+    <li>Enter recipient email</li>
+    <li>Enter amount</li>
+    <li>Enter transaction PIN</li>
+    <li>Confirm transfer</li>
+</ol>
+<p>Instant transfer between TCGC wallets with transaction recorded for both parties.</p>
+
+<h3>7.7 Transaction History</h3>
+<p>Transactions Page shows all wallet transactions with:</p>
+<ul>
+    <li><span class="badge badge-green">🟢 Money In</span> and <span class="badge badge-red">🔴 Money Out</span> indicators</li>
+    <li>Amount, Date/Time, Status, Reference number</li>
+    <li>Filter options: Date range, Transaction type, Category</li>
+</ul>
+
+<hr class="section-divider">
+
+<!-- Section 8 -->
+<h2 class="page-break">8. Teens Section</h2>
+
+<h3>8.1 Teens Page</h3>
+<p>Dedicated content for young members:</p>
+
+<table>
+    <tr><th>Category</th><th>Content</th></tr>
+    <tr><td><strong>Daily Devotional</strong></td><td>Daily spiritual content, short audio messages, youth-focused topics</td></tr>
+    <tr><td><strong>Teens Retreat</strong></td><td>Retreat recordings, special messages, event highlights</td></tr>
+    <tr><td><strong>The Forge Teens Camp</strong></td><td>Camp session recordings, workshop content, testimonies</td></tr>
+</table>
+
+<p><strong>Features:</strong> Teen-specific events, age-appropriate content, audio & video content</p>
+
+<hr class="section-divider">
+
+<!-- Section 9 -->
+<h2>9. Notifications</h2>
+
+<h3>9.1 Notifications Page</h3>
+<table>
+    <tr><th>Type</th><th>Description</th></tr>
+    <tr><td><strong>Message</strong></td><td>New sermon uploaded</td></tr>
+    <tr><td><strong>Event</strong></td><td>Upcoming event reminder</td></tr>
+    <tr><td><strong>Wallet</strong></td><td>Transaction alerts</td></tr>
+    <tr><td><strong>Teens</strong></td><td>New teen content</td></tr>
+    <tr><td><strong>Announcement</strong></td><td>Church announcements</td></tr>
+    <tr><td><strong>System</strong></td><td>App updates, maintenance</td></tr>
+</table>
+
+<h3>9.2 Notification Preferences</h3>
+<p>Customizable settings for each notification type (on/off toggle):</p>
+<ul>
+    <li>Push notifications</li>
+    <li>Email notifications</li>
+    <li>Event, Message, Wallet, Teens, Announcements, Promotions</li>
+</ul>
+
+<hr class="section-divider">
+
+<!-- Section 10 -->
+<h2 class="page-break">10. User Profile & Settings</h2>
+
+<h3>10.1 Profile Page</h3>
+<p><strong>Profile Information:</strong></p>
+<ul>
+    <li>Profile photo (editable)</li>
+    <li>Full name, Email, Phone number</li>
+    <li>Gender, Date of birth</li>
+    <li>KCC (Church identification)</li>
+    <li>Department, Membership status</li>
+</ul>
+
+<h3>10.2 Edit Profile</h3>
+<p>Editable fields: Profile photo, First/Middle/Last name, Phone number, Gender, Date of birth, Address</p>
+
+<h3>10.3 Settings Page</h3>
+<table>
+    <tr><th>Category</th><th>Options</th></tr>
+    <tr><td><strong>Appearance</strong></td><td>Dark Mode / Light Mode toggle, Theme follows system</td></tr>
+    <tr><td><strong>Security</strong></td><td>Change Password, Change Transaction PIN, Biometric Login</td></tr>
+    <tr><td><strong>Notifications</strong></td><td>Notification preferences, Sound settings</td></tr>
+    <tr><td><strong>About</strong></td><td>App version, Terms of Service, Privacy Policy</td></tr>
+    <tr><td><strong>Account</strong></td><td>Delete Account option</td></tr>
+</table>
+
+<hr class="section-divider">
+
+<!-- Section 11 -->
+<h2>11. Support & Contact</h2>
+
+<h3>11.1 Contact/Complaint Page</h3>
+<p><strong>Submit a Message:</strong></p>
+<ul>
+    <li><strong>Category:</strong> General Inquiry, Technical Issue, Payment Problem, Account Issue, Suggestion, Complaint, Other</li>
+    <li><strong>Subject:</strong> Brief description</li>
+    <li><strong>Message:</strong> Detailed message body</li>
+</ul>
+
+<h3>11.2 My Messages</h3>
+<p>View past communications with status (Pending/Replied/Resolved), date, and admin replies.</p>
+
+<hr class="section-divider">
+
+<!-- Section 12 -->
+<h2>12. Offline & Network Handling</h2>
+
+<h3>12.1 Offline Mode</h3>
+<table>
+    <tr><th>Available Offline</th><th>Not Available Offline</th></tr>
+    <tr><td><span class="check">✓</span> Downloaded audio messages</td><td><span class="cross">✗</span> New content fetching</td></tr>
+    <tr><td><span class="check">✓</span> Cached images</td><td><span class="cross">✗</span> Live streaming</td></tr>
+    <tr><td><span class="check">✓</span> Previously loaded content</td><td><span class="cross">✗</span> Wallet transactions</td></tr>
+    <tr><td><span class="check">✓</span> Saved favorites list</td><td><span class="cross">✗</span> Real-time notifications</td></tr>
+</table>
+
+<h3>12.2 Network Awareness</h3>
+<p>Banner when offline, auto-retry when connection restored, graceful error handling, cached content fallback.</p>
+
+<hr class="section-divider">
+
+<!-- Section 13 -->
+<h2 class="page-break">13. App Updates</h2>
+
+<h3>13.1 Update Check</h3>
+<p>Automatic update detection on app launch comparing current vs latest version.</p>
+
+<table>
+    <tr><th>Update Type</th><th>Behavior</th></tr>
+    <tr><td><strong>Optional Update</strong></td><td>Notification shown, "Update Now" and "Later" options available</td></tr>
+    <tr><td><strong>Force Update</strong></td><td>Blocks app usage, must update to continue, direct link to app store</td></tr>
+</table>
+
+<hr class="section-divider">
+
+<!-- Section 14 -->
+<h2>14. Security Features</h2>
+
+<table>
+    <tr><th>Feature</th><th>Description</th></tr>
+    <tr><td><strong>JWT Tokens</strong></td><td>Secure authentication with access + refresh tokens</td></tr>
+    <tr><td><strong>Email Verification</strong></td><td>Account confirmation via email link</td></tr>
+    <tr><td><strong>Transaction PIN</strong></td><td>4-digit secure PIN for wallet transactions</td></tr>
+    <tr><td><strong>Biometric Auth</strong></td><td>Fingerprint/Face ID login option</td></tr>
+    <tr><td><strong>Rate Limiting</strong></td><td>Prevents brute force attacks (5 attempts/minute)</td></tr>
+    <tr><td><strong>KYC Verification</strong></td><td>NIN/BVN identity verification for wallet tiers</td></tr>
+    <tr><td><strong>Encrypted Storage</strong></td><td>Secure local data storage</td></tr>
+</table>
+
+<hr class="section-divider">
+
+<!-- Section 15 -->
+<h2>15. User Journey Summary</h2>
+
+<div class="flow-diagram">
+1. Download App
+       ↓
+2. Get Started Screen
+       ↓
+3. Sign Up (Register)
+       ↓
+4. Email Confirmation
+       ↓
+5. Sign In
+       ↓
+6. Select Interests
+       ↓
+7. Home Dashboard
+       ↓
+  ┌────┴────┬────────┬────────┬────────┐
+  ↓         ↓        ↓        ↓        ↓
+Audio     Live    Wallet   Teens   Profile
+  ↓         ↓        ↓        ↓        ↓
+Browse   Watch    Setup   Browse    Edit
+  ↓       Live    Wallet  Content  Profile
+Listen     ↓        ↓                 ↓
+  ↓      Events   Give/           Settings
+Download    ↓      Fund
+  ↓         ↓        ↓
+Favorites Notify  History
+</div>
+
+<hr class="section-divider">
+
+<!-- Summary -->
+<h2>Key Statistics</h2>
+
+<div class="feature-grid">
+    <div class="feature-item"><strong>5</strong> Main navigation tabs</div>
+    <div class="feature-item"><strong>7+</strong> Giving categories</div>
+    <div class="feature-item"><strong>4</strong> Wallet tiers</div>
+    <div class="feature-item"><strong>6</strong> Notification types</div>
+    <div class="feature-item"><strong>7</strong> Contact categories</div>
+    <div class="feature-item"><strong>3</strong> Teen content categories</div>
+</div>
+
+<hr class="section-divider">
+
+<div style="text-align: center; padding: 40px 0;">
+    <h2 style="background: none; color: #1a1a2e;">End of Presentation</h2>
+    <p style="margin-top: 20px;"><strong>Platforms Available:</strong><br>Android (Play Store) | iOS (App Store) | Web | Desktop</p>
+    <p style="margin-top: 30px; font-style: italic; color: #d4af37; font-size: 18px;">"Connecting Members. Empowering Faith."</p>
+    <p style="margin-top: 40px; color: #666;">TCGC - The CityGate Church Mobile Application</p>
+</div>
+
+</body>
+</html>

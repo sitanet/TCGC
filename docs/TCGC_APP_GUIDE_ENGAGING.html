@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCGC Mobile App - Your Church in Your Pocket</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Poppins', 'Segoe UI', sans-serif;
+            line-height: 1.8;
+            color: #333;
+            max-width: 850px;
+            margin: 0 auto;
+            padding: 0;
+            background: #fff;
+        }
+        
+        /* Cover Page */
+        .cover-page {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 60px 30px;
+            color: white;
+            page-break-after: always;
+        }
+        .cover-logo {
+            width: 120px;
+            height: 120px;
+            background: #d4af37;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 50px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 60px rgba(212, 175, 55, 0.3);
+        }
+        .cover-page h1 {
+            font-size: 52px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #d4af37, #f4e4bc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .cover-page .subtitle {
+            font-size: 24px;
+            font-weight: 300;
+            margin-bottom: 20px;
+            color: #e0e0e0;
+        }
+        .cover-page .tagline {
+            font-size: 18px;
+            color: #d4af37;
+            font-style: italic;
+            margin: 30px 0;
+            padding: 15px 30px;
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 50px;
+        }
+        .cover-features {
+            display: flex;
+            gap: 20px;
+            margin-top: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .cover-feature {
+            background: rgba(255,255,255,0.1);
+            padding: 15px 25px;
+            border-radius: 15px;
+            font-size: 14px;
+        }
+        .cover-feature span {
+            margin-right: 8px;
+        }
+        
+        /* Content Sections */
+        .content {
+            padding: 40px 30px;
+        }
+        
+        h2 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin: 50px 0 25px 0;
+            position: relative;
+            padding-bottom: 15px;
+        }
+        h2::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 80px;
+            height: 4px;
+            background: linear-gradient(90deg, #d4af37, #f4e4bc);
+            border-radius: 2px;
+        }
+        
+        h3 {
+            font-size: 22px;
+            font-weight: 600;
+            color: #1a1a2e;
+            margin: 35px 0 15px 0;
+        }
+        
+        p {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 16px;
+        }
+        
+        /* Hero Sections */
+        .hero-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 40px;
+            color: white;
+            margin: 30px 0;
+            text-align: center;
+        }
+        .hero-section.gold {
+            background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+        }
+        .hero-section.green {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        .hero-section.orange {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .hero-section.blue {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .hero-section h3 {
+            color: white;
+            font-size: 28px;
+            margin: 0 0 15px 0;
+        }
+        .hero-section p {
+            color: rgba(255,255,255,0.9);
+            font-size: 18px;
+            margin: 0;
+        }
+        .hero-section .emoji {
+            font-size: 50px;
+            margin-bottom: 20px;
+        }
+        
+        /* Feature Cards */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin: 25px 0;
+        }
+        .feature-card {
+            background: #f8f9fa;
+            border-radius: 16px;
+            padding: 25px;
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 1px solid #eee;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        .feature-card .icon {
+            font-size: 40px;
+            margin-bottom: 15px;
+        }
+        .feature-card h4 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a2e;
+            margin-bottom: 10px;
+        }
+        .feature-card p {
+            font-size: 14px;
+            color: #666;
+            margin: 0;
+        }
+        
+        /* Steps */
+        .steps-container {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 25px 0;
+        }
+        .steps-container h4 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a1a2e;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .step:last-child {
+            margin-bottom: 0;
+        }
+        .step-number {
+            background: linear-gradient(135deg, #d4af37, #b8860b);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+            margin-right: 20px;
+            flex-shrink: 0;
+        }
+        .step-content h5 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a2e;
+            margin-bottom: 5px;
+        }
+        .step-content p {
+            font-size: 14px;
+            color: #666;
+            margin: 0;
+        }
+        
+        /* Callout Boxes */
+        .callout {
+            border-radius: 16px;
+            padding: 25px;
+            margin: 25px 0;
+            display: flex;
+            align-items: flex-start;
+        }
+        .callout .icon {
+            font-size: 30px;
+            margin-right: 20px;
+            flex-shrink: 0;
+        }
+        .callout h4 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .callout p {
+            margin: 0;
+            font-size: 15px;
+        }
+        .callout.tip {
+            background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
+            border-left: 4px solid #ffc107;
+        }
+        .callout.tip h4 { color: #856404; }
+        .callout.success {
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            border-left: 4px solid #4caf50;
+        }
+        .callout.success h4 { color: #2e7d32; }
+        .callout.info {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-left: 4px solid #2196f3;
+        }
+        .callout.info h4 { color: #1565c0; }
+        .callout.love {
+            background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%);
+            border-left: 4px solid #e91e63;
+        }
+        .callout.love h4 { color: #c2185b; }
+        
+        /* Navigation Display */
+        .nav-display {
+            display: flex;
+            justify-content: space-between;
+            background: #1a1a2e;
+            border-radius: 20px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+        .nav-item {
+            text-align: center;
+            color: white;
+            flex: 1;
+            padding: 15px 10px;
+            border-radius: 12px;
+            transition: background 0.3s;
+        }
+        .nav-item:hover {
+            background: rgba(212, 175, 55, 0.2);
+        }
+        .nav-item .icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        .nav-item .label {
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.08);
+        }
+        th {
+            background: linear-gradient(135deg, #1a1a2e, #2d2d5a);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        /* Quote Box */
+        .quote-box {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            margin: 40px 0;
+            position: relative;
+        }
+        .quote-box::before {
+            content: '"';
+            font-size: 80px;
+            color: #d4af37;
+            position: absolute;
+            top: 10px;
+            left: 30px;
+            opacity: 0.5;
+            font-family: Georgia, serif;
+        }
+        .quote-box p {
+            color: white;
+            font-size: 22px;
+            font-style: italic;
+            margin: 0;
+            position: relative;
+            z-index: 1;
+        }
+        .quote-box .author {
+            color: #d4af37;
+            font-size: 14px;
+            margin-top: 15px;
+            font-style: normal;
+        }
+        
+        /* Highlight List */
+        .highlight-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+        .highlight-list li {
+            padding: 15px 20px 15px 60px;
+            margin-bottom: 12px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            position: relative;
+            font-size: 15px;
+        }
+        .highlight-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 25px;
+            height: 25px;
+            background: linear-gradient(135deg, #4caf50, #8bc34a);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        
+        /* Divider */
+        .divider {
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #d4af37, transparent);
+            margin: 50px 0;
+            border: none;
+        }
+        
+        /* Page Break */
+        .page-break {
+            page-break-before: always;
+        }
+        
+        /* Final Page */
+        .final-page {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 60px 30px;
+            text-align: center;
+            color: white;
+            margin: 50px -30px -40px -30px;
+            border-radius: 30px 30px 0 0;
+        }
+        .final-page h2 {
+            color: #d4af37;
+            font-size: 36px;
+            margin: 0 0 20px 0;
+        }
+        .final-page h2::after {
+            display: none;
+        }
+        .final-page p {
+            color: #e0e0e0;
+            font-size: 16px;
+        }
+        .final-page .tagline {
+            color: #d4af37;
+            font-size: 20px;
+            font-style: italic;
+            margin: 30px 0;
+        }
+        
+        /* Print Styles */
+        @media print {
+            .feature-card:hover {
+                transform: none;
+                box-shadow: none;
+            }
+            .cover-page {
+                min-height: auto;
+                padding: 80px 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ==================== COVER PAGE ==================== -->
+<div class="cover-page">
+    <div class="cover-logo">⛪</div>
+    <h1>TCGC Mobile App</h1>
+    <p class="subtitle">The CityGate Church</p>
+    <p class="tagline">✨ Your Church, Right in Your Pocket ✨</p>
+    
+    <div class="cover-features">
+        <div class="cover-feature"><span>🎧</span> Listen to Sermons</div>
+        <div class="cover-feature"><span>📺</span> Watch Live Services</div>
+        <div class="cover-feature"><span>💝</span> Give Offerings</div>
+        <div class="cover-feature"><span>🔔</span> Stay Connected</div>
+    </div>
+    
+    <p style="margin-top: 60px; font-size: 14px; color: #888;">
+        Available on Android • iPhone • Web
+    </p>
+</div>
+
+<!-- ==================== CONTENT ==================== -->
+<div class="content">
+
+<!-- Welcome Section -->
+<div class="hero-section">
+    <div class="emoji">👋</div>
+    <h3>Welcome to Your New Church Experience!</h3>
+    <p>We're so excited you're here! This app is designed to help you stay connected to your church family, grow in faith, and experience God's word - anytime, anywhere.</p>
+</div>
+
+<h2>What Can You Do With This App?</h2>
+
+<p>Great question! Here's everything at your fingertips:</p>
+
+<div class="feature-grid">
+    <div class="feature-card">
+        <div class="icon">🎵</div>
+        <h4>Listen to Powerful Sermons</h4>
+        <p>Access hundreds of life-changing messages. Download them and listen even without internet!</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">📺</div>
+        <h4>Watch Live Services</h4>
+        <p>Can't make it to church? No problem! Join services live from your couch, office, or anywhere.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">💰</div>
+        <h4>Give Tithes & Offerings</h4>
+        <p>Give conveniently and securely. No more "I forgot my offering" moments!</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">🔔</div>
+        <h4>Never Miss Anything</h4>
+        <p>Get notified about new sermons, upcoming events, and live services.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">❤️</div>
+        <h4>Save Your Favorites</h4>
+        <p>Love a message? Save it! Build your personal collection of sermons that touched your heart.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">👦</div>
+        <h4>Teen-Friendly Content</h4>
+        <p>Special section just for teenagers with content that speaks their language.</p>
+    </div>
+</div>
+
+<hr class="divider">
+
+<!-- Getting Started -->
+<h2 class="page-break">Let's Get You Started! 🚀</h2>
+
+<p>Setting up is super easy. You'll be listening to sermons in just a few minutes!</p>
+
+<h3>Creating Your Account</h3>
+
+<div class="steps-container">
+    <h4>🆕 First Time? Here's How to Sign Up</h4>
+    
+    <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+            <h5>Open the App & Tap "Sign Up"</h5>
+            <p>You'll see a beautiful welcome screen. Choose the Sign Up option.</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+            <h5>Fill in Your Details</h5>
+            <p>Enter your name, email address, and create a password you'll remember.</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+            <h5>Check Your Email 📧</h5>
+            <p>We'll send you a confirmation link. Click it to activate your account!</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+            <h5>Sign In & You're Ready!</h5>
+            <p>Come back to the app, sign in, and start exploring. Welcome home! 🎉</p>
+        </div>
+    </div>
+</div>
+
+<div class="callout tip">
+    <div class="icon">💡</div>
+    <div>
+        <h4>Pro Tip!</h4>
+        <p>Didn't get the email? Check your spam folder first. Still nothing? Tap "Resend Confirmation" and we'll send another one.</p>
+    </div>
+</div>
+
+<h3>Already Have an Account?</h3>
+
+<p>Even easier! Just tap "Sign In," enter your email and password, and you're in! 🎯</p>
+
+<div class="callout info">
+    <div class="icon">👆</div>
+    <div>
+        <h4>Use Your Fingerprint!</h4>
+        <p>Hate typing passwords? After your first login, you can enable fingerprint or face recognition. One touch and you're in! Find this in <strong>Profile → Settings → Biometric Login</strong>.</p>
+    </div>
+</div>
+
+<h3>Forgot Your Password? 🤔</h3>
+
+<p>It happens to the best of us! Here's how to get back in:</p>
+
+<ul class="highlight-list">
+    <li>Tap "Forgot Password" on the sign-in screen</li>
+    <li>Enter your email address</li>
+    <li>Check your email for a reset link</li>
+    <li>Create a new password</li>
+    <li>Sign in with your new password - easy!</li>
+</ul>
+
+<hr class="divider">
+
+<!-- Choose Your Interests -->
+<h3>Tell Us What You Love! 💝</h3>
+
+<p>After signing in for the first time, we'll ask what topics interest you most. This helps us show you content you'll actually enjoy!</p>
+
+<div class="feature-grid">
+    <div class="feature-card">
+        <div class="icon">📖</div>
+        <h4>Sunday Messages</h4>
+        <p>Weekly sermon recordings</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">📚</div>
+        <h4>Bible Study</h4>
+        <p>Deep-dive teachings</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">🙏</div>
+        <h4>Prayer & Worship</h4>
+        <p>Spirit-filled content</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">👨‍👩‍👧</div>
+        <h4>Family & Marriage</h4>
+        <p>Building strong homes</p>
+    </div>
+</div>
+
+<div class="callout success">
+    <div class="icon">🔄</div>
+    <div>
+        <h4>You Can Always Change These!</h4>
+        <p>Your interests aren't set in stone. Update them anytime in your profile settings as your spiritual journey evolves.</p>
+    </div>
+</div>
+
+<hr class="divider">
+
+<!-- Navigation -->
+<h2 class="page-break">Finding Your Way Around 🧭</h2>
+
+<p>The app is designed to be super simple. Everything you need is at the bottom of your screen!</p>
+
+<div class="nav-display">
+    <div class="nav-item">
+        <div class="icon">🏠</div>
+        <div class="label">Home</div>
+    </div>
+    <div class="nav-item">
+        <div class="icon">🎵</div>
+        <div class="label">Audio</div>
+    </div>
+    <div class="nav-item">
+        <div class="icon">📺</div>
+        <div class="label">Live</div>
+    </div>
+    <div class="nav-item">
+        <div class="icon">💰</div>
+        <div class="label">Wallet</div>
+    </div>
+    <div class="nav-item">
+        <div class="icon">👦</div>
+        <div class="label">Teens</div>
+    </div>
+</div>
+
+<table>
+    <tr>
+        <th>Tap This</th>
+        <th>To Do This</th>
+    </tr>
+    <tr>
+        <td><strong>🏠 Home</strong></td>
+        <td>See featured sermons, upcoming events, and get quick access to everything</td>
+    </tr>
+    <tr>
+        <td><strong>🎵 Audio</strong></td>
+        <td>Browse ALL sermons by topic, speaker, or just the latest ones</td>
+    </tr>
+    <tr>
+        <td><strong>📺 Live</strong></td>
+        <td>Watch live services and see what events are coming up</td>
+    </tr>
+    <tr>
+        <td><strong>💰 Wallet</strong></td>
+        <td>Give tithes, offerings, and see your giving history</td>
+    </tr>
+    <tr>
+        <td><strong>👦 Teens</strong></td>
+        <td>Access content specially made for young people</td>
+    </tr>
+</table>
+
+<hr class="divider">
+
+<!-- Home Page -->
+<h2>Your Home Page 🏠</h2>
+
+<p>Think of Home as your personal dashboard. Every time you open the app, it greets you by name (yes, we remember you! 😊) and shows you:</p>
+
+<div class="feature-grid">
+    <div class="feature-card">
+        <div class="icon">⭐</div>
+        <h4>Recommended For You</h4>
+        <p>Hand-picked sermons we think you'll love based on your interests.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">📅</div>
+        <h4>Upcoming Events</h4>
+        <p>What's happening at church? Special services, programs, and more.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">🔴</div>
+        <h4>Live Now!</h4>
+        <p>When a service is streaming, you'll see a big "LIVE" badge. Tap to join!</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">🆕</div>
+        <h4>What's New</h4>
+        <p>The latest sermons uploaded, fresh and ready for you.</p>
+    </div>
+</div>
+
+<hr class="divider">
+
+<!-- Audio Section -->
+<h2 class="page-break">Listening to Sermons 🎧</h2>
+
+<div class="hero-section gold">
+    <div class="emoji">🎵</div>
+    <h3>This is Where the Magic Happens!</h3>
+    <p>Hundreds of life-changing messages at your fingertips. Listen while commuting, exercising, cooking, or relaxing. Your spiritual growth doesn't have to wait!</p>
+</div>
+
+<h3>Finding the Perfect Message</h3>
+
+<p>Browse sermons in whatever way works best for you:</p>
+
+<table>
+    <tr>
+        <th>Browse By</th>
+        <th>Perfect When...</th>
+    </tr>
+    <tr>
+        <td><strong>📁 Categories</strong></td>
+        <td>You want sermons on a specific topic like faith, marriage, or healing</td>
+    </tr>
+    <tr>
+        <td><strong>🎤 Speakers</strong></td>
+        <td>You want to hear more from your favorite pastor</td>
+    </tr>
+    <tr>
+        <td><strong>🆕 Recent</strong></td>
+        <td>You want to catch up on the latest messages</td>
+    </tr>
+    <tr>
+        <td><strong>⭐ Recommended</strong></td>
+        <td>You want us to suggest something powerful for you</td>
+    </tr>
+</table>
+
+<h3>The Player - Your Control Center</h3>
+
+<p>When you tap a sermon, you get a beautiful full-screen player. Here's what you can do:</p>
+
+<div class="feature-grid">
+    <div class="feature-card">
+        <div class="icon">⏯️</div>
+        <h4>Play & Pause</h4>
+        <p>Big, easy button to start or stop</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">⏩</div>
+        <h4>Skip Forward 15s</h4>
+        <p>Jump ahead - skip intros or find a part</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">⏪</div>
+        <h4>Skip Back 15s</h4>
+        <p>Missed something? Go back and hear it again</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">📊</div>
+        <h4>Progress Bar</h4>
+        <p>See where you are and jump to any point</p>
+    </div>
+</div>
+
+<div class="callout love">
+    <div class="icon">🎉</div>
+    <div>
+        <h4>It Keeps Playing!</h4>
+        <p>Here's the best part - the sermon keeps playing even when you leave the app, lock your phone, or use other apps. Listen while doing anything! You'll see controls on your lock screen too.</p>
+    </div>
+</div>
+
+<h3>Save It, Love It, Share It!</h3>
+
+<div class="feature-grid">
+    <div class="feature-card">
+        <div class="icon">⬇️</div>
+        <h4>Download</h4>
+        <p>Save to your phone. Listen offline on planes, in areas with no signal, or to save data!</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">❤️</div>
+        <h4>Favorite</h4>
+        <p>Tap the heart to save messages you love. Find them all in one place later!</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">📤</div>
+        <h4>Share</h4>
+        <p>Bless someone else! Share the message via WhatsApp, text, or any app.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">📋</div>
+        <h4>Playlists</h4>
+        <p>Create your own collections. Perfect for topical study!</p>
+    </div>
+</div>
+
+<div class="callout success">
+    <div class="icon">📍</div>
+    <div>
+        <h4>We Remember Where You Stopped!</h4>
+        <p>Had to pause halfway through a sermon? No worries! The app remembers exactly where you left off. Come back anytime and continue right from that spot. Even after closing the app!</p>
+    </div>
+</div>
+
+<h3>The Mini Player</h3>
+
+<p>When you're listening and want to browse other parts of the app, a tiny player appears at the bottom. You can see what's playing and control it without leaving your current screen. Tap it to go back to the full player! 🎵</p>
+
+<hr class="divider">
+
+<!-- Live Streaming -->
+<h2 class="page-break">Watching Live Services 📺</h2>
+
+<div class="hero-section blue">
+    <div class="emoji">🔴</div>
+    <h3>Be There, Even When You Can't Be There!</h3>
+    <p>Traveling? Sick? Working? Life happens! But you can still experience church live, wherever you are in the world.</p>
+</div>
+
+<h3>Joining a Live Service</h3>
+
+<div class="steps-container">
+    <h4>It's This Easy!</h4>
+    
+    <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+            <h5>Go to the Live Tab</h5>
+            <p>Tap the 📺 icon at the bottom of your screen</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+            <h5>Look for the Red "LIVE" Badge</h5>
+            <p>If a service is happening right now, you'll see it immediately!</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+            <h5>Tap and Join!</h5>
+            <p>One tap and you're watching the service in real-time. Worship along! 🙌</p>
+        </div>
+    </div>
+</div>
+
+<h3>Upcoming Events</h3>
+
+<p>Not only do you see what's live NOW, but also what's coming UP! Check the Live section to see:</p>
+
+<ul class="highlight-list">
+    <li>Special services and programs</li>
+    <li>Event dates and times</li>
+    <li>Whether it's online or in-person</li>
+    <li>Event descriptions and what to expect</li>
+</ul>
+
+<div class="callout tip">
+    <div class="icon">🔔</div>
+    <div>
+        <h4>Get Notified!</h4>
+        <p>Turn on notifications and we'll remind you when live services are about to start. Never miss a service again!</p>
+    </div>
+</div>
+
+<hr class="divider">
+
+<!-- Wallet & Giving -->
+<h2 class="page-break">Giving Made Easy 💝</h2>
+
+<div class="hero-section green">
+    <div class="emoji">💰</div>
+    <h3>Give Joyfully, Give Conveniently!</h3>
+    <p>No more forgetting your offering at home. No more looking for your wallet during service. Give tithes and offerings right from your phone - anytime, anywhere!</p>
+</div>
+
+<h3>Setting Up Your Wallet (One Time Only!)</h3>
+
+<p>Before your first giving, you'll set up your wallet. It takes just a minute:</p>
+
+<div class="steps-container">
+    <h4>💳 Quick Wallet Setup</h4>
+    
+    <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+            <h5>Go to Wallet & Create</h5>
+            <p>Tap the 💰 icon, then "Create Wallet"</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+            <h5>Get Your Account Number</h5>
+            <p>You'll instantly receive a personal bank account number just for you!</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+            <h5>Create Your PIN</h5>
+            <p>Choose a 4-digit PIN to protect your transactions. Keep it secret! 🤫</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+            <h5>Verify Your Identity (Optional)</h5>
+            <p>Add your NIN to unlock higher giving limits. But it's optional - basic limits work for most people!</p>
+        </div>
+    </div>
+</div>
+
+<h3>Adding Money to Your Wallet</h3>
+
+<p>Think of your wallet like a digital purse for church giving. Here's how to fill it up:</p>
+
+<div class="steps-container">
+    <h4>💵 How to Add Money</h4>
+    
+    <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+            <h5>Tap "Fund Wallet" or "Add Money"</h5>
+            <p>You'll see your personal account number and bank name</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+            <h5>Copy the Account Number</h5>
+            <p>Tap to copy it to your clipboard</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+            <h5>Transfer from Your Bank</h5>
+            <p>Open your bank app (any bank works!) and transfer to that account</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+            <h5>Money Appears Automatically!</h5>
+            <p>Usually within seconds, your wallet balance updates. Magic! ✨</p>
+        </div>
+    </div>
+</div>
+
+<div class="callout info">
+    <div class="icon">🏦</div>
+    <div>
+        <h4>Works with Any Bank!</h4>
+        <p>GTBank, Access, First Bank, Zenith, UBA - literally any bank in Nigeria. Just do a normal transfer to your wallet account number!</p>
+    </div>
+</div>
+
+<h3>Making a Giving 🙏</h3>
+
+<p>Now the beautiful part - actually giving!</p>
+
+<div class="steps-container">
+    <h4>❤️ How to Give</h4>
+    
+    <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+            <h5>Tap "Give"</h5>
+            <p>From your Wallet screen</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+            <h5>Choose What You're Giving</h5>
+            <p>Tithe? Offering? Thanksgiving? Seeds? Select it!</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+            <h5>Enter the Amount</h5>
+            <p>Any amount from ₦100 upward</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+            <h5>Enter Your PIN & Confirm</h5>
+            <p>Your 4-digit PIN keeps it secure</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">5</div>
+        <div class="step-content">
+            <h5>Done! 🎉</h5>
+            <p>You'll see a confirmation with all the details. God bless your giving!</p>
+        </div>
+    </div>
+</div>
+
+<h3>Ways You Can Give</h3>
+
+<table>
+    <tr>
+        <th>Giving Type</th>
+        <th>What It's For</th>
+    </tr>
+    <tr>
+        <td><strong>Tithe</strong></td>
+        <td>Your faithful 10%</td>
+    </tr>
+    <tr>
+        <td><strong>Offering</strong></td>
+        <td>General church support</td>
+    </tr>
+    <tr>
+        <td><strong>Thanksgiving</strong></td>
+        <td>Celebrating God's goodness in your life</td>
+    </tr>
+    <tr>
+        <td><strong>Seeds</strong></td>
+        <td>Sowing in faith for a harvest</td>
+    </tr>
+    <tr>
+        <td><strong>Building Fund</strong></td>
+        <td>Church building and expansion</td>
+    </tr>
+    <tr>
+        <td><strong>Missions</strong></td>
+        <td>Supporting outreach and missionaries</td>
+    </tr>
+</table>
+
+<h3>Your Giving Records</h3>
+
+<p>Every single giving is recorded! You can:</p>
+
+<ul class="highlight-list">
+    <li>See your complete giving history</li>
+    <li>View amounts and dates</li>
+    <li>Get reference numbers for your records</li>
+    <li>Track your tithes over time</li>
+</ul>
+
+<div class="callout success">
+    <div class="icon">🌟</div>
+    <div>
+        <h4>Why This is Amazing</h4>
+        <p><strong>Give anytime</strong> - not just Sundays! <strong>Never forget</strong> - give when you think of it. <strong>Complete privacy</strong> - no counting cash in public. <strong>Full records</strong> - everything tracked for you. <strong>Totally secure</strong> - protected by your PIN!</p>
+    </div>
+</div>
+
+<hr class="divider">
+
+<!-- Teens Section -->
+<h2 class="page-break">For the Young Ones 👦</h2>
+
+<div class="hero-section orange">
+    <div class="emoji">🌟</div>
+    <h3>Teens - This Section is ALL Yours!</h3>
+    <p>Content made BY young people FOR young people. Real talk about real issues, delivered in a way that actually connects with you!</p>
+</div>
+
+<h3>What You'll Find</h3>
+
+<div class="feature-grid">
+    <div class="feature-card">
+        <div class="icon">📖</div>
+        <h4>Daily Devotional</h4>
+        <p>Start each day right! Short, powerful content just for teens. Building habits that'll last a lifetime.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">🏕️</div>
+        <h4>Teens Retreat</h4>
+        <p>All the recordings from retreat. Relive the moments or catch what you missed!</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">⚒️</div>
+        <h4>The Forge Camp</h4>
+        <p>Camp sessions, workshops, and all the highlights from The Forge program.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">📅</div>
+        <h4>Teen Events</h4>
+        <p>What's coming up for youth? Find out here and don't miss out!</p>
+    </div>
+</div>
+
+<hr class="divider">
+
+<!-- Notifications -->
+<h2>Stay in the Loop 🔔</h2>
+
+<p>Never miss what matters! The app keeps you updated on everything happening:</p>
+
+<table>
+    <tr>
+        <th>You'll Get Notified When...</th>
+        <th>So You Can...</th>
+    </tr>
+    <tr>
+        <td>A new sermon is uploaded</td>
+        <td>Be the first to listen!</td>
+    </tr>
+    <tr>
+        <td>A live service is starting</td>
+        <td>Join in real-time</td>
+    </tr>
+    <tr>
+        <td>An event is coming up</td>
+        <td>Plan to attend</td>
+    </tr>
+    <tr>
+        <td>Money hits your wallet</td>
+        <td>Know it arrived safely</td>
+    </tr>
+    <tr>
+        <td>Important announcements</td>
+        <td>Stay informed</td>
+    </tr>
+</table>
+
+<div class="callout tip">
+    <div class="icon">⚙️</div>
+    <div>
+        <h4>You're in Control!</h4>
+        <p>Too many notifications? Customize them! Go to <strong>Profile → Settings → Notifications</strong> and turn off any types you don't want. Simple!</p>
+    </div>
+</div>
+
+<hr class="divider">
+
+<!-- Profile -->
+<h2 class="page-break">Your Profile & Settings ⚙️</h2>
+
+<p>Make the app yours! Update your info and customize your experience.</p>
+
+<h3>What You Can Do</h3>
+
+<div class="feature-grid">
+    <div class="feature-card">
+        <div class="icon">📸</div>
+        <h4>Update Your Photo</h4>
+        <p>Add a profile picture so we know it's you!</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">✏️</div>
+        <h4>Edit Your Details</h4>
+        <p>Update your name, phone number, and other info.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">🌙</div>
+        <h4>Dark Mode</h4>
+        <p>Easy on the eyes at night. Tap to toggle!</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">🔐</div>
+        <h4>Change Password</h4>
+        <p>Keep your account secure with a strong password.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">👆</div>
+        <h4>Fingerprint Login</h4>
+        <p>Enable biometrics for quick, secure access.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">🔢</div>
+        <h4>Change PIN</h4>
+        <p>Update your wallet PIN when needed.</p>
+    </div>
+</div>
+
+<hr class="divider">
+
+<!-- Need Help -->
+<h2>Need Help? We're Here! 💬</h2>
+
+<p>Got a question or running into a problem? Reach out directly from the app!</p>
+
+<div class="steps-container">
+    <h4>How to Contact Us</h4>
+    
+    <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+            <h5>Go to Profile → Contact Us</h5>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+            <h5>Choose What It's About</h5>
+            <p>General question? Payment issue? Technical problem? Pick the category.</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+            <h5>Write Your Message & Send</h5>
+            <p>Tell us what you need help with.</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+            <h5>Check Back for Reply</h5>
+            <p>We'll respond right in the app. Check "My Messages" to see our reply!</p>
+        </div>
+    </div>
+</div>
+
+<hr class="divider">
+
+<!-- Tips -->
+<h2>Pro Tips for Power Users 💪</h2>
+
+<div class="callout tip">
+    <div class="icon">📥</div>
+    <div>
+        <h4>Download on WiFi, Listen Anywhere!</h4>
+        <p>Connect to WiFi, download your favorite sermons, then listen without using any mobile data. Perfect for long trips!</p>
+    </div>
+</div>
+
+<div class="callout tip">
+    <div class="icon">❤️</div>
+    <div>
+        <h4>Build Your Favorites Collection</h4>
+        <p>Whenever a message touches your heart, tap that heart button! Over time, you'll build an amazing personal library of sermons that have impacted you.</p>
+    </div>
+</div>
+
+<div class="callout tip">
+    <div class="icon">📋</div>
+    <div>
+        <h4>Create Themed Playlists</h4>
+        <p>Going through a tough season? Create a "Faith Building" playlist. Preparing for marriage? Make a "Relationship" playlist. Organize content for your specific journey!</p>
+    </div>
+</div>
+
+<div class="callout tip">
+    <div class="icon">🔔</div>
+    <div>
+        <h4>Turn On Notifications</h4>
+        <p>Don't miss out! Enable notifications for new sermons and live services. You'll be the first to know when fresh content drops.</p>
+    </div>
+</div>
+
+<div class="callout tip">
+    <div class="icon">🌙</div>
+    <div>
+        <h4>Try Dark Mode at Night</h4>
+        <p>Listening to a sermon before bed? Dark mode is easier on your eyes and saves battery too!</p>
+    </div>
+</div>
+
+<hr class="divider">
+
+<!-- Quick Reference -->
+<h2>Quick "How Do I...?" Guide</h2>
+
+<table>
+    <tr>
+        <th>I Want To...</th>
+        <th>Here's How</th>
+    </tr>
+    <tr>
+        <td>Listen to a sermon</td>
+        <td>🎵 Audio → Browse → Tap any message</td>
+    </tr>
+    <tr>
+        <td>Watch live service</td>
+        <td>📺 Live → Tap the LIVE event</td>
+    </tr>
+    <tr>
+        <td>Give tithe/offering</td>
+        <td>💰 Wallet → Give → Select & Confirm</td>
+    </tr>
+    <tr>
+        <td>Download a sermon</td>
+        <td>Open sermon → Tap ⬇️ download icon</td>
+    </tr>
+    <tr>
+        <td>Find my favorites</td>
+        <td>🎵 Audio → Favorites</td>
+    </tr>
+    <tr>
+        <td>See giving history</td>
+        <td>💰 Wallet → Transactions</td>
+    </tr>
+    <tr>
+        <td>Change password</td>
+        <td>Profile → Settings → Change Password</td>
+    </tr>
+    <tr>
+        <td>Turn on dark mode</td>
+        <td>Profile → Settings → Dark Mode</td>
+    </tr>
+    <tr>
+        <td>Update my profile</td>
+        <td>Profile → Edit Profile</td>
+    </tr>
+    <tr>
+        <td>Get help</td>
+        <td>Profile → Contact Us</td>
+    </tr>
+</table>
+
+<!-- Quote -->
+<div class="quote-box">
+    <p>Your word is a lamp for my feet, a light on my path.</p>
+    <div class="author">— Psalm 119:105</div>
+</div>
+
+</div>
+
+<!-- ==================== FINAL PAGE ==================== -->
+<div class="final-page">
+    <h2>You're All Set! 🎉</h2>
+    <p style="font-size: 18px; margin-bottom: 20px;">
+        Welcome to the TCGC family! We're so glad you're here.
+    </p>
+    <p>
+        Now go explore, listen, worship, give, and grow!<br>
+        Your spiritual journey just got a whole lot easier.
+    </p>
+    <p class="tagline">✨ Connecting Members. Empowering Faith. ✨</p>
+    <p style="margin-top: 40px; font-size: 14px; color: #888;">
+        The CityGate Church<br>
+        <span style="font-size: 24px; margin-top: 10px; display: block;">⛪</span>
+    </p>
+</div>
+
+</body>
+</html>

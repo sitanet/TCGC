@@ -98,10 +98,7 @@ class AppUser {
   }
 
   String get fullName {
-    if (middleName != null && middleName!.isNotEmpty) {
-      return '$firstName $middleName $lastName';
-    }
-    return '$firstName $lastName';
+    return '$firstName $lastName'.trim();
   }
 
   AppUser copyWith({

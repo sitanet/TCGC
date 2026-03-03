@@ -5,6 +5,7 @@ class TeensContent {
   final String? thumbnailUrl;
   final String? videoUrl;
   final String? audioUrl;
+  final String? transcript;
   final String category;
   final DateTime date;
   final Duration? duration;
@@ -16,6 +17,7 @@ class TeensContent {
     this.thumbnailUrl,
     this.videoUrl,
     this.audioUrl,
+    this.transcript,
     required this.category,
     required this.date,
     this.duration,
@@ -29,6 +31,7 @@ class TeensContent {
       thumbnailUrl: json['thumbnail_url'],
       videoUrl: json['video_url'],
       audioUrl: json['audio_url'],
+      transcript: json['transcript'],
       category: json['category'] ?? '',
       date: json['date'] != null 
           ? DateTime.parse(json['date']) 

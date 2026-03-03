@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -243,78 +244,80 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
     final errorMessage = audioProvider.errorMessage;
 
-    return Builder(
-      builder: (context) {
-
-        return Scaffold(
-          appBar: CustomAppBar(
-            title: widget.sermon.categoryName.isNotEmpty
-                ? widget.sermon.categoryName
-                : widget.sermon.category,
-            actions: [
-              IconButton(
-                onPressed: () => _showGivingBottomSheet(context, isDark),
-                icon: Icon(
-                  Icons.volunteer_activism,
-                  color: AppColors.primaryGold,
-                ),
-                tooltip: 'Give an Offering',
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        appBar: CustomAppBar(
+          title: widget.sermon.categoryName.isNotEmpty
+              ? widget.sermon.categoryName
+              : widget.sermon.category,
+          lightBackground: true,
+          actions: [
+            IconButton(
+              onPressed: () => _showGivingBottomSheet(context, isDark),
+              icon: Icon(
+                Icons.volunteer_activism,
+                color: AppColors.primaryGold,
               ),
-              IconButton(
-                onPressed: () => _showActionsBottomSheet(context, isDark),
-                icon: const Icon(Icons.more_vert),
-                tooltip: 'More options',
-              ),
-            ],
-          ),
-          body: Builder(
-            builder: (context) {
-              // Show toast for error instead of error page
-              if (errorMessage != null) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          _downloadService.isDownloaded(widget.sermon.id)
-                              ? 'Unable to play. The downloaded file may be corrupted. Try re-downloading.'
-                              : 'Unable to stream audio. Large files may take time to load. Try downloading for offline playback.',
-                        ),
-                        duration: const Duration(seconds: 5),
-                        action: SnackBarAction(
-                          label: _downloadService.isDownloaded(widget.sermon.id) ? 'Re-download' : 'Download',
-                          onPressed: () async {
-                            if (_downloadService.isDownloaded(widget.sermon.id)) {
-                              await _downloadService.deleteDownload(widget.sermon.id);
-                            }
-                            await _downloadService.downloadSermon(widget.sermon);
-                          },
-                        ),
+              tooltip: 'Give an Offering',
+            ),
+            IconButton(
+              onPressed: () => _showActionsBottomSheet(context, isDark),
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'More options',
+            ),
+          ],
+        ),
+        body: Builder(
+          builder: (context) {
+            if (errorMessage != null) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _downloadService.isDownloaded(widget.sermon.id)
+                            ? 'Unable to play. The downloaded file may be corrupted. Try re-downloading.'
+                            : 'Unable to stream audio. Large files may take time to load. Try downloading for offline playback.',
                       ),
-                    );
-                  }
-                });
-              }
-              return SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 16),
-                      _buildAlbumArt(isDark),
-                      const SizedBox(height: 32),
-                      _buildSongInfo(context),
-                      const SizedBox(height: 32),
-                      _buildProgressBar(isDark, audioProvider),
-                      const SizedBox(height: 24),
-                      _buildControls(isDark, audioProvider),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                );
-            },
-          ),
-        );
-      },
+                      duration: const Duration(seconds: 5),
+                      action: SnackBarAction(
+                        label: _downloadService.isDownloaded(widget.sermon.id) ? 'Re-download' : 'Download',
+                        onPressed: () async {
+                          if (_downloadService.isDownloaded(widget.sermon.id)) {
+                            await _downloadService.deleteDownload(widget.sermon.id);
+                          }
+                          await _downloadService.downloadSermon(widget.sermon);
+                        },
+                      ),
+                    ),
+                  );
+                }
+              });
+            }
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  const SizedBox(height: 16),
+                  _buildAlbumArt(isDark),
+                  const SizedBox(height: 32),
+                  _buildSongInfo(context),
+                  const SizedBox(height: 32),
+                  _buildProgressBar(isDark, audioProvider),
+                  const SizedBox(height: 24),
+                  _buildControls(isDark, audioProvider),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -554,8 +557,13 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   }
 
   String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    
+    if (hours > 0) {
+      return '$hours:$minutes:$seconds';
+    }
     return '$minutes:$seconds';
   }
 
@@ -709,7 +717,7 @@ Check out this message: "${sermon.title}"
 
 ${sermon.description}
 
-Listen on TCGC App
+Listen on Citygate Mobile
 ''';
     Share.share(shareText, subject: sermon.title);
     // Track share action to backend

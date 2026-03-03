@@ -75,101 +75,98 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   }
 
   Widget _buildSummaryCard(BuildContext context, bool isDark, WalletProvider walletProvider) {
-    final spacing = Responsive.verticalSpacing(context);
-    final borderRadius = Responsive.largeBorderRadius(context);
-    final bodyFontSize = Responsive.bodyFontSize(context);
     final smallFontSize = Responsive.smallFontSize(context);
     final balanceFontSize = Responsive.value(context, mobile: 32.0, tablet: 38.0, desktop: 44.0);
-    final subtitleFontSize = Responsive.subtitleFontSize(context);
     
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(spacing * 1.5),
+      height: 178,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(borderRadius),
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primaryGold,
-            AppColors.primaryGold.withOpacity(0.85),
-            AppColors.goldVariant1,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        borderRadius: BorderRadius.circular(52),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Transaction Summary',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
-                  fontSize: bodyFontSize,
-                  fontWeight: FontWeight.w500,
-                ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(52),
+        child: Stack(
+          children: [
+            // Background image
+            Positioned.fill(
+              child: Image.asset(
+                'assets/images/wallet_bg.png',
+                fit: BoxFit.cover,
               ),
-              Text(
-                _formatDate(DateTime.now()),
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: smallFontSize,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: spacing * 1.25),
-          Text(
-            'Current Balance:',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: smallFontSize,
             ),
-          ),
-          SizedBox(height: spacing * 0.25),
-          Text(
-            _formatCurrency(walletProvider.balance, walletProvider.currency),
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: balanceFontSize,
-              fontWeight: FontWeight.bold,
-              shadows: [
-                Shadow(
-                  color: Colors.black.withOpacity(0.2),
-                  offset: const Offset(1, 1),
-                  blurRadius: 2,
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: spacing),
-          Row(
-            children: [
-              Expanded(
+            // Content
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Total Transactions',
-                      style: TextStyle(color: Colors.white70, fontSize: smallFontSize),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Transaction Summary',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: smallFontSize,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        Text(
+                          _formatDate(DateTime.now()),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: smallFontSize * 0.9,
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: spacing * 0.25),
+                    const Spacer(),
+                    Center(
+                      child: Column(
+                        children: [
+                          Text(
+                            'Current Balance:',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              fontSize: smallFontSize,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatCurrency(walletProvider.balance, walletProvider.currency),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: balanceFontSize,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
                     Text(
-                      '${walletProvider.transactions.length}',
+                      'Total Transactions: ${walletProvider.transactions.length}',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: subtitleFontSize * 0.9,
-                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: smallFontSize,
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

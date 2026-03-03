@@ -212,6 +212,17 @@ class AuthProvider extends ChangeNotifier {
     return result.success;
   }
 
+  Future<bool> verifyPassword(String password) async {
+    _error = null;
+    
+    final result = await _authService.verifyPassword(password);
+    
+    if (!result.success) {
+      _error = result.error;
+    }
+    return result.success;
+  }
+
   Future<bool> forgotPassword(String email) async {
     _isLoading = true;
     _error = null;

@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/audio_cache_service.dart';
-import '../../../data/services/image_cache_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -14,6 +14,19 @@ import 'audio_list_page.dart';
 import 'favorites_page.dart';
 import 'playlists_page.dart';
 import 'downloads_page.dart';
+import 'transcript_list_page.dart';
+
+String _stripHtmlTags(String htmlText) {
+  return htmlText
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .trim();
+}
 
 class AudioPage extends ConsumerStatefulWidget {
   const AudioPage({super.key});
@@ -27,7 +40,6 @@ class _AudioPageState extends ConsumerState<AudioPage>
   late TabController _tabController;
   final DataService _dataService = DataService();
   final AudioCacheService _audioCacheService = AudioCacheService();
-  final ImageCacheService _imageCacheService = ImageCacheService();
   
   List<MessageCategory> _categories = [];
   List<Sermon> _sermons = [];
@@ -37,35 +49,67 @@ class _AudioPageState extends ConsumerState<AudioPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _audioCacheService.initialize();
-    _loadData();
+    // Load data after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _audioCacheService.initialize();
+      _loadData();
+    });
   }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
+      // Get user permissions for filtering
+      final authProvider = ref.read(authChangeNotifierProvider);
+      final user = authProvider.user;
+      final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+      final isGeneralMarried = user?.isGeneralMarried ?? false;
+      final isInHouseMarried = user?.isInHouseMarried ?? false;
+      
       // Try to load from cache first for instant display
       final cachedCategories = await _audioCacheService.getCachedCategories();
       final cachedSermons = await _audioCacheService.getCachedSermons();
       
       if (cachedCategories != null && cachedSermons != null && mounted) {
+        // Filter cached sermons based on user permissions
+        final filteredSermons = cachedSermons.where((sermon) {
+          if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
+          if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
+          if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
+          return true;
+        }).toList();
+        
         setState(() {
           _categories = cachedCategories;
-          _sermons = cachedSermons;
+          _sermons = filteredSermons;
           _isLoading = false;
         });
-        debugPrint('Loaded from cache: ${cachedCategories.length} categories, ${cachedSermons.length} sermons');
+        debugPrint('Loaded from cache: ${cachedCategories.length} categories, ${filteredSermons.length} sermons (filtered)');
+        // Fetch fresh data in background to get new transcripts
+        _refreshDataInBackground();
+        return;
       }
       
-      // Fetch fresh data from API
+      // Only fetch from API if no cache exists
       final categories = await _dataService.getMessageCategories();
-      final sermons = await _dataService.getMessages();
       
-      // Cache the metadata for next time
-      _audioCacheService.cacheMetadata(categories: categories, sermons: sermons);
+      // Small delay to let UI breathe
+      await Future.delayed(const Duration(milliseconds: 50));
       
-      // Pre-cache images in background
-      _imageCacheService.preCacheImages(categories: categories, sermons: sermons);
+      final allSermons = await _dataService.getMessages();
+      
+      // Filter sermons based on user permissions
+      final sermons = allSermons.where((sermon) {
+        if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
+        if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
+        if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
+        return true;
+      }).toList();
+      
+      // Cache the metadata in background (don't await)
+      Future.microtask(() {
+        _audioCacheService.cacheMetadata(categories: categories, sermons: sermons);
+      });
       
       debugPrint('=== Audio Page Data ===');
       debugPrint('Categories loaded: ${categories.length}');
@@ -128,14 +172,44 @@ class _AudioPageState extends ConsumerState<AudioPage>
           _isLoading = false;
         });
         
-        // Pre-buffer first 10 sermons for instant playback (~3 min each)
-        _audioCacheService.preBufferCategory(sermons, count: 10);
+        // Pre-buffer first 3 sermons for instant playback (reduced to prevent memory issues)
+        _audioCacheService.preBufferCategory(sermons, count: 3);
       }
     } catch (e) {
       debugPrint('Error loading audio data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _refreshDataInBackground() async {
+    try {
+      final authProvider = ref.read(authChangeNotifierProvider);
+      final user = authProvider.user;
+      final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+      final isGeneralMarried = user?.isGeneralMarried ?? false;
+      final isInHouseMarried = user?.isInHouseMarried ?? false;
+
+      final categories = await _dataService.getMessageCategories();
+      final allSermons = await _dataService.getMessages(forceRefresh: true);
+
+      final sermons = allSermons.where((sermon) {
+        if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
+        if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
+        if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
+        return true;
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _categories = categories;
+          _sermons = sermons;
+        });
+        debugPrint('Background refresh complete: ${sermons.length} sermons');
+      }
+    } catch (e) {
+      debugPrint('Background refresh error: $e');
     }
   }
 
@@ -149,40 +223,47 @@ class _AudioPageState extends ConsumerState<AudioPage>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: CustomAppBar(
-        title: '',
-        showBackButton: true,
-        onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.favorite_border),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FavoritesPage()),
-            ),
-            tooltip: 'Favorites',
-          ),
-          IconButton(
-            icon: const Icon(Icons.playlist_play),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const PlaylistsPage()),
-            ),
-            tooltip: 'Playlists',
-          ),
-          IconButton(
-            icon: const Icon(Icons.download),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const DownloadsPage()),
-            ),
-            tooltip: 'Downloads',
-          ),
-        ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
-      body: Column(
-        children: [
+      child: Scaffold(
+        appBar: CustomAppBar(
+          title: '',
+          showBackButton: true,
+          lightBackground: true,
+          onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.favorite_border),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FavoritesPage()),
+              ),
+              tooltip: 'Favorites',
+            ),
+            IconButton(
+              icon: const Icon(Icons.playlist_play),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PlaylistsPage()),
+              ),
+              tooltip: 'Playlists',
+            ),
+            IconButton(
+              icon: const Icon(Icons.download),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DownloadsPage()),
+              ),
+              tooltip: 'Downloads',
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
           _buildTabBar(isDark),
           Expanded(
             child: TabBarView(
@@ -194,6 +275,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -233,53 +315,72 @@ class _AudioPageState extends ConsumerState<AudioPage>
       return const Center(child: CircularProgressIndicator());
     }
 
+    final isTabletOrLarger = !Responsive.isMobile(context);
+    final padding = Responsive.horizontalPadding(context);
+
     if (_categories.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        color: AppColors.primaryGold,
+        child: ListView(
           children: [
-            Icon(
-              Icons.music_off,
-              size: 64,
-              color: isDark
-                  ? AppColors.textSecondaryDark.withValues(alpha: 0.5)
-                  : AppColors.textSecondaryLight.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No audio categories available',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                  ),
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.5,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.music_off,
+                      size: 64,
+                      color: isDark
+                          ? AppColors.textSecondaryDark.withValues(alpha: 0.5)
+                          : AppColors.textSecondaryLight.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No audio categories available',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
       );
     }
 
-    final isTabletOrLarger = !Responsive.isMobile(context);
-    final padding = Responsive.horizontalPadding(context);
-
     if (isTabletOrLarger) {
-      return GridView.builder(
-        padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: Responsive.gridCrossAxisCount(context, mobile: 1, tablet: 2, desktop: 3),
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 2.5,
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        color: AppColors.primaryGold,
+        child: GridView.builder(
+          padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: Responsive.gridCrossAxisCount(context, mobile: 1, tablet: 2, desktop: 3),
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 2.5,
+          ),
+          itemCount: _categories.length,
+          itemBuilder: (context, index) => _buildCategoryCard(context, isDark, _categories[index]),
         ),
-        itemCount: _categories.length,
-        itemBuilder: (context, index) => _buildCategoryCard(context, isDark, _categories[index]),
       );
     }
 
-    return ListView.builder(
-      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
-      itemCount: _categories.length,
-      itemBuilder: (context, index) => _buildCategoryCard(context, isDark, _categories[index]),
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      color: AppColors.primaryGold,
+      child: ListView.builder(
+        padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
+        itemCount: _categories.length,
+        itemBuilder: (context, index) => _buildCategoryCard(context, isDark, _categories[index]),
+      ),
     );
   }
 
@@ -341,15 +442,15 @@ class _AudioPageState extends ConsumerState<AudioPage>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    category.name,
+                    _stripHtmlTags(category.name),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: AppColors.primaryGold,
+                          color: isDark ? Colors.white : Colors.black87,
                         ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    category.description ?? 'It is a time for to come together to worship, hear God\'s word, and fellowship.',
+                    _stripHtmlTags(category.description ?? 'It is a time for to come together to worship, hear God\'s word, and fellowship.'),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: isDark
                               ? AppColors.textSecondaryDark
@@ -413,36 +514,178 @@ class _AudioPageState extends ConsumerState<AudioPage>
   }
 
   Widget _buildTranscriptList(BuildContext context, bool isDark) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Filter categories that have sermons with transcripts
+    final categoriesWithTranscripts = _categories.where((category) {
+      return _sermons.any((sermon) =>
+          (sermon.category == category.id || sermon.categoryName == category.name) &&
+          sermon.transcript != null &&
+          sermon.transcript!.isNotEmpty);
+    }).toList();
+
+    final padding = Responsive.horizontalPadding(context);
+    final isTabletOrLarger = !Responsive.isMobile(context);
+
+    if (categoriesWithTranscripts.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        color: AppColors.primaryGold,
+        child: ListView(
           children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.5,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGold.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.article_outlined,
+                          size: 64,
+                          color: AppColors.primaryGold.withOpacity(0.6),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'No Transcripts Yet',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Message transcripts will be available here soon.\nStay tuned for written versions of our messages.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                              height: 1.5,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (isTabletOrLarger) {
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        color: AppColors.primaryGold,
+        child: GridView.builder(
+          padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: Responsive.gridCrossAxisCount(context, mobile: 1, tablet: 2, desktop: 3),
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 2.5,
+          ),
+          itemCount: categoriesWithTranscripts.length,
+          itemBuilder: (context, index) => _buildTranscriptCategoryCard(context, isDark, categoriesWithTranscripts[index]),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      color: AppColors.primaryGold,
+      child: ListView.builder(
+        padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
+        itemCount: categoriesWithTranscripts.length,
+        itemBuilder: (context, index) => _buildTranscriptCategoryCard(context, isDark, categoriesWithTranscripts[index]),
+      ),
+    );
+  }
+
+  Widget _buildTranscriptCategoryCard(BuildContext context, bool isDark, MessageCategory category) {
+    final transcriptCount = _sermons.where((sermon) =>
+        (sermon.category == category.id || sermon.categoryName == category.name) &&
+        sermon.transcript != null &&
+        sermon.transcript!.isNotEmpty).length;
+
+    // Get categories that have transcripts for filter list
+    final categoriesWithTranscripts = _categories.where((cat) {
+      return _sermons.any((sermon) =>
+          (sermon.category == cat.id || sermon.categoryName == cat.name) &&
+          sermon.transcript != null &&
+          sermon.transcript!.isNotEmpty);
+    }).toList();
+    
+    final categoryNameToId = {
+      for (var c in categoriesWithTranscripts) c.name: c.id
+    };
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TranscriptListPage(
+              category: category.name,
+              categoryId: category.id,
+              sermons: _sermons,
+              categories: categoriesWithTranscripts.map((c) => c.name).toList(),
+              categoryNameToId: categoryNameToId,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        margin: Responsive.isMobile(context) ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: _buildCategoryImage(category, isDark),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _stripHtmlTags(category.name),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$transcriptCount transcript${transcriptCount != 1 ? 's' : ''} available',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
             Icon(
-              Icons.description_outlined,
-              size: 80,
+              Icons.chevron_right,
               color: isDark
-                  ? AppColors.textSecondaryDark.withValues(alpha: 0.5)
-                  : AppColors.textSecondaryLight.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Transcripts',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Sermon transcripts will be available here soon. Stay tuned for written versions of our messages.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                    height: 1.5,
-                  ),
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ],
         ),

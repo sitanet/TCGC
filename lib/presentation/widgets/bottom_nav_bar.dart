@@ -17,8 +17,8 @@ class BottomNavBar extends StatelessWidget {
     
     return Center(
       child: Container(
-        width: 358,
-        height: 78,
+        width: 344,
+        height: 70,
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
           color: isDark ? AppColors.cardDark : Colors.white,
@@ -61,7 +61,7 @@ class BottomNavBar extends StatelessWidget {
         child: Center(
           child: Icon(
             isSelected ? filledIcon : outlinedIcon,
-            size: 28,
+            size: 32,
             color: AppColors.primaryGold,
           ),
         ),

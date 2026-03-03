@@ -28,8 +28,8 @@ class AppTheme {
       ),
       systemOverlayStyle: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark, // Dark icons for light background
-        statusBarBrightness: Brightness.light, // iOS: light status bar content
+        statusBarIconBrightness: Brightness.light, // White status bar icons by default
+        statusBarBrightness: Brightness.dark, // iOS: dark status bar content
       ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(

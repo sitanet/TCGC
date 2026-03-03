@@ -97,8 +97,8 @@ class PrivacyPolicyPage extends StatelessWidget {
                 isDark,
                 'Contact Us',
                 'If you have any questions about this Privacy Policy, please contact us at:\n\n'
-                    'Email: privacy@tcgc.org\n'
-                    'Phone: +234 800 000 0000',
+                    'Email: support@thecitygatechurch.org\n'
+                    'Phone: +234 706 090 4430',
               ),
               const SizedBox(height: 16),
               _buildLastUpdated(context, isDark),

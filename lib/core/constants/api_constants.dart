@@ -13,6 +13,7 @@ class ApiConstants {
   // User
   static const String userProfile = '/user/profile/';
   static const String changePassword = '/user/change-password/';
+  static const String verifyPassword = '/user/verify-password/';
   static const String transactionPin = '/user/transaction-pin/';
   static const String changeTransactionPin = '/user/transaction-pin/change/';
   static const String deleteAccount = '/user/delete-account/';

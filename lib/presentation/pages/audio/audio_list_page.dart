@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/sermon.dart';
+import '../../../data/services/data_service.dart';
 import '../../../main.dart';
+import 'package:flutter/services.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_player_page.dart';
 
@@ -36,17 +38,21 @@ class AudioListPage extends ConsumerStatefulWidget {
 class _AudioListPageState extends ConsumerState<AudioListPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final DataService _dataService = DataService();
+  List<Sermon> _allItems = [];
   List<Sermon> _filteredItems = [];
   late String _selectedCategory;
   late String? _selectedCategoryId;
   late FilterType _filterType;
   String? _selectedSpeaker;
   List<String> _speakers = [];
-  int _preBufferedUpTo = 0; // Track how many items have been pre-buffered
+  int _preBufferedUpTo = 0;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
+    _allItems = widget.audioItems;
     _selectedCategory = widget.category;
     _selectedCategoryId = widget.categoryId;
     _filterType = widget.initialFilterType;
@@ -56,17 +62,41 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
     _searchController.addListener(_filterAudio);
     _scrollController.addListener(_onScroll);
     
-    // Pre-buffer audio files for instant playback immediately
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _preBufferInitial();
     });
   }
+
+  Future<void> _onRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    
+    try {
+      final sermons = await _dataService.getMessages();
+      if (mounted) {
+        setState(() {
+          _allItems = sermons;
+          _extractSpeakers();
+          _filteredItems = _getFilteredItems(_searchController.text);
+          _isRefreshing = false;
+        });
+        _preBufferInitial();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to refresh')),
+        );
+      }
+    }
+  }
   
   void _preBufferInitial() {
     final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
-    // Pre-buffer first 20 items (~3 min each) for instant playback
-    audioProvider.preBufferSermons(_filteredItems, count: 20);
-    _preBufferedUpTo = 20;
+    // Pre-buffer first 3 items for instant playback (reduced to prevent memory issues)
+    audioProvider.preBufferSermons(_filteredItems, count: 3);
+    _preBufferedUpTo = 3;
   }
   
   void _onScroll() {
@@ -81,14 +111,14 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
     if (_preBufferedUpTo >= _filteredItems.length) return;
     
     final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
-    // Pre-buffer next 10 items when user scrolls near the end
-    audioProvider.preBufferMore(_filteredItems, _preBufferedUpTo, count: 10);
-    _preBufferedUpTo += 10;
+    // Pre-buffer next 2 items when user scrolls near the end (reduced to prevent memory issues)
+    audioProvider.preBufferMore(_filteredItems, _preBufferedUpTo, count: 2);
+    _preBufferedUpTo += 2;
   }
 
   void _extractSpeakers() {
     final speakerSet = <String>{};
-    for (var audio in widget.audioItems) {
+    for (var audio in _allItems) {
       if (audio.speaker != null && audio.speaker!.isNotEmpty) {
         speakerSet.add(audio.speaker!);
       }
@@ -155,9 +185,21 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
 
   List<Sermon> _getFilteredItems(String query) {
     debugPrint('Filtering: filterType=$_filterType, category=$_selectedCategory, speaker=$_selectedSpeaker');
-    debugPrint('Total audio items: ${widget.audioItems.length}');
+    debugPrint('Total audio items: ${_allItems.length}');
     
-    final filtered = widget.audioItems.where((audio) {
+    // Get user permissions
+    final authProvider = ref.read(authChangeNotifierProvider);
+    final user = authProvider.user;
+    final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+    final isGeneralMarried = user?.isGeneralMarried ?? false;
+    final isInHouseMarried = user?.isInHouseMarried ?? false;
+    
+    final filtered = _allItems.where((audio) {
+      // Filter out restricted messages that user cannot access
+      if (audio.isServiceTeamOnly && !isServiceTeamMember) return false;
+      if (audio.isGeneralMarriedOnly && !isGeneralMarried) return false;
+      if (audio.isInHouseMarriedOnly && !isInHouseMarried) return false;
+      
       bool matchesFilter = false;
       
       if (_filterType == FilterType.speaker) {
@@ -225,9 +267,15 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: const CustomAppBar(title: ''),
-      body: Column(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark, // Black status bar icons
+        statusBarBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        appBar: const CustomAppBar(title: '', lightBackground: true),
+        body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
@@ -278,67 +326,78 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: _filteredItems.isEmpty
-                ? Center(
-                    child: Text(
-                      'No audio found',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
+            child: RefreshIndicator(
+              onRefresh: _onRefresh,
+              color: AppColors.primaryGold,
+              child: _filteredItems.isEmpty
+                  ? ListView(
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.4,
+                          child: Center(
+                            child: Text(
+                              'No audio found',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
+                            ),
                           ),
+                        ),
+                      ],
+                    )
+                  : Builder(
+                      builder: (context) {
+                        final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+                        final authProvider = ref.watch(authChangeNotifierProvider);
+                        final user = authProvider.user;
+                        final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+                        final isGeneralMarried = user?.isGeneralMarried ?? false;
+                        final isInHouseMarried = user?.isInHouseMarried ?? false;
+                        return ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: _filteredItems.length,
+                          itemBuilder: (context, index) {
+                            final audio = _filteredItems[index];
+                            final isPreBuffered = audioProvider.isPreBuffered(audio.id);
+                            final isBuffering = audioProvider.isBuffering(audio.id);
+                            final bufferProgress = audioProvider.getBufferProgress(audio.id);
+                            final isLocked = (audio.isServiceTeamOnly && !isServiceTeamMember) ||
+                                (audio.isGeneralMarriedOnly && !isGeneralMarried) ||
+                                (audio.isInHouseMarriedOnly && !isInHouseMarried);
+                            return _AudioListItem(
+                              sermon: audio,
+                              isDark: isDark,
+                              isPreBuffered: isPreBuffered,
+                              isBuffering: isBuffering,
+                              bufferProgress: bufferProgress,
+                              isServiceTeamMember: isServiceTeamMember,
+                              isGeneralMarried: isGeneralMarried,
+                              isInHouseMarried: isInHouseMarried,
+                              onTap: () {
+                                if (isLocked) {
+                                  _showLockedMessage(context, isDark);
+                                  return;
+                                }
+                                audioProvider.setQueue(_filteredItems, index);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => AudioPlayerPage(sermon: audio),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
                     ),
-                  )
-                : Builder(
-                    builder: (context) {
-                      final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
-                      final authProvider = ref.watch(authChangeNotifierProvider);
-                      final user = authProvider.user;
-                      final isServiceTeamMember = user?.isServiceTeamMember ?? false;
-                      final isGeneralMarried = user?.isGeneralMarried ?? false;
-                      final isInHouseMarried = user?.isInHouseMarried ?? false;
-                      return ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: _filteredItems.length,
-                        itemBuilder: (context, index) {
-                          final audio = _filteredItems[index];
-                          final isPreBuffered = audioProvider.isPreBuffered(audio.id);
-                          final isBuffering = audioProvider.isBuffering(audio.id);
-                          final bufferProgress = audioProvider.getBufferProgress(audio.id);
-                          final isLocked = (audio.isServiceTeamOnly && !isServiceTeamMember) ||
-                              (audio.isGeneralMarriedOnly && !isGeneralMarried) ||
-                              (audio.isInHouseMarriedOnly && !isInHouseMarried);
-                          return _AudioListItem(
-                            sermon: audio,
-                            isDark: isDark,
-                            isPreBuffered: isPreBuffered,
-                            isBuffering: isBuffering,
-                            bufferProgress: bufferProgress,
-                            isServiceTeamMember: isServiceTeamMember,
-                            isGeneralMarried: isGeneralMarried,
-                            isInHouseMarried: isInHouseMarried,
-                            onTap: () {
-                              if (isLocked) {
-                                _showLockedMessage(context, isDark);
-                                return;
-                              }
-                              // Set the queue for Next/Previous functionality (without starting playback)
-                              audioProvider.setQueue(_filteredItems, index);
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => AudioPlayerPage(sermon: audio),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
+            ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -498,27 +557,21 @@ class _AudioListItem extends StatelessWidget {
     }
   }
 
-  String _buildDisplayTitle() {
-    final parts = <String>[];
-    
-    // Category
+  String _getCategoryName() {
     if (sermon.categoryName.isNotEmpty) {
-      parts.add(sermon.categoryName);
+      return sermon.categoryName;
     } else if (sermon.category.isNotEmpty) {
-      parts.add(sermon.category);
+      return sermon.category;
     }
-    
-    // Title
-    parts.add(sermon.title);
-    
-    // Speaker
+    return '';
+  }
+
+  String _getSpeakerAndTime() {
+    final parts = <String>[];
     if (sermon.speaker != null && sermon.speaker!.isNotEmpty) {
       parts.add(sermon.speaker!);
     }
-    
-    // Time ago
     parts.add(_formatTimeAgo(sermon.date));
-    
     return parts.join(' - ');
   }
 
@@ -625,15 +678,52 @@ class _AudioListItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _buildDisplayTitle(),
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight,
-                        ),
+                  // Category (bold dark) - Title (regular dark)
+                  RichText(
                     maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    text: TextSpan(
+                      children: [
+                        if (_getCategoryName().isNotEmpty) ...[
+                          TextSpan(
+                            text: _getCategoryName(),
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black87,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          TextSpan(
+                            text: ' - ',
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black87,
+                              fontWeight: FontWeight.normal,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                        TextSpan(
+                          text: sermon.title,
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black87,
+                            fontWeight: FontWeight.normal,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Speaker - Time ago
+                  Text(
+                    _getSpeakerAndTime(),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: isDark
+                              ? AppColors.textSecondaryDark.withValues(alpha: 0.7)
+                              : AppColors.textSecondaryLight.withValues(alpha: 0.7),
+                          fontSize: 12,
+                        ),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],

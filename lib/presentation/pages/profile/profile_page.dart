@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers/biometric_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/responsive.dart';
@@ -10,11 +11,121 @@ import 'edit_profile_page.dart';
 import 'settings_page.dart';
 import '../wallet/wallet_page.dart';
 
-class ProfilePage extends ConsumerWidget {
+class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends ConsumerState<ProfilePage> {
+  Future<void> _authenticateAndNavigateToEditProfile(BuildContext context, bool isDark) async {
+    final biometricProvider = ref.read(biometricChangeNotifierProvider);
+    await biometricProvider.initialize();
+
+    // Try biometric first if enabled
+    if (biometricProvider.biometricLoginEnabled && biometricProvider.isAvailable) {
+      final authenticated = await biometricProvider.authenticate(
+        reason: 'Authenticate to edit your profile',
+      );
+      if (authenticated && context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const EditProfilePage()),
+        );
+        return;
+      }
+    }
+
+    // Fall back to password
+    if (context.mounted) {
+      _showPasswordDialog(context, isDark);
+    }
+  }
+
+  void _showPasswordDialog(BuildContext context, bool isDark) {
+    final passwordController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+          title: const Text('Verify Identity'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Enter your password to edit your profile'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Password',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (passwordController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please enter your password')),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => isLoading = true);
+
+                      final authProvider = ref.read(authChangeNotifierProvider);
+                      final isValid = await authProvider.verifyPassword(passwordController.text);
+
+                      setDialogState(() => isLoading = false);
+
+                      if (isValid && dialogContext.mounted) {
+                        Navigator.pop(dialogContext);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const EditProfilePage()),
+                        );
+                      } else if (dialogContext.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(authProvider.error ?? 'Invalid password'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Verify', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final spacing = Responsive.verticalSpacing(context);
     final maxWidth = Responsive.maxContentWidth(context);
@@ -26,15 +137,15 @@ class ProfilePage extends ConsumerWidget {
             constraints: BoxConstraints(maxWidth: maxWidth),
             child: Column(
               children: [
-                _buildProfileHeader(context, isDark, ref),
+                _buildProfileHeader(context, isDark),
                 SizedBox(height: spacing * 1.5),
                 _buildMenuItems(context, isDark),
                 SizedBox(height: spacing * 1.5),
                 _buildPrivacyPolicyLink(context, isDark),
                 SizedBox(height: spacing * 1.5),
-                _buildDeleteAccountButton(context, isDark, ref),
+                _buildDeleteAccountButton(context, isDark),
                 SizedBox(height: spacing),
-                _buildLogoutButton(context, isDark, ref),
+                _buildLogoutButton(context, isDark),
                 SizedBox(height: spacing * 6),
               ],
             ),
@@ -44,38 +155,24 @@ class ProfilePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildProfileHeader(BuildContext context, bool isDark, WidgetRef ref) {
+  Widget _buildProfileHeader(BuildContext context, bool isDark) {
     final themeProvider = ref.watch(themeChangeNotifierProvider);
     final authProvider = ref.watch(authChangeNotifierProvider);
     final user = authProvider.user;
     final displayName = user?.fullName ?? user?.email ?? 'User';
     final statusBarHeight = MediaQuery.of(context).padding.top;
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(30),
-          bottomRight: Radius.circular(30),
-        ),
-        image: const DecorationImage(
-          image: AssetImage('assets/images/profile_background.png'),
-          fit: BoxFit.cover,
-        ),
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        bottomLeft: Radius.circular(30),
+        bottomRight: Radius.circular(30),
       ),
       child: Container(
-        decoration: BoxDecoration(
-          borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(30),
-            bottomRight: Radius.circular(30),
-          ),
-          gradient: LinearGradient(
-            colors: [
-              Colors.black.withOpacity(0.3),
-              Colors.black.withOpacity(0.5),
-            ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/profile_background.png'),
+            fit: BoxFit.cover,
           ),
         ),
         child: Column(
@@ -104,14 +201,7 @@ class ProfilePage extends ConsumerWidget {
             ),
             const SizedBox(height: 20),
             GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const EditProfilePage(),
-                  ),
-                );
-              },
+              onTap: () => _authenticateAndNavigateToEditProfile(context, isDark),
               child: Stack(
                 alignment: Alignment.bottomRight,
                 children: [
@@ -142,12 +232,15 @@ class ProfilePage extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Text(
-              displayName,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+            Center(
+              child: Text(
+                displayName,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(height: 40),
@@ -231,14 +324,7 @@ class ProfilePage extends ConsumerWidget {
               isDark,
               Icons.person_outline,
               'Edit your Profile',
-              () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const EditProfilePage(),
-                  ),
-                );
-              },
+              () => _authenticateAndNavigateToEditProfile(context, isDark),
             ),
             _buildDivider(isDark),
             _buildMenuItem(
@@ -338,7 +424,7 @@ class ProfilePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildDeleteAccountButton(BuildContext context, bool isDark, WidgetRef ref) {
+  Widget _buildDeleteAccountButton(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
     final buttonHeight = Responsive.buttonHeight(context);
@@ -352,7 +438,7 @@ class ProfilePage extends ConsumerWidget {
         width: double.infinity,
         height: buttonHeight,
         child: OutlinedButton.icon(
-          onPressed: () => _showDeleteAccountDialog(context, isDark, ref),
+          onPressed: () => _showDeleteAccountDialog(context, isDark),
           icon: Icon(Icons.delete_forever, color: AppColors.error, size: iconSize),
           label: Text(
             'Delete Account',
@@ -374,7 +460,7 @@ class ProfilePage extends ConsumerWidget {
     );
   }
 
-  void _showDeleteAccountDialog(BuildContext context, bool isDark, WidgetRef ref) {
+  void _showDeleteAccountDialog(BuildContext context, bool isDark) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -432,7 +518,7 @@ class ProfilePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildLogoutButton(BuildContext context, bool isDark, WidgetRef ref) {
+  Widget _buildLogoutButton(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
     final buttonHeight = Responsive.buttonHeight(context);

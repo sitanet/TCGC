@@ -18,10 +18,10 @@ class AudioCacheService {
   
   static const String _metadataCacheKey = 'audio_metadata_cache';
   static const String _categoriesCacheKey = 'categories_cache';
-  // Pre-buffer ~1 minute of audio for instant playback with seamless transition
-  // At 128kbps (16KB/s), 1 minute = ~960KB. We use 1MB for comfortable buffer.
-  static const int _preBufferBytes = 1 * 1024 * 1024; // 1MB for ~1 minute
-  static const int _maxPreBufferItems = 100; // Buffer all sermons at login
+  // Pre-buffer ~30 seconds of audio for instant playback
+  // At 128kbps (16KB/s), 30 seconds = ~480KB. We use 512KB for comfortable buffer.
+  static const int _preBufferBytes = 512 * 1024; // 512KB for ~30 seconds
+  static const int _maxPreBufferItems = 5; // Only buffer first 5 sermons to avoid memory issues
   
   // Store full URLs for pre-buffered content
   final Map<String, String> _audioUrls = {};
@@ -92,59 +92,18 @@ class AudioCacheService {
   }
 
   /// Pre-buffer audio files silently in background for instant playback
+  /// DISABLED: Causing ANR issues, audio will stream directly instead
   Future<void> preBufferCategory(List<Sermon> sermons, {int count = _maxPreBufferItems}) async {
-    final toBuffer = sermons.take(count).toList();
-    debugPrint('Starting silent background pre-buffer for ${toBuffer.length} sermons (~1 min each)...');
-    
-    // Buffer in background without blocking
-    Future.microtask(() async {
-      // Process in parallel batches for faster pre-buffering
-      const batchSize = 5;
-      for (var i = 0; i < toBuffer.length; i += batchSize) {
-        final batch = toBuffer.skip(i).take(batchSize).toList();
-        
-        await Future.wait(
-          batch.where((sermon) => 
-            sermon.audioUrl != null && 
-            sermon.audioUrl!.isNotEmpty &&
-            !_audioBuffers.containsKey(sermon.id)
-          ).map((sermon) async {
-            // Check disk cache first
-            final diskBuffer = await _loadBufferFromDisk(sermon.id);
-            if (diskBuffer != null && diskBuffer.length >= _preBufferBytes * 0.9) {
-              _audioBuffers[sermon.id] = diskBuffer;
-              final url = await _loadUrlFromDisk(sermon.id);
-              if (url != null) _audioUrls[sermon.id] = url;
-              return;
-            }
-            
-            // Pre-buffer this sermon
-            await _preBufferAudio(sermon.id, sermon.audioUrl!);
-          }),
-        );
-        
-        // Small delay between batches to be network-friendly
-        if (i + batchSize < toBuffer.length) {
-          await Future.delayed(const Duration(milliseconds: 100));
-        }
-      }
-      debugPrint('Background pre-buffering completed for ${toBuffer.length} sermons');
-    });
+    // Disabled pre-buffering to prevent ANR - audio will stream on demand
+    debugPrint('Pre-buffering disabled to prevent ANR issues');
+    return;
   }
   
   /// Pre-buffer additional items (for infinite scroll)
+  /// DISABLED: Causing ANR issues
   Future<void> preBufferMore(List<Sermon> sermons, int startIndex, {int count = 10}) async {
-    final endIndex = (startIndex + count).clamp(0, sermons.length);
-    if (startIndex >= sermons.length) return;
-    
-    final toBuffer = sermons.sublist(startIndex, endIndex);
-    debugPrint('Pre-buffering ${toBuffer.length} more audio files (index $startIndex-$endIndex)...');
-    
-    for (final sermon in toBuffer) {
-      if (sermon.audioUrl != null && sermon.audioUrl!.isNotEmpty) {
-        _preBufferAudio(sermon.id, sermon.audioUrl!);
-      }
-    }
+    // Disabled to prevent ANR
+    return;
   }
 
   /// Pre-buffer ~1 minute of audio for instant playback
@@ -299,10 +258,10 @@ class AudioCacheService {
   }
 
   /// Pre-buffer a single sermon (call when user might play it soon)
+  /// DISABLED: Causing ANR issues
   Future<void> preBufferSingle(Sermon sermon) async {
-    if (sermon.audioUrl != null && sermon.audioUrl!.isNotEmpty) {
-      await _preBufferAudio(sermon.id, sermon.audioUrl!);
-    }
+    // Disabled to prevent ANR
+    return;
   }
 
   String _sanitizeFileName(String id) {

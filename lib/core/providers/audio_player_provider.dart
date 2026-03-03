@@ -37,7 +37,7 @@ Future<void> initAudioService() async {
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.tcgc.tcgc.audio',
         androidNotificationChannelName: 'TCGC Audio',
-        androidNotificationOngoing: true,
+        androidNotificationOngoing: false,
         androidStopForegroundOnPause: true,
         androidNotificationIcon: 'mipmap/ic_launcher',
       ),
@@ -82,22 +82,17 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool get hasPrevious => _currentIndex > 0;
 
   AudioPlayerProvider() {
-    _initCacheDir();
-    _audioCacheService.initialize();
-    _initPositionService();
     WidgetsBinding.instance.addObserver(this);
-    _initProvider();
+    // Initialize in background
+    Future.microtask(() async {
+      await _initCacheDir();
+      await _initPositionService();
+      _setupListeners();
+    });
   }
   
   bool _positionServiceInitialized = false;
   bool _listenersSetup = false;
-  
-  Future<void> _initProvider() async {
-    if (!_audioServiceInitialized) {
-      await initAudioService();
-    }
-    _setupListeners();
-  }
   
   Future<void> _initPositionService() async {
     await _positionService.initialize();
@@ -282,7 +277,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
         id: sermon.id,
         title: sermon.title,
         artist: sermon.speaker ?? 'TCGC',
-        album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Sermons',
+        album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Messages',
         artUri: sermon.imageUrl != null ? Uri.parse(sermon.imageUrl!) : null,
       );
 
@@ -463,7 +458,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
         id: sermon.id,
         title: sermon.title,
         artist: sermon.speaker ?? 'TCGC',
-        album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Sermons',
+        album: sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Messages',
         artUri: sermon.imageUrl != null ? Uri.parse(sermon.imageUrl!) : null,
       );
 
@@ -602,6 +597,69 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
       }
     } catch (e) {
       debugPrint('Error deleting cached sermon: $e');
+    }
+  }
+
+  // Livestream support
+  bool _isLiveStream = false;
+  bool get isLiveStream => _isLiveStream;
+
+  Future<void> playLiveStream(String streamUrl, {String title = 'Live Stream', String subtitle = 'TCGC Live'}) async {
+    _errorMessage = null;
+    _isLiveStream = true;
+    _isLoading = true;
+    _queue.clear();
+    _currentIndex = -1;
+    notifyListeners();
+
+    // Create a pseudo-sermon for the livestream
+    _currentSermon = Sermon(
+      id: 'livestream',
+      title: title,
+      description: subtitle,
+      category: 'Live',
+      categoryName: 'Live Stream',
+      date: DateTime.now(),
+      duration: Duration.zero,
+      audioUrl: streamUrl,
+    );
+
+    try {
+      final mediaItem = MediaItem(
+        id: 'livestream',
+        title: title,
+        artist: subtitle,
+        album: 'TCGC Live',
+        artUri: null,
+      );
+
+      if (_useAudioService && _audioHandler != null) {
+        _audioHandler!.stop();
+        await _audioHandler!.setAudioSource(streamUrl, mediaItem);
+        _audioHandler!.play();
+      } else if (_fallbackPlayer != null) {
+        _fallbackPlayer!.stop();
+        await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(streamUrl)));
+        _fallbackPlayer!.play();
+      }
+
+      _isPlaying = true;
+      _isLoading = false;
+    } catch (e) {
+      debugPrint('Livestream playback error: $e');
+      _errorMessage = 'Failed to play live stream: $e';
+      _isLoading = false;
+      _isLiveStream = false;
+    }
+    notifyListeners();
+  }
+
+  Future<void> stopLiveStream() async {
+    if (_isLiveStream) {
+      await stop();
+      _isLiveStream = false;
+      _currentSermon = null;
+      notifyListeners();
     }
   }
 

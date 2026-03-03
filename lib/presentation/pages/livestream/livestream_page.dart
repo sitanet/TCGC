@@ -74,6 +74,7 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
       appBar: CustomAppBar(
         title: '',
         showBackButton: true,
+        lightBackground: true,
         onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
       ),
       body: Column(

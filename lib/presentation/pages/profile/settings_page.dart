@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'change_password_page.dart';
+import '../interests/edit_interests_page.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -229,6 +230,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 isDark,
                 'Account',
                 [
+                  _buildNavigationTile(
+                      context, isDark, 'Interests', Icons.interests_outlined),
+                  Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: isDark
+                        ? Colors.white.withAlpha(25)
+                        : Colors.black.withAlpha(13),
+                  ),
                   _buildNavigationTile(
                       context, isDark, 'Change Password', Icons.lock_outline),
                 ],
@@ -489,6 +500,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             context,
             MaterialPageRoute(
                 builder: (context) => const ChangePasswordPage()),
+          );
+        } else if (title == 'Interests') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const EditInterestsPage()),
           );
         }
       },

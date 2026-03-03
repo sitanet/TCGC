@@ -40,8 +40,8 @@ class ContentCacheService {
       _initialized = true;
       debugPrint('ContentCacheService initialized');
       
-      // Resume incomplete downloads in background
-      _resumeIncompleteDownloads();
+      // Disabled to prevent ANR
+      // _resumeIncompleteDownloads();
     } catch (e) {
       debugPrint('ContentCacheService init error: $e');
     }
@@ -73,8 +73,11 @@ class ContentCacheService {
         final List<dynamic> data = decoded is List ? decoded : (decoded['results'] ?? decoded);
         final categories = data.map((json) => MessageCategory.fromJson(json)).toList();
         
-        await _db.cacheCategories(categories);
-        await _db.updateSyncMetadata('categories');
+        // Cache in background to not block UI
+        Future.microtask(() async {
+          await _db.cacheCategories(categories);
+          await _db.updateSyncMetadata('categories');
+        });
         
         debugPrint('Fetched and cached ${categories.length} categories');
         return categories;
@@ -115,12 +118,11 @@ class ContentCacheService {
         final List<dynamic> results = data['results'] ?? data;
         final sermons = results.map((json) => Sermon.fromJson(json)).toList();
         
-        // Cache the new data
-        await _db.cacheSermons(sermons);
-        await _db.updateSyncMetadata('sermons');
-        
-        // Pre-cache audio for first 10 sermons in background
-        _preCacheAudioInBackground(sermons.take(10).toList());
+        // Cache in background to not block UI
+        Future.microtask(() async {
+          await _db.cacheSermons(sermons);
+          await _db.updateSyncMetadata('sermons');
+        });
         
         debugPrint('Fetched and cached ${sermons.length} sermons');
         return sermons;
@@ -152,27 +154,28 @@ class ContentCacheService {
         final List<dynamic> data = response.dataList;
         final sermons = data.map((json) => Sermon.fromJson(json)).toList();
         
-        // Mark as recommended and cache
-        for (final sermon in sermons) {
-          final recommended = Sermon(
-            id: sermon.id,
-            title: sermon.title,
-            description: sermon.description,
-            speaker: sermon.speaker,
-            imageUrl: sermon.imageUrl,
-            audioUrl: sermon.audioUrl,
-            videoUrl: sermon.videoUrl,
-            transcript: sermon.transcript,
-            category: sermon.category,
-            categoryName: sermon.categoryName,
-            date: sermon.date,
-            duration: sermon.duration,
-            isRecommended: true,
-          );
-          await _db.cacheSermons([recommended]);
-        }
-        
-        await _db.updateSyncMetadata('recommended_sermons');
+        // Mark as recommended and cache in background
+        Future.microtask(() async {
+          for (final sermon in sermons) {
+            final recommended = Sermon(
+              id: sermon.id,
+              title: sermon.title,
+              description: sermon.description,
+              speaker: sermon.speaker,
+              imageUrl: sermon.imageUrl,
+              audioUrl: sermon.audioUrl,
+              videoUrl: sermon.videoUrl,
+              transcript: sermon.transcript,
+              category: sermon.category,
+              categoryName: sermon.categoryName,
+              date: sermon.date,
+              duration: sermon.duration,
+              isRecommended: true,
+            );
+            await _db.cacheSermons([recommended]);
+          }
+          await _db.updateSyncMetadata('recommended_sermons');
+        });
         return sermons;
       }
     } catch (e) {
@@ -205,8 +208,11 @@ class ContentCacheService {
         final List<dynamic> results = data['results'] ?? data;
         final events = results.map((json) => Event.fromJson(json)).toList();
         
-        await _db.cacheEvents(events);
-        await _db.updateSyncMetadata('events');
+        // Cache in background to not block UI
+        Future.microtask(() async {
+          await _db.cacheEvents(events);
+          await _db.updateSyncMetadata('events');
+        });
         
         debugPrint('Fetched and cached ${events.length} events');
         return events;
@@ -219,36 +225,10 @@ class ContentCacheService {
   }
 
   // Pre-cache 3 minutes of audio for a sermon
+  // DISABLED: Causing ANR issues - audio will stream on demand
   Future<void> preCacheAudio(Sermon sermon) async {
-    if (sermon.audioUrl == null || sermon.audioUrl!.isEmpty) return;
-    if (_audioCacheDir == null) await initialize();
-    
-    final sermonId = sermon.id;
-    final audioUrl = sermon.audioUrl!;
-    
-    // Check if already downloading or cached
-    if (_downloadCompleters.containsKey(sermonId)) return;
-    
-    final existingCache = await _db.getAudioCacheMetadata(sermonId);
-    if (existingCache != null) {
-      final cachedBytes = existingCache['cached_bytes'] as int? ?? 0;
-      if (cachedBytes >= _threeMinutesBytes) {
-        debugPrint('Audio already cached for sermon: $sermonId');
-        return;
-      }
-    }
-    
-    _downloadCompleters[sermonId] = Completer<void>();
-    _downloadProgress[sermonId] = 0.0;
-    
-    try {
-      await _downloadAudioPartial(sermonId, audioUrl);
-    } catch (e) {
-      debugPrint('Error pre-caching audio for $sermonId: $e');
-    } finally {
-      _downloadCompleters[sermonId]?.complete();
-      _downloadCompleters.remove(sermonId);
-    }
+    // Disabled to prevent ANR
+    return;
   }
 
   Future<void> _downloadAudioPartial(String sermonId, String audioUrl, {int startByte = 0}) async {
@@ -358,12 +338,24 @@ class ContentCacheService {
     return _downloadCompleters.containsKey(sermonId);
   }
 
-  // Background sync methods
+  // Throttle background syncs to prevent multiple simultaneous operations
+  bool _isSyncingSermons = false;
+  bool _isSyncingEvents = false;
+  bool _isSyncingCategories = false;
+
+  // Background sync methods - with throttling and delayed execution
   void _syncSermonsInBackground() {
-    Future.microtask(() async {
+    if (_isSyncingSermons) return;
+    _isSyncingSermons = true;
+    
+    // Delay background sync to let UI settle first
+    Future.delayed(const Duration(seconds: 3), () async {
       try {
         final hasConnection = await _checkConnectivity();
-        if (!hasConnection) return;
+        if (!hasConnection) {
+          _isSyncingSermons = false;
+          return;
+        }
         
         final response = await _api.get(ApiConstants.messages);
         if (response.isSuccess) {
@@ -371,29 +363,28 @@ class ContentCacheService {
           final List<dynamic> results = data['results'] ?? data;
           final sermons = results.map((json) => Sermon.fromJson(json)).toList();
           
-          // Get existing IDs to detect new content
-          final existingIds = await _db.getCachedSermonIds();
-          final newSermons = sermons.where((s) => !existingIds.contains(s.id)).toList();
-          
           await _db.cacheSermons(sermons);
           await _db.updateSyncMetadata('sermons');
-          
-          if (newSermons.isNotEmpty) {
-            debugPrint('Background sync found ${newSermons.length} new sermons');
-            _preCacheAudioInBackground(newSermons.take(5).toList());
-          }
         }
       } catch (e) {
         debugPrint('Background sync error: $e');
+      } finally {
+        _isSyncingSermons = false;
       }
     });
   }
 
   void _syncEventsInBackground() {
-    Future.microtask(() async {
+    if (_isSyncingEvents) return;
+    _isSyncingEvents = true;
+    
+    Future.delayed(const Duration(seconds: 4), () async {
       try {
         final hasConnection = await _checkConnectivity();
-        if (!hasConnection) return;
+        if (!hasConnection) {
+          _isSyncingEvents = false;
+          return;
+        }
         
         final response = await _api.get(ApiConstants.events);
         if (response.isSuccess) {
@@ -406,15 +397,23 @@ class ContentCacheService {
         }
       } catch (e) {
         debugPrint('Background events sync error: $e');
+      } finally {
+        _isSyncingEvents = false;
       }
     });
   }
 
   void _syncCategoriesInBackground() {
-    Future.microtask(() async {
+    if (_isSyncingCategories) return;
+    _isSyncingCategories = true;
+    
+    Future.delayed(const Duration(seconds: 5), () async {
       try {
         final hasConnection = await _checkConnectivity();
-        if (!hasConnection) return;
+        if (!hasConnection) {
+          _isSyncingCategories = false;
+          return;
+        }
         
         final response = await _api.get(ApiConstants.messageCategories);
         if (response.isSuccess) {
@@ -427,6 +426,8 @@ class ContentCacheService {
         }
       } catch (e) {
         debugPrint('Background categories sync error: $e');
+      } finally {
+        _isSyncingCategories = false;
       }
     });
   }

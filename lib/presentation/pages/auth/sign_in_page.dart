@@ -27,18 +27,25 @@ class _SignInPageState extends ConsumerState<SignInPage> {
   void initState() {
     super.initState();
     _emailController.addListener(_validateEmail);
-    _initBiometric();
+    // Delay biometric initialization to let UI render first
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _initBiometric();
+    });
   }
 
   Future<void> _initBiometric() async {
-    final biometricProvider = ref.read(biometricChangeNotifierProvider);
-    await biometricProvider.initialize();
-    if (mounted) {
-      setState(() {
-        _biometricAvailable = biometricProvider.isAvailable && 
-                              biometricProvider.biometricLoginEnabled &&
-                              biometricProvider.hasSavedCredentials;
-      });
+    try {
+      final biometricProvider = ref.read(biometricChangeNotifierProvider);
+      await biometricProvider.initialize();
+      if (mounted) {
+        setState(() {
+          _biometricAvailable = biometricProvider.isAvailable && 
+                                biometricProvider.biometricLoginEnabled &&
+                                biometricProvider.hasSavedCredentials;
+        });
+      }
+    } catch (e) {
+      debugPrint('Biometric init error: $e');
     }
   }
 

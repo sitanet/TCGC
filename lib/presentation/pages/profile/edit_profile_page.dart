@@ -129,7 +129,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: const CustomAppBar(title: 'Edit Profile', showBackButton: true),
+      appBar: const CustomAppBar(title: 'Edit Profile', showBackButton: true, lightBackground: true),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -147,7 +147,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   label: 'First Name',
                   hint: 'Enter your first name',
                   isDark: isDark,
-                  enabled: false,
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
@@ -155,7 +154,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   label: 'Middle Name',
                   hint: 'Enter your middle name (optional)',
                   isDark: isDark,
-                  enabled: false,
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
@@ -163,7 +161,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   label: 'Last Name',
                   hint: 'Enter your last name',
                   isDark: isDark,
-                  enabled: false,
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
@@ -175,7 +172,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   enabled: false,
                 ),
                 const SizedBox(height: 16),
-                _buildPhoneField(isDark, enabled: false),
+                _buildPhoneField(isDark),
                 const SizedBox(height: 16),
                 _buildTextField(
                   controller: _ninController,
@@ -1027,9 +1024,25 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     if (_formKey.currentState?.validate() ?? false) {
       final authProvider = ref.read(authChangeNotifierProvider);
       
-      // Build profile data - only editable fields
-      // Note: first_name, middle_name, last_name, email, and phone_number are not editable for security
       final Map<String, dynamic> profileData = {};
+      
+      // Personal Information
+      if (_firstNameController.text.trim().isNotEmpty) {
+        profileData['first_name'] = _firstNameController.text.trim();
+      }
+      
+      if (_middleNameController.text.trim().isNotEmpty) {
+        profileData['middle_name'] = _middleNameController.text.trim();
+      }
+      
+      if (_lastNameController.text.trim().isNotEmpty) {
+        profileData['last_name'] = _lastNameController.text.trim();
+      }
+      
+      if (_phoneController.text.trim().isNotEmpty) {
+        profileData['phone_number'] = _phoneController.text.trim();
+        profileData['country_code'] = _selectedCountryCode.dialCode;
+      }
       
       if (_selectedGender != null) {
         profileData['gender'] = _selectedGender;

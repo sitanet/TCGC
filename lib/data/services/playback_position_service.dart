@@ -34,14 +34,22 @@ class PlaybackPosition {
   double get progress => durationMs > 0 ? positionMs / durationMs : 0.0;
   
   String get formattedPosition {
+    final hours = position.inHours;
     final minutes = position.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = position.inSeconds.remainder(60).toString().padLeft(2, '0');
+    if (hours > 0) {
+      return '$hours:$minutes:$seconds';
+    }
     return '$minutes:$seconds';
   }
   
   String get formattedDuration {
+    final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    if (hours > 0) {
+      return '$hours:$minutes:$seconds';
+    }
     return '$minutes:$seconds';
   }
   

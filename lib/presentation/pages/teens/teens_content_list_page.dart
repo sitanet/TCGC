@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/teens_content.dart';
+import '../../../data/services/data_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'teens_content_detail_page.dart';
 
@@ -16,32 +17,77 @@ String _stripHtmlTags(String htmlText) {
       .trim();
 }
 
-class TeensContentListPage extends StatelessWidget {
+enum TeensContentType { devotionals, retreats, forgeCamp }
+
+class TeensContentListPage extends StatefulWidget {
   final String title;
   final List<TeensContent> contents;
   final Color accentColor;
+  final TeensContentType contentType;
 
   const TeensContentListPage({
     super.key,
     required this.title,
     required this.contents,
     required this.accentColor,
+    required this.contentType,
   });
+
+  @override
+  State<TeensContentListPage> createState() => _TeensContentListPageState();
+}
+
+class _TeensContentListPageState extends State<TeensContentListPage> {
+  final DataService _dataService = DataService();
+  late List<TeensContent> _contents;
+
+  @override
+  void initState() {
+    super.initState();
+    _contents = widget.contents;
+  }
+
+  Future<void> _onRefresh() async {
+    try {
+      List<TeensContent> refreshedContents;
+      switch (widget.contentType) {
+        case TeensContentType.devotionals:
+          refreshedContents = await _dataService.getDevotionals();
+          break;
+        case TeensContentType.retreats:
+          refreshedContents = await _dataService.getRetreats();
+          break;
+        case TeensContentType.forgeCamp:
+          refreshedContents = await _dataService.getForgeCamp();
+          break;
+      }
+      if (mounted) {
+        setState(() => _contents = refreshedContents);
+      }
+    } catch (e) {
+      debugPrint('Error refreshing teens content: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: CustomAppBar(title: title, showBackButton: true),
-      body: contents.isEmpty
+      appBar: CustomAppBar(title: widget.title, showBackButton: true),
+      body: _contents.isEmpty
           ? _buildEmptyState(context, isDark)
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: contents.length,
-              itemBuilder: (context, index) {
-                return _buildContentCard(context, isDark, contents[index]);
-              },
+          : RefreshIndicator(
+              onRefresh: _onRefresh,
+              color: AppColors.primaryGold,
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                itemCount: _contents.length,
+                itemBuilder: (context, index) {
+                  return _buildContentCard(context, isDark, _contents[index]);
+                },
+              ),
             ),
     );
   }
@@ -83,11 +129,11 @@ class TeensContentListPage extends StatelessWidget {
     Widget placeholder = Container(
       height: 160,
       width: double.infinity,
-      color: accentColor.withValues(alpha: 0.2),
+      color: widget.accentColor.withValues(alpha: 0.2),
       child: Icon(
         Icons.image_outlined,
         size: 48,
-        color: accentColor,
+        color: widget.accentColor,
       ),
     );
 
@@ -121,7 +167,7 @@ class TeensContentListPage extends StatelessWidget {
           MaterialPageRoute(
             builder: (_) => TeensContentDetailPage(
               content: content,
-              accentColor: accentColor,
+              accentColor: widget.accentColor,
             ),
           ),
         );
@@ -155,7 +201,7 @@ class TeensContentListPage extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: accentColor,
+                        color: widget.accentColor,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -198,7 +244,7 @@ class TeensContentListPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    content.title,
+                    _stripHtmlTags(content.title),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -239,7 +285,7 @@ class TeensContentListPage extends StatelessWidget {
                       Icon(
                         Icons.arrow_forward_ios,
                         size: 14,
-                        color: accentColor,
+                        color: widget.accentColor,
                       ),
                     ],
                   ),

@@ -213,6 +213,20 @@ class AuthService {
     );
   }
 
+  Future<AuthResult> verifyPassword(String password) async {
+    final response = await _api.post(ApiConstants.verifyPassword, {
+      'password': password,
+    });
+
+    if (response.isSuccess) {
+      return AuthResult(success: true);
+    }
+    return AuthResult(
+      success: false,
+      error: response.errorMessage ?? 'Invalid password',
+    );
+  }
+
   Future<AuthResult> forgotPassword(String email) async {
     final normalizedEmail = email.toLowerCase();
     final response = await _api.post(ApiConstants.forgotPassword, {
@@ -256,8 +270,10 @@ class AuthService {
     final response = await _api.get(ApiConstants.myContactMessages);
     
     if (response.isSuccess) {
-      final List<dynamic> data = response.dataList;
-      return data.map((json) => ContactMessage.fromJson(json)).toList();
+      final data = response.data;
+      // Handle both paginated and non-paginated responses
+      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
+      return results.map((json) => ContactMessage.fromJson(json)).toList();
     }
     return [];
   }

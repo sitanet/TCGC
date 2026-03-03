@@ -108,26 +108,29 @@ class _InterestsPageState extends State<InterestsPage> {
             constraints: BoxConstraints(maxWidth: maxWidth),
             child: Column(
               children: [
-                // Header
+                // Header with Church Logo
                 Padding(
                   padding: EdgeInsets.all(horizontalPadding),
                   child: Column(
                     children: [
-                      SizedBox(height: spacing),
-                      Icon(
-                        Icons.interests_outlined,
-                        size: 60,
-                        color: AppColors.primaryGold,
-                      ),
-                      SizedBox(height: spacing),
-                      Text(
-                        'What interests you?',
-                        style: TextStyle(
-                          fontSize: titleFontSize,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black,
+                      SizedBox(height: spacing * 0.5),
+                      // Title with gradient effect
+                      ShaderMask(
+                        shaderCallback: (bounds) => LinearGradient(
+                          colors: [
+                            AppColors.primaryGold,
+                            AppColors.primaryGold.withValues(alpha: 0.8),
+                          ],
+                        ).createShader(bounds),
+                        child: Text(
+                          'What interests you?',
+                          style: TextStyle(
+                            fontSize: titleFontSize * 1.1,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
                       ),
                       SizedBox(height: spacing * 0.5),
                       Text(
@@ -135,23 +138,45 @@ class _InterestsPageState extends State<InterestsPage> {
                         style: TextStyle(
                           fontSize: bodyFontSize,
                           color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          height: 1.4,
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      SizedBox(height: spacing * 0.5),
+                      SizedBox(height: spacing * 0.75),
+                      // Selection counter with improved design
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: spacing, vertical: spacing * 0.5),
+                        padding: EdgeInsets.symmetric(horizontal: spacing * 1.2, vertical: spacing * 0.6),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryGold.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '${_selectedIds.length} of $maxSelection selected',
-                          style: TextStyle(
-                            fontSize: bodyFontSize * 0.9,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primaryGold,
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primaryGold.withValues(alpha: 0.15),
+                              AppColors.primaryGold.withValues(alpha: 0.05),
+                            ],
                           ),
+                          borderRadius: BorderRadius.circular(25),
+                          border: Border.all(
+                            color: AppColors.primaryGold.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle_outline,
+                              size: 18,
+                              color: AppColors.primaryGold,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${_selectedIds.length} of $maxSelection selected',
+                              style: TextStyle(
+                                fontSize: bodyFontSize * 0.9,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primaryGold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

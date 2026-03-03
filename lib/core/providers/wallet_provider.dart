@@ -241,7 +241,10 @@ class WalletProvider extends ChangeNotifier {
       final response = await _api.get(ApiConstants.giveOptions);
       
       if (response.isSuccess) {
-        final List<dynamic> data = response.dataList;
+        final decoded = response.data;
+        final List<dynamic> data = decoded is List 
+            ? decoded 
+            : (decoded['results'] ?? decoded['data'] ?? []);
         _giveOptions = data.map((item) => GiveOptionModel.fromJson(item)).toList();
       }
     } catch (e) {
@@ -255,7 +258,10 @@ class WalletProvider extends ChangeNotifier {
       final response = await _api.get(ApiConstants.transactions);
       
       if (response.isSuccess) {
-        final List<dynamic> data = response.dataList;
+        final decoded = response.data;
+        final List<dynamic> data = decoded is List 
+            ? decoded 
+            : (decoded['results'] ?? decoded['data'] ?? []);
         _transactions = data.map((item) => TransactionModel.fromJson(item)).toList();
       }
     } catch (e) {
@@ -269,7 +275,10 @@ class WalletProvider extends ChangeNotifier {
       final response = await _api.get(ApiConstants.givings);
       
       if (response.isSuccess) {
-        final List<dynamic> data = response.dataList;
+        final decoded = response.data;
+        final List<dynamic> data = decoded is List 
+            ? decoded 
+            : (decoded['results'] ?? decoded['data'] ?? []);
         _givings = data.map((item) => GivingModel.fromJson(item)).toList();
       }
     } catch (e) {
@@ -471,6 +480,24 @@ class WalletProvider extends ChangeNotifier {
       _error = 'Failed to set transaction PIN';
       _isLoading = false;
       notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> verifyPin(String pin) async {
+    _error = null;
+    try {
+      final response = await _api.post('${ApiConstants.transactionPin}verify/', {
+        'pin': pin,
+      });
+      if (response.isSuccess && response.data['valid'] == true) {
+        return true;
+      }
+      _error = response.errorMessage ?? 'Invalid PIN';
+      return false;
+    } catch (e) {
+      debugPrint('Error verifying PIN: $e');
+      _error = 'Failed to verify PIN';
       return false;
     }
   }

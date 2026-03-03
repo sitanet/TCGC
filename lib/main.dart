@@ -27,16 +27,13 @@ import 'data/services/interests_service.dart';
 import 'presentation/widgets/bottom_nav_bar.dart';
 import 'presentation/widgets/mini_player.dart';
 import 'presentation/widgets/promotion_popup.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'data/services/data_service.dart' show DataService, AppUpdateInfo;
 import 'data/services/notification_service.dart';
-import 'data/services/audio_cache_service.dart';
 import 'presentation/pages/audio/audio_player_page.dart';
 import 'domain/entities/promotion.dart';
-import 'domain/entities/sermon.dart';
-import 'domain/entities/event.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/widgets/network_aware_widget.dart';
+import 'data/services/biometric_service.dart';
 
 const String appVersion = '1.0.0';
 
@@ -62,7 +59,7 @@ void main() async {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
     
-    // Initialize Firebase only on supported platforms (Android/iOS)
+    // Initialize Firebase FIRST (required for other services) - this is fast
     if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       try {
         await Firebase.initializeApp();
@@ -71,17 +68,28 @@ void main() async {
       }
     }
     
-    // Initialize audio service for background playback
-    await initAudioService();
+    // Initialize AudioService BEFORE runApp (required for background audio)
+    try {
+      await initAudioService();
+    } catch (e) {
+      debugPrint('Audio service initialization error: $e');
+    }
     
-    // Initialize connectivity service
-    await ConnectivityService().initialize();
-    
+    // Now start the app
     runApp(
       const ProviderScope(
         child: MyApp(),
       ),
     );
+    
+    // Initialize non-critical services in background
+    Future.delayed(const Duration(seconds: 2), () async {
+      try {
+        await ConnectivityService().initialize();
+      } catch (e) {
+        debugPrint('Connectivity service initialization error: $e');
+      }
+    });
   }, (error, stackTrace) {
     debugPrint('Uncaught async error: $error');
     debugPrint('Stack trace: $stackTrace');
@@ -111,55 +119,58 @@ class _MyAppState extends ConsumerState<MyApp> {
   }
 
   Future<void> _initializeApp() async {
-    try {
-      final authProvider = ref.read(authChangeNotifierProvider);
-      
-      await Future.wait([
-        authProvider.initialize().timeout(
+    // Show UI immediately, don't wait for initialization
+    if (mounted) {
+      setState(() {
+        _initialized = true;
+      });
+    }
+    
+    // Initialize auth in background
+    Future.microtask(() async {
+      try {
+        final authProvider = ref.read(authChangeNotifierProvider);
+        
+        await authProvider.initialize().timeout(
           const Duration(seconds: 5),
           onTimeout: () {
             debugPrint('Auth initialization timed out');
           },
-        ),
-        _interestsService.initialize().timeout(
-          const Duration(seconds: 5),
+        );
+        
+        await _interestsService.initialize().timeout(
+          const Duration(seconds: 3),
           onTimeout: () {
             debugPrint('Interests initialization timed out');
           },
-        ),
-      ]);
-      
-      _initializeNotifications();
-      
-      if (mounted) {
-        setState(() {
-          _initialized = true;
-          if (authProvider.isAuthenticated) {
+        );
+        
+        if (mounted && authProvider.isAuthenticated) {
+          setState(() {
             _showGetStarted = false;
             if (!_interestsService.interestsCompleted) {
               _showInterests = true;
             }
-            // Start pre-buffering for already logged in users
-            _startBackgroundPreBuffering();
-          }
-        });
+          });
+          _startBackgroundPreBuffering();
+        }
+        
+        _initializeNotifications();
+      } catch (e) {
+        debugPrint('Initialization error: $e');
       }
-    } catch (e) {
-      debugPrint('Initialization error: $e');
-      if (mounted) {
-        setState(() {
-          _initialized = true;
-        });
-      }
-    }
+    });
   }
   
   Future<void> _initializeNotifications() async {
-    try {
-      await ref.read(notificationChangeNotifierProvider).initialize();
-    } catch (e) {
-      debugPrint('Notification initialization error: $e');
-    }
+    // Delay notification init to let UI render first
+    Future.delayed(const Duration(seconds: 1), () async {
+      try {
+        await ref.read(notificationChangeNotifierProvider).initialize();
+      } catch (e) {
+        debugPrint('Notification initialization error: $e');
+      }
+    });
   }
 
   void _onAuthenticated() {
@@ -175,60 +186,9 @@ class _MyAppState extends ConsumerState<MyApp> {
   }
   
   Future<void> _startBackgroundPreBuffering() async {
-    try {
-      final dataService = DataService();
-      final audioCacheService = AudioCacheService();
-      await audioCacheService.initialize();
-      
-      // Fetch all messages - this will cache metadata in local database
-      final sermons = await dataService.getMessages();
-      if (sermons.isNotEmpty) {
-        debugPrint('Caching ${sermons.length} sermons metadata, images, and audio');
-        
-        // Cache sermon metadata is already done by dataService
-        // Pre-cache all sermon images in background
-        _preCacheImages(sermons);
-        
-        // Pre-buffer audio for all sermons
-        audioCacheService.preBufferCategory(sermons, count: sermons.length);
-      }
-      
-      // Also cache events
-      final events = await dataService.getEvents();
-      if (events.isNotEmpty) {
-        debugPrint('Caching ${events.length} events');
-        _preCacheEventImages(events);
-      }
-      
-      // Cache categories
-      final categories = await dataService.getMessageCategories();
-      if (categories.isNotEmpty) {
-        debugPrint('Caching ${categories.length} categories');
-        audioCacheService.cacheMetadata(categories: categories, sermons: sermons);
-      }
-    } catch (e) {
-      debugPrint('Background caching error: $e');
-    }
-  }
-  
-  void _preCacheImages(List<Sermon> sermons) {
-    for (final sermon in sermons) {
-      if (sermon.imageUrl != null && sermon.imageUrl!.isNotEmpty) {
-        try {
-          CachedNetworkImageProvider(sermon.imageUrl!).resolve(ImageConfiguration.empty);
-        } catch (_) {}
-      }
-    }
-  }
-  
-  void _preCacheEventImages(List<Event> events) {
-    for (final event in events) {
-      if (event.imageUrl != null && event.imageUrl!.isNotEmpty) {
-        try {
-          CachedNetworkImageProvider(event.imageUrl!).resolve(ImageConfiguration.empty);
-        } catch (_) {}
-      }
-    }
+    // Disabled heavy background caching to prevent ANR issues
+    // Data will be fetched on demand from screens
+    debugPrint('Background pre-buffering disabled to prevent ANR');
   }
   
   void _onInterestsComplete() {
@@ -327,19 +287,30 @@ class MainScreen extends ConsumerStatefulWidget {
 class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObserver {
   bool _showPromotion = false;
   bool _showUpdateDialog = false;
+  bool _walletAuthenticated = false;
   List<Promotion> _activePromotions = [];
   final DataService _dataService = DataService();
   AppUpdateInfo? _updateInfo;
   
   static const String _lastTabKey = 'last_tab_index';
 
-  final List<Widget> _pages = const [
-    HomePage(),
-    AudioPage(),
-    LiveStreamPage(),
-    WalletPage(),
-    TeensPage(),
-  ];
+  // Pages are built lazily to prevent ANR from heavy pages like LiveStreamPage
+  Widget _buildPage(int index) {
+    switch (index) {
+      case 0:
+        return const HomePage();
+      case 1:
+        return const AudioPage();
+      case 2:
+        return const LiveStreamPage();
+      case 3:
+        return const WalletPage();
+      case 4:
+        return const TeensPage();
+      default:
+        return const HomePage();
+    }
+  }
 
   int get _currentIndex => ref.watch(mainTabIndexProvider);
 
@@ -352,11 +323,19 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _restoreLastTab();
-    _initializeWallet();
-    _checkForAppUpdate();
-    _checkForPromotion();
     _setupNotificationHandler();
+    _restoreLastTab();
+    
+    // Delay non-critical operations to let UI render first
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _initializeWallet();
+    });
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) _checkForAppUpdate();
+    });
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) _checkForPromotion();
+    });
   }
   
   void _setupNotificationHandler() {
@@ -402,7 +381,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastIndex = prefs.getInt(_lastTabKey) ?? 0;
-      if (lastIndex >= 0 && lastIndex < _pages.length && mounted) {
+      if (lastIndex >= 0 && lastIndex < 5 && mounted) {
         ref.read(mainTabIndexProvider.notifier).state = lastIndex;
       }
     } catch (e) {
@@ -425,6 +404,56 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     } catch (e) {
       debugPrint('Wallet initialization error: $e');
     }
+  }
+  
+  Future<void> _handleWalletTap() async {
+    final walletProvider = ref.read(walletChangeNotifierProvider);
+    
+    // If user doesn't have wallet, go directly to wallet page (no auth needed for creation)
+    if (!walletProvider.hasWallet) {
+      _setCurrentIndex(3);
+      return;
+    }
+    
+    // If already authenticated in this session, go directly
+    if (_walletAuthenticated) {
+      _setCurrentIndex(3);
+      return;
+    }
+    
+    // Show authentication dialog
+    final authenticated = await _showWalletAuthDialog();
+    if (authenticated) {
+      _walletAuthenticated = true;
+      _setCurrentIndex(3);
+    }
+  }
+  
+  Future<bool> _showWalletAuthDialog() async {
+    final biometricService = BiometricService();
+    final biometricEnabled = await biometricService.isBiometricTransactionEnabled();
+    final biometricAvailable = await biometricService.isBiometricAvailable();
+    
+    // Try biometric first if enabled and available
+    if (biometricEnabled && biometricAvailable) {
+      final authenticated = await biometricService.authenticate(
+        reason: 'Authenticate to access wallet',
+      );
+      if (authenticated) return true;
+    }
+    
+    // Fall back to PIN dialog
+    if (!mounted) return false;
+    
+    return await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _WalletPinDialog(
+        walletProvider: ref.read(walletChangeNotifierProvider),
+        biometricService: biometricService,
+        biometricAvailable: biometricAvailable,
+      ),
+    ) ?? false;
   }
   
   Future<void> _checkForAppUpdate() async {
@@ -583,10 +612,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     }
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
+      body: _buildPage(_currentIndex),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -594,11 +620,161 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
           BottomNavBar(
             currentIndex: _currentIndex,
             onTap: (index) {
-              _setCurrentIndex(index);
+              if (index == 3) {
+                _handleWalletTap();
+              } else {
+                _setCurrentIndex(index);
+              }
             },
           ),
         ],
       ),
+    );
+  }
+}
+
+class _WalletPinDialog extends StatefulWidget {
+  final WalletProvider walletProvider;
+  final BiometricService biometricService;
+  final bool biometricAvailable;
+
+  const _WalletPinDialog({
+    required this.walletProvider,
+    required this.biometricService,
+    required this.biometricAvailable,
+  });
+
+  @override
+  State<_WalletPinDialog> createState() => _WalletPinDialogState();
+}
+
+class _WalletPinDialogState extends State<_WalletPinDialog> {
+  final _pinController = TextEditingController();
+  bool _isLoading = false;
+  String? _error;
+  bool _obscurePin = true;
+
+  @override
+  void dispose() {
+    _pinController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _verifyPin() async {
+    if (_pinController.text.length != 4) {
+      setState(() => _error = 'Please enter a 4-digit PIN');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final success = await widget.walletProvider.verifyPin(_pinController.text);
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (success) {
+        Navigator.of(context).pop(true);
+      } else {
+        setState(() => _error = widget.walletProvider.error ?? 'Invalid PIN');
+      }
+    }
+  }
+
+  Future<void> _tryBiometric() async {
+    final authenticated = await widget.biometricService.authenticate(
+      reason: 'Authenticate to access wallet',
+    );
+    if (authenticated && mounted) {
+      Navigator.of(context).pop(true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return AlertDialog(
+      backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(Icons.lock_outline, color: AppColors.primaryGold),
+          const SizedBox(width: 12),
+          const Text('Wallet Access'),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Enter your transaction PIN to access wallet'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _pinController,
+            keyboardType: TextInputType.number,
+            maxLength: 4,
+            obscureText: _obscurePin,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 24, letterSpacing: 8),
+            decoration: InputDecoration(
+              counterText: '',
+              hintText: '****',
+              errorText: _error,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.primaryGold, width: 2),
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePin ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscurePin = !_obscurePin),
+              ),
+            ),
+            onSubmitted: (_) => _verifyPin(),
+          ),
+          if (widget.biometricAvailable) ...[
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: _tryBiometric,
+              icon: const Icon(Icons.fingerprint, color: AppColors.primaryGold),
+              label: Text(
+                'Use Biometrics',
+                style: TextStyle(color: AppColors.primaryGold),
+              ),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(
+            'Cancel',
+            style: TextStyle(
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            ),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: _isLoading ? null : _verifyPin,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primaryGold,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Verify'),
+        ),
+      ],
     );
   }
 }

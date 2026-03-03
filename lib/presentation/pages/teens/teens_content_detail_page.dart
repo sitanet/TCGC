@@ -8,6 +8,18 @@ import '../../../domain/entities/sermon.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../audio/audio_player_page.dart';
 
+String _stripHtmlTags(String htmlText) {
+  return htmlText
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .trim();
+}
+
 class TeensContentDetailPage extends StatelessWidget {
   final TeensContent content;
   final Color accentColor;
@@ -36,6 +48,41 @@ $plainText
 Category: ${content.category}
 ''';
     Share.share(shareText, subject: content.title);
+  }
+
+  void _viewTranscript(BuildContext context) {
+    if (content.transcript == null || content.transcript!.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Transcript Not Available'),
+          content: const Text(
+            'The transcript for this content is not yet available. Please check back later.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'OK',
+                style: TextStyle(color: accentColor),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _TranscriptPage(
+          title: content.title,
+          transcript: content.transcript!,
+          accentColor: accentColor,
+        ),
+      ),
+    );
   }
 
   void _playAudio(BuildContext context) {
@@ -174,7 +221,7 @@ Category: ${content.category}
               ),
               const SizedBox(height: 8),
               Text(
-                content.title,
+                _stripHtmlTags(content.title),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
@@ -485,6 +532,28 @@ Category: ${content.category}
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
+            onPressed: () => _viewTranscript(context),
+            icon: Icon(Icons.article_outlined, color: accentColor),
+            label: Text(
+              'Read Transcript',
+              style: TextStyle(
+                color: accentColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: accentColor),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
             onPressed: _shareContent,
             icon: Icon(Icons.share_outlined, color: accentColor),
             label: Text(
@@ -527,5 +596,95 @@ Category: ${content.category}
     if (content.videoUrl != null) return 'Video';
     if (content.audioUrl != null) return 'Audio';
     return 'Article';
+  }
+}
+
+class _TranscriptPage extends StatelessWidget {
+  final String title;
+  final String transcript;
+  final Color accentColor;
+
+  const _TranscriptPage({
+    required this.title,
+    required this.transcript,
+    required this.accentColor,
+  });
+
+  String _formatTranscript(String htmlText) {
+    String text = htmlText
+        .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n\n')
+        .replaceAll(RegExp(r'<p[^>]*>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'</div>', caseSensitive: false), '\n\n')
+        .replaceAll(RegExp(r'<div[^>]*>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</h[1-6]>', caseSensitive: false), '\n\n')
+        .replaceAll(RegExp(r'<h[1-6][^>]*>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</li>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '• ')
+        .replaceAll(RegExp(r'</?ul[^>]*>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</?ol[^>]*>', caseSensitive: false), '\n');
+
+    text = text.replaceAll(RegExp(r'<[^>]*>'), '');
+
+    text = text
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&rsquo;', "'")
+        .replaceAll('&lsquo;', "'")
+        .replaceAll('&rdquo;', '"')
+        .replaceAll('&ldquo;', '"')
+        .replaceAll('&mdash;', '—')
+        .replaceAll('&ndash;', '–')
+        .replaceAll('&hellip;', '...');
+
+    text = text
+        .replaceAll(RegExp(r'[ \t]+'), ' ')
+        .replaceAll(RegExp(r'\n[ \t]+'), '\n')
+        .replaceAll(RegExp(r'[ \t]+\n'), '\n')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n');
+
+    return text.trim();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final formattedTranscript = _formatTranscript(transcript);
+
+    return Scaffold(
+      appBar: CustomAppBar(
+        title: 'Transcript',
+        showBackButton: true,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: accentColor,
+                  ),
+            ),
+            const SizedBox(height: 20),
+            SelectableText(
+              formattedTranscript,
+              style: TextStyle(
+                fontSize: 16,
+                height: 1.8,
+                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+              ),
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
   }
 }

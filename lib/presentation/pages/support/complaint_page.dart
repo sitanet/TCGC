@@ -403,21 +403,22 @@ class _ComplaintPageState extends ConsumerState<ComplaintPage> {
           _buildContactItem(
             Icons.email_outlined,
             'Email',
-            'support@tcgc.org',
+            'support@thecitygatechurch.org',
             isDark,
           ),
           const SizedBox(height: 12),
           _buildContactItem(
             Icons.phone_outlined,
             'Phone',
-            '+234 800 000 0000',
+            '+234 706 090 4430',
             isDark,
           ),
           const SizedBox(height: 12),
           _buildContactItem(
             Icons.location_on_outlined,
             'Address',
-            'Oyo, Nigeria',
+            '120, UI/Ojoo Road, Ajibode Junction, Ibadan Oyo, Nigeria',
+            
             isDark,
           ),
         ],

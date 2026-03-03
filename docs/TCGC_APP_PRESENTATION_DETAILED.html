@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCGC Mobile App - Comprehensive Presentation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.7;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #fff;
+        }
+        h1 {
+            color: #1a1a2e;
+            font-size: 28px;
+            text-align: center;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #d4af37;
+            padding-bottom: 15px;
+        }
+        h2 {
+            color: #16213e;
+            font-size: 22px;
+            margin-top: 40px;
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            background: linear-gradient(90deg, #d4af37 0%, #f4e4bc 100%);
+            border-radius: 5px;
+        }
+        h3 {
+            color: #1a1a2e;
+            font-size: 18px;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            border-left: 4px solid #d4af37;
+            padding-left: 12px;
+        }
+        h4 {
+            color: #444;
+            font-size: 16px;
+            margin-top: 20px;
+            margin-bottom: 8px;
+        }
+        p {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 40px;
+        }
+        .cover-page {
+            text-align: center;
+            padding: 80px 20px;
+            page-break-after: always;
+        }
+        .cover-page h1 {
+            font-size: 42px;
+            border: none;
+            margin-bottom: 20px;
+        }
+        .cover-page .tagline {
+            font-size: 18px;
+            color: #d4af37;
+            margin-top: 30px;
+            font-style: italic;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px 10px;
+            text-align: left;
+        }
+        th {
+            background: #1a1a2e;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        ul, ol {
+            margin: 15px 0 15px 25px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .highlight-box {
+            background: #f8f4e8;
+            border-left: 4px solid #d4af37;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        .benefit-box {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        .benefit-box h4 {
+            color: #2e7d32;
+            margin-top: 0;
+        }
+        .reason-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        .reason-box h4 {
+            color: #1565c0;
+            margin-top: 0;
+        }
+        .feature-box {
+            background: #fff8e1;
+            border: 1px solid #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .feature-box h4 {
+            color: #f57c00;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .section-divider {
+            border: none;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #d4af37, transparent);
+            margin: 40px 0;
+        }
+        .flow-diagram {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+        .toc {
+            background: #f9f9f9;
+            padding: 25px 30px;
+            border-radius: 8px;
+            margin: 30px 0;
+        }
+        .toc h3 {
+            border: none;
+            padding: 0;
+            margin-bottom: 15px;
+        }
+        .toc ol {
+            columns: 2;
+            column-gap: 30px;
+        }
+        .check { color: #28a745; }
+        .cross { color: #dc3545; }
+        .intro-text {
+            font-size: 16px;
+            color: #555;
+            padding: 20px;
+            background: #fafafa;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-item {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-item .number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #d4af37;
+        }
+        .stat-item .label {
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
+        @media print {
+            body { padding: 20px; }
+            h2 { page-break-after: avoid; }
+            table { page-break-inside: avoid; }
+            .highlight-box, .benefit-box, .reason-box { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Cover Page -->
+<div class="cover-page">
+    <h1>TCGC MOBILE APP</h1>
+    <p class="subtitle" style="font-size: 24px;">The CityGate Church Mobile Application</p>
+    <p style="font-size: 18px; margin-top: 40px; color: #555;">Comprehensive Feature Presentation</p>
+    <p class="tagline">"Connecting Members. Empowering Faith."</p>
+    
+    <div style="margin-top: 60px; text-align: left; max-width: 500px; margin-left: auto; margin-right: auto;">
+        <p style="color: #666; font-size: 14px;"><strong>Application Overview:</strong></p>
+        <p style="color: #666; font-size: 14px;">
+            A comprehensive mobile application designed to connect church members with spiritual content, 
+            facilitate giving, enable live streaming, and provide a complete digital church experience.
+        </p>
+    </div>
+    
+    <p style="margin-top: 60px; color: #666;">
+        <strong>Platforms:</strong> Android | iOS | Web | Windows | macOS | Linux<br><br>
+        <strong>Version:</strong> 1.0.0
+    </p>
+</div>
+
+<!-- Executive Summary -->
+<h2>Executive Summary</h2>
+
+<div class="intro-text">
+    <p><strong>TCGC Mobile App</strong> is a comprehensive digital platform designed to enhance the spiritual journey of church members by providing seamless access to sermons, live services, giving options, and community features. The application bridges the gap between physical church attendance and digital engagement, ensuring members stay connected regardless of their location.</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-item">
+        <div class="number">5</div>
+        <div class="label">Main Features</div>
+    </div>
+    <div class="stat-item">
+        <div class="number">6</div>
+        <div class="label">Platforms</div>
+    </div>
+    <div class="stat-item">
+        <div class="number">4</div>
+        <div class="label">Wallet Tiers</div>
+    </div>
+</div>
+
+<!-- Table of Contents -->
+<div class="toc">
+    <h3>Table of Contents</h3>
+    <ol>
+        <li>Introduction & Onboarding</li>
+        <li>Main App Navigation</li>
+        <li>Home Page Dashboard</li>
+        <li>Audio/Messages Section</li>
+        <li>Video Content</li>
+        <li>Live Streaming</li>
+        <li>Wallet & Giving System</li>
+        <li>Teens Section</li>
+        <li>Notifications System</li>
+        <li>User Profile & Settings</li>
+        <li>Support & Contact</li>
+        <li>Offline Capabilities</li>
+        <li>App Updates</li>
+        <li>Security Features</li>
+        <li>Technical Architecture</li>
+    </ol>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 1: Introduction & Onboarding -->
+<h2 class="page-break">1. Introduction & Onboarding</h2>
+
+<div class="intro-text">
+    The onboarding process is designed to be simple, secure, and welcoming. It introduces new users to the app while ensuring existing members can quickly access their accounts. The process captures essential information while respecting user privacy and time.
+</div>
+
+<h3>1.1 Get Started Screen</h3>
+
+<p>The Get Started screen serves as the welcoming gateway to the TCGC mobile experience. It is the first impression users have of the application and sets the tone for their entire journey.</p>
+
+<div class="feature-box">
+    <h4>Features of the Get Started Screen</h4>
+    <ul>
+        <li><strong>Church Branding:</strong> Displays the official TCGC logo and brand colors, creating immediate recognition and trust</li>
+        <li><strong>Welcome Message:</strong> A warm, inviting message that reflects the church's values and hospitality</li>
+        <li><strong>Sign In Button:</strong> For returning members who already have accounts</li>
+        <li><strong>Sign Up Button:</strong> For new members creating their first account</li>
+    </ul>
+</div>
+
+<div class="reason-box">
+    <h4>Why This Matters</h4>
+    <p>First impressions are crucial in app engagement. A clean, branded welcome screen establishes credibility and helps users understand they are entering an official church platform. The clear distinction between Sign In and Sign Up reduces confusion and streamlines the entry process.</p>
+</div>
+
+<div class="benefit-box">
+    <h4>Benefits</h4>
+    <ul>
+        <li>Immediate brand recognition builds trust</li>
+        <li>Simple two-option choice reduces decision fatigue</li>
+        <li>Professional design reflects the church's commitment to excellence</li>
+        <li>Welcoming tone encourages continued engagement</li>
+    </ul>
+</div>
+
+<h3>1.2 User Registration (Sign Up)</h3>
+
+<p>The registration process is designed to collect essential information while being quick and non-intrusive. It balances the need for user data with respect for user time and privacy.</p>
+
+<h4>Registration Form Fields:</h4>
+<table>
+    <tr><th>Field</th><th>Purpose</th><th>Validation</th></tr>
+    <tr><td>First Name</td><td>Personal identification and greeting</td><td>Required, letters only</td></tr>
+    <tr><td>Last Name</td><td>Complete name for records</td><td>Required, letters only</td></tr>
+    <tr><td>Email Address</td><td>Primary login credential and communication</td><td>Valid email format, unique</td></tr>
+    <tr><td>Password</td><td>Account security</td><td>Minimum 8 characters, complexity rules</td></tr>
+    <tr><td>Confirm Password</td><td>Prevents typo errors</td><td>Must match password</td></tr>
+</table>
+
+<h4>Registration Process Flow:</h4>
+<ol>
+    <li><strong>Form Completion:</strong> User fills in all required fields with real-time validation feedback</li>
+    <li><strong>Submission:</strong> Data is securely transmitted to the server via encrypted connection</li>
+    <li><strong>Account Creation:</strong> User account is created in the database with a "pending" status</li>
+    <li><strong>Email Confirmation:</strong> An automated email is sent with a unique confirmation link</li>
+    <li><strong>Success Feedback:</strong> User sees a confirmation message instructing them to check their email</li>
+</ol>
+
+<div class="highlight-box">
+    <h4>Email Confirmation System</h4>
+    <p><strong>How it works:</strong> Upon registration, the system generates a unique token that is embedded in a confirmation link. This link is sent to the user's email address and expires after 24 hours for security.</p>
+    <p><strong>Why email confirmation:</strong></p>
+    <ul>
+        <li>Verifies that the user owns the email address</li>
+        <li>Prevents fake or spam registrations</li>
+        <li>Ensures important communications reach the user</li>
+        <li>Adds a layer of account security</li>
+    </ul>
+    <p><strong>Resend Option:</strong> If the email doesn't arrive (spam folder, typo, etc.), users can request a new confirmation email, which invalidates any previous tokens.</p>
+</div>
+
+<div class="benefit-box">
+    <h4>Benefits of This Registration Approach</h4>
+    <ul>
+        <li><strong>Security:</strong> Email verification ensures account authenticity</li>
+        <li><strong>Simplicity:</strong> Only essential fields are required initially</li>
+        <li><strong>Flexibility:</strong> Additional profile details can be added later</li>
+        <li><strong>Trust:</strong> Professional process builds confidence in the platform</li>
+        <li><strong>Communication:</strong> Verified email enables important notifications</li>
+    </ul>
+</div>
+
+<h3>1.3 User Sign In</h3>
+
+<p>The sign-in process prioritizes both security and convenience. It offers multiple authentication methods to accommodate different user preferences and device capabilities.</p>
+
+<h4>Authentication Methods:</h4>
+
+<div class="feature-box">
+    <h4>1. Email + Password (Primary)</h4>
+    <p>The standard authentication method using the email address registered during sign-up and a secure password. This method works on all devices and platforms.</p>
+    <ul>
+        <li>Email is case-insensitive for user convenience</li>
+        <li>Password is securely hashed and never stored in plain text</li>
+        <li>Failed attempts are rate-limited to prevent brute force attacks</li>
+    </ul>
+</div>
+
+<div class="feature-box">
+    <h4>2. Biometric Authentication (Optional)</h4>
+    <p>After initial email/password login, users can enable biometric authentication for faster subsequent logins.</p>
+    <ul>
+        <li><strong>Fingerprint:</strong> Uses device fingerprint sensor for quick authentication</li>
+        <li><strong>Face ID:</strong> Uses facial recognition on supported devices</li>
+        <li><strong>Fallback:</strong> Password option always available if biometrics fail</li>
+    </ul>
+</div>
+
+<div class="reason-box">
+    <h4>Why Biometric Authentication?</h4>
+    <p>Modern users expect convenience without compromising security. Biometric authentication provides:</p>
+    <ul>
+        <li>Faster login (under 1 second vs. typing credentials)</li>
+        <li>Higher security (biometrics are harder to steal than passwords)</li>
+        <li>Better user experience (no need to remember passwords)</li>
+        <li>Reduced password fatigue</li>
+    </ul>
+</div>
+
+<h4>JWT Token Authentication System:</h4>
+<p>The app uses JSON Web Tokens (JWT) for secure session management:</p>
+<table>
+    <tr><th>Token Type</th><th>Lifespan</th><th>Purpose</th></tr>
+    <tr><td>Access Token</td><td>Short (minutes)</td><td>Authenticates API requests</td></tr>
+    <tr><td>Refresh Token</td><td>Longer (days)</td><td>Obtains new access tokens without re-login</td></tr>
+</table>
+
+<div class="benefit-box">
+    <h4>Benefits of JWT Authentication</h4>
+    <ul>
+        <li><strong>Stateless:</strong> Server doesn't need to store session data</li>
+        <li><strong>Scalable:</strong> Works across multiple servers</li>
+        <li><strong>Secure:</strong> Short-lived tokens limit exposure if compromised</li>
+        <li><strong>Seamless:</strong> Automatic refresh keeps users logged in</li>
+    </ul>
+</div>
+
+<h4>Forgot Password Recovery:</h4>
+<p>A secure password recovery system allows users to regain access to their accounts:</p>
+<ol>
+    <li><strong>Request:</strong> User enters their registered email address</li>
+    <li><strong>Validation:</strong> System verifies email exists (without revealing this to prevent enumeration)</li>
+    <li><strong>Email:</strong> Reset link sent with unique, time-limited token (1 hour expiry)</li>
+    <li><strong>Reset:</strong> User sets new password via secure web form</li>
+    <li><strong>Confirmation:</strong> Old password invalidated, user can login with new credentials</li>
+</ol>
+
+<h3>1.4 Interests Selection</h3>
+
+<p>After first-time login, users are guided through an interests selection process. This personalizes their experience by highlighting content that matters most to them.</p>
+
+<div class="feature-box">
+    <h4>Available Interest Categories</h4>
+    <table>
+        <tr><th>Category</th><th>Description</th></tr>
+        <tr><td>Sunday Service Messages</td><td>Weekly sermon recordings from main services</td></tr>
+        <tr><td>Bible Study</td><td>In-depth scripture exploration and teaching</td></tr>
+        <tr><td>Prayer & Worship</td><td>Prayer sessions and worship content</td></tr>
+        <tr><td>Family & Marriage</td><td>Content for family life and relationships</td></tr>
+        <tr><td>Youth & Young Adults</td><td>Messages targeted at younger members</td></tr>
+        <tr><td>Leadership</td><td>Leadership development content</td></tr>
+        <tr><td>Special Programs</td><td>Conferences, retreats, special events</td></tr>
+    </table>
+</div>
+
+<div class="reason-box">
+    <h4>Why Personalization Matters</h4>
+    <p>Research shows that personalized content increases engagement by up to 80%. By understanding user interests:</p>
+    <ul>
+        <li>The home page displays relevant recommendations</li>
+        <li>Users discover content aligned with their spiritual needs</li>
+        <li>Engagement increases as users find value immediately</li>
+        <li>The church can better understand congregation interests</li>
+    </ul>
+</div>
+
+<div class="benefit-box">
+    <h4>Benefits for Users</h4>
+    <ul>
+        <li>Curated content saves time searching</li>
+        <li>Relevant recommendations enhance spiritual growth</li>
+        <li>Personal connection to the app experience</li>
+        <li>Can be updated anytime as interests change</li>
+    </ul>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 2: Main Navigation -->
+<h2 class="page-break">2. Main App Navigation</h2>
+
+<div class="intro-text">
+    The navigation structure is designed following mobile UX best practices, ensuring users can access any feature within 2-3 taps. The bottom navigation bar provides persistent access to the five core areas of the app.
+</div>
+
+<h3>2.1 Bottom Navigation Bar</h3>
+
+<p>The bottom navigation bar is the primary navigation element, always visible and accessible. It follows the thumb-zone principle, placing frequently-used features within easy reach.</p>
+
+<table>
+    <tr><th>Tab</th><th>Icon</th><th>Function</th><th>Why It's Important</th></tr>
+    <tr>
+        <td><strong>Home</strong></td>
+        <td>🏠</td>
+        <td>Central dashboard with featured content and quick access</td>
+        <td>Provides overview and discovery point for all content</td>
+    </tr>
+    <tr>
+        <td><strong>Audio</strong></td>
+        <td>🎵</td>
+        <td>Complete sermon and message library</td>
+        <td>Core spiritual content - the main reason users engage</td>
+    </tr>
+    <tr>
+        <td><strong>Live</strong></td>
+        <td>📺</td>
+        <td>Live streaming and upcoming events</td>
+        <td>Real-time connection to church services</td>
+    </tr>
+    <tr>
+        <td><strong>Wallet</strong></td>
+        <td>💰</td>
+        <td>Giving, offerings, and financial management</td>
+        <td>Convenient, secure giving at any time</td>
+    </tr>
+    <tr>
+        <td><strong>Teens</strong></td>
+        <td>👦</td>
+        <td>Youth-specific content and programs</td>
+        <td>Dedicated space for younger members</td>
+    </tr>
+</table>
+
+<div class="reason-box">
+    <h4>Design Rationale</h4>
+    <ul>
+        <li><strong>5 tabs maximum:</strong> Research shows users can comfortably navigate up to 5 bottom tabs</li>
+        <li><strong>Icon + Label:</strong> Combines visual recognition with clarity</li>
+        <li><strong>Persistent visibility:</strong> Users always know where they are and can navigate easily</li>
+        <li><strong>Priority ordering:</strong> Most-used features (Home, Audio) on the left (thumb-friendly)</li>
+    </ul>
+</div>
+
+<div class="benefit-box">
+    <h4>Navigation Benefits</h4>
+    <ul>
+        <li>Intuitive - users understand immediately how to navigate</li>
+        <li>Efficient - any major feature is one tap away</li>
+        <li>Consistent - same navigation pattern throughout the app</li>
+        <li>Accessible - large touch targets for all users</li>
+    </ul>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 3: Home Page -->
+<h2 class="page-break">3. Home Page Dashboard</h2>
+
+<div class="intro-text">
+    The Home page serves as the central hub of the application, providing personalized content, quick access to key features, and an overview of what's happening in the church. It's designed to answer the question: "What should I engage with today?"
+</div>
+
+<h3>3.1 Welcome Section</h3>
+
+<div class="feature-box">
+    <h4>Personalized Greeting</h4>
+    <p>The app greets users by name (e.g., "Hello, John!"), creating a personal connection. This small touch makes the digital experience feel more human and welcoming.</p>
+    <ul>
+        <li>Time-appropriate greetings (Good morning/afternoon/evening)</li>
+        <li>User's first name prominently displayed</li>
+        <li>Quick link to profile for updates</li>
+    </ul>
+</div>
+
+<div class="benefit-box">
+    <h4>Why Personalization?</h4>
+    <p>Personalized greetings increase user engagement by 26% and create emotional connection with the platform. Users feel recognized and valued, not just another anonymous user.</p>
+</div>
+
+<h3>3.2 Featured Content Section</h3>
+
+<h4>Recommended Messages:</h4>
+<p>Messages specifically marked as "recommended" by church administrators appear prominently on the home page. These are typically:</p>
+<ul>
+    <li>Recent powerful sermons</li>
+    <li>Timely messages relevant to current events</li>
+    <li>Series that the church wants to highlight</li>
+    <li>Messages aligned with user's selected interests</li>
+</ul>
+
+<div class="reason-box">
+    <h4>Curation Strategy</h4>
+    <p>Rather than overwhelming users with all content, curated recommendations guide them to high-impact messages. This approach:</p>
+    <ul>
+        <li>Reduces decision paralysis</li>
+        <li>Highlights the church's current focus</li>
+        <li>Ensures new users find quality content immediately</li>
+        <li>Supports spiritual growth through intentional content paths</li>
+    </ul>
+</div>
+
+<h4>Upcoming Events:</h4>
+<p>The home page displays upcoming church events with key details:</p>
+<ul>
+    <li>Event title and description</li>
+    <li>Date and time</li>
+    <li>Location (physical or virtual)</li>
+    <li>Visual thumbnails/banners</li>
+    <li>Quick action to add to calendar or learn more</li>
+</ul>
+
+<h4>Live Now Indicator:</h4>
+<p>When a service is currently streaming, a prominent "LIVE" indicator appears, allowing users to join immediately. This feature:</p>
+<ul>
+    <li>Creates urgency and real-time connection</li>
+    <li>Makes joining live services effortless</li>
+    <li>Keeps remote members connected to live church experience</li>
+</ul>
+
+<h3>3.3 Content Cards Design</h3>
+
+<p>Each sermon/message is displayed as a visually appealing card containing:</p>
+<table>
+    <tr><th>Element</th><th>Purpose</th></tr>
+    <tr><td>Thumbnail Image</td><td>Visual appeal and quick recognition</td></tr>
+    <tr><td>Message Title</td><td>Clear identification of content</td></tr>
+    <tr><td>Speaker Name</td><td>Allows following favorite speakers</td></tr>
+    <tr><td>Duration</td><td>Helps users plan listening time</td></tr>
+    <tr><td>Category Badge</td><td>Quick content type identification</td></tr>
+    <tr><td>Play Button</td><td>Immediate access to content</td></tr>
+</table>
+
+<div class="benefit-box">
+    <h4>Card Design Benefits</h4>
+    <ul>
+        <li>Scannable - users can quickly browse multiple items</li>
+        <li>Informative - all key details visible at a glance</li>
+        <li>Actionable - one tap to start playing</li>
+        <li>Beautiful - engaging visual design encourages exploration</li>
+    </ul>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 4: Audio/Messages -->
+<h2 class="page-break">4. Audio/Messages Section</h2>
+
+<div class="intro-text">
+    The Audio section is the heart of the TCGC app, providing access to the church's complete library of sermons, teachings, and messages. It's designed to make spiritual content as accessible and enjoyable as using popular music streaming apps.
+</div>
+
+<h3>4.1 Content Organization</h3>
+
+<h4>Browse by Category:</h4>
+<p>Messages are organized into categories that reflect the church's teaching structure:</p>
+<ul>
+    <li>Each category has a distinctive image/icon</li>
+    <li>Categories show message count for context</li>
+    <li>Tapping a category reveals all messages within</li>
+    <li>Categories are managed by church administrators</li>
+</ul>
+
+<div class="feature-box">
+    <h4>Browse by Speaker</h4>
+    <p>Users can explore content by speaker, useful for those who connect with particular teaching styles:</p>
+    <ul>
+        <li>Speaker profile with photo and title (Pastor, Rev., Dr., etc.)</li>
+        <li>Brief biography</li>
+        <li>Complete list of messages by that speaker</li>
+        <li>Helps members connect with guest speakers or specific pastors</li>
+    </ul>
+</div>
+
+<div class="reason-box">
+    <h4>Why Multiple Browse Options?</h4>
+    <p>Different users have different discovery preferences:</p>
+    <ul>
+        <li><strong>Topic seekers:</strong> Browse by category to find specific subjects</li>
+        <li><strong>Speaker fans:</strong> Browse by speaker to follow their teaching</li>
+        <li><strong>Recent visitors:</strong> Browse recent for latest content</li>
+        <li><strong>Guided users:</strong> Recommended for curated experience</li>
+    </ul>
+</div>
+
+<h3>4.2 Audio Player - Full Experience</h3>
+
+<p>The full-screen audio player provides an immersive listening experience with comprehensive controls:</p>
+
+<div class="feature-box">
+    <h4>Now Playing Display</h4>
+    <ul>
+        <li><strong>Large Artwork:</strong> Beautiful sermon thumbnail fills the screen</li>
+        <li><strong>Message Title:</strong> Clear, readable title</li>
+        <li><strong>Speaker Name:</strong> Who is delivering the message</li>
+        <li><strong>Category:</strong> Content classification</li>
+    </ul>
+</div>
+
+<h4>Playback Controls:</h4>
+<table>
+    <tr><th>Control</th><th>Function</th><th>Why It's Useful</th></tr>
+    <tr><td>Play/Pause</td><td>Start or stop playback</td><td>Basic control, large animated button</td></tr>
+    <tr><td>Skip Forward 15s</td><td>Jump ahead 15 seconds</td><td>Skip introductions or find specific parts</td></tr>
+    <tr><td>Skip Backward 15s</td><td>Go back 15 seconds</td><td>Replay important points, catch missed content</td></tr>
+    <tr><td>Progress Bar</td><td>Visual timeline with scrubbing</td><td>See progress, jump to any point</td></tr>
+    <tr><td>Time Display</td><td>Current position / Total duration</td><td>Know how much time remains</td></tr>
+</table>
+
+<h4>Additional Actions:</h4>
+<table>
+    <tr><th>Action</th><th>What It Does</th><th>Benefit</th></tr>
+    <tr>
+        <td><strong>Download</strong></td>
+        <td>Saves audio file to device</td>
+        <td>Listen offline - no internet needed</td>
+    </tr>
+    <tr>
+        <td><strong>Favorite</strong></td>
+        <td>Adds to favorites list</td>
+        <td>Quick access to loved messages</td>
+    </tr>
+    <tr>
+        <td><strong>Share</strong></td>
+        <td>Share message link</td>
+        <td>Spread content to friends and family</td>
+    </tr>
+    <tr>
+        <td><strong>Add to Playlist</strong></td>
+        <td>Add to custom playlist</td>
+        <td>Organize content for specific purposes</td>
+    </tr>
+</table>
+
+<div class="highlight-box">
+    <h4>Background Playback</h4>
+    <p><strong>What it means:</strong> Audio continues playing even when you leave the app, lock your phone, or use other apps.</p>
+    <p><strong>How it works:</strong></p>
+    <ul>
+        <li>Uses system audio service for uninterrupted playback</li>
+        <li>Lock screen shows playback controls</li>
+        <li>Notification appears with play/pause controls</li>
+        <li>Works with Bluetooth devices and car audio</li>
+    </ul>
+    <p><strong>Why it matters:</strong> Users can listen during commute, exercise, or while doing other tasks - just like a music app.</p>
+</div>
+
+<h3>4.3 Mini Player</h3>
+
+<p>When users navigate away from the full player, a compact mini player appears at the bottom of the screen:</p>
+
+<div class="feature-box">
+    <h4>Mini Player Features</h4>
+    <ul>
+        <li>Displays current message title and speaker</li>
+        <li>Play/Pause button for quick control</li>
+        <li>Tap anywhere to return to full player</li>
+        <li>Persists across all app screens</li>
+        <li>Doesn't interfere with navigation</li>
+    </ul>
+</div>
+
+<div class="benefit-box">
+    <h4>Benefits of Mini Player</h4>
+    <ul>
+        <li>Continue listening while browsing other content</li>
+        <li>Never lose track of what's playing</li>
+        <li>Easy control without leaving current screen</li>
+        <li>Familiar pattern from music streaming apps</li>
+    </ul>
+</div>
+
+<h3>4.4 Offline Features</h3>
+
+<h4>Downloads:</h4>
+<p>The download feature allows users to save messages for offline listening:</p>
+<ul>
+    <li><strong>Download Page:</strong> View all downloaded messages</li>
+    <li><strong>Storage Info:</strong> See how much space is used</li>
+    <li><strong>Delete Options:</strong> Remove downloads to free space</li>
+    <li><strong>Offline Playback:</strong> Listen without any internet connection</li>
+</ul>
+
+<div class="reason-box">
+    <h4>Why Offline Downloads Matter</h4>
+    <ul>
+        <li><strong>Travel:</strong> Listen during flights, road trips, or areas with poor connectivity</li>
+        <li><strong>Data Savings:</strong> Download on WiFi, listen anywhere without using mobile data</li>
+        <li><strong>Reliability:</strong> Content always available regardless of network issues</li>
+        <li><strong>Privacy:</strong> Listen without online tracking</li>
+    </ul>
+</div>
+
+<h4>Favorites:</h4>
+<p>The favorites system allows users to bookmark messages they love:</p>
+<ul>
+    <li>One-tap to add or remove from favorites</li>
+    <li>Dedicated favorites page for quick access</li>
+    <li>Synced to account (available on all devices)</li>
+    <li>Great for building a personal sermon library</li>
+</ul>
+
+<h4>Playlists:</h4>
+<p>Users can create custom playlists to organize messages:</p>
+<ul>
+    <li>Create themed playlists (e.g., "Faith Building," "Marriage Series")</li>
+    <li>Add messages from anywhere in the app</li>
+    <li>Reorder messages within playlists</li>
+    <li>Continuous playback through playlist</li>
+</ul>
+
+<h3>4.5 Playback Position Memory</h3>
+
+<div class="feature-box">
+    <h4>Resume Where You Left Off</h4>
+    <p>The app automatically remembers your listening position for every message:</p>
+    <ul>
+        <li>Position saved locally on device</li>
+        <li>Works even after app restart or phone reboot</li>
+        <li>Each message has its own saved position</li>
+        <li>Visual indicator shows progress on message cards</li>
+    </ul>
+</div>
+
+<div class="benefit-box">
+    <h4>User Experience Impact</h4>
+    <p>This feature eliminates the frustration of:</p>
+    <ul>
+        <li>Losing your place in a long sermon</li>
+        <li>Having to manually seek to where you stopped</li>
+        <li>Re-listening to content you've already heard</li>
+    </ul>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 5: Video -->
+<h2 class="page-break">5. Video Content</h2>
+
+<div class="intro-text">
+    For messages that include video content, the app provides a rich video playback experience through YouTube integration. This allows the church to leverage existing video infrastructure while providing a seamless in-app experience.
+</div>
+
+<h3>5.1 Video Player Features</h3>
+
+<div class="feature-box">
+    <h4>YouTube Integration</h4>
+    <p>Videos are streamed via YouTube, providing:</p>
+    <ul>
+        <li><strong>Adaptive Quality:</strong> Automatically adjusts based on connection speed</li>
+        <li><strong>Full-Screen Mode:</strong> Immersive viewing experience</li>
+        <li><strong>Landscape Support:</strong> Rotate for larger view</li>
+        <li><strong>Quality Selection:</strong> Manual quality override when needed</li>
+        <li><strong>Reliable Delivery:</strong> YouTube's infrastructure ensures smooth playback</li>
+    </ul>
+</div>
+
+<div class="reason-box">
+    <h4>Why YouTube Integration?</h4>
+    <ul>
+        <li>Reduces server costs - video hosting is expensive</li>
+        <li>Global CDN ensures fast loading worldwide</li>
+        <li>Familiar interface users already understand</li>
+        <li>Handles all video encoding and format compatibility</li>
+        <li>Allows church to use same video for app and YouTube channel</li>
+    </ul>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 6: Live Streaming -->
+<h2>6. Live Streaming</h2>
+
+<div class="intro-text">
+    The Live section connects members to real-time church services, creating a shared worship experience regardless of physical location. It bridges the gap between in-person attendance and remote participation.
+</div>
+
+<h3>6.1 Live Stream Features</h3>
+
+<div class="feature-box">
+    <h4>Live Now Experience</h4>
+    <ul>
+        <li><strong>"LIVE" Badge:</strong> Prominent red indicator when service is streaming</li>
+        <li><strong>One-Tap Join:</strong> Immediately enter live stream</li>
+        <li><strong>Viewer Experience:</strong> Watch service as it happens</li>
+        <li><strong>Real-Time Connection:</strong> Participate in worship from anywhere</li>
+    </ul>
+</div>
+
+<h4>Upcoming Events:</h4>
+<p>The live section also displays scheduled events:</p>
+<table>
+    <tr><th>Information</th><th>Purpose</th></tr>
+    <tr><td>Event Title</td><td>What the event is about</td></tr>
+    <tr><td>Date & Time</td><td>When it will occur</td></tr>
+    <tr><td>Description</td><td>Details about the event</td></tr>
+    <tr><td>Location</td><td>Physical location or "Online"</td></tr>
+    <tr><td>Countdown</td><td>Time remaining until event</td></tr>
+</table>
+
+<div class="benefit-box">
+    <h4>Benefits of Live Streaming</h4>
+    <ul>
+        <li><strong>Accessibility:</strong> Members who can't attend physically can participate</li>
+        <li><strong>Reach:</strong> Connect with members traveling or relocated</li>
+        <li><strong>Convenience:</strong> Participate from home during illness or other constraints</li>
+        <li><strong>Community:</strong> Maintain connection to church family</li>
+        <li><strong>Evangelism:</strong> Easy way for visitors to experience services</li>
+    </ul>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 7: Wallet & Giving -->
+<h2 class="page-break">7. Wallet & Giving System</h2>
+
+<div class="intro-text">
+    The Wallet system is a comprehensive financial feature that enables members to give offerings, tithes, and donations directly from their mobile device. It integrates with 9 Payment Service Bank (9PSB) to provide real banking capabilities, making giving as convenient as mobile banking.
+</div>
+
+<h3>7.1 Wallet Overview</h3>
+
+<p>The wallet dashboard provides a complete view of the user's financial activity within the church:</p>
+
+<div class="feature-box">
+    <h4>Dashboard Elements</h4>
+    <table>
+        <tr><th>Element</th><th>Description</th></tr>
+        <tr><td>Current Balance</td><td>Available funds in Naira (₦)</td></tr>
+        <tr><td>Account Number</td><td>Unique 9PSB bank account number</td></tr>
+        <tr><td>Account Name</td><td>User's registered name</td></tr>
+        <tr><td>Wallet Tier</td><td>Current verification level (0-3)</td></tr>
+        <tr><td>Quick Actions</td><td>Buttons for common transactions</td></tr>
+    </table>
+</div>
+
+<h3>7.2 Wallet Setup Process</h3>
+
+<p>Setting up a wallet is a guided process that creates a real bank account for the user:</p>
+
+<h4>Step 1: Create Wallet</h4>
+<ul>
+    <li>User initiates wallet creation from the app</li>
+    <li>System communicates with 9PSB API</li>
+    <li>Real bank account number is generated instantly</li>
+    <li>Account linked to user's profile</li>
+    <li>Starts at Tier 0 (Unverified)</li>
+</ul>
+
+<h4>Step 2: Set Transaction PIN</h4>
+<ul>
+    <li>User creates a 4-digit PIN</li>
+    <li>PIN is required for all transactions</li>
+    <li>Securely hashed and stored</li>
+    <li>Adds security layer beyond login</li>
+</ul>
+
+<h4>Step 3: Verification (Optional Upgrades)</h4>
+<ul>
+    <li><strong>NIN Verification:</strong> Verifies national identity</li>
+    <li><strong>Auto-Fetch:</strong> Pulls personal details from government database</li>
+    <li><strong>Upgrade Approval:</strong> Increases transaction limits</li>
+</ul>
+
+<div class="reason-box">
+    <h4>Why Real Bank Accounts?</h4>
+    <p>Unlike simple payment links, having a real bank account provides:</p>
+    <ul>
+        <li><strong>Regulatory Compliance:</strong> Meets CBN requirements for financial services</li>
+        <li><strong>Trust:</strong> Users know their money is in a regulated institution</li>
+        <li><strong>Flexibility:</strong> Receive transfers from any bank</li>
+        <li><strong>Records:</strong> Complete transaction history for tax/giving receipts</li>
+        <li><strong>Security:</strong> Bank-level security and insurance</li>
+    </ul>
+</div>
+
+<h3>7.3 Wallet Tier System</h3>
+
+<p>The tiered system follows CBN regulations for mobile money and ensures appropriate KYC (Know Your Customer) levels:</p>
+
+<table>
+    <tr><th>Tier</th><th>Status</th><th>Daily Limit</th><th>Single Transaction</th><th>Balance Limit</th><th>Requirements</th></tr>
+    <tr><td>0</td><td>Unverified</td><td>₦0</td><td>₦0</td><td>₦0</td><td>None (viewing only)</td></tr>
+    <tr><td>1</td><td>Basic</td><td>₦50,000</td><td>₦50,000</td><td>₦300,000</td><td>NIN verification</td></tr>
+    <tr><td>2</td><td>Standard</td><td>₦500,000</td><td>₦200,000</td><td>₦500,000</td><td>BVN + ID document</td></tr>
+    <tr><td>3</td><td>Premium</td><td>₦5,000,000</td><td>₦5,000,000</td><td>Unlimited</td><td>Full KYC + address proof</td></tr>
+</table>
+
+<div class="benefit-box">
+    <h4>Benefits of Tiered System</h4>
+    <ul>
+        <li><strong>Accessibility:</strong> Basic tier is easy to achieve for most users</li>
+        <li><strong>Security:</strong> Higher limits require stronger verification</li>
+        <li><strong>Compliance:</strong> Meets regulatory requirements</li>
+        <li><strong>Flexibility:</strong> Users can upgrade as needed</li>
+    </ul>
+</div>
+
+<h3>7.4 Fund Wallet</h3>
+
+<p>Users can add money to their wallet via bank transfer:</p>
+
+<div class="feature-box">
+    <h4>Funding Process</h4>
+    <ol>
+        <li>Open "Fund Wallet" screen</li>
+        <li>View your unique account number and bank name (9PSB)</li>
+        <li>Copy account details or share to banking app</li>
+        <li>Transfer any amount from your bank</li>
+        <li>Funds appear automatically (webhook integration)</li>
+    </ol>
+</div>
+
+<div class="reason-box">
+    <h4>Why Bank Transfer?</h4>
+    <ul>
+        <li><strong>Familiar:</strong> Users already know how to do bank transfers</li>
+        <li><strong>Low Cost:</strong> NIP transfers typically have lower fees than card payments</li>
+        <li><strong>Secure:</strong> Uses existing bank security infrastructure</li>
+        <li><strong>No Card Needed:</strong> Works for users without debit cards</li>
+    </ul>
+</div>
+
+<h3>7.5 Giving/Offering</h3>
+
+<p>The giving feature makes it easy to contribute to various church funds:</p>
+
+<h4>Giving Categories:</h4>
+<table>
+    <tr><th>Category</th><th>Purpose</th></tr>
+    <tr><td>Tithe</td><td>10% offering as per biblical principle</td></tr>
+    <tr><td>Offering</td><td>General church support</td></tr>
+    <tr><td>Thanksgiving</td><td>Special gratitude offering</td></tr>
+    <tr><td>Seeds</td><td>Faith-based giving</td></tr>
+    <tr><td>Building Fund</td><td>Church infrastructure projects</td></tr>
+    <tr><td>Missions</td><td>Support for missionary work</td></tr>
+</table>
+
+<h4>Giving Process:</h4>
+<ol>
+    <li><strong>Select Category:</strong> Choose giving type from available options</li>
+    <li><strong>Enter Amount:</strong> Input amount (minimum ₦100)</li>
+    <li><strong>Review:</strong> Confirm giving details</li>
+    <li><strong>Enter PIN:</strong> Authenticate with transaction PIN</li>
+    <li><strong>Confirm:</strong> Complete the transaction</li>
+    <li><strong>Receipt:</strong> Receive confirmation with reference number</li>
+</ol>
+
+<div class="benefit-box">
+    <h4>Benefits of Digital Giving</h4>
+    <ul>
+        <li><strong>Convenience:</strong> Give anytime, anywhere - not just during service</li>
+        <li><strong>Consistency:</strong> Easier to maintain regular giving habits</li>
+        <li><strong>Records:</strong> Complete history for tax purposes and personal tracking</li>
+        <li><strong>Privacy:</strong> No handling of cash in public</li>
+        <li><strong>Security:</strong> Funds go directly to church accounts</li>
+    </ul>
+</div>
+
+<h3>7.6 Send Money (Person-to-Person)</h3>
+
+<p>Members can transfer funds to other TCGC wallet holders:</p>
+
+<div class="feature-box">
+    <h4>Transfer Process</h4>
+    <ol>
+        <li>Enter recipient's registered email</li>
+        <li>Enter amount to send</li>
+        <li>Review transfer details</li>
+        <li>Enter transaction PIN</li>
+        <li>Confirm transfer</li>
+        <li>Instant transfer - both parties notified</li>
+    </ol>
+</div>
+
+<div class="reason-box">
+    <h4>Use Cases</h4>
+    <ul>
+        <li>Group contributions for church activities</li>
+        <li>Helping fellow members in need</li>
+        <li>Splitting costs for church events</li>
+        <li>Family members supporting each other</li>
+    </ul>
+</div>
+
+<h3>7.7 Transaction History</h3>
+
+<p>Complete record of all wallet activity:</p>
+
+<div class="feature-box">
+    <h4>Transaction Display</h4>
+    <ul>
+        <li><strong>Visual Indicators:</strong> Green for money in, red for money out</li>
+        <li><strong>Details:</strong> Amount, date/time, category, status</li>
+        <li><strong>Reference:</strong> Unique transaction reference for support</li>
+        <li><strong>Filtering:</strong> Filter by date, type, or category</li>
+    </ul>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 8: Teens -->
+<h2 class="page-break">8. Teens Section</h2>
+
+<div class="intro-text">
+    The Teens section provides a dedicated space for young members with age-appropriate content, creating an engaging digital experience that speaks to their generation while delivering meaningful spiritual growth content.
+</div>
+
+<h3>8.1 Teen Content Categories</h3>
+
+<table>
+    <tr><th>Category</th><th>Content Type</th><th>Purpose</th></tr>
+    <tr>
+        <td><strong>Daily Devotional</strong></td>
+        <td>Short daily audio/text content</td>
+        <td>Build daily spiritual habits in young people</td>
+    </tr>
+    <tr>
+        <td><strong>Teens Retreat</strong></td>
+        <td>Retreat session recordings</td>
+        <td>Extend retreat impact beyond the event</td>
+    </tr>
+    <tr>
+        <td><strong>The Forge Teens Camp</strong></td>
+        <td>Camp recordings and highlights</td>
+        <td>Capture and share camp experiences</td>
+    </tr>
+</table>
+
+<div class="reason-box">
+    <h4>Why a Dedicated Teens Section?</h4>
+    <ul>
+        <li><strong>Relevance:</strong> Content specifically designed for teen issues and interests</li>
+        <li><strong>Engagement:</strong> Youth-focused design and presentation</li>
+        <li><strong>Safety:</strong> Appropriate content environment</li>
+        <li><strong>Identity:</strong> Teens feel they have "their own space"</li>
+        <li><strong>Development:</strong> Builds faith habits early</li>
+    </ul>
+</div>
+
+<div class="benefit-box">
+    <h4>Benefits for Teen Users</h4>
+    <ul>
+        <li>Content that addresses their specific life stage</li>
+        <li>Connection to teen community and events</li>
+        <li>Building personal faith independent of parents</li>
+        <li>Accessible spiritual growth on their devices</li>
+    </ul>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 9: Notifications -->
+<h2 class="page-break">9. Notifications System</h2>
+
+<div class="intro-text">
+    The notifications system keeps members informed about church activities, new content, and personal account updates. It uses Firebase Cloud Messaging (FCM) to deliver real-time push notifications to all platforms.
+</div>
+
+<h3>9.1 Notification Types</h3>
+
+<table>
+    <tr><th>Type</th><th>Triggers</th><th>Purpose</th></tr>
+    <tr><td><strong>Message</strong></td><td>New sermon uploaded</td><td>Alert members to fresh content</td></tr>
+    <tr><td><strong>Event</strong></td><td>Upcoming event reminder</td><td>Ensure attendance and participation</td></tr>
+    <tr><td><strong>Wallet</strong></td><td>Transactions, balance changes</td><td>Financial transparency and security</td></tr>
+    <tr><td><strong>Teens</strong></td><td>New teen content</td><td>Engage young members</td></tr>
+    <tr><td><strong>Announcement</strong></td><td>Church-wide announcements</td><td>Important communications</td></tr>
+    <tr><td><strong>System</strong></td><td>App updates, maintenance</td><td>Technical information</td></tr>
+</table>
+
+<h3>9.2 Notification Preferences</h3>
+
+<p>Users have granular control over what notifications they receive:</p>
+
+<div class="feature-box">
+    <h4>Customizable Settings</h4>
+    <ul>
+        <li>Master push notification toggle</li>
+        <li>Master email notification toggle</li>
+        <li>Individual toggles for each notification type</li>
+        <li>Promotions can be disabled separately</li>
+    </ul>
+</div>
+
+<div class="benefit-box">
+    <h4>Why User Control Matters</h4>
+    <ul>
+        <li><strong>Respect:</strong> Users choose what's important to them</li>
+        <li><strong>Retention:</strong> Overwhelmed users uninstall apps</li>
+        <li><strong>Relevance:</strong> Only wanted notifications come through</li>
+        <li><strong>Trust:</strong> Transparent communication practices</li>
+    </ul>
+</div>
+
+<h3>9.3 Promotions System</h3>
+
+<p>Special promotional popups can be displayed for important announcements:</p>
+<ul>
+    <li>Full-screen promotional images</li>
+    <li>Optional link to related content</li>
+    <li>Dismissible by users</li>
+    <li>Respects user preferences (can be disabled)</li>
+    <li>Time-based scheduling (start/end dates)</li>
+</ul>
+
+<hr class="section-divider">
+
+<!-- Section 10: Profile & Settings -->
+<h2 class="page-break">10. User Profile & Settings</h2>
+
+<div class="intro-text">
+    The profile section allows users to manage their personal information, customize their app experience, and control security settings. It serves as the central hub for account management.
+</div>
+
+<h3>10.1 Profile Information</h3>
+
+<div class="feature-box">
+    <h4>Viewable & Editable Fields</h4>
+    <table>
+        <tr><th>Field</th><th>Editable</th><th>Purpose</th></tr>
+        <tr><td>Profile Photo</td><td>Yes</td><td>Personal identification</td></tr>
+        <tr><td>First Name</td><td>Yes</td><td>Personalization</td></tr>
+        <tr><td>Middle Name</td><td>Yes</td><td>Complete name</td></tr>
+        <tr><td>Last Name</td><td>Yes</td><td>Identification</td></tr>
+        <tr><td>Email</td><td>No</td><td>Login credential</td></tr>
+        <tr><td>Phone Number</td><td>Yes</td><td>Contact & verification</td></tr>
+        <tr><td>Gender</td><td>Yes</td><td>Church records</td></tr>
+        <tr><td>Date of Birth</td><td>Yes</td><td>Age-appropriate content</td></tr>
+        <tr><td>Address</td><td>Yes</td><td>Location services</td></tr>
+        <tr><td>KCC</td><td>View only</td><td>Church identification number</td></tr>
+        <tr><td>Department</td><td>View only</td><td>Service team assignment</td></tr>
+        <tr><td>Membership Status</td><td>View only</td><td>Active/Pending status</td></tr>
+    </table>
+</div>
+
+<h3>10.2 Settings Options</h3>
+
+<h4>Appearance:</h4>
+<ul>
+    <li><strong>Dark Mode:</strong> Toggle between light and dark themes</li>
+    <li><strong>System Default:</strong> Follow device theme setting</li>
+</ul>
+
+<div class="reason-box">
+    <h4>Why Dark Mode?</h4>
+    <ul>
+        <li>Reduces eye strain in low light</li>
+        <li>Saves battery on OLED screens</li>
+        <li>User preference - many prefer dark interfaces</li>
+        <li>Modern app expectation</li>
+    </ul>
+</div>
+
+<h4>Security Settings:</h4>
+<ul>
+    <li><strong>Change Password:</strong> Update login password</li>
+    <li><strong>Change Transaction PIN:</strong> Update wallet PIN</li>
+    <li><strong>Biometric Login:</strong> Enable/disable fingerprint or face login</li>
+</ul>
+
+<h4>Account Options:</h4>
+<ul>
+    <li><strong>Delete Account:</strong> Permanently remove account and all data</li>
+</ul>
+
+<div class="highlight-box">
+    <h4>Account Deletion</h4>
+    <p>Users have the right to delete their accounts. This removes:</p>
+    <ul>
+        <li>All personal information</li>
+        <li>Wallet and transaction history</li>
+        <li>Favorites and downloads</li>
+        <li>Notification preferences</li>
+        <li>All associated data</li>
+    </ul>
+    <p>This complies with data protection regulations and user rights.</p>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 11: Support -->
+<h2 class="page-break">11. Support & Contact</h2>
+
+<div class="intro-text">
+    The support system provides a direct communication channel between members and church administration. It allows users to submit inquiries, report issues, and receive responses within the app.
+</div>
+
+<h3>11.1 Contact Form</h3>
+
+<div class="feature-box">
+    <h4>Submission Categories</h4>
+    <table>
+        <tr><th>Category</th><th>Use For</th></tr>
+        <tr><td>General Inquiry</td><td>Questions about church or app</td></tr>
+        <tr><td>Technical Issue</td><td>App bugs or problems</td></tr>
+        <tr><td>Payment Problem</td><td>Wallet or giving issues</td></tr>
+        <tr><td>Account Issue</td><td>Login or profile problems</td></tr>
+        <tr><td>Suggestion</td><td>Feature requests or improvements</td></tr>
+        <tr><td>Complaint</td><td>Formal complaints</td></tr>
+        <tr><td>Other</td><td>Anything else</td></tr>
+    </table>
+</div>
+
+<h3>11.2 Message Tracking</h3>
+
+<p>Users can view and track their submitted messages:</p>
+<ul>
+    <li>List of all submitted messages</li>
+    <li>Status indicators (Pending/Replied/Resolved)</li>
+    <li>Admin replies visible in-app</li>
+    <li>Threaded conversation view</li>
+</ul>
+
+<div class="benefit-box">
+    <h4>Benefits of In-App Support</h4>
+    <ul>
+        <li><strong>Convenience:</strong> No need to send separate emails</li>
+        <li><strong>Tracking:</strong> See status of inquiries</li>
+        <li><strong>Context:</strong> Support team has user information</li>
+        <li><strong>History:</strong> All communications in one place</li>
+    </ul>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 12: Offline -->
+<h2>12. Offline Capabilities</h2>
+
+<div class="intro-text">
+    The app is designed to provide value even without an internet connection. Offline features ensure users can access content and maintain their spiritual habits regardless of connectivity.
+</div>
+
+<h3>12.1 What Works Offline</h3>
+
+<table>
+    <tr><th>Feature</th><th>Offline Capability</th></tr>
+    <tr><td>Downloaded Audio</td><td><span class="check">✓</span> Full playback</td></tr>
+    <tr><td>Cached Images</td><td><span class="check">✓</span> Previously loaded images</td></tr>
+    <tr><td>Favorites List</td><td><span class="check">✓</span> View list (play if downloaded)</td></tr>
+    <tr><td>Playback Position</td><td><span class="check">✓</span> Resume positions saved</td></tr>
+    <tr><td>Profile Information</td><td><span class="check">✓</span> Cached data viewable</td></tr>
+    <tr><td>New Content</td><td><span class="cross">✗</span> Requires internet</td></tr>
+    <tr><td>Live Streaming</td><td><span class="cross">✗</span> Requires internet</td></tr>
+    <tr><td>Wallet Transactions</td><td><span class="cross">✗</span> Requires internet</td></tr>
+    <tr><td>Notifications</td><td><span class="cross">✗</span> Requires internet</td></tr>
+</table>
+
+<h3>12.2 Network Awareness</h3>
+
+<p>The app intelligently handles connectivity changes:</p>
+<ul>
+    <li><strong>Offline Banner:</strong> Clear indicator when offline</li>
+    <li><strong>Auto-Retry:</strong> Automatically retries when connection restored</li>
+    <li><strong>Graceful Degradation:</strong> Shows cached content instead of errors</li>
+    <li><strong>Smart Caching:</strong> Pre-loads content when on WiFi</li>
+</ul>
+
+<hr class="section-divider">
+
+<!-- Section 13: Updates -->
+<h2 class="page-break">13. App Updates</h2>
+
+<div class="intro-text">
+    The update system ensures all users are running secure, feature-complete versions of the app. It provides both optional and mandatory update paths depending on the nature of the update.
+</div>
+
+<h3>13.1 Update Types</h3>
+
+<table>
+    <tr><th>Type</th><th>User Experience</th><th>When Used</th></tr>
+    <tr>
+        <td><strong>Optional Update</strong></td>
+        <td>Notification with "Update" and "Later" options</td>
+        <td>New features, minor improvements</td>
+    </tr>
+    <tr>
+        <td><strong>Force Update</strong></td>
+        <td>Blocks app until updated</td>
+        <td>Security fixes, breaking changes, critical bugs</td>
+    </tr>
+</table>
+
+<div class="reason-box">
+    <h4>Why Force Updates?</h4>
+    <p>Some updates cannot be optional:</p>
+    <ul>
+        <li><strong>Security:</strong> Vulnerabilities must be patched immediately</li>
+        <li><strong>API Changes:</strong> Old versions may not work with new backend</li>
+        <li><strong>Critical Bugs:</strong> Issues that affect data integrity</li>
+        <li><strong>Compliance:</strong> Regulatory requirements</li>
+    </ul>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 14: Security -->
+<h2>14. Security Features</h2>
+
+<div class="intro-text">
+    Security is paramount, especially for an app handling financial transactions and personal data. The TCGC app implements multiple layers of security to protect user information and transactions.
+</div>
+
+<h3>14.1 Security Measures</h3>
+
+<table>
+    <tr><th>Feature</th><th>How It Works</th><th>What It Protects</th></tr>
+    <tr>
+        <td><strong>JWT Tokens</strong></td>
+        <td>Short-lived access tokens with refresh mechanism</td>
+        <td>Session security, prevents token theft abuse</td>
+    </tr>
+    <tr>
+        <td><strong>Email Verification</strong></td>
+        <td>Confirmation link required to activate account</td>
+        <td>Prevents fake accounts, ensures valid contact</td>
+    </tr>
+    <tr>
+        <td><strong>Transaction PIN</strong></td>
+        <td>4-digit PIN required for all financial actions</td>
+        <td>Wallet funds, unauthorized transactions</td>
+    </tr>
+    <tr>
+        <td><strong>Biometric Auth</strong></td>
+        <td>Fingerprint or face recognition</td>
+        <td>Account access, convenient yet secure</td>
+    </tr>
+    <tr>
+        <td><strong>Rate Limiting</strong></td>
+        <td>5 attempts per minute on auth endpoints</td>
+        <td>Prevents brute force password attacks</td>
+    </tr>
+    <tr>
+        <td><strong>KYC Verification</strong></td>
+        <td>NIN/BVN verification for wallet tiers</td>
+        <td>Regulatory compliance, fraud prevention</td>
+    </tr>
+    <tr>
+        <td><strong>Encrypted Storage</strong></td>
+        <td>Sensitive data encrypted on device</td>
+        <td>Local data protection</td>
+    </tr>
+    <tr>
+        <td><strong>HTTPS Only</strong></td>
+        <td>All communications over TLS</td>
+        <td>Data in transit</td>
+    </tr>
+</table>
+
+<div class="benefit-box">
+    <h4>User Security Benefits</h4>
+    <ul>
+        <li>Funds protected by multiple authentication layers</li>
+        <li>Personal data encrypted and secured</li>
+        <li>Account protected from unauthorized access</li>
+        <li>Regulatory-compliant financial services</li>
+    </ul>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 15: Technical -->
+<h2 class="page-break">15. Technical Architecture</h2>
+
+<div class="intro-text">
+    For technical stakeholders, this section provides an overview of the technologies and architecture powering the TCGC mobile application.
+</div>
+
+<h3>15.1 Technology Stack</h3>
+
+<h4>Frontend (Mobile App):</h4>
+<table>
+    <tr><th>Technology</th><th>Purpose</th></tr>
+    <tr><td>Flutter</td><td>Cross-platform UI framework</td></tr>
+    <tr><td>Riverpod</td><td>State management</td></tr>
+    <tr><td>just_audio</td><td>Audio playback engine</td></tr>
+    <tr><td>audio_service</td><td>Background audio capability</td></tr>
+    <tr><td>sqflite</td><td>Local SQLite database</td></tr>
+    <tr><td>Firebase Messaging</td><td>Push notifications</td></tr>
+</table>
+
+<h4>Backend (Server):</h4>
+<table>
+    <tr><th>Technology</th><th>Purpose</th></tr>
+    <tr><td>Django</td><td>Web framework</td></tr>
+    <tr><td>Django REST Framework</td><td>API development</td></tr>
+    <tr><td>PostgreSQL</td><td>Production database</td></tr>
+    <tr><td>SimpleJWT</td><td>Token authentication</td></tr>
+    <tr><td>Firebase Admin SDK</td><td>Push notification dispatch</td></tr>
+</table>
+
+<h4>External Services:</h4>
+<table>
+    <tr><th>Service</th><th>Purpose</th></tr>
+    <tr><td>9PSB</td><td>Banking and wallet services</td></tr>
+    <tr><td>Firebase</td><td>Push notifications</td></tr>
+    <tr><td>YouTube</td><td>Video streaming</td></tr>
+    <tr><td>KYC Provider</td><td>Identity verification</td></tr>
+</table>
+
+<hr class="section-divider">
+
+<!-- Summary -->
+<h2>Summary & Conclusion</h2>
+
+<div class="intro-text">
+    <p>The TCGC Mobile App represents a comprehensive digital platform that serves the diverse needs of church members. From spiritual content consumption to financial giving, from live streaming to teen engagement, the app provides a complete ecosystem for church life.</p>
+</div>
+
+<h3>Key Value Propositions:</h3>
+
+<div class="feature-box">
+    <h4>For Members</h4>
+    <ul>
+        <li>Access sermons anytime, anywhere</li>
+        <li>Convenient, secure digital giving</li>
+        <li>Stay connected through live streaming</li>
+        <li>Personalized content recommendations</li>
+        <li>Offline access to downloaded content</li>
+    </ul>
+</div>
+
+<div class="feature-box">
+    <h4>For The Church</h4>
+    <ul>
+        <li>Extended reach beyond physical walls</li>
+        <li>Streamlined giving and financial management</li>
+        <li>Direct communication channel to members</li>
+        <li>Analytics on content engagement</li>
+        <li>Modern platform that appeals to all generations</li>
+    </ul>
+</div>
+
+<hr class="section-divider">
+
+<div style="text-align: center; padding: 40px 0;">
+    <h2 style="background: none; color: #1a1a2e; font-size: 28px;">Thank You</h2>
+    <p style="margin-top: 20px; font-size: 16px;">
+        <strong>TCGC Mobile App</strong><br>
+        The CityGate Church
+    </p>
+    <p style="margin-top: 30px; font-style: italic; color: #d4af37; font-size: 20px;">
+        "Connecting Members. Empowering Faith."
+    </p>
+    <p style="margin-top: 40px; color: #666;">
+        Available on: Android | iOS | Web | Windows | macOS | Linux
+    </p>
+</div>
+
+</body>
+</html>
