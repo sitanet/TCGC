@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../domain/entities/sermon.dart';
+import '../../../domain/entities/transcript.dart';
 import '../../../data/services/data_service.dart';
 import '../../widgets/custom_app_bar.dart';
 
@@ -12,7 +12,6 @@ enum TranscriptFilterType { category, speaker }
 class TranscriptListPage extends StatefulWidget {
   final String category;
   final String? categoryId;
-  final List<Sermon> sermons;
   final List<String> categories;
   final Map<String, String>? categoryNameToId;
   final TranscriptFilterType initialFilterType;
@@ -22,7 +21,6 @@ class TranscriptListPage extends StatefulWidget {
     super.key,
     required this.category,
     this.categoryId,
-    required this.sermons,
     required this.categories,
     this.categoryNameToId,
     this.initialFilterType = TranscriptFilterType.category,
@@ -37,31 +35,44 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final DataService _dataService = DataService();
-  List<Sermon> _allItems = [];
-  List<Sermon> _filteredItems = [];
+  List<Transcript> _allItems = [];
+  List<Transcript> _filteredItems = [];
   late String _selectedCategory;
   late String? _selectedCategoryId;
   late TranscriptFilterType _filterType;
   String? _selectedSpeaker;
   List<String> _speakers = [];
+  bool _isLoading = true;
   bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
-    // Only show sermons that have actual transcript content
-    _allItems = widget.sermons.where((s) => 
-        s.transcript != null && 
-        s.transcript!.trim().isNotEmpty &&
-        s.transcript!.trim().length > 10  // Ensure it has meaningful content
-    ).toList();
     _selectedCategory = widget.category;
     _selectedCategoryId = widget.categoryId;
     _filterType = widget.initialFilterType;
     _selectedSpeaker = widget.initialSpeaker;
-    _extractSpeakers();
-    _filteredItems = _getFilteredItems('');
     _searchController.addListener(_filterTranscripts);
+    _loadTranscripts();
+  }
+
+  Future<void> _loadTranscripts() async {
+    setState(() => _isLoading = true);
+    try {
+      final transcripts = await _dataService.getTranscripts();
+      if (mounted) {
+        setState(() {
+          _allItems = transcripts;
+          _extractSpeakers();
+          _filteredItems = _getFilteredItems('');
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Future<void> _onRefresh() async {
@@ -69,15 +80,10 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
     setState(() => _isRefreshing = true);
     
     try {
-      final sermons = await _dataService.getMessages(forceRefresh: true);
+      final transcripts = await _dataService.getTranscripts();
       if (mounted) {
         setState(() {
-          // Only show sermons that have actual transcript content
-          _allItems = sermons.where((s) => 
-              s.transcript != null && 
-              s.transcript!.trim().isNotEmpty &&
-              s.transcript!.trim().length > 10
-          ).toList();
+          _allItems = transcripts;
           _extractSpeakers();
           _filteredItems = _getFilteredItems(_searchController.text);
           _isRefreshing = false;
@@ -117,7 +123,7 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
     });
   }
 
-  List<Sermon> _getFilteredItems(String query) {
+  List<Transcript> _getFilteredItems(String query) {
     final filtered = _allItems.where((item) {
       bool matchesFilter = false;
       
@@ -145,7 +151,7 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
       
       final matchesSearch = query.isEmpty ||
           item.title.toLowerCase().contains(query) ||
-          item.description.toLowerCase().contains(query) ||
+          (item.description?.toLowerCase().contains(query) ?? false) ||
           (item.speaker?.toLowerCase().contains(query) ?? false);
       
       return matchesFilter && matchesSearch;
@@ -189,7 +195,9 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
       ),
       child: Scaffold(
         appBar: const CustomAppBar(title: '', lightBackground: true),
-        body: Column(
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGold))
+            : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
@@ -266,7 +274,7 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
                         itemBuilder: (context, index) {
                           final item = _filteredItems[index];
                           return _TranscriptListItem(
-                            sermon: item,
+                            transcript: item,
                             isDark: isDark,
                             onTap: () => _openTranscript(context, item),
                           );
@@ -276,6 +284,15 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _openTranscript(BuildContext context, Transcript transcript) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TranscriptViewPage(transcript: transcript),
       ),
     );
   }
@@ -391,51 +408,15 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
     );
   }
 
-  void _openTranscript(BuildContext context, Sermon sermon) {
-    if (sermon.transcript == null || sermon.transcript!.isEmpty) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Icon(Icons.info_outline, color: Colors.orange),
-              const SizedBox(width: 12),
-              const Text('Not Available'),
-            ],
-          ),
-          content: const Text(
-            'The transcript for this message is not yet available. Please check back later.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'OK',
-                style: TextStyle(color: AppColors.primaryGold),
-              ),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TranscriptViewPage(sermon: sermon),
-      ),
-    );
-  }
 }
 
 class _TranscriptListItem extends StatelessWidget {
-  final Sermon sermon;
+  final Transcript transcript;
   final bool isDark;
   final VoidCallback? onTap;
 
   const _TranscriptListItem({
-    required this.sermon,
+    required this.transcript,
     required this.isDark,
     this.onTap,
   });
@@ -456,25 +437,25 @@ class _TranscriptListItem extends StatelessWidget {
   }
 
   String _getCategoryName() {
-    if (sermon.categoryName.isNotEmpty) {
-      return sermon.categoryName;
-    } else if (sermon.category.isNotEmpty) {
-      return sermon.category;
+    if (transcript.categoryName.isNotEmpty) {
+      return transcript.categoryName;
+    } else if (transcript.category.isNotEmpty) {
+      return transcript.category;
     }
     return '';
   }
 
   String _getSpeakerAndTime() {
     final parts = <String>[];
-    if (sermon.speaker != null && sermon.speaker!.isNotEmpty) {
-      parts.add(sermon.speaker!);
+    if (transcript.speaker != null && transcript.speaker!.isNotEmpty) {
+      parts.add(transcript.speaker!);
     }
-    parts.add(_formatTimeAgo(sermon.date));
+    parts.add(_formatTimeAgo(transcript.date));
     return parts.join(' - ');
   }
 
   Widget _buildImage(bool isDark) {
-    if (sermon.imageUrl == null || sermon.imageUrl!.isEmpty) {
+    if (transcript.imageUrl == null || transcript.imageUrl!.isEmpty) {
       return Container(
         color: isDark ? AppColors.cardDark : AppColors.dividerLight,
         child: Icon(
@@ -483,9 +464,9 @@ class _TranscriptListItem extends StatelessWidget {
         ),
       );
     }
-    if (sermon.imageUrl!.startsWith('http')) {
+    if (transcript.imageUrl!.startsWith('http')) {
       return CachedNetworkImage(
-        imageUrl: sermon.imageUrl!,
+        imageUrl: transcript.imageUrl!,
         fit: BoxFit.cover,
         placeholder: (context, url) => Container(
           color: isDark ? AppColors.cardDark : AppColors.dividerLight,
@@ -496,7 +477,7 @@ class _TranscriptListItem extends StatelessWidget {
       );
     }
     return Image.asset(
-      sermon.imageUrl!,
+      transcript.imageUrl!,
       fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) => Container(
         color: isDark ? AppColors.cardDark : AppColors.dividerLight,
@@ -550,7 +531,7 @@ class _TranscriptListItem extends StatelessWidget {
                           ),
                         ],
                         TextSpan(
-                          text: sermon.title,
+                          text: transcript.title,
                           style: TextStyle(
                             color: isDark ? Colors.white : Colors.black87,
                             fontWeight: FontWeight.normal,
@@ -583,9 +564,9 @@ class _TranscriptListItem extends StatelessWidget {
 }
 
 class TranscriptViewPage extends StatelessWidget {
-  final Sermon sermon;
+  final Transcript transcript;
 
-  const TranscriptViewPage({super.key, required this.sermon});
+  const TranscriptViewPage({super.key, required this.transcript});
 
   String _formatTranscript(String htmlText) {
     String text = htmlText
@@ -629,14 +610,14 @@ class TranscriptViewPage extends StatelessWidget {
 
   void _shareTranscript() {
     const playStoreLink = 'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
-    final formattedText = _formatTranscript(sermon.transcript ?? '');
+    final formattedText = _formatTranscript(transcript.content);
     
     // Get first 50 words from transcript
     final words = formattedText.split(RegExp(r'\s+'));
     final excerpt = words.take(50).join(' ');
     final hasMore = words.length > 50;
     
-    final shareText = '''${sermon.title}
+    final shareText = '''${transcript.title}
 
 $excerpt${hasMore ? '...' : ''}
 
@@ -644,7 +625,7 @@ Read more in the app
 
 Download Citygate mobile: $playStoreLink''';
     
-    Share.share(shareText, subject: sermon.title);
+    Share.share(shareText, subject: transcript.title);
   }
 
   String _formatDate(DateTime date) {
@@ -662,7 +643,7 @@ Download Citygate mobile: $playStoreLink''';
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final formattedTranscript = _formatTranscript(sermon.transcript ?? '');
+    final formattedTranscript = _formatTranscript(transcript.content);
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
@@ -700,7 +681,7 @@ Download Citygate mobile: $playStoreLink''';
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Category
-                  if (sermon.categoryName.isNotEmpty || sermon.category.isNotEmpty)
+                  if (transcript.categoryName.isNotEmpty || transcript.category.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
@@ -708,7 +689,7 @@ Download Citygate mobile: $playStoreLink''';
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        sermon.categoryName.isNotEmpty ? sermon.categoryName : sermon.category,
+                        transcript.categoryName.isNotEmpty ? transcript.categoryName : transcript.category,
                         style: const TextStyle(
                           fontSize: 11,
                           color: Colors.white,
@@ -719,7 +700,7 @@ Download Citygate mobile: $playStoreLink''';
                   const SizedBox(height: 12),
                   // Title
                   Text(
-                    sermon.title,
+                    transcript.title,
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -729,7 +710,7 @@ Download Citygate mobile: $playStoreLink''';
                   ),
                   const SizedBox(height: 12),
                   // Speaker
-                  if (sermon.speaker != null && sermon.speaker!.isNotEmpty)
+                  if (transcript.speaker != null && transcript.speaker!.isNotEmpty)
                     Row(
                       children: [
                         Icon(
@@ -739,7 +720,7 @@ Download Citygate mobile: $playStoreLink''';
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          sermon.speaker!,
+                          transcript.speaker!,
                           style: TextStyle(
                             fontSize: 14,
                             color: AppColors.primaryGold,
@@ -759,7 +740,7 @@ Download Citygate mobile: $playStoreLink''';
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        _formatDate(sermon.date),
+                        _formatDate(transcript.date),
                         style: TextStyle(
                           fontSize: 13,
                           color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
@@ -773,7 +754,7 @@ Download Citygate mobile: $playStoreLink''';
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        _formatTime(sermon.date),
+                        _formatTime(transcript.date),
                         style: TextStyle(
                           fontSize: 13,
                           color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,

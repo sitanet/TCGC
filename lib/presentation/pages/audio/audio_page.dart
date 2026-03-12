@@ -661,7 +661,6 @@ class _AudioPageState extends ConsumerState<AudioPage>
             builder: (_) => TranscriptListPage(
               category: category.name,
               categoryId: category.id,
-              sermons: _sermons,
               categories: categoriesWithTranscripts.map((c) => c.name).toList(),
               categoryNameToId: categoryNameToId,
             ),

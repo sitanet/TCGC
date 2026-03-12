@@ -1,0 +1,73 @@
+class Transcript {
+  final String id;
+  final String title;
+  final String? description;
+  final String content;
+  final String? speaker;
+  final String? imageUrl;
+  final String category;
+  final String categoryName;
+  final DateTime date;
+  final bool isFeatured;
+  final bool isServiceTeamOnly;
+  final bool isGeneralMarriedOnly;
+  final bool isInHouseMarriedOnly;
+
+  const Transcript({
+    required this.id,
+    required this.title,
+    this.description,
+    required this.content,
+    this.speaker,
+    this.imageUrl,
+    required this.category,
+    this.categoryName = '',
+    required this.date,
+    this.isFeatured = false,
+    this.isServiceTeamOnly = false,
+    this.isGeneralMarriedOnly = false,
+    this.isInHouseMarriedOnly = false,
+  });
+
+  factory Transcript.fromJson(Map<String, dynamic> json) {
+    final categoryValue = json['category'];
+    final categoryStr = categoryValue?.toString() ?? '';
+    final categoryName = json['category_name']?.toString() ?? '';
+    
+    return Transcript(
+      id: json['id'].toString(),
+      title: json['title'] ?? '',
+      description: json['description'],
+      content: json['content'] ?? '',
+      speaker: json['speaker'],
+      imageUrl: json['image_url'],
+      category: categoryStr,
+      categoryName: categoryName,
+      date: json['date'] != null 
+          ? DateTime.parse(json['date']) 
+          : DateTime.now(),
+      isFeatured: json['is_featured'] ?? false,
+      isServiceTeamOnly: json['is_service_team_only'] ?? false,
+      isGeneralMarriedOnly: json['is_general_married_only'] ?? false,
+      isInHouseMarriedOnly: json['is_in_house_married_only'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'content': content,
+      'speaker': speaker,
+      'image_url': imageUrl,
+      'category': category,
+      'category_name': categoryName,
+      'date': date.toIso8601String(),
+      'is_featured': isFeatured,
+      'is_service_team_only': isServiceTeamOnly,
+      'is_general_married_only': isGeneralMarriedOnly,
+      'is_in_house_married_only': isInHouseMarriedOnly,
+    };
+  }
+}

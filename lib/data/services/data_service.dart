@@ -7,6 +7,7 @@ import '../../domain/entities/teens_content.dart';
 import '../../domain/entities/wallet.dart';
 import '../../domain/entities/transaction.dart';
 import '../../domain/entities/promotion.dart';
+import '../../domain/entities/transcript.dart';
 import 'api_service.dart';
 import 'content_cache_service.dart';
 
@@ -123,6 +124,43 @@ class DataService {
     } catch (e) {
       return false;
     }
+  }
+
+  // Transcripts (standalone)
+  Future<List<Transcript>> getTranscripts() async {
+    final response = await _api.get(ApiConstants.transcripts);
+    if (response.isSuccess) {
+      final data = response.data;
+      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
+      return results.map((json) => Transcript.fromJson(json)).toList();
+    }
+    return [];
+  }
+
+  Future<Transcript?> getTranscriptById(String transcriptId) async {
+    final response = await _api.get('${ApiConstants.transcripts}$transcriptId/');
+    if (response.isSuccess) {
+      return Transcript.fromJson(response.data);
+    }
+    return null;
+  }
+
+  Future<List<Transcript>> getTranscriptsByCategory(String categoryId) async {
+    final response = await _api.get('${ApiConstants.transcriptsByCategory}?category_id=$categoryId');
+    if (response.isSuccess) {
+      final List<dynamic> data = response.dataList;
+      return data.map((json) => Transcript.fromJson(json)).toList();
+    }
+    return [];
+  }
+
+  Future<List<Transcript>> getFeaturedTranscripts() async {
+    final response = await _api.get(ApiConstants.featuredTranscripts);
+    if (response.isSuccess) {
+      final List<dynamic> data = response.dataList;
+      return data.map((json) => Transcript.fromJson(json)).toList();
+    }
+    return [];
   }
 
   // Events - Now uses cache-first strategy

@@ -33,6 +33,11 @@ class ApiConstants {
   static const String topFavorites = '/messages/top_favorites/'; // Get most favorited messages
   static const String topShares = '/messages/top_shares/'; // Get most shared messages
   
+  // Transcripts (standalone)
+  static const String transcripts = '/transcripts/';
+  static const String transcriptsByCategory = '/transcripts/by_category/';
+  static const String featuredTranscripts = '/transcripts/featured/';
+  
   // Favorites (synced to backend)
   static const String favorites = '/favorites/';
   static const String favoritesSync = '/favorites/sync/';
