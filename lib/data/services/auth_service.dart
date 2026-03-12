@@ -287,6 +287,14 @@ class AuthService {
     return null;
   }
 
+  Future<bool> replyToContactMessage(int id, String message) async {
+    final response = await _api.post('${ApiConstants.myContactMessageDetail}$id/reply/', {
+      'message': message,
+    });
+    
+    return response.isSuccess;
+  }
+
   bool get isAuthenticated => _api.isAuthenticated;
 
   Future<void> loadSession() async {

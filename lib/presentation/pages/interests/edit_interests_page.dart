@@ -40,7 +40,8 @@ class _EditInterestsPageState extends State<EditInterestsPage> {
       
       if (mounted) {
         setState(() {
-          _categories = categories.where((c) => c.isActive).toList();
+          // Filter out service team only categories for regular users
+          _categories = categories.where((c) => c.isActive && !c.isServiceTeamOnly).toList();
           _selectedIds = _interestsService.selectedCategoryIds.toSet();
           _isLoading = false;
         });

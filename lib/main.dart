@@ -14,6 +14,7 @@ import 'core/providers/notification_provider.dart';
 import 'core/providers/audio_player_provider.dart';
 import 'core/providers/wallet_provider.dart';
 import 'core/providers/biometric_provider.dart';
+import 'core/providers/app_config_provider.dart';
 import 'presentation/pages/home/home_page.dart';
 import 'presentation/pages/audio/audio_page.dart';
 import 'presentation/pages/livestream/livestream_page.dart';
@@ -44,6 +45,7 @@ final notificationChangeNotifierProvider = ChangeNotifierProvider<NotificationPr
 final walletChangeNotifierProvider = ChangeNotifierProvider<WalletProvider>((ref) => WalletProvider());
 final audioPlayerChangeNotifierProvider = ChangeNotifierProvider<AudioPlayerProvider>((ref) => AudioPlayerProvider());
 final biometricChangeNotifierProvider = ChangeNotifierProvider<BiometricProvider>((ref) => BiometricProvider());
+final appConfigChangeNotifierProvider = ChangeNotifierProvider<AppConfigProvider>((ref) => AppConfigProvider());
 
 // Navigation provider to allow tab pages to navigate to home
 final mainTabIndexProvider = StateProvider<int>((ref) => 0);
@@ -329,6 +331,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     // Delay non-critical operations to let UI render first
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) _initializeWallet();
+      if (mounted) _fetchAppConfig();
     });
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) _checkForAppUpdate();
@@ -403,6 +406,14 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       await ref.read(walletChangeNotifierProvider).initialize();
     } catch (e) {
       debugPrint('Wallet initialization error: $e');
+    }
+  }
+
+  Future<void> _fetchAppConfig() async {
+    try {
+      await ref.read(appConfigChangeNotifierProvider).fetchConfig();
+    } catch (e) {
+      debugPrint('App config fetch error: $e');
     }
   }
   

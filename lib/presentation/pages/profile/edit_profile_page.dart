@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/providers/biometric_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/user.dart';
 import '../../../main.dart';
@@ -31,7 +30,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   DateTime? _selectedDateOfBirth;
   String? _selectedKCC;
   String? _selectedDepartment;
-  String? _selectedMembershipStatus;
   CountryCode _selectedCountryCode = CountryCode.countries.first;
   String? _profilePhotoUrl;
   File? _selectedImageFile;
@@ -67,20 +65,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     'Hospitality',
     'Security',
   ];
-  // Membership status options - values must match backend choices (lowercase)
-  final Map<String, String> _membershipStatusOptions = {
-    'pending': 'Pending',
-    'active': 'Active',
-    'inactive': 'Inactive',
-  };
-
   @override
   void initState() {
     super.initState();
     _loadUserData();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(biometricChangeNotifierProvider).initialize();
-    });
   }
 
   void _loadUserData() {
@@ -97,7 +85,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       _selectedDateOfBirth = user.dateOfBirth;
       _selectedKCC = user.kcc;
       _selectedDepartment = user.department;
-      _selectedMembershipStatus = user.membershipStatus;
       _profilePhotoUrl = user.photoUrl;
       
       // Set country code if available
@@ -222,18 +209,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   },
                 ),
                 const SizedBox(height: 16),
-                _buildMapDropdownField(
-                  label: 'Membership Status',
-                  value: _selectedMembershipStatus,
-                  items: _membershipStatusOptions,
-                  isDark: isDark,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedMembershipStatus = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
                 _buildTextField(
                   controller: _addressController,
                   label: 'Address',
@@ -241,10 +216,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   isDark: isDark,
                   maxLines: 3,
                 ),
-                const SizedBox(height: 32),
-                _buildSectionTitle(context, 'Security'),
-                const SizedBox(height: 16),
-                _buildBiometricToggle(context, isDark),
                 const SizedBox(height: 32),
                 _buildSaveButton(context),
                 const SizedBox(height: 100),
@@ -848,154 +819,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     );
   }
 
-  Widget _buildBiometricToggle(BuildContext context, bool isDark) {
-    final biometricProvider = ref.watch(biometricChangeNotifierProvider);
-    final isAvailable = biometricProvider.isAvailable;
-    final biometricName = biometricProvider.biometricTypeName;
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.primaryGold.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.fingerprint,
-              color: AppColors.primaryGold,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Biometric Authentication',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isAvailable
-                      ? 'Use $biometricName to login'
-                      : 'Biometric not available on this device',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: biometricProvider.biometricLoginEnabled,
-            onChanged: isAvailable
-                ? (value) => _handleBiometricToggle(value, biometricProvider)
-                : null,
-            activeColor: AppColors.primaryGold,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _handleBiometricToggle(bool value, BiometricProvider biometricProvider) async {
-    if (value) {
-      final authProvider = ref.read(authChangeNotifierProvider);
-      final user = authProvider.user;
-      final email = user?.email;
-      
-      if (email != null) {
-        _showEnableBiometricDialog(biometricProvider, email);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to enable biometric login. Please try again later.'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } else {
-      await biometricProvider.setBiometricLoginEnabled(false);
-    }
-  }
-
-  void _showEnableBiometricDialog(BiometricProvider biometricProvider, String email) {
-    final passwordController = TextEditingController();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-        title: const Text('Enable Biometric Login'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Enter your password to enable biometric login:'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Password',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (passwordController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter your password')),
-                );
-                return;
-              }
-
-              Navigator.pop(dialogContext);
-
-              await biometricProvider.setBiometricLoginEnabled(
-                true,
-                email: email,
-                password: passwordController.text,
-              );
-
-              if (biometricProvider.biometricLoginEnabled && mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Biometric login enabled'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
-            child: const Text('Enable', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSaveButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
@@ -1058,10 +881,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       
       if (_selectedDepartment != null) {
         profileData['department'] = _selectedDepartment;
-      }
-      
-      if (_selectedMembershipStatus != null) {
-        profileData['membership_status'] = _selectedMembershipStatus;
       }
       
       if (_addressController.text.trim().isNotEmpty) {

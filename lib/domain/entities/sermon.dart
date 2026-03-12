@@ -95,6 +95,7 @@ class MessageCategory {
   final bool isActive;
   final DateTime? latestMessageDate;
   final bool hasNewMessage;
+  final bool isServiceTeamOnly;
 
   const MessageCategory({
     required this.id,
@@ -104,6 +105,7 @@ class MessageCategory {
     this.isActive = true,
     this.latestMessageDate,
     this.hasNewMessage = false,
+    this.isServiceTeamOnly = false,
   });
 
   factory MessageCategory.fromJson(Map<String, dynamic> json) {
@@ -117,6 +119,7 @@ class MessageCategory {
           ? DateTime.tryParse(json['latest_message_date'].toString())
           : null,
       hasNewMessage: json['has_new_message'] ?? false,
+      isServiceTeamOnly: json['is_service_team_only'] ?? false,
     );
   }
 
@@ -128,6 +131,7 @@ class MessageCategory {
     bool? isActive,
     DateTime? latestMessageDate,
     bool? hasNewMessage,
+    bool? isServiceTeamOnly,
   }) {
     return MessageCategory(
       id: id ?? this.id,
@@ -137,6 +141,7 @@ class MessageCategory {
       isActive: isActive ?? this.isActive,
       latestMessageDate: latestMessageDate ?? this.latestMessageDate,
       hasNewMessage: hasNewMessage ?? this.hasNewMessage,
+      isServiceTeamOnly: isServiceTeamOnly ?? this.isServiceTeamOnly,
     );
   }
 
@@ -149,6 +154,7 @@ class MessageCategory {
       'is_active': isActive,
       'latest_message_date': latestMessageDate?.toIso8601String(),
       'has_new_message': hasNewMessage,
+      'is_service_team_only': isServiceTeamOnly,
     };
   }
 }

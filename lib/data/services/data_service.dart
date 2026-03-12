@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import '../../core/constants/api_constants.dart';
 import '../../domain/entities/sermon.dart';
 import '../../domain/entities/event.dart';
@@ -170,31 +172,82 @@ class DataService {
 
   Future<List<TeensContent>> getDevotionals() async {
     final response = await _api.get(ApiConstants.devotionals);
+    debugPrint('Devotionals API URL: ${ApiConstants.baseUrl}${ApiConstants.devotionals}');
+    debugPrint('Devotionals API response: ${response.statusCode}');
+    debugPrint('Devotionals body: ${response.body}');
     if (response.isSuccess) {
-      final data = response.data;
-      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
-      return results.map((json) => TeensContent.fromJson(json)).toList();
+      try {
+        final decoded = jsonDecode(response.body);
+        debugPrint('Devotionals decoded type: ${decoded.runtimeType}');
+        List<dynamic> results;
+        if (decoded is List) {
+          results = decoded;
+        } else if (decoded is Map) {
+          results = decoded['results'] ?? decoded['data'] ?? [];
+        } else {
+          results = [];
+        }
+        debugPrint('Devotionals results count: ${results.length}');
+        return results.map((json) => TeensContent.fromJson(json)).toList();
+      } catch (e) {
+        debugPrint('Devotionals parse error: $e');
+      }
     }
+    debugPrint('Devotionals API failed: ${response.errorMessage}');
     return [];
   }
 
   Future<List<TeensContent>> getRetreats() async {
     final response = await _api.get(ApiConstants.retreats);
+    debugPrint('Retreats API URL: ${ApiConstants.baseUrl}${ApiConstants.retreats}');
+    debugPrint('Retreats API response: ${response.statusCode}');
+    debugPrint('Retreats body: ${response.body}');
     if (response.isSuccess) {
-      final data = response.data;
-      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
-      return results.map((json) => TeensContent.fromJson(json)).toList();
+      try {
+        final decoded = jsonDecode(response.body);
+        debugPrint('Retreats decoded type: ${decoded.runtimeType}');
+        List<dynamic> results;
+        if (decoded is List) {
+          results = decoded;
+        } else if (decoded is Map) {
+          results = decoded['results'] ?? decoded['data'] ?? [];
+        } else {
+          results = [];
+        }
+        debugPrint('Retreats results count: ${results.length}');
+        return results.map((json) => TeensContent.fromJson(json)).toList();
+      } catch (e) {
+        debugPrint('Retreats parse error: $e');
+      }
     }
+    debugPrint('Retreats API failed: ${response.errorMessage}');
     return [];
   }
 
   Future<List<TeensContent>> getForgeCamp() async {
     final response = await _api.get(ApiConstants.forgeCamp);
+    debugPrint('ForgeCamp API URL: ${ApiConstants.baseUrl}${ApiConstants.forgeCamp}');
+    debugPrint('ForgeCamp API response: ${response.statusCode}');
+    debugPrint('ForgeCamp body: ${response.body}');
     if (response.isSuccess) {
-      final data = response.data;
-      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
-      return results.map((json) => TeensContent.fromJson(json)).toList();
+      try {
+        final decoded = jsonDecode(response.body);
+        debugPrint('ForgeCamp decoded type: ${decoded.runtimeType}');
+        List<dynamic> results;
+        if (decoded is List) {
+          results = decoded;
+        } else if (decoded is Map) {
+          results = decoded['results'] ?? decoded['data'] ?? [];
+        } else {
+          results = [];
+        }
+        debugPrint('ForgeCamp results count: ${results.length}');
+        return results.map((json) => TeensContent.fromJson(json)).toList();
+      } catch (e) {
+        debugPrint('ForgeCamp parse error: $e');
+      }
     }
+    debugPrint('ForgeCamp API failed: ${response.errorMessage}');
     return [];
   }
 

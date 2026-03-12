@@ -2,61 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:flutter_html/flutter_html.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/utils/responsive.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../data/services/data_service.dart';
 import '../../widgets/custom_app_bar.dart';
-
-String _stripHtmlTags(String htmlText) {
-  // Convert block-level tags to double newlines for paragraphs
-  String text = htmlText
-      .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n\n')
-      .replaceAll(RegExp(r'<p[^>]*>', caseSensitive: false), '')
-      .replaceAll(RegExp(r'</div>', caseSensitive: false), '\n\n')
-      .replaceAll(RegExp(r'<div[^>]*>', caseSensitive: false), '')
-      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
-      .replaceAll(RegExp(r'</h[1-6]>', caseSensitive: false), '\n\n')
-      .replaceAll(RegExp(r'<h[1-6][^>]*>', caseSensitive: false), '\n')
-      .replaceAll(RegExp(r'</li>', caseSensitive: false), '\n')
-      .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '• ')
-      .replaceAll(RegExp(r'</?ul[^>]*>', caseSensitive: false), '\n')
-      .replaceAll(RegExp(r'</?ol[^>]*>', caseSensitive: false), '\n');
-  
-  // Remove remaining HTML tags
-  text = text.replaceAll(RegExp(r'<[^>]*>'), '');
-  
-  // Decode HTML entities
-  text = text
-      .replaceAll('&nbsp;', ' ')
-      .replaceAll('&amp;', '&')
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&#39;', "'")
-      .replaceAll('&rsquo;', "'")
-      .replaceAll('&lsquo;', "'")
-      .replaceAll('&rdquo;', '"')
-      .replaceAll('&ldquo;', '"')
-      .replaceAll('&mdash;', '—')
-      .replaceAll('&ndash;', '–')
-      .replaceAll('&hellip;', '...')
-      .replaceAllMapped(RegExp(r'&#(\d+);'), (match) {
-        final code = int.tryParse(match.group(1) ?? '');
-        return code != null ? String.fromCharCode(code) : '';
-      });
-  
-  // Normalize whitespace: collapse multiple spaces and normalize newlines
-  text = text
-      .replaceAll(RegExp(r'[ \t]+'), ' ')
-      .replaceAll(RegExp(r'\n[ \t]+'), '\n')
-      .replaceAll(RegExp(r'[ \t]+\n'), '\n')
-      .replaceAll(RegExp(r'\n{3,}'), '\n\n');
-  
-  return text.trim();
-}
 
 enum TranscriptFilterType { category, speaker }
 
@@ -100,7 +49,12 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
   @override
   void initState() {
     super.initState();
-    _allItems = widget.sermons; // Show all sermons, not just those with transcripts
+    // Only show sermons that have actual transcript content
+    _allItems = widget.sermons.where((s) => 
+        s.transcript != null && 
+        s.transcript!.trim().isNotEmpty &&
+        s.transcript!.trim().length > 10  // Ensure it has meaningful content
+    ).toList();
     _selectedCategory = widget.category;
     _selectedCategoryId = widget.categoryId;
     _filterType = widget.initialFilterType;
@@ -118,7 +72,12 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
       final sermons = await _dataService.getMessages(forceRefresh: true);
       if (mounted) {
         setState(() {
-          _allItems = sermons;
+          // Only show sermons that have actual transcript content
+          _allItems = sermons.where((s) => 
+              s.transcript != null && 
+              s.transcript!.trim().isNotEmpty &&
+              s.transcript!.trim().length > 10
+          ).toList();
           _extractSpeakers();
           _filteredItems = _getFilteredItems(_searchController.text);
           _isRefreshing = false;
@@ -481,8 +440,6 @@ class _TranscriptListItem extends StatelessWidget {
     this.onTap,
   });
 
-  bool get _hasTranscript => sermon.transcript != null && sermon.transcript!.isNotEmpty;
-
   String _formatTimeAgo(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
@@ -551,51 +508,40 @@ class _TranscriptListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      child: Opacity(
-        opacity: _hasTranscript ? 1.0 : 0.6,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-                  child: _buildImage(isDark),
-                ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 50,
+                height: 50,
+                color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                child: _buildImage(isDark),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    RichText(
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      text: TextSpan(
-                        children: [
-                          if (_getCategoryName().isNotEmpty) ...[
-                            TextSpan(
-                              text: _getCategoryName(),
-                              style: TextStyle(
-                                color: isDark ? Colors.white : Colors.black87,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            TextSpan(
-                              text: ' - ',
-                              style: TextStyle(
-                                color: isDark ? Colors.white : Colors.black87,
-                                fontWeight: FontWeight.normal,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  RichText(
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    text: TextSpan(
+                      children: [
+                        if (_getCategoryName().isNotEmpty) ...[
                           TextSpan(
-                            text: sermon.title,
+                            text: _getCategoryName(),
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black87,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          TextSpan(
+                            text: ' - ',
                             style: TextStyle(
                               color: isDark ? Colors.white : Colors.black87,
                               fontWeight: FontWeight.normal,
@@ -603,521 +549,254 @@ class _TranscriptListItem extends StatelessWidget {
                             ),
                           ),
                         ],
-                      ),
+                        TextSpan(
+                          text: sermon.title,
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black87,
+                            fontWeight: FontWeight.normal,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    if (_hasTranscript)
-                      Text(
-                        _getSpeakerAndTime(),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isDark
-                                  ? AppColors.textSecondaryDark.withValues(alpha: 0.7)
-                                  : AppColors.textSecondaryLight.withValues(alpha: 0.7),
-                              fontSize: 12,
-                            ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      )
-                    else
-                      Text(
-                        'Not available yet',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.orange,
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                            ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class TranscriptViewPage extends StatefulWidget {
-  final Sermon sermon;
-
-  const TranscriptViewPage({super.key, required this.sermon});
-
-  @override
-  State<TranscriptViewPage> createState() => _TranscriptViewPageState();
-}
-
-class _TranscriptViewPageState extends State<TranscriptViewPage> {
-  double _fontSize = 16.0;
-  final ScrollController _scrollController = ScrollController();
-  double _scrollProgress = 0.0;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_updateScrollProgress);
-  }
-
-  void _updateScrollProgress() {
-    if (_scrollController.hasClients) {
-      final maxScroll = _scrollController.position.maxScrollExtent;
-      if (maxScroll > 0) {
-        setState(() {
-          _scrollProgress = _scrollController.offset / maxScroll;
-        });
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _scrollController.removeListener(_updateScrollProgress);
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final padding = Responsive.horizontalPadding(context);
-    final rawTranscript = widget.sermon.transcript ?? '';
-    final plainText = _stripHtmlTags(rawTranscript);
-    final wordCount = plainText.split(RegExp(r'\s+')).length;
-    final readTime = (wordCount / 200).ceil();
-
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFFAFAFA),
-        body: CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            _buildSliverAppBar(context, isDark),
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context, isDark, padding, readTime, wordCount),
-                  _buildTranscriptContent(context, isDark, padding, rawTranscript),
-                  const SizedBox(height: 100),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _getSpeakerAndTime(),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: isDark
+                              ? AppColors.textSecondaryDark.withValues(alpha: 0.7)
+                              : AppColors.textSecondaryLight.withValues(alpha: 0.7),
+                          fontSize: 12,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),
           ],
         ),
-        floatingActionButton: _buildFontSizeControls(isDark),
-        bottomNavigationBar: _buildProgressBar(isDark),
       ),
     );
   }
+}
 
-  Widget _buildSliverAppBar(BuildContext context, bool isDark) {
-    return SliverAppBar(
-      expandedHeight: 200,
-      pinned: true,
-      backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-      leading: IconButton(
-        icon: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.3),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-        ),
-        onPressed: () => Navigator.pop(context),
-      ),
-      actions: [
-        IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.3),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.share, color: Colors.white, size: 20),
-          ),
-          onPressed: () => _shareTranscript(context),
-        ),
-        IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.3),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.copy, color: Colors.white, size: 20),
-          ),
-          onPressed: () => _copyTranscript(context),
-        ),
-      ],
-      flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (widget.sermon.imageUrl != null && widget.sermon.imageUrl!.isNotEmpty)
-              CachedNetworkImage(
-                imageUrl: widget.sermon.imageUrl!,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  color: AppColors.primaryGold.withOpacity(0.2),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  color: AppColors.primaryGold.withOpacity(0.2),
-                  child: Icon(
-                    Icons.description,
-                    size: 60,
-                    color: AppColors.primaryGold.withOpacity(0.5),
-                  ),
-                ),
-              )
-            else
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.primaryGold.withOpacity(0.8),
-                      AppColors.primaryGold.withOpacity(0.4),
-                    ],
-                  ),
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.article,
-                    size: 60,
-                    color: Colors.white.withOpacity(0.5),
-                  ),
-                ),
-              ),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withOpacity(0.7),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+class TranscriptViewPage extends StatelessWidget {
+  final Sermon sermon;
+
+  const TranscriptViewPage({super.key, required this.sermon});
+
+  String _formatTranscript(String htmlText) {
+    String text = htmlText
+        .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n\n')
+        .replaceAll(RegExp(r'<p[^>]*>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'</div>', caseSensitive: false), '\n\n')
+        .replaceAll(RegExp(r'<div[^>]*>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</h[1-6]>', caseSensitive: false), '\n\n')
+        .replaceAll(RegExp(r'<h[1-6][^>]*>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</li>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '• ')
+        .replaceAll(RegExp(r'</?ul[^>]*>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</?ol[^>]*>', caseSensitive: false), '\n');
+
+    text = text.replaceAll(RegExp(r'<[^>]*>'), '');
+
+    text = text
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&rsquo;', "'")
+        .replaceAll('&lsquo;', "'")
+        .replaceAll('&rdquo;', '"')
+        .replaceAll('&ldquo;', '"')
+        .replaceAll('&mdash;', '—')
+        .replaceAll('&ndash;', '–')
+        .replaceAll('&hellip;', '...');
+
+    text = text
+        .replaceAll(RegExp(r'[ \t]+'), ' ')
+        .replaceAll(RegExp(r'\n[ \t]+'), '\n')
+        .replaceAll(RegExp(r'[ \t]+\n'), '\n')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n');
+
+    return text.trim();
   }
 
-  Widget _buildHeader(BuildContext context, bool isDark, double padding, int readTime, int wordCount) {
-    return Container(
-      padding: EdgeInsets.all(padding),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.primaryGold.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              'MESSAGE TRANSCRIPT',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primaryGold,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            widget.sermon.title,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87,
-                  height: 1.3,
-                ),
-          ),
-          const SizedBox(height: 12),
-          if (widget.sermon.speaker != null && widget.sermon.speaker!.isNotEmpty)
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: AppColors.primaryGold.withOpacity(0.2),
-                  child: Icon(
-                    Icons.person,
-                    size: 18,
-                    color: AppColors.primaryGold,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  widget.sermon.speaker!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                ),
-              ],
-            ),
-          const SizedBox(height: 16),
-          Divider(color: isDark ? AppColors.dividerDark : AppColors.dividerLight),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildInfoChip(Icons.calendar_today_outlined, _formatDate(widget.sermon.date), isDark),
-              const SizedBox(width: 16),
-              _buildInfoChip(Icons.schedule_outlined, '$readTime min read', isDark),
-              const SizedBox(width: 16),
-              _buildInfoChip(Icons.text_fields, '$wordCount words', isDark),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoChip(IconData icon, String text, bool isDark) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          size: 14,
-          color: isDark ? Colors.grey[500] : Colors.grey[600],
-        ),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 12,
-            color: isDark ? Colors.grey[500] : Colors.grey[600],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTranscriptContent(BuildContext context, bool isDark, double padding, String transcript) {
-    final textColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final secondaryColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final bgColor = isDark ? AppColors.cardDark : Colors.grey[100];
+  void _shareTranscript() {
+    const playStoreLink = 'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
+    final formattedText = _formatTranscript(sermon.transcript ?? '');
     
-    return Container(
-      margin: EdgeInsets.all(padding),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Html(
-        data: transcript,
-        style: {
-          "body": Style(
-            fontSize: FontSize(_fontSize),
-            lineHeight: LineHeight(1.8),
-            color: secondaryColor,
-            margin: Margins.zero,
-            padding: HtmlPaddings.zero,
-            letterSpacing: 0.3,
-          ),
-          "h1": Style(
-            fontSize: FontSize(_fontSize + 12),
-            fontWeight: FontWeight.bold,
-            color: textColor,
-            margin: Margins.only(bottom: 16, top: 24),
-          ),
-          "h2": Style(
-            fontSize: FontSize(_fontSize + 8),
-            fontWeight: FontWeight.bold,
-            color: textColor,
-            margin: Margins.only(bottom: 12, top: 20),
-          ),
-          "h3": Style(
-            fontSize: FontSize(_fontSize + 4),
-            fontWeight: FontWeight.bold,
-            color: textColor,
-            margin: Margins.only(bottom: 10, top: 16),
-          ),
-          "p": Style(
-            fontSize: FontSize(_fontSize),
-            lineHeight: LineHeight(1.8),
-            color: secondaryColor,
-            margin: Margins.only(bottom: 12),
-          ),
-          "strong": Style(
-            fontWeight: FontWeight.bold,
-            color: textColor,
-          ),
-          "b": Style(
-            fontWeight: FontWeight.bold,
-            color: textColor,
-          ),
-          "em": Style(
-            fontStyle: FontStyle.italic,
-          ),
-          "i": Style(
-            fontStyle: FontStyle.italic,
-          ),
-          "u": Style(
-            textDecoration: TextDecoration.underline,
-          ),
-          "blockquote": Style(
-            backgroundColor: bgColor,
-            padding: HtmlPaddings.all(16),
-            margin: Margins.symmetric(vertical: 16),
-            border: Border(
-              left: BorderSide(
-                color: AppColors.primaryGold,
-                width: 4,
-              ),
-            ),
-            fontStyle: FontStyle.italic,
-            color: textColor,
-          ),
-          "ul": Style(
-            margin: Margins.only(bottom: 12, left: 8),
-          ),
-          "ol": Style(
-            margin: Margins.only(bottom: 12, left: 8),
-          ),
-          "li": Style(
-            margin: Margins.only(bottom: 6),
-            lineHeight: LineHeight(1.6),
-          ),
-          "a": Style(
-            color: AppColors.primaryGold,
-            textDecoration: TextDecoration.underline,
-          ),
-        },
-        onLinkTap: (url, _, __) async {
-          if (url != null) {
-            final uri = Uri.parse(url);
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            }
-          }
-        },
-      ),
-    );
-  }
+    // Get first 50 words from transcript
+    final words = formattedText.split(RegExp(r'\s+'));
+    final excerpt = words.take(50).join(' ');
+    final hasMore = words.length > 50;
+    
+    final shareText = '''${sermon.title}
 
-  Widget _buildFontSizeControls(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.text_decrease, size: 20),
-            onPressed: _fontSize > 12
-                ? () => setState(() => _fontSize -= 2)
-                : null,
-            color: AppColors.primaryGold,
-          ),
-          Text(
-            '${_fontSize.toInt()}',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.text_increase, size: 20),
-            onPressed: _fontSize < 28
-                ? () => setState(() => _fontSize += 2)
-                : null,
-            color: AppColors.primaryGold,
-          ),
-        ],
-      ),
-    );
-  }
+$excerpt${hasMore ? '...' : ''}
 
-  Widget _buildProgressBar(bool isDark) {
-    return Container(
-      height: 4,
-      color: isDark ? AppColors.cardDark : Colors.grey[200],
-      child: FractionallySizedBox(
-        alignment: Alignment.centerLeft,
-        widthFactor: _scrollProgress.clamp(0.0, 1.0),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.primaryGold,
-                AppColors.primaryGold.withOpacity(0.7),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+Read more in the app
+
+Download Citygate mobile: $playStoreLink''';
+    
+    Share.share(shareText, subject: sermon.title);
   }
 
   String _formatDate(DateTime date) {
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
-                    'July', 'August', 'September', 'October', 'November', 'December'];
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
-  void _shareTranscript(BuildContext context) {
-    final transcript = _stripHtmlTags(widget.sermon.transcript ?? '');
-    final title = widget.sermon.title;
-    final speaker = widget.sermon.speaker ?? '';
-    
-    final shareText = '''$title
-${speaker.isNotEmpty ? 'By $speaker\n' : ''}
-$transcript''';
-    
-    Share.share(shareText, subject: title);
+  String _formatTime(DateTime date) {
+    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+    final period = date.hour >= 12 ? 'PM' : 'AM';
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$hour:$minute $period';
   }
 
-  void _copyTranscript(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: _stripHtmlTags(widget.sermon.transcript ?? '')));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Transcript copied to clipboard'),
-        backgroundColor: AppColors.primaryGold,
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final formattedTranscript = _formatTranscript(sermon.transcript ?? '');
+
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
+      appBar: CustomAppBar(
+        title: 'Transcript',
+        showBackButton: true,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.share, color: isDark ? Colors.white : Colors.black),
+            onPressed: _shareTranscript,
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header Section
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark 
+                    ? AppColors.cardDark 
+                    : AppColors.primaryGold.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark 
+                      ? AppColors.dividerDark 
+                      : AppColors.primaryGold.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Category
+                  if (sermon.categoryName.isNotEmpty || sermon.category.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGold,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        sermon.categoryName.isNotEmpty ? sermon.categoryName : sermon.category,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  // Title
+                  Text(
+                    sermon.title,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Speaker
+                  if (sermon.speaker != null && sermon.speaker!.isNotEmpty)
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.person_outline,
+                          size: 16,
+                          color: AppColors.primaryGold,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          sermon.speaker!,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.primaryGold,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 8),
+                  // Date and Time
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today_outlined,
+                        size: 14,
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _formatDate(sermon.date),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Icon(
+                        Icons.access_time,
+                        size: 14,
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _formatTime(sermon.date),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Transcript Body
+            SelectableText(
+              formattedTranscript,
+              style: TextStyle(
+                fontSize: 16,
+                height: 1.8,
+                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+              ),
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
     );
   }

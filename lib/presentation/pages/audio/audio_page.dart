@@ -71,6 +71,12 @@ class _AudioPageState extends ConsumerState<AudioPage>
       final cachedSermons = await _audioCacheService.getCachedSermons();
       
       if (cachedCategories != null && cachedSermons != null && mounted) {
+        // Filter cached categories based on user permissions
+        final filteredCategories = cachedCategories.where((category) {
+          if (category.isServiceTeamOnly && !isServiceTeamMember) return false;
+          return true;
+        }).toList();
+        
         // Filter cached sermons based on user permissions
         final filteredSermons = cachedSermons.where((sermon) {
           if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
@@ -80,7 +86,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
         }).toList();
         
         setState(() {
-          _categories = cachedCategories;
+          _categories = filteredCategories;
           _sermons = filteredSermons;
           _isLoading = false;
         });
@@ -98,6 +104,12 @@ class _AudioPageState extends ConsumerState<AudioPage>
       
       final allSermons = await _dataService.getMessages();
       
+      // Filter categories based on user permissions
+      final filteredCategories = categories.where((category) {
+        if (category.isServiceTeamOnly && !isServiceTeamMember) return false;
+        return true;
+      }).toList();
+      
       // Filter sermons based on user permissions
       final sermons = allSermons.where((sermon) {
         if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
@@ -108,7 +120,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
       
       // Cache the metadata in background (don't await)
       Future.microtask(() {
-        _audioCacheService.cacheMetadata(categories: categories, sermons: sermons);
+        _audioCacheService.cacheMetadata(categories: filteredCategories, sermons: sermons);
       });
       
       debugPrint('=== Audio Page Data ===');
@@ -125,7 +137,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
       final now = DateTime.now();
       final threeDaysAgo = now.subtract(const Duration(days: 3));
       
-      final updatedCategories = categories.map((category) {
+      final updatedCategories = filteredCategories.map((category) {
         // Find sermons in this category
         final categorySermons = sermons.where((s) => 
           s.category == category.id || s.categoryName == category.name
@@ -194,6 +206,12 @@ class _AudioPageState extends ConsumerState<AudioPage>
       final categories = await _dataService.getMessageCategories();
       final allSermons = await _dataService.getMessages(forceRefresh: true);
 
+      // Filter categories based on user permissions
+      final filteredCategories = categories.where((category) {
+        if (category.isServiceTeamOnly && !isServiceTeamMember) return false;
+        return true;
+      }).toList();
+
       final sermons = allSermons.where((sermon) {
         if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
         if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
@@ -203,7 +221,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
 
       if (mounted) {
         setState(() {
-          _categories = categories;
+          _categories = filteredCategories;
           _sermons = sermons;
         });
         debugPrint('Background refresh complete: ${sermons.length} sermons');
@@ -452,6 +470,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
                   Text(
                     _stripHtmlTags(category.description ?? 'It is a time for to come together to worship, hear God\'s word, and fellowship.'),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontFamily: 'ClashDisplay',
                           color: isDark
                               ? AppColors.textSecondaryDark
                               : AppColors.textSecondaryLight,
@@ -518,12 +537,13 @@ class _AudioPageState extends ConsumerState<AudioPage>
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Filter categories that have sermons with transcripts
+    // Filter categories that have sermons with actual transcript content
     final categoriesWithTranscripts = _categories.where((category) {
       return _sermons.any((sermon) =>
           (sermon.category == category.id || sermon.categoryName == category.name) &&
           sermon.transcript != null &&
-          sermon.transcript!.isNotEmpty);
+          sermon.transcript!.trim().isNotEmpty &&
+          sermon.transcript!.trim().length > 10);
     }).toList();
 
     final padding = Responsive.horizontalPadding(context);
@@ -617,14 +637,16 @@ class _AudioPageState extends ConsumerState<AudioPage>
     final transcriptCount = _sermons.where((sermon) =>
         (sermon.category == category.id || sermon.categoryName == category.name) &&
         sermon.transcript != null &&
-        sermon.transcript!.isNotEmpty).length;
+        sermon.transcript!.trim().isNotEmpty &&
+        sermon.transcript!.trim().length > 10).length;
 
     // Get categories that have transcripts for filter list
     final categoriesWithTranscripts = _categories.where((cat) {
       return _sermons.any((sermon) =>
           (sermon.category == cat.id || sermon.categoryName == cat.name) &&
           sermon.transcript != null &&
-          sermon.transcript!.isNotEmpty);
+          sermon.transcript!.trim().isNotEmpty &&
+          sermon.transcript!.trim().length > 10);
     }).toList();
     
     final categoryNameToId = {

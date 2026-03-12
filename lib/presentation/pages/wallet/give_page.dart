@@ -29,6 +29,8 @@ class _GivePageState extends ConsumerState<GivePage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = ref.read(walletChangeNotifierProvider);
+      // Always fetch fresh wallet data to get account name/number
+      provider.fetchWallet();
       provider.fetchTransactions();
       provider.fetchGivings();
       provider.fetchGiveOptions();
@@ -264,32 +266,65 @@ class _GivePageState extends ConsumerState<GivePage> {
                   color: AppColors.primaryGold.withValues(alpha: 0.3),
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildAccountDetailRow(
-                    context,
-                    isDark,
-                    'Bank Name',
-                    '9 Payment Service Bank (9PSB)',
-                  ),
-                  const SizedBox(height: 16),
-                  _buildAccountDetailRow(
-                    context,
-                    isDark,
-                    'Account Number',
-                    walletProvider.accountNumber ?? 'N/A',
-                    showCopy: true,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildAccountDetailRow(
-                    context,
-                    isDark,
-                    'Account Name',
-                    walletProvider.accountName ?? 'N/A',
-                  ),
-                ],
-              ),
+              child: (walletProvider.accountNumber == null || walletProvider.accountNumber!.isEmpty)
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.hourglass_empty,
+                              color: AppColors.primaryGold,
+                              size: 32,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Account details are being set up...',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Please check back in a few minutes.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.grey[500] : Colors.grey[500],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildAccountDetailRow(
+                          context,
+                          isDark,
+                          'Bank Name',
+                          '9 Payment Service Bank (9PSB)',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildAccountDetailRow(
+                          context,
+                          isDark,
+                          'Account Number',
+                          walletProvider.accountNumber!,
+                          showCopy: true,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildAccountDetailRow(
+                          context,
+                          isDark,
+                          'Account Name',
+                          walletProvider.accountName ?? 'N/A',
+                        ),
+                      ],
+                    ),
             ),
             const SizedBox(height: 16),
             // Transfer to Bank Button
@@ -846,14 +881,48 @@ class _GivePageState extends ConsumerState<GivePage> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              walletProvider.accountNumber ?? '',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.7),
-                                fontSize: 14,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
+                            // Account Number with copy icon
+                            (walletProvider.accountNumber != null && walletProvider.accountNumber!.isNotEmpty)
+                                ? GestureDetector(
+                                    onTap: () {
+                                      Clipboard.setData(ClipboardData(text: walletProvider.accountNumber!));
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Account number copied'),
+                                          duration: Duration(seconds: 2),
+                                          backgroundColor: AppColors.primaryGold,
+                                        ),
+                                      );
+                                    },
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          walletProvider.accountNumber!,
+                                          style: TextStyle(
+                                            color: Colors.white.withValues(alpha: 0.7),
+                                            fontSize: 14,
+                                            letterSpacing: 1.5,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Icon(
+                                          Icons.copy,
+                                          color: Colors.white.withValues(alpha: 0.7),
+                                          size: 16,
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : Text(
+                                    'Setting up account...',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                      fontSize: 14,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
                           ],
                         ),
                       ),

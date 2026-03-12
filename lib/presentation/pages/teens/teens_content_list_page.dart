@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/teens_content.dart';
@@ -39,34 +40,46 @@ class TeensContentListPage extends StatefulWidget {
 
 class _TeensContentListPageState extends State<TeensContentListPage> {
   final DataService _dataService = DataService();
-  late List<TeensContent> _contents;
+  List<TeensContent> _contents = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _contents = widget.contents;
+    _loadData();
   }
 
-  Future<void> _onRefresh() async {
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
     try {
-      List<TeensContent> refreshedContents;
+      List<TeensContent> loadedContents;
       switch (widget.contentType) {
         case TeensContentType.devotionals:
-          refreshedContents = await _dataService.getDevotionals();
+          loadedContents = await _dataService.getDevotionals();
           break;
         case TeensContentType.retreats:
-          refreshedContents = await _dataService.getRetreats();
+          loadedContents = await _dataService.getRetreats();
           break;
         case TeensContentType.forgeCamp:
-          refreshedContents = await _dataService.getForgeCamp();
+          loadedContents = await _dataService.getForgeCamp();
           break;
       }
       if (mounted) {
-        setState(() => _contents = refreshedContents);
+        setState(() {
+          _contents = loadedContents;
+          _isLoading = false;
+        });
       }
     } catch (e) {
-      debugPrint('Error refreshing teens content: $e');
+      debugPrint('Error loading teens content: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
+  }
+
+  Future<void> _onRefresh() async {
+    await _loadData();
   }
 
   @override
@@ -75,20 +88,22 @@ class _TeensContentListPageState extends State<TeensContentListPage> {
 
     return Scaffold(
       appBar: CustomAppBar(title: widget.title, showBackButton: true),
-      body: _contents.isEmpty
-          ? _buildEmptyState(context, isDark)
-          : RefreshIndicator(
-              onRefresh: _onRefresh,
-              color: AppColors.primaryGold,
-              child: ListView.builder(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                itemCount: _contents.length,
-                itemBuilder: (context, index) {
-                  return _buildContentCard(context, isDark, _contents[index]);
-                },
-              ),
-            ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGold))
+          : _contents.isEmpty
+              ? _buildEmptyState(context, isDark)
+              : RefreshIndicator(
+                  onRefresh: _onRefresh,
+                  color: AppColors.primaryGold,
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _contents.length,
+                    itemBuilder: (context, index) {
+                      return _buildContentCard(context, isDark, _contents[index]);
+                    },
+                  ),
+                ),
     );
   }
 

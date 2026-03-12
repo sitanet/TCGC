@@ -57,6 +57,12 @@ class _TeensPageState extends ConsumerState<TeensPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     final spacing = Responsive.verticalSpacing(context);
+    final appConfig = ref.watch(appConfigChangeNotifierProvider);
+    
+    // Check if teens page is disabled
+    if (appConfig.config.teensPageDisabled) {
+      return _buildDisabledPage(context, appConfig.config.teensPageDisabledMessage);
+    }
 
     return Scaffold(
       appBar: CustomAppBar(
@@ -84,6 +90,60 @@ class _TeensPageState extends ConsumerState<TeensPage> {
                   ),
                 ),
               ),
+      ),
+    );
+  }
+
+  Widget _buildDisabledPage(BuildContext context, String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    
+    return Scaffold(
+      appBar: CustomAppBar(
+        title: 'Teens',
+        showBackButton: true,
+        lightBackground: true,
+        onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+      ),
+      body: Center(
+        child: Padding(
+          padding: EdgeInsets.all(horizontalPadding),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.construction_rounded,
+                  size: 50,
+                  color: Colors.orange,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Under Maintenance',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

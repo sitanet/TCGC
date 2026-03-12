@@ -372,11 +372,15 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      debugPrint('WalletProvider.give: Sending request - giveOptionId=$giveOptionId, amount=$amount');
       final response = await _api.post(ApiConstants.walletGive, {
         'give_option': giveOptionId,
         'amount': amount,
         'pin': pin,
       });
+      
+      debugPrint('WalletProvider.give: Response statusCode=${response.statusCode}, isSuccess=${response.isSuccess}');
+      debugPrint('WalletProvider.give: Response body=${response.body}');
       
       if (response.isSuccess) {
         _balance = double.tryParse(response.data['new_balance']?.toString() ?? '0') ?? _balance;
@@ -388,11 +392,12 @@ class WalletProvider extends ChangeNotifier {
       }
       
       _error = response.errorMessage;
+      debugPrint('WalletProvider.give: Failed - error=$_error');
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
-      debugPrint('Error giving: $e');
+      debugPrint('WalletProvider.give: Exception - $e');
       _error = 'Failed to process giving';
       _isLoading = false;
       notifyListeners();

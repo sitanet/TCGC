@@ -40,7 +40,8 @@ class _InterestsPageState extends State<InterestsPage> {
       final categories = await _dataService.getMessageCategories();
       if (mounted) {
         setState(() {
-          _categories = categories.where((c) => c.isActive).toList();
+          // Filter out service team only categories (user isn't logged in during onboarding)
+          _categories = categories.where((c) => c.isActive && !c.isServiceTeamOnly).toList();
           _isLoading = false;
         });
       }

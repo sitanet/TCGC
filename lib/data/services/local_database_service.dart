@@ -307,6 +307,7 @@ class LocalDatabaseService {
           'is_active': category.isActive ? 1 : 0,
           'latest_message_date': category.latestMessageDate?.toIso8601String(),
           'has_new_message': category.hasNewMessage ? 1 : 0,
+          'is_service_team_only': category.isServiceTeamOnly ? 1 : 0,
           'cached_at': cachedAt,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
@@ -340,6 +341,7 @@ class LocalDatabaseService {
           ? DateTime.tryParse(row['latest_message_date'] as String)
           : null,
       hasNewMessage: (row['has_new_message'] as int? ?? 0) == 1,
+      isServiceTeamOnly: (row['is_service_team_only'] as int? ?? 0) == 1,
     );
   }
 

@@ -711,6 +711,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   }
 
   void _shareSermon() {
+    const playStoreLink = 'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
     final sermon = widget.sermon;
     final shareText = '''
 Check out this message: "${sermon.title}"
@@ -718,7 +719,8 @@ Check out this message: "${sermon.title}"
 ${sermon.description}
 
 Listen on Citygate Mobile
-''';
+
+Download Citygate mobile: $playStoreLink''';
     Share.share(shareText, subject: sermon.title);
     // Track share action to backend
     _trackMessageStat('share', true);

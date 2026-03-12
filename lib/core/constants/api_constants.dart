@@ -2,6 +2,13 @@ class ApiConstants {
   static const String baseUrl = 'https://tcgc.thecitygatechurch.org/api'; // Production server
   // static const String baseUrl = 'http://192.168.43.57:8000/api'; // Local development
   
+  // Base URL without /api for web pages
+  static const String webBaseUrl = 'https://tcgc.thecitygatechurch.org';
+  // static const String webBaseUrl = 'http://192.168.43.57:8000'; // Local development
+  
+  // Web pages (for WebView)
+  static String transcriptUrl(int messageId) => '$webBaseUrl/transcript/$messageId/';
+  
   // Auth
   static const String register = '/auth/register/';
   static const String login = '/auth/login/';
@@ -81,8 +88,9 @@ class ApiConstants {
   // Promotions
   static const String activePromotion = '/promotions/active/';
   
-  // App Version
+  // App Version & Config
   static const String checkAppUpdate = '/app/check-update/';
+  static const String appConfig = '/app/config/';
   
   // KYC Verification
   static const String verifyNin = '/kyc/verify-nin/';

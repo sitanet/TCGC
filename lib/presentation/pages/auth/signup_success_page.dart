@@ -162,7 +162,7 @@ class _SignupSuccessPageState extends State<SignupSuccessPage>
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: widget.onGoToLogin,
+                  onPressed: _isResending ? null : _handleResend,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryGold,
                     shape: RoundedRectangleBorder(
@@ -170,41 +170,19 @@ class _SignupSuccessPageState extends State<SignupSuccessPage>
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Go to Login',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: OutlinedButton(
-                  onPressed: _isResending ? null : _handleResend,
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.primaryGold, width: 2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                  ),
                   child: _isResending
                       ? const SizedBox(
                           height: 24,
                           width: 24,
                           child: CircularProgressIndicator(
-                            color: AppColors.primaryGold,
+                            color: Colors.white,
                             strokeWidth: 2,
                           ),
                         )
                       : const Text(
                           'Resend Email',
                           style: TextStyle(
-                            color: AppColors.primaryGold,
+                            color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),

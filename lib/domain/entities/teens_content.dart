@@ -32,7 +32,7 @@ class TeensContent {
       videoUrl: json['video_url'],
       audioUrl: json['audio_url'],
       transcript: json['transcript'],
-      category: json['category'] ?? '',
+      category: json['category_name'] ?? json['category']?.toString() ?? '',
       date: json['date'] != null 
           ? DateTime.parse(json['date']) 
           : DateTime.now(),
