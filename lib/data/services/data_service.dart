@@ -4,6 +4,7 @@ import '../../core/constants/api_constants.dart';
 import '../../domain/entities/sermon.dart';
 import '../../domain/entities/event.dart';
 import '../../domain/entities/teens_content.dart';
+import '../../domain/entities/teens_category.dart';
 import '../../domain/entities/wallet.dart';
 import '../../domain/entities/transaction.dart';
 import '../../domain/entities/promotion.dart';
@@ -35,16 +36,17 @@ class DataService {
   Future<List<Sermon>> getMessages({bool forceRefresh = false}) async {
     return await _cacheService.getSermons(forceRefresh: forceRefresh);
   }
+
+  /// Clears all cached sermons and fetches fresh data from server
+  /// Use this when audio URLs are missing or corrupted
+  Future<List<Sermon>> clearAndRefreshMessages() async {
+    return await _cacheService.clearAndRefreshSermons();
+  }
   
-  // Legacy method for backward compatibility (fetches directly from API)
+  // Legacy method for backward compatibility (fetches ALL pages directly from API)
   Future<List<Sermon>> getMessagesFromServer() async {
-    final response = await _api.get(ApiConstants.messages);
-    if (response.isSuccess) {
-      final data = response.data;
-      final List<dynamic> results = data['results'] ?? data;
-      return results.map((json) => Sermon.fromJson(json)).toList();
-    }
-    return [];
+    final allResults = await _api.getAllPages(ApiConstants.messages);
+    return allResults.map((json) => Sermon.fromJson(json)).toList();
   }
 
   Future<Sermon?> getMessageById(String messageId) async {
@@ -75,9 +77,13 @@ class DataService {
 
   // Get messages by speaker
   Future<List<Sermon>> getMessagesBySpeaker(String speaker) async {
-    final response = await _api.get('${ApiConstants.messages}by_speaker/?speaker=$speaker');
+    final encodedSpeaker = Uri.encodeComponent(speaker);
+    debugPrint('Fetching messages for speaker: $speaker (encoded: $encodedSpeaker)');
+    final response = await _api.get('${ApiConstants.messages}by_speaker/?speaker=$encodedSpeaker');
+    debugPrint('Response isSuccess: ${response.isSuccess}, data: ${response.data}');
     if (response.isSuccess) {
       final List<dynamic> data = response.dataList;
+      debugPrint('Found ${data.length} messages by speaker');
       return data.map((json) => Sermon.fromJson(json)).toList();
     }
     return [];
@@ -89,7 +95,11 @@ class DataService {
     if (response.isSuccess) {
       final data = response.data;
       final List<dynamic> speakers = data['speakers'] ?? [];
-      return speakers.map((s) => SpeakerModel.fromJson(s)).toList();
+      debugPrint('Speakers API response: $speakers');
+      return speakers.map((s) {
+        debugPrint('Parsing speaker: $s');
+        return SpeakerModel.fromJson(s);
+      }).toList();
     }
     return [];
   }
@@ -197,12 +207,76 @@ class DataService {
     return [];
   }
 
-  // Teens Content
-  Future<List<TeensContent>> getTeensContent() async {
-    final response = await _api.get(ApiConstants.teensContent);
+  // Teens Categories - Now uses cache-first strategy
+  Future<List<TeensCategory>> getTeensCategories({bool forceRefresh = false}) async {
+    return await _cacheService.getTeensCategories(forceRefresh: forceRefresh);
+  }
+  
+  // Legacy method for backward compatibility
+  Future<List<TeensCategory>> getTeensCategoriesFromServer() async {
+    final response = await _api.get(ApiConstants.teensCategories);
     if (response.isSuccess) {
       final data = response.data;
-      final List<dynamic> results = data['results'] ?? data;
+      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
+      return results.map((json) => TeensCategory.fromJson(json)).toList();
+    }
+    return [];
+  }
+
+  // Teens Banner
+  Future<String?> getTeensBannerUrl() async {
+    final response = await _api.get(ApiConstants.teensBanner);
+    if (response.isSuccess) {
+      final data = response.data;
+      return data['image_url'];
+    }
+    return null;
+  }
+
+  // Teens Content - Now uses cache-first strategy
+  Future<List<TeensContent>> getTeensContent({bool forceRefresh = false}) async {
+    return await _cacheService.getTeensContent(forceRefresh: forceRefresh);
+  }
+
+  Future<List<TeensContent>> getTeensContentByCategory(int categoryId, {bool forceRefresh = false}) async {
+    return await _cacheService.getTeensContentByCategory(categoryId, forceRefresh: forceRefresh);
+  }
+  
+  // Legacy method for backward compatibility
+  Future<List<TeensContent>> getTeensContentFromServer(int categoryId) async {
+    final url = '${ApiConstants.teensContentByCategory}?category_id=$categoryId';
+    debugPrint('Fetching teens content by category: ${ApiConstants.baseUrl}$url');
+    final response = await _api.get(url);
+    debugPrint('Response status: ${response.statusCode}');
+    debugPrint('Response body: ${response.body}');
+    if (response.isSuccess) {
+      try {
+        final decoded = jsonDecode(response.body);
+        debugPrint('Decoded type: ${decoded.runtimeType}');
+        List<dynamic> results;
+        if (decoded is List) {
+          results = decoded;
+        } else if (decoded is Map) {
+          results = decoded['results'] ?? [];
+        } else {
+          results = [];
+        }
+        debugPrint('Teens content results count: ${results.length}');
+        return results.map((json) => TeensContent.fromJson(json as Map<String, dynamic>)).toList();
+      } catch (e, stackTrace) {
+        debugPrint('Error parsing teens content: $e');
+        debugPrint('Stack trace: $stackTrace');
+      }
+    }
+    debugPrint('Teens content API failed: ${response.errorMessage}');
+    return [];
+  }
+
+  Future<List<TeensContent>> getTeensContentByCategoryName(String categoryName) async {
+    final response = await _api.get('${ApiConstants.teensContentByCategory}?category=$categoryName');
+    if (response.isSuccess) {
+      final data = response.data;
+      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
       return results.map((json) => TeensContent.fromJson(json)).toList();
     }
     return [];
@@ -464,6 +538,9 @@ class SpeakerModel {
   final String? bio;
   final String? photoUrl;
   final bool isActive;
+  final bool isMainSpeaker;
+  final bool seniorPastor;
+  final bool showExploreSection;
 
   SpeakerModel({
     required this.id,
@@ -473,17 +550,28 @@ class SpeakerModel {
     this.bio,
     this.photoUrl,
     this.isActive = true,
+    this.isMainSpeaker = false,
+    this.seniorPastor = false,
+    this.showExploreSection = false,
   });
 
   factory SpeakerModel.fromJson(Map<String, dynamic> json) {
+    String? rawPhotoUrl = json['photo_url'] ?? json['image_url'] ?? json['picture'] ?? json['avatar'] ?? json['photo'];
+    // If it's a relative URL, prepend the base URL
+    if (rawPhotoUrl != null && rawPhotoUrl.isNotEmpty && !rawPhotoUrl.startsWith('http')) {
+      rawPhotoUrl = 'https://tcgc.thecitygatechurch.org$rawPhotoUrl';
+    }
     return SpeakerModel(
       id: json['id'],
       name: json['name'] ?? '',
       title: json['title'],
       fullName: json['full_name'] ?? json['name'] ?? '',
       bio: json['bio'],
-      photoUrl: json['photo_url'],
+      photoUrl: rawPhotoUrl,
       isActive: json['is_active'] ?? true,
+      isMainSpeaker: json['is_main_speaker'] ?? false,
+      seniorPastor: json['senior_pastor'] ?? false,
+      showExploreSection: json['show_explore_section'] ?? false,
     );
   }
 }

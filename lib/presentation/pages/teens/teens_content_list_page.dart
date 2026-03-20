@@ -18,20 +18,16 @@ String _stripHtmlTags(String htmlText) {
       .trim();
 }
 
-enum TeensContentType { devotionals, retreats, forgeCamp }
-
 class TeensContentListPage extends StatefulWidget {
   final String title;
-  final List<TeensContent> contents;
+  final int categoryId;
   final Color accentColor;
-  final TeensContentType contentType;
 
   const TeensContentListPage({
     super.key,
     required this.title,
-    required this.contents,
+    required this.categoryId,
     required this.accentColor,
-    required this.contentType,
   });
 
   @override
@@ -49,21 +45,10 @@ class _TeensContentListPageState extends State<TeensContentListPage> {
     _loadData();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     setState(() => _isLoading = true);
     try {
-      List<TeensContent> loadedContents;
-      switch (widget.contentType) {
-        case TeensContentType.devotionals:
-          loadedContents = await _dataService.getDevotionals();
-          break;
-        case TeensContentType.retreats:
-          loadedContents = await _dataService.getRetreats();
-          break;
-        case TeensContentType.forgeCamp:
-          loadedContents = await _dataService.getForgeCamp();
-          break;
-      }
+      final loadedContents = await _dataService.getTeensContentByCategory(widget.categoryId, forceRefresh: forceRefresh);
       if (mounted) {
         setState(() {
           _contents = loadedContents;
@@ -79,7 +64,7 @@ class _TeensContentListPageState extends State<TeensContentListPage> {
   }
 
   Future<void> _onRefresh() async {
-    await _loadData();
+    await _loadData(forceRefresh: true);
   }
 
   @override
@@ -280,6 +265,28 @@ class _TeensContentListPageState extends State<TeensContentListPage> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
+                      if (content.speaker != null && content.speaker!.isNotEmpty) ...[
+                        Icon(
+                          Icons.person_outline,
+                          size: 14,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            content.speaker!,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
                       Icon(
                         Icons.calendar_today_outlined,
                         size: 14,
@@ -287,7 +294,7 @@ class _TeensContentListPageState extends State<TeensContentListPage> {
                             ? AppColors.textSecondaryDark
                             : AppColors.textSecondaryLight,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 4),
                       Text(
                         _formatDate(content.date),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(

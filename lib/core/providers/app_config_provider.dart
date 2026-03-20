@@ -9,9 +9,9 @@ class AppConfig {
   final String teensPageDisabledMessage;
 
   AppConfig({
-    this.walletPageDisabled = true,
+    this.walletPageDisabled = false,
     this.walletPageDisabledMessage = 'Wallet is temporarily disabled as we are working on improvements. Please check back later.',
-    this.teensPageDisabled = true,
+    this.teensPageDisabled = false,
     this.teensPageDisabledMessage = 'Teens page is temporarily disabled as we are working on improvements. Please check back later.',
   });
 

@@ -3,6 +3,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../../domain/entities/sermon.dart';
 import '../../domain/entities/event.dart';
+import '../../domain/entities/teens_category.dart';
+import '../../domain/entities/teens_content.dart';
 
 class LocalDatabaseService {
   static final LocalDatabaseService _instance = LocalDatabaseService._internal();
@@ -11,15 +13,24 @@ class LocalDatabaseService {
 
   Database? _database;
   static const String _dbName = 'tcgc_cache.db';
-  static const int _dbVersion = 2;
+  static const int _dbVersion = 5;
+  
+  // Check if running on web platform
+  bool get _isWeb => kIsWeb;
 
   Future<Database> get database async {
+    if (_isWeb) {
+      throw UnsupportedError('SQLite is not supported on web platform');
+    }
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
   }
 
   Future<Database> _initDatabase() async {
+    if (_isWeb) {
+      throw UnsupportedError('SQLite is not supported on web platform');
+    }
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, _dbName);
 
@@ -48,6 +59,9 @@ class LocalDatabaseService {
         date TEXT,
         duration_minutes INTEGER,
         is_recommended INTEGER DEFAULT 0,
+        is_service_team_only INTEGER DEFAULT 0,
+        is_general_married_only INTEGER DEFAULT 0,
+        is_in_house_married_only INTEGER DEFAULT 0,
         cached_at INTEGER NOT NULL,
         is_synced INTEGER DEFAULT 1
       )
@@ -107,6 +121,41 @@ class LocalDatabaseService {
         is_active INTEGER DEFAULT 1,
         latest_message_date TEXT,
         has_new_message INTEGER DEFAULT 0,
+        is_service_team_only INTEGER DEFAULT 0,
+        cached_at INTEGER NOT NULL
+      )
+    ''');
+
+    // Teens categories table
+    await db.execute('''
+      CREATE TABLE teens_categories (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        image_url TEXT,
+        content_count INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
+        created_at TEXT,
+        cached_at INTEGER NOT NULL
+      )
+    ''');
+
+    // Teens content table
+    await db.execute('''
+      CREATE TABLE teens_content (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        speaker TEXT,
+        thumbnail_url TEXT,
+        video_url TEXT,
+        audio_url TEXT,
+        transcript TEXT,
+        html_transcript TEXT,
+        category TEXT,
+        category_id INTEGER,
+        date TEXT,
+        duration_minutes INTEGER,
         cached_at INTEGER NOT NULL
       )
     ''');
@@ -117,6 +166,9 @@ class LocalDatabaseService {
     await db.execute('CREATE INDEX idx_sermons_recommended ON sermons(is_recommended)');
     await db.execute('CREATE INDEX idx_events_cached ON events(cached_at DESC)');
     await db.execute('CREATE INDEX idx_categories_active ON categories(is_active)');
+    await db.execute('CREATE INDEX idx_teens_categories_active ON teens_categories(is_active)');
+    await db.execute('CREATE INDEX idx_teens_content_category ON teens_content(category_id)');
+    await db.execute('CREATE INDEX idx_teens_content_date ON teens_content(date DESC)');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -135,43 +187,106 @@ class LocalDatabaseService {
       ''');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_categories_active ON categories(is_active)');
     }
+    if (oldVersion < 3) {
+      // Add teens tables
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS teens_categories (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          image_url TEXT,
+          content_count INTEGER DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          created_at TEXT,
+          cached_at INTEGER NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS teens_content (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          description TEXT,
+          speaker TEXT,
+          thumbnail_url TEXT,
+          video_url TEXT,
+          audio_url TEXT,
+          transcript TEXT,
+          html_transcript TEXT,
+          category TEXT,
+          category_id INTEGER,
+          date TEXT,
+          duration_minutes INTEGER,
+          cached_at INTEGER NOT NULL
+        )
+      ''');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_teens_categories_active ON teens_categories(is_active)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_teens_content_category ON teens_content(category_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_teens_content_date ON teens_content(date DESC)');
+    }
+    if (oldVersion < 4) {
+      // Add is_service_team_only column to categories table
+      await db.execute('ALTER TABLE categories ADD COLUMN is_service_team_only INTEGER DEFAULT 0');
+    }
+    if (oldVersion < 5) {
+      // Add restriction columns to sermons table
+      await db.execute('ALTER TABLE sermons ADD COLUMN is_service_team_only INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE sermons ADD COLUMN is_general_married_only INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE sermons ADD COLUMN is_in_house_married_only INTEGER DEFAULT 0');
+    }
   }
+
+  // Batch size for chunked inserts to prevent ANR on large datasets
+  static const int _batchChunkSize = 100;
 
   // Sermon methods
   Future<void> cacheSermons(List<Sermon> sermons) async {
+    if (_isWeb || sermons.isEmpty) return;
     final db = await database;
-    final batch = db.batch();
     final cachedAt = DateTime.now().millisecondsSinceEpoch;
 
-    for (final sermon in sermons) {
-      batch.insert(
-        'sermons',
-        {
-          'id': sermon.id,
-          'title': sermon.title,
-          'description': sermon.description,
-          'speaker': sermon.speaker,
-          'image_url': sermon.imageUrl,
-          'audio_url': sermon.audioUrl,
-          'video_url': sermon.videoUrl,
-          'transcript': sermon.transcript,
-          'category': sermon.category,
-          'category_name': sermon.categoryName,
-          'date': sermon.date.toIso8601String(),
-          'duration_minutes': sermon.duration.inMinutes,
-          'is_recommended': sermon.isRecommended ? 1 : 0,
-          'cached_at': cachedAt,
-          'is_synced': 1,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+    // Process in chunks to prevent ANR on large datasets
+    for (int i = 0; i < sermons.length; i += _batchChunkSize) {
+      final chunk = sermons.skip(i).take(_batchChunkSize);
+      final batch = db.batch();
+      
+      for (final sermon in chunk) {
+        batch.insert(
+          'sermons',
+          {
+            'id': sermon.id,
+            'title': sermon.title,
+            'description': sermon.description,
+            'speaker': sermon.speaker,
+            'image_url': sermon.imageUrl,
+            'audio_url': sermon.audioUrl,
+            'video_url': sermon.videoUrl,
+            'transcript': sermon.transcript,
+            'category': sermon.category,
+            'category_name': sermon.categoryName,
+            'date': sermon.date.toIso8601String(),
+            'duration_minutes': sermon.duration.inMinutes,
+            'is_recommended': sermon.isRecommended ? 1 : 0,
+            'is_service_team_only': sermon.isServiceTeamOnly ? 1 : 0,
+            'is_general_married_only': sermon.isGeneralMarriedOnly ? 1 : 0,
+            'is_in_house_married_only': sermon.isInHouseMarriedOnly ? 1 : 0,
+            'cached_at': cachedAt,
+            'is_synced': 1,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+      
+      // Yield to main thread between chunks to prevent ANR
+      if (i + _batchChunkSize < sermons.length) {
+        await Future.delayed(Duration.zero);
+      }
     }
-
-    await batch.commit(noResult: true);
     debugPrint('Cached ${sermons.length} sermons to local database');
   }
 
   Future<List<Sermon>> getCachedSermons({int? limit}) async {
+    if (_isWeb) return [];
     final db = await database;
     final results = await db.query(
       'sermons',
@@ -183,6 +298,7 @@ class LocalDatabaseService {
   }
 
   Future<List<Sermon>> getCachedRecommendedSermons() async {
+    if (_isWeb) return [];
     final db = await database;
     final results = await db.query(
       'sermons',
@@ -213,6 +329,13 @@ class LocalDatabaseService {
     return results.map((row) => row['id'] as String).toSet();
   }
 
+  Future<void> clearSermons() async {
+    if (_isWeb) return;
+    final db = await database;
+    await db.delete('sermons');
+    debugPrint('Cleared all cached sermons');
+  }
+
   Sermon _sermonFromRow(Map<String, dynamic> row) {
     return Sermon(
       id: row['id'] as String,
@@ -228,11 +351,15 @@ class LocalDatabaseService {
       date: DateTime.tryParse(row['date'] as String? ?? '') ?? DateTime.now(),
       duration: Duration(minutes: row['duration_minutes'] as int? ?? 0),
       isRecommended: (row['is_recommended'] as int? ?? 0) == 1,
+      isServiceTeamOnly: (row['is_service_team_only'] as int? ?? 0) == 1,
+      isGeneralMarriedOnly: (row['is_general_married_only'] as int? ?? 0) == 1,
+      isInHouseMarriedOnly: (row['is_in_house_married_only'] as int? ?? 0) == 1,
     );
   }
 
   // Event methods
   Future<void> cacheEvents(List<Event> events) async {
+    if (_isWeb) return;
     final db = await database;
     final batch = db.batch();
     final cachedAt = DateTime.now().millisecondsSinceEpoch;
@@ -263,6 +390,7 @@ class LocalDatabaseService {
   }
 
   Future<List<Event>> getCachedEvents() async {
+    if (_isWeb) return [];
     final db = await database;
     final results = await db.query('events', orderBy: 'cached_at DESC');
 
@@ -270,6 +398,7 @@ class LocalDatabaseService {
   }
 
   Future<Set<String>> getCachedEventIds() async {
+    if (_isWeb) return {};
     final db = await database;
     final results = await db.query('events', columns: ['id']);
     return results.map((row) => row['id'] as String).toSet();
@@ -292,6 +421,7 @@ class LocalDatabaseService {
 
   // Category methods
   Future<void> cacheCategories(List<MessageCategory> categories) async {
+    if (_isWeb) return;
     final db = await database;
     final batch = db.batch();
     final cachedAt = DateTime.now().millisecondsSinceEpoch;
@@ -319,6 +449,7 @@ class LocalDatabaseService {
   }
 
   Future<List<MessageCategory>> getCachedCategories() async {
+    if (_isWeb) return [];
     final db = await database;
     final results = await db.query(
       'categories',
@@ -342,6 +473,127 @@ class LocalDatabaseService {
           : null,
       hasNewMessage: (row['has_new_message'] as int? ?? 0) == 1,
       isServiceTeamOnly: (row['is_service_team_only'] as int? ?? 0) == 1,
+    );
+  }
+
+  // Teens category methods
+  Future<void> cacheTeensCategories(List<TeensCategory> categories) async {
+    if (_isWeb) return;
+    final db = await database;
+    final batch = db.batch();
+    final cachedAt = DateTime.now().millisecondsSinceEpoch;
+
+    for (final category in categories) {
+      batch.insert(
+        'teens_categories',
+        {
+          'id': category.id,
+          'name': category.name,
+          'description': category.description,
+          'image_url': category.imageUrl,
+          'content_count': category.contentCount,
+          'is_active': category.isActive ? 1 : 0,
+          'created_at': category.createdAt.toIso8601String(),
+          'cached_at': cachedAt,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    await batch.commit(noResult: true);
+    debugPrint('Cached ${categories.length} teens categories to local database');
+  }
+
+  Future<List<TeensCategory>> getCachedTeensCategories() async {
+    if (_isWeb) return [];
+    final db = await database;
+    final results = await db.query(
+      'teens_categories',
+      where: 'is_active = ?',
+      whereArgs: [1],
+      orderBy: 'name ASC',
+    );
+
+    return results.map((row) => _teensCategoryFromRow(row)).toList();
+  }
+
+  TeensCategory _teensCategoryFromRow(Map<String, dynamic> row) {
+    return TeensCategory(
+      id: row['id'] as int,
+      name: row['name'] as String,
+      description: row['description'] as String?,
+      imageUrl: row['image_url'] as String?,
+      contentCount: row['content_count'] as int? ?? 0,
+      isActive: (row['is_active'] as int? ?? 1) == 1,
+      createdAt: row['created_at'] != null
+          ? DateTime.tryParse(row['created_at'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+
+  // Teens content methods
+  Future<void> cacheTeensContent(List<TeensContent> contents, {int? categoryId}) async {
+    if (_isWeb) return;
+    final db = await database;
+    final batch = db.batch();
+    final cachedAt = DateTime.now().millisecondsSinceEpoch;
+
+    for (final content in contents) {
+      batch.insert(
+        'teens_content',
+        {
+          'id': content.id,
+          'title': content.title,
+          'description': content.description,
+          'speaker': content.speaker,
+          'thumbnail_url': content.thumbnailUrl,
+          'video_url': content.videoUrl,
+          'audio_url': content.audioUrl,
+          'transcript': content.transcript,
+          'html_transcript': content.htmlTranscript,
+          'category': content.category,
+          'category_id': categoryId,
+          'date': content.date.toIso8601String(),
+          'duration_minutes': content.duration?.inMinutes,
+          'cached_at': cachedAt,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    await batch.commit(noResult: true);
+    debugPrint('Cached ${contents.length} teens content to local database');
+  }
+
+  Future<List<TeensContent>> getCachedTeensContent({int? categoryId}) async {
+    if (_isWeb) return [];
+    final db = await database;
+    final results = await db.query(
+      'teens_content',
+      where: categoryId != null ? 'category_id = ?' : null,
+      whereArgs: categoryId != null ? [categoryId] : null,
+      orderBy: 'date DESC',
+    );
+
+    return results.map((row) => _teensContentFromRow(row)).toList();
+  }
+
+  TeensContent _teensContentFromRow(Map<String, dynamic> row) {
+    return TeensContent(
+      id: row['id'] as String,
+      title: row['title'] as String,
+      description: row['description'] as String? ?? '',
+      speaker: row['speaker'] as String?,
+      thumbnailUrl: row['thumbnail_url'] as String?,
+      videoUrl: row['video_url'] as String?,
+      audioUrl: row['audio_url'] as String?,
+      transcript: row['transcript'] as String?,
+      htmlTranscript: row['html_transcript'] as String?,
+      category: row['category'] as String? ?? '',
+      date: DateTime.tryParse(row['date'] as String? ?? '') ?? DateTime.now(),
+      duration: row['duration_minutes'] != null
+          ? Duration(minutes: row['duration_minutes'] as int)
+          : null,
     );
   }
 
@@ -439,6 +691,7 @@ class LocalDatabaseService {
 
   // Sync metadata methods
   Future<void> updateSyncMetadata(String key, {String? etag, String? dataHash}) async {
+    if (_isWeb) return;
     final db = await database;
     await db.insert(
       'sync_metadata',
@@ -453,6 +706,7 @@ class LocalDatabaseService {
   }
 
   Future<Map<String, dynamic>?> getSyncMetadata(String key) async {
+    if (_isWeb) return null;
     final db = await database;
     final results = await db.query(
       'sync_metadata',
@@ -466,6 +720,7 @@ class LocalDatabaseService {
   }
 
   Future<bool> needsSync(String key, {Duration maxAge = const Duration(minutes: 15)}) async {
+    if (_isWeb) return true; // Always sync on web since there's no local cache
     final metadata = await getSyncMetadata(key);
     if (metadata == null) return true;
 
@@ -478,6 +733,7 @@ class LocalDatabaseService {
 
   // Cleanup methods
   Future<void> clearAllData() async {
+    if (_isWeb) return;
     final db = await database;
     await db.delete('sermons');
     await db.delete('events');

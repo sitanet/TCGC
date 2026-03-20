@@ -47,20 +47,26 @@ class AuthProvider extends ChangeNotifier {
 
     final result = await _authService.login(email, password);
     
+    print('[AUTH] Login result: success=${result.success}, error=${result.error}');
+    
     if (result.success) {
+      print('[AUTH] Login successful, fetching profile...');
       _user = await _authService.getProfile();
       _isLoading = false;
       
       if (_user == null) {
+        print('[AUTH] Failed to fetch profile');
         _error = 'Failed to load profile. Please try again.';
         notifyListeners();
         return false;
       }
       
+      print('[AUTH] Profile fetched: ${_user?.email}');
       notifyListeners();
       return true;
     }
     
+    print('[AUTH] Login failed: ${result.error}');
     _error = result.error;
     _isLoading = false;
     notifyListeners();

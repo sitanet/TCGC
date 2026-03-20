@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dart:async' show Future, TimeoutException, runZonedGuarded;
 import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -24,10 +24,12 @@ import 'presentation/pages/get_started/get_started_page.dart';
 import 'presentation/pages/auth/sign_in_page.dart';
 import 'presentation/pages/auth/sign_up_page.dart';
 import 'presentation/pages/interests/interests_page.dart';
+import 'presentation/pages/audio/offline_downloads_page.dart';
 import 'data/services/interests_service.dart';
 import 'presentation/widgets/bottom_nav_bar.dart';
 import 'presentation/widgets/mini_player.dart';
 import 'presentation/widgets/promotion_popup.dart';
+import 'presentation/widgets/ready_to_play_popup.dart';
 import 'data/services/data_service.dart' show DataService, AppUpdateInfo;
 import 'data/services/notification_service.dart';
 import 'presentation/pages/audio/audio_player_page.dart';
@@ -35,6 +37,7 @@ import 'domain/entities/promotion.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/widgets/network_aware_widget.dart';
 import 'data/services/biometric_service.dart';
+import 'core/services/image_cache_service.dart';
 
 const String appVersion = '1.0.0';
 
@@ -61,31 +64,52 @@ void main() async {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
     
-    // Initialize Firebase FIRST (required for other services) - this is fast
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-      try {
-        await Firebase.initializeApp();
-      } catch (e) {
-        debugPrint('Firebase initialization error: $e');
-      }
-    }
+    // Initialize image cache with conservative memory limits first
+    ImageCacheService.initialize();
     
-    // Initialize AudioService BEFORE runApp (required for background audio)
-    try {
-      await initAudioService();
-    } catch (e) {
-      debugPrint('Audio service initialization error: $e');
-    }
-    
-    // Now start the app
+    // Start the app IMMEDIATELY - don't block on any initialization
+    // This prevents ANR on low-end devices
     runApp(
       const ProviderScope(
         child: MyApp(),
       ),
     );
     
-    // Initialize non-critical services in background
-    Future.delayed(const Duration(seconds: 2), () async {
+    // Initialize Firebase in background (non-blocking)
+    Future.microtask(() async {
+      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+        try {
+          await Firebase.initializeApp().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              debugPrint('Firebase initialization timed out');
+              throw TimeoutException('Firebase init timeout');
+            },
+          );
+          debugPrint('Firebase initialized');
+        } catch (e) {
+          debugPrint('Firebase initialization error: $e');
+        }
+      }
+    });
+    
+    // Initialize AudioService in background with delay to let UI render first
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      try {
+        await initAudioService().timeout(
+          const Duration(seconds: 15),
+          onTimeout: () {
+            debugPrint('Audio service initialization timed out');
+            throw TimeoutException('Audio service init timeout');
+          },
+        );
+      } catch (e) {
+        debugPrint('Audio service initialization error: $e');
+      }
+    });
+    
+    // Initialize non-critical services in background with longer delay
+    Future.delayed(const Duration(seconds: 3), () async {
       try {
         await ConnectivityService().initialize();
       } catch (e) {
@@ -110,7 +134,9 @@ class _MyAppState extends ConsumerState<MyApp> {
   bool _showSignUp = false;
   bool _showInterests = false;
   bool _initialized = false;
+  bool _isOffline = false;
   final InterestsService _interestsService = InterestsService();
+  final ConnectivityService _connectivityService = ConnectivityService();
 
   @override
   void initState() {
@@ -121,10 +147,44 @@ class _MyAppState extends ConsumerState<MyApp> {
   }
 
   Future<void> _initializeApp() async {
-    // Show UI immediately, don't wait for initialization
+    // Check connectivity FIRST before anything else
+    bool isConnected = false;
+    try {
+      await _connectivityService.initialize().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          debugPrint('Connectivity check timed out - assuming offline');
+        },
+      );
+      isConnected = _connectivityService.isConnected;
+      debugPrint('Connectivity check: isConnected = $isConnected');
+    } catch (e) {
+      debugPrint('Connectivity check error: $e - assuming offline');
+      isConnected = false;
+    }
+    
+    // If no internet, show offline page immediately
+    if (!isConnected) {
+      if (mounted) {
+        setState(() {
+          _initialized = true;
+          _isOffline = true;
+        });
+      }
+      // Listen for connection changes
+      _connectivityService.connectionStream.listen((connected) {
+        if (connected && mounted) {
+          _onConnectionRestored();
+        }
+      });
+      return;
+    }
+    
+    // Show UI now that we confirmed we have internet
     if (mounted) {
       setState(() {
         _initialized = true;
+        _isOffline = false;
       });
     }
     
@@ -162,6 +222,16 @@ class _MyAppState extends ConsumerState<MyApp> {
         debugPrint('Initialization error: $e');
       }
     });
+  }
+  
+  void _onConnectionRestored() {
+    if (mounted) {
+      setState(() {
+        _isOffline = false;
+      });
+      // Re-initialize the app now that we have connection
+      _initializeApp();
+    }
   }
   
   Future<void> _initializeNotifications() async {
@@ -217,7 +287,13 @@ class _MyAppState extends ConsumerState<MyApp> {
     }
 
     Widget homeWidget;
-    if (authProvider.isAuthenticated) {
+    
+    // Check if offline - show downloads page directly
+    if (_isOffline) {
+      homeWidget = OfflineDownloadsPage(
+        onConnected: _onConnectionRestored,
+      );
+    } else if (authProvider.isAuthenticated) {
       if (_showInterests) {
         homeWidget = InterestsPage(onComplete: _onInterestsComplete);
       } else {
@@ -289,6 +365,7 @@ class MainScreen extends ConsumerStatefulWidget {
 class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObserver {
   bool _showPromotion = false;
   bool _showUpdateDialog = false;
+  bool _showReadyToPlayPopup = false;
   bool _walletAuthenticated = false;
   List<Promotion> _activePromotions = [];
   final DataService _dataService = DataService();
@@ -339,6 +416,27 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) _checkForPromotion();
     });
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) _checkForReadyToPlayPopup();
+    });
+  }
+  
+  Future<void> _checkForReadyToPlayPopup() async {
+    final shouldShow = await ReadyToPlayPopup.shouldShow();
+    if (shouldShow && mounted) {
+      setState(() {
+        _showReadyToPlayPopup = true;
+      });
+    }
+  }
+  
+  void _closeReadyToPlayPopup() async {
+    await ReadyToPlayPopup.markAsShown();
+    if (mounted) {
+      setState(() {
+        _showReadyToPlayPopup = false;
+      });
+    }
   }
   
   void _setupNotificationHandler() {
@@ -377,7 +475,16 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     if (state == AppLifecycleState.paused || 
         state == AppLifecycleState.inactive) {
       _saveCurrentTab();
+      // Clear memory cache when app goes to background to prevent OOM
+      ImageCacheService.clearMemoryCache();
     }
+  }
+  
+  @override
+  void didHaveMemoryPressure() {
+    // System is low on memory - clear image caches
+    ImageCacheService.clearMemoryCache();
+    debugPrint('Memory pressure detected - cleared image cache');
   }
   
   Future<void> _restoreLastTab() async {
@@ -619,6 +726,33 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       return PromotionPopup(
         promotions: _activePromotions,
         onClose: _closePromotion,
+      );
+    }
+    
+    if (_showReadyToPlayPopup) {
+      return Stack(
+        children: [
+          Scaffold(
+            body: _buildPage(_currentIndex),
+            bottomNavigationBar: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const MiniPlayer(),
+                BottomNavBar(
+                  currentIndex: _currentIndex,
+                  onTap: (index) {
+                    if (index == 3) {
+                      _handleWalletTap();
+                    } else {
+                      _setCurrentIndex(index);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          ReadyToPlayPopup(onDismiss: _closeReadyToPlayPopup),
+        ],
       );
     }
 

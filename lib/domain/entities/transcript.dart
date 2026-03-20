@@ -3,6 +3,7 @@ class Transcript {
   final String title;
   final String? description;
   final String content;
+  final String? htmlContent;
   final String? speaker;
   final String? imageUrl;
   final String category;
@@ -18,6 +19,7 @@ class Transcript {
     required this.title,
     this.description,
     required this.content,
+    this.htmlContent,
     this.speaker,
     this.imageUrl,
     required this.category,
@@ -29,6 +31,40 @@ class Transcript {
     this.isInHouseMarriedOnly = false,
   });
 
+  Transcript copyWith({
+    String? id,
+    String? title,
+    String? description,
+    String? content,
+    String? htmlContent,
+    String? speaker,
+    String? imageUrl,
+    String? category,
+    String? categoryName,
+    DateTime? date,
+    bool? isFeatured,
+    bool? isServiceTeamOnly,
+    bool? isGeneralMarriedOnly,
+    bool? isInHouseMarriedOnly,
+  }) {
+    return Transcript(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      content: content ?? this.content,
+      htmlContent: htmlContent ?? this.htmlContent,
+      speaker: speaker ?? this.speaker,
+      imageUrl: imageUrl ?? this.imageUrl,
+      category: category ?? this.category,
+      categoryName: categoryName ?? this.categoryName,
+      date: date ?? this.date,
+      isFeatured: isFeatured ?? this.isFeatured,
+      isServiceTeamOnly: isServiceTeamOnly ?? this.isServiceTeamOnly,
+      isGeneralMarriedOnly: isGeneralMarriedOnly ?? this.isGeneralMarriedOnly,
+      isInHouseMarriedOnly: isInHouseMarriedOnly ?? this.isInHouseMarriedOnly,
+    );
+  }
+
   factory Transcript.fromJson(Map<String, dynamic> json) {
     final categoryValue = json['category'];
     final categoryStr = categoryValue?.toString() ?? '';
@@ -39,6 +75,7 @@ class Transcript {
       title: json['title'] ?? '',
       description: json['description'],
       content: json['content'] ?? '',
+      htmlContent: json['html_content'],
       speaker: json['speaker'],
       imageUrl: json['image_url'],
       category: categoryStr,
@@ -59,6 +96,7 @@ class Transcript {
       'title': title,
       'description': description,
       'content': content,
+      'html_content': htmlContent,
       'speaker': speaker,
       'image_url': imageUrl,
       'category': category,

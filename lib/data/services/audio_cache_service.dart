@@ -27,6 +27,12 @@ class AudioCacheService {
   final Map<String, String> _audioUrls = {};
 
   Future<void> initialize() async {
+    // Skip file-based caching on web platform
+    if (kIsWeb) {
+      debugPrint('AudioCacheService initialized (web mode - no file caching)');
+      return;
+    }
+    
     try {
       final appDir = await getApplicationDocumentsDirectory();
       _cacheDir = Directory('${appDir.path}/audio_buffer_cache');
@@ -296,6 +302,18 @@ class AudioCacheService {
       debugPrint('All audio cache cleared');
     } catch (e) {
       debugPrint('Error clearing cache: $e');
+    }
+  }
+
+  /// Clear only metadata cache (categories and sermons list)
+  Future<void> clearMetadataCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_metadataCacheKey);
+      await prefs.remove(_categoriesCacheKey);
+      debugPrint('Audio metadata cache cleared');
+    } catch (e) {
+      debugPrint('Error clearing metadata cache: $e');
     }
   }
 

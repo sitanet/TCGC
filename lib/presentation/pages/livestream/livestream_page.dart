@@ -17,52 +17,93 @@ class LiveStreamPage extends ConsumerStatefulWidget {
 
 class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  late WebViewController _webViewController;
-  late WebViewController _watchLiveController;
+  WebViewController? _webViewController;
+  WebViewController? _watchLiveController;
   
-  static const String _liveStreamUrl = 'https://waystre.am/embed/dcitygatechurch';
+  static const String _liveStreamUrl = 'https://dcitygatechurch.mixlr.com/embed';
   static const String _watchLiveUrl = 'https://thecitygatechurch.org/tcgc/watchlive_mobile/';
   
+  bool _isStreamLiveLoading = true;
   bool _isWatchLiveLoading = true;
+  bool _streamLiveInitialized = false;
+  bool _watchLiveInitialized = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _initializeWebView();
-    _initializeWatchLiveWebView();
+    _tabController.addListener(_onTabChanged);
+    // Lazy load: only initialize the first tab's WebView after frame renders
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeStreamLiveWebView();
+    });
   }
 
-  void _initializeWebView() {
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging) return;
+    // Lazy load WebView when tab is selected
+    if (_tabController.index == 0 && !_streamLiveInitialized) {
+      _initializeStreamLiveWebView();
+    } else if (_tabController.index == 1 && !_watchLiveInitialized) {
+      _initializeWatchLiveWebView();
+    }
+  }
+
+  void _initializeStreamLiveWebView() {
+    if (_streamLiveInitialized) return;
+    _streamLiveInitialized = true;
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (url) {
+            if (mounted) setState(() => _isStreamLiveLoading = true);
+          },
+          onPageFinished: (url) {
+            if (mounted) setState(() => _isStreamLiveLoading = false);
+          },
+          onWebResourceError: (error) {
+            if (mounted) setState(() => _isStreamLiveLoading = false);
+          },
+        ),
+      )
       ..loadRequest(Uri.parse(_liveStreamUrl));
+    if (mounted) setState(() {});
   }
 
   void _initializeWatchLiveWebView() {
+    if (_watchLiveInitialized) return;
+    _watchLiveInitialized = true;
     _watchLiveController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (url) {
-            setState(() => _isWatchLiveLoading = true);
+            if (mounted) setState(() => _isWatchLiveLoading = true);
           },
           onPageFinished: (url) {
-            setState(() => _isWatchLiveLoading = false);
+            if (mounted) setState(() => _isWatchLiveLoading = false);
           },
           onWebResourceError: (error) {
-            setState(() => _isWatchLiveLoading = false);
+            if (mounted) setState(() => _isWatchLiveLoading = false);
           },
         ),
       )
       ..loadRequest(Uri.parse(_watchLiveUrl));
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
+    // Clear WebView resources to free memory
+    _webViewController?.clearCache();
+    _watchLiveController?.clearCache();
+    _webViewController = null;
+    _watchLiveController = null;
     super.dispose();
   }
 
@@ -171,18 +212,19 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
               borderRadius: BorderRadius.circular(borderRadius),
               child: Stack(
                 children: [
-                  WebViewWidget(
-                    controller: _watchLiveController,
-                    gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                      Factory<VerticalDragGestureRecognizer>(
-                        () => VerticalDragGestureRecognizer(),
-                      ),
-                      Factory<HorizontalDragGestureRecognizer>(
-                        () => HorizontalDragGestureRecognizer(),
-                      ),
-                    },
-                  ),
-                  if (_isWatchLiveLoading)
+                  if (_watchLiveController != null)
+                    WebViewWidget(
+                      controller: _watchLiveController!,
+                      gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                        Factory<VerticalDragGestureRecognizer>(
+                          () => VerticalDragGestureRecognizer(),
+                        ),
+                        Factory<HorizontalDragGestureRecognizer>(
+                          () => HorizontalDragGestureRecognizer(),
+                        ),
+                      },
+                    ),
+                  if (_isWatchLiveLoading || _watchLiveController == null)
                     Container(
                       color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
                       child: const Center(
@@ -203,7 +245,7 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
           child: SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () => _watchLiveController.reload(),
+              onPressed: () => _watchLiveController?.reload(),
               icon: Icon(Icons.refresh_rounded, size: iconSize * 0.75),
               label: Text('Refresh', style: TextStyle(fontSize: bodyFontSize)),
               style: OutlinedButton.styleFrom(
@@ -294,16 +336,31 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(borderRadius),
-              child: WebViewWidget(
-                controller: _webViewController,
-                gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                  Factory<VerticalDragGestureRecognizer>(
-                    () => VerticalDragGestureRecognizer(),
-                  ),
-                  Factory<HorizontalDragGestureRecognizer>(
-                    () => HorizontalDragGestureRecognizer(),
-                  ),
-                },
+              child: Stack(
+                children: [
+                  if (_webViewController != null)
+                    WebViewWidget(
+                      controller: _webViewController!,
+                      gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                        Factory<VerticalDragGestureRecognizer>(
+                          () => VerticalDragGestureRecognizer(),
+                        ),
+                        Factory<HorizontalDragGestureRecognizer>(
+                          () => HorizontalDragGestureRecognizer(),
+                        ),
+                      },
+                    ),
+                  if (_isStreamLiveLoading || _webViewController == null)
+                    Container(
+                      color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.primaryGold,
+                          strokeWidth: 3,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -314,7 +371,7 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
           child: SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () => _webViewController.reload(),
+              onPressed: () => _webViewController?.reload(),
               icon: Icon(Icons.refresh_rounded, size: iconSize * 0.75),
               label: Text('Refresh', style: TextStyle(fontSize: bodyFontSize)),
               style: OutlinedButton.styleFrom(

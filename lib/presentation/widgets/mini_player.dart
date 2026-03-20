@@ -7,6 +7,10 @@ import '../pages/audio/audio_player_page.dart';
 
 class MiniPlayer extends ConsumerWidget {
   const MiniPlayer({super.key});
+  
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -80,7 +84,7 @@ class MiniPlayer extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              sermon.title,
+                              '${_formatDate(sermon.date)} - ${sermon.title}',
                               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                     fontWeight: FontWeight.w600,
                                   ),

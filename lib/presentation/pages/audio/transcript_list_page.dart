@@ -1,10 +1,16 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../domain/entities/transcript.dart';
 import '../../../data/services/data_service.dart';
+import '../../../data/services/transcript_cache_service.dart';
 import '../../widgets/custom_app_bar.dart';
 
 enum TranscriptFilterType { category, speaker }
@@ -41,9 +47,12 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
   late String? _selectedCategoryId;
   late TranscriptFilterType _filterType;
   String? _selectedSpeaker;
+  List<SpeakerModel> _speakerModels = [];
   List<String> _speakers = [];
   bool _isLoading = true;
   bool _isRefreshing = false;
+  
+  static const String _cacheKey = 'cached_transcripts';
 
   @override
   void initState() {
@@ -59,6 +68,26 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
   Future<void> _loadTranscripts() async {
     setState(() => _isLoading = true);
     try {
+      // Try to load from cache first
+      final cachedTranscripts = await _loadCachedTranscripts();
+      if (cachedTranscripts.isNotEmpty && mounted) {
+        setState(() {
+          _allItems = cachedTranscripts;
+          _extractSpeakers();
+          _filteredItems = _getFilteredItems('');
+          _isLoading = false;
+        });
+      }
+      
+      // Load speakers with photos
+      final speakers = await _dataService.getSpeakers();
+      if (mounted) {
+        setState(() {
+          _speakerModels = speakers;
+        });
+      }
+      
+      // Fetch fresh data from API
       final transcripts = await _dataService.getTranscripts();
       if (mounted) {
         setState(() {
@@ -67,11 +96,37 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
           _filteredItems = _getFilteredItems('');
           _isLoading = false;
         });
+        // Cache the transcripts
+        _cacheTranscripts(transcripts);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+  
+  Future<List<Transcript>> _loadCachedTranscripts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString(_cacheKey);
+      if (cached != null) {
+        final List<dynamic> jsonList = json.decode(cached);
+        return jsonList.map((j) => Transcript.fromJson(j)).toList();
+      }
+    } catch (e) {
+      debugPrint('Error loading cached transcripts: $e');
+    }
+    return [];
+  }
+  
+  Future<void> _cacheTranscripts(List<Transcript> transcripts) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = transcripts.map((t) => t.toJson()).toList();
+      await prefs.setString(_cacheKey, json.encode(jsonList));
+    } catch (e) {
+      debugPrint('Error caching transcripts: $e');
     }
   }
 
@@ -80,14 +135,19 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
     setState(() => _isRefreshing = true);
     
     try {
+      // Load speakers with photos
+      final speakers = await _dataService.getSpeakers();
       final transcripts = await _dataService.getTranscripts();
       if (mounted) {
         setState(() {
+          _speakerModels = speakers;
           _allItems = transcripts;
           _extractSpeakers();
           _filteredItems = _getFilteredItems(_searchController.text);
           _isRefreshing = false;
         });
+        // Update cache
+        _cacheTranscripts(transcripts);
       }
     } catch (e) {
       if (mounted) {
@@ -123,6 +183,14 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
     });
   }
 
+  bool _isMainSpeaker(String? speakerName) {
+    if (speakerName == null) return false;
+    return _speakerModels.any((s) => 
+        s.isMainSpeaker && 
+        (s.fullName.toLowerCase() == speakerName.toLowerCase() || 
+         s.name.toLowerCase() == speakerName.toLowerCase()));
+  }
+
   List<Transcript> _getFilteredItems(String query) {
     final filtered = _allItems.where((item) {
       bool matchesFilter = false;
@@ -130,6 +198,8 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
       if (_filterType == TranscriptFilterType.speaker) {
         if (_selectedSpeaker == null || _selectedSpeaker == 'All') {
           matchesFilter = true;
+        } else if (_selectedSpeaker == 'Others') {
+          matchesFilter = !_isMainSpeaker(item.speaker);
         } else {
           matchesFilter = item.speaker?.toLowerCase() == _selectedSpeaker?.toLowerCase();
         }
@@ -233,13 +303,13 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
                 children: [
                   _buildFilterToggle('Category', TranscriptFilterType.category, isDark),
                   const SizedBox(width: 12),
-                  _buildFilterToggle('Speaker', TranscriptFilterType.speaker, isDark),
+                  _buildFilterToggle('Minister', TranscriptFilterType.speaker, isDark),
                 ],
               ),
             ),
             const SizedBox(height: 12),
             SizedBox(
-              height: 32,
+              height: _filterType == TranscriptFilterType.speaker ? 90 : 32,
               child: _filterType == TranscriptFilterType.category
                   ? _buildCategoryFilterList(isDark)
                   : _buildSpeakerFilterList(isDark),
@@ -368,7 +438,13 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
   }
 
   Widget _buildSpeakerFilterList(bool isDark) {
-    if (_speakers.isEmpty) {
+    // Get main speakers only
+    final mainSpeakers = _speakerModels.where((s) => s.isMainSpeaker).toList();
+    
+    // Check if there are any non-main speakers in the content
+    final hasOtherSpeakers = _speakers.any((speakerName) => !_isMainSpeaker(speakerName));
+    
+    if (mainSpeakers.isEmpty && !hasOtherSpeakers) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Text(
@@ -381,31 +457,185 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
       );
     }
 
-    final speakersWithAll = ['All', ..._speakers];
-    return ListView.separated(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: speakersWithAll.length,
-      separatorBuilder: (_, __) => const SizedBox(width: 16),
-      itemBuilder: (context, index) {
-        final speaker = speakersWithAll[index];
-        final isSelected = (speaker == 'All' && _selectedSpeaker == null) ||
-            speaker == _selectedSpeaker;
-        return GestureDetector(
-          onTap: () => _selectSpeaker(speaker == 'All' ? 'All' : speaker),
-          child: Text(
-            speaker,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              color: isSelected
-                  ? AppColors.maroon
-                  : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-            ),
-          ),
-        );
-      },
+    // Total count: All + main speakers + Others (if exists)
+    final itemCount = 1 + mainSpeakers.length + (hasOtherSpeakers ? 1 : 0);
+
+    return SizedBox(
+      height: 100,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: itemCount,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            // "All" option
+            final isSelected = _selectedSpeaker == null || _selectedSpeaker == 'All';
+            return _buildSpeakerChip(
+              name: 'All',
+              photoUrl: null,
+              isSelected: isSelected,
+              isDark: isDark,
+              onTap: () => _selectSpeaker('All'),
+            );
+          }
+          
+          // Main speakers
+          if (index <= mainSpeakers.length) {
+            final speaker = mainSpeakers[index - 1];
+            final isSelected = speaker.fullName == _selectedSpeaker;
+            return _buildSpeakerChip(
+              name: speaker.fullName,
+              photoUrl: speaker.photoUrl,
+              isSelected: isSelected,
+              isDark: isDark,
+              onTap: () => _selectSpeaker(speaker.fullName),
+              isFullName: true,
+            );
+          }
+          
+          // "Others" option (last item if hasOtherSpeakers)
+          final isSelected = _selectedSpeaker == 'Others';
+          return _buildSpeakerChip(
+            name: 'Others',
+            photoUrl: null,
+            isSelected: isSelected,
+            isDark: isDark,
+            onTap: () => _selectSpeaker('Others'),
+            isOthers: true,
+          );
+        },
+      ),
     );
+  }
+  
+  Widget _buildSpeakerChip({
+    required String name,
+    String? photoUrl,
+    required bool isSelected,
+    required bool isDark,
+    required VoidCallback onTap,
+    bool isFullName = false,
+    bool isOthers = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 80,
+        margin: const EdgeInsets.only(right: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? AppColors.primaryGold : Colors.transparent,
+                  width: 3,
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.primaryGold.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        )
+                      ]
+                    : null,
+              ),
+              child: ClipOval(
+                child: name == 'All'
+                    ? Container(
+                        color: isSelected
+                            ? AppColors.primaryGold
+                            : (isDark ? AppColors.cardDark : AppColors.dividerLight),
+                        child: Icon(
+                          Icons.people,
+                          size: 28,
+                          color: isSelected
+                              ? Colors.white
+                              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                        ),
+                      )
+                    : isOthers
+                        ? Container(
+                            color: isSelected
+                                ? AppColors.primaryGold
+                                : (isDark ? AppColors.cardDark : AppColors.dividerLight),
+                            child: Icon(
+                              Icons.more_horiz,
+                              size: 28,
+                              color: isSelected
+                                  ? Colors.white
+                                  : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                            ),
+                          )
+                        : photoUrl != null && photoUrl.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: photoUrl,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => Container(
+                                  color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                  child: Icon(
+                                    Icons.person,
+                                    size: 28,
+                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                  ),
+                                ),
+                                errorWidget: (_, __, ___) => Container(
+                                  color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                  child: Icon(
+                                    Icons.person,
+                                    size: 28,
+                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                child: Center(
+                                  child: Text(
+                                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: isSelected
+                                          ? AppColors.primaryGold
+                                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                    ),
+                                  ),
+                                ),
+                              ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              name == 'All' || isOthers ? name : _formatSpeakerName(name),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected
+                    ? AppColors.primaryGold
+                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  String _formatSpeakerName(String fullName) {
+    final parts = fullName.split(' ');
+    if (parts.length >= 2) {
+      // Return first name on first line, last name on second line
+      return '${parts.first}\n${parts.last}';
+    }
+    return fullName;
   }
 
 }
@@ -563,88 +793,110 @@ class _TranscriptListItem extends StatelessWidget {
   }
 }
 
-class TranscriptViewPage extends StatelessWidget {
+class TranscriptViewPage extends StatefulWidget {
   final Transcript transcript;
 
   const TranscriptViewPage({super.key, required this.transcript});
 
-  String _formatTranscript(String htmlText) {
-    String text = htmlText
-        .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n\n')
-        .replaceAll(RegExp(r'<p[^>]*>', caseSensitive: false), '')
-        .replaceAll(RegExp(r'</div>', caseSensitive: false), '\n\n')
-        .replaceAll(RegExp(r'<div[^>]*>', caseSensitive: false), '')
-        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
-        .replaceAll(RegExp(r'</h[1-6]>', caseSensitive: false), '\n\n')
-        .replaceAll(RegExp(r'<h[1-6][^>]*>', caseSensitive: false), '\n')
-        .replaceAll(RegExp(r'</li>', caseSensitive: false), '\n')
-        .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '• ')
-        .replaceAll(RegExp(r'</?ul[^>]*>', caseSensitive: false), '\n')
-        .replaceAll(RegExp(r'</?ol[^>]*>', caseSensitive: false), '\n');
+  @override
+  State<TranscriptViewPage> createState() => _TranscriptViewPageState();
+}
 
-    text = text.replaceAll(RegExp(r'<[^>]*>'), '');
+class _TranscriptViewPageState extends State<TranscriptViewPage> {
+  late WebViewController _webViewController;
+  final TranscriptCacheService _cacheService = TranscriptCacheService();
+  bool _isLoading = true;
 
-    text = text
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#39;', "'")
-        .replaceAll('&rsquo;', "'")
-        .replaceAll('&lsquo;', "'")
-        .replaceAll('&rdquo;', '"')
-        .replaceAll('&ldquo;', '"')
-        .replaceAll('&mdash;', '—')
-        .replaceAll('&ndash;', '–')
-        .replaceAll('&hellip;', '...');
+  @override
+  void initState() {
+    super.initState();
+    _initializeWebView();
+  }
 
-    text = text
-        .replaceAll(RegExp(r'[ \t]+'), ' ')
-        .replaceAll(RegExp(r'\n[ \t]+'), '\n')
-        .replaceAll(RegExp(r'[ \t]+\n'), '\n')
-        .replaceAll(RegExp(r'\n{3,}'), '\n\n');
+  void _initializeWebView() {
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.transparent)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (url) {
+            if (mounted) setState(() => _isLoading = true);
+          },
+          onPageFinished: (url) {
+            if (mounted) setState(() => _isLoading = false);
+          },
+          onWebResourceError: (error) {
+            debugPrint('WebView error: ${error.description}');
+          },
+        ),
+      );
+    
+    _loadContent();
+  }
 
-    return text.trim();
+  Future<void> _loadContent() async {
+    final cachedHtml = await _cacheService.getCachedHtml(widget.transcript.id);
+    
+    if (cachedHtml != null && cachedHtml.isNotEmpty) {
+      await _webViewController.loadHtmlString(cachedHtml);
+      _cacheService.fetchAndCacheHtml(widget.transcript.id);
+    } else {
+      final html = await _cacheService.fetchAndCacheHtml(widget.transcript.id);
+      if (html != null && mounted) {
+        await _webViewController.loadHtmlString(html);
+      } else {
+        final transcriptUrl = ApiConstants.standaloneTranscriptUrl(widget.transcript.id);
+        await _webViewController.loadRequest(Uri.parse(transcriptUrl));
+      }
+    }
   }
 
   void _shareTranscript() {
     const playStoreLink = 'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
-    final formattedText = _formatTranscript(transcript.content);
     
-    // Get first 50 words from transcript
-    final words = formattedText.split(RegExp(r'\s+'));
-    final excerpt = words.take(50).join(' ');
-    final hasMore = words.length > 50;
+    final shareText = '''${widget.transcript.title}
+
+Read the full transcript in the Citygate mobile app
+
+Download: $playStoreLink''';
     
-    final shareText = '''${transcript.title}
-
-$excerpt${hasMore ? '...' : ''}
-
-Read more in the app
-
-Download Citygate mobile: $playStoreLink''';
-    
-    Share.share(shareText, subject: transcript.title);
-  }
-
-  String _formatDate(DateTime date) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
-  }
-
-  String _formatTime(DateTime date) {
-    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
-    final period = date.hour >= 12 ? 'PM' : 'AM';
-    final minute = date.minute.toString().padLeft(2, '0');
-    return '$hour:$minute $period';
+    Share.share(shareText, subject: widget.transcript.title);
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final formattedTranscript = _formatTranscript(transcript.content);
 
+    // For web platform, fall back to simple text display
+    if (kIsWeb) {
+      return _buildFallbackView(context, isDark);
+    }
+
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
+      appBar: CustomAppBar(
+        title: 'Transcript',
+        showBackButton: true,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.share, color: isDark ? Colors.white : Colors.black),
+            onPressed: _shareTranscript,
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _webViewController),
+          if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(color: AppColors.primaryGold),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFallbackView(BuildContext context, bool isDark) {
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
       appBar: CustomAppBar(
@@ -662,120 +914,23 @@ Download Citygate mobile: $playStoreLink''';
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Section
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark 
-                    ? AppColors.cardDark 
-                    : AppColors.primaryGold.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark 
-                      ? AppColors.dividerDark 
-                      : AppColors.primaryGold.withValues(alpha: 0.2),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Category
-                  if (transcript.categoryName.isNotEmpty || transcript.category.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGold,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        transcript.categoryName.isNotEmpty ? transcript.categoryName : transcript.category,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  // Title
-                  Text(
-                    transcript.title,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Speaker
-                  if (transcript.speaker != null && transcript.speaker!.isNotEmpty)
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.person_outline,
-                          size: 16,
-                          color: AppColors.primaryGold,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          transcript.speaker!,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.primaryGold,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  const SizedBox(height: 8),
-                  // Date and Time
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today_outlined,
-                        size: 14,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _formatDate(transcript.date),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Icon(
-                        Icons.access_time,
-                        size: 14,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _formatTime(transcript.date),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+            Text(
+              widget.transcript.title,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
               ),
             ),
-            const SizedBox(height: 24),
-            // Transcript Body
+            const SizedBox(height: 16),
             SelectableText(
-              formattedTranscript,
+              widget.transcript.content,
               style: TextStyle(
                 fontSize: 16,
                 height: 1.8,
                 color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
               ),
             ),
-            const SizedBox(height: 40),
           ],
         ),
       ),

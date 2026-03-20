@@ -5,6 +5,11 @@ import 'seamless_audio_source.dart';
 
 class MyAudioHandler extends BaseAudioHandler with SeekHandler {
   final AudioPlayer _player = AudioPlayer();
+  
+  // Store current audio info for reloading after system kills the source
+  String? _currentUrl;
+  MediaItem? _currentMediaItem;
+  Duration _lastPosition = Duration.zero;
 
   AudioPlayer get player => _player;
 
@@ -14,8 +19,15 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
     _player.processingStateStream.listen((state) {
       debugPrint('Audio processing state: $state');
       if (state == ProcessingState.completed) {
-        stop();
+        // Don't call stop() - just update state, keep notification visible
+        _player.pause();
+        _player.seek(Duration.zero);
       }
+    });
+    
+    // Track position for recovery
+    _player.positionStream.listen((position) {
+      _lastPosition = position;
     });
     
     // Listen for errors
@@ -59,6 +71,9 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
 
   Future<void> setAudioSource(String url, MediaItem item) async {
     debugPrint('Setting audio source: $url');
+    _currentUrl = url;
+    _currentMediaItem = item;
+    _lastPosition = Duration.zero;
     mediaItem.add(item);
     try {
       await _player.setAudioSource(
@@ -80,6 +95,9 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
 
   Future<void> setAudioSourceWithPosition(String url, MediaItem item, Duration position) async {
     debugPrint('Setting audio source with position: $url at $position');
+    _currentUrl = url;
+    _currentMediaItem = item;
+    _lastPosition = position;
     mediaItem.add(item);
     try {
       await _player.setAudioSource(
@@ -111,14 +129,40 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   @override
-  Future<void> play() => _player.play();
+  Future<void> play() async {
+    // If player is in idle state, the source was released by system - reload it
+    if (_player.processingState == ProcessingState.idle) {
+      debugPrint('Player in idle state, reloading source...');
+      if (_currentUrl != null && _currentMediaItem != null) {
+        try {
+          await setAudioSourceWithPosition(_currentUrl!, _currentMediaItem!, _lastPosition);
+          await _player.play();
+          debugPrint('Successfully reloaded and resumed playback');
+        } catch (e) {
+          debugPrint('Error reloading audio source: $e');
+        }
+      } else {
+        debugPrint('No previous audio to reload');
+      }
+      return;
+    }
+    await _player.play();
+  }
 
   @override
-  Future<void> pause() => _player.pause();
+  Future<void> pause() async {
+    _lastPosition = _player.position; // Save position before pause
+    await _player.pause();
+  }
 
   @override
   Future<void> stop() async {
-    await _player.stop();
+    _lastPosition = _player.position; // Save position before stop
+    try {
+      await _player.stop();
+    } catch (e) {
+      debugPrint('Error stopping player: $e');
+    }
   }
 
   @override
@@ -133,9 +177,14 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
+  Stream<double> get speedStream => _player.speedStream;
   
   Duration get position => _player.position;
   Duration? get duration => _player.duration;
   bool get playing => _player.playing;
   ProcessingState get processingState => _player.processingState;
+  double get speed => _player.speed;
+
+  @override
+  Future<void> setSpeed(double speed) => _player.setSpeed(speed);
 }

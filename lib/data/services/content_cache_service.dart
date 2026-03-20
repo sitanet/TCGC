@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../domain/entities/sermon.dart';
 import '../../domain/entities/event.dart';
+import '../../domain/entities/teens_category.dart';
+import '../../domain/entities/teens_content.dart';
 import 'local_database_service.dart';
 import 'api_service.dart';
+import 'audio_cache_service.dart';
 import '../../core/constants/api_constants.dart';
 
 class ContentCacheService {
@@ -21,14 +23,22 @@ class ContentCacheService {
   Directory? _audioCacheDir;
   bool _initialized = false;
   
-  // 3 minutes in bytes (assuming ~128kbps audio = 16KB/sec * 180 sec = ~2.88MB)
-  static const int _threeMinutesBytes = 3 * 1024 * 1024; // ~3MB for 3 min
-  
-  final Map<String, Completer<void>> _downloadCompleters = {};
   final Map<String, double> _downloadProgress = {};
+  
+  // In-memory cache for instant access (avoids database queries)
+  List<MessageCategory>? _memoryCachedCategories;
+  List<Sermon>? _memoryCachedSermons;
+  List<Sermon>? _memoryCachedRecommended;
 
   Future<void> initialize() async {
     if (_initialized) return;
+    
+    // Skip file-based caching on web platform
+    if (kIsWeb) {
+      _initialized = true;
+      debugPrint('ContentCacheService initialized (web mode - no file caching)');
+      return;
+    }
     
     try {
       final appDir = await getApplicationDocumentsDirectory();
@@ -48,18 +58,26 @@ class ContentCacheService {
   }
 
   // Get categories with cache-first strategy
+  // Only fetches from server on first install (no cache) or manual refresh
   Future<List<MessageCategory>> getCategories({bool forceRefresh = false}) async {
+    // Return from memory cache immediately if available (instant)
+    if (_memoryCachedCategories != null && _memoryCachedCategories!.isNotEmpty && !forceRefresh) {
+      debugPrint('Returning ${_memoryCachedCategories!.length} categories from memory cache (instant)');
+      return _memoryCachedCategories!;
+    }
+    
     await initialize();
     
     final cachedCategories = await _db.getCachedCategories();
-    final needsSync = await _db.needsSync('categories');
     
-    if (cachedCategories.isNotEmpty && !forceRefresh && !needsSync) {
-      debugPrint('Returning ${cachedCategories.length} cached categories');
-      _syncCategoriesInBackground();
+    // Return cached data if available and not forcing refresh
+    if (cachedCategories.isNotEmpty && !forceRefresh) {
+      _memoryCachedCategories = cachedCategories; // Store in memory for next time
+      debugPrint('Returning ${cachedCategories.length} cached categories (offline-first)');
       return cachedCategories;
     }
     
+    // Only fetch from server on first install or manual refresh
     try {
       final hasConnection = await _checkConnectivity();
       if (!hasConnection) {
@@ -72,6 +90,8 @@ class ContentCacheService {
         final decoded = response.data;
         final List<dynamic> data = decoded is List ? decoded : (decoded['results'] ?? decoded);
         final categories = data.map((json) => MessageCategory.fromJson(json)).toList();
+        
+        _memoryCachedCategories = categories; // Store in memory
         
         // Cache in background to not block UI
         Future.microtask(() async {
@@ -89,22 +109,28 @@ class ContentCacheService {
     return cachedCategories;
   }
 
-  // Get sermons with cache-first strategy
+  // Get sermons with cache-first strategy (fetches ALL pages)
+  // Only fetches from server on first install (no cache) or manual refresh
   Future<List<Sermon>> getSermons({bool forceRefresh = false}) async {
+    // Return from memory cache immediately if available (instant)
+    if (_memoryCachedSermons != null && _memoryCachedSermons!.isNotEmpty && !forceRefresh) {
+      debugPrint('Returning ${_memoryCachedSermons!.length} sermons from memory cache (instant)');
+      return _memoryCachedSermons!;
+    }
+    
     await initialize();
     
     // Check if we have cached data
     final cachedSermons = await _db.getCachedSermons();
-    final needsSync = await _db.needsSync('sermons');
     
-    if (cachedSermons.isNotEmpty && !forceRefresh && !needsSync) {
-      debugPrint('Returning ${cachedSermons.length} cached sermons');
-      // Sync in background if needed
-      _syncSermonsInBackground();
+    // Return cached data if available and not forcing refresh
+    if (cachedSermons.isNotEmpty && !forceRefresh) {
+      _memoryCachedSermons = cachedSermons; // Store in memory for next time
+      debugPrint('Returning ${cachedSermons.length} cached sermons (offline-first)');
       return cachedSermons;
     }
     
-    // Try to fetch from server
+    // Only fetch from server on first install or manual refresh
     try {
       final hasConnection = await _checkConnectivity();
       if (!hasConnection) {
@@ -112,21 +138,20 @@ class ContentCacheService {
         return cachedSermons;
       }
       
-      final response = await _api.get(ApiConstants.messages);
-      if (response.isSuccess) {
-        final data = response.data;
-        final List<dynamic> results = data['results'] ?? data;
-        final sermons = results.map((json) => Sermon.fromJson(json)).toList();
-        
-        // Cache in background to not block UI
-        Future.microtask(() async {
-          await _db.cacheSermons(sermons);
-          await _db.updateSyncMetadata('sermons');
-        });
-        
-        debugPrint('Fetched and cached ${sermons.length} sermons');
-        return sermons;
-      }
+      // Use getAllPages to fetch all paginated results
+      final allResults = await _api.getAllPages(ApiConstants.messages);
+      final sermons = allResults.map((json) => Sermon.fromJson(json)).toList();
+      
+      _memoryCachedSermons = sermons; // Store in memory
+      
+      // Cache in background to not block UI
+      Future.microtask(() async {
+        await _db.cacheSermons(sermons);
+        await _db.updateSyncMetadata('sermons');
+      });
+      
+      debugPrint('Fetched and cached ${sermons.length} sermons (all pages)');
+      return sermons;
     } catch (e) {
       debugPrint('Error fetching sermons: $e');
     }
@@ -134,17 +159,38 @@ class ContentCacheService {
     return cachedSermons;
   }
 
+  /// Clears all cached sermons and fetches fresh data from server
+  Future<List<Sermon>> clearAndRefreshSermons() async {
+    await initialize();
+    await _db.clearSermons();
+    // Also clear the AudioCacheService metadata to ensure audio_page gets fresh data
+    final audioCacheService = AudioCacheService();
+    await audioCacheService.clearMetadataCache();
+    debugPrint('Cleared sermon cache, fetching fresh data...');
+    return getSermons(forceRefresh: true);
+  }
+
   // Get recommended sermons with cache-first strategy
+  // Only fetches from server on first install (no cache) or manual refresh
   Future<List<Sermon>> getRecommendedSermons({bool forceRefresh = false}) async {
+    // Return from memory cache immediately if available (instant)
+    if (_memoryCachedRecommended != null && _memoryCachedRecommended!.isNotEmpty && !forceRefresh) {
+      debugPrint('Returning ${_memoryCachedRecommended!.length} recommended from memory cache (instant)');
+      return _memoryCachedRecommended!;
+    }
+    
     await initialize();
     
     final cachedRecommended = await _db.getCachedRecommendedSermons();
-    final needsSync = await _db.needsSync('recommended_sermons');
     
-    if (cachedRecommended.isNotEmpty && !forceRefresh && !needsSync) {
+    // Return cached data if available and not forcing refresh
+    if (cachedRecommended.isNotEmpty && !forceRefresh) {
+      _memoryCachedRecommended = cachedRecommended; // Store in memory
+      debugPrint('Returning ${cachedRecommended.length} cached recommended sermons (offline-first)');
       return cachedRecommended;
     }
     
+    // Only fetch from server on first install or manual refresh
     try {
       final hasConnection = await _checkConnectivity();
       if (!hasConnection) return cachedRecommended;
@@ -153,6 +199,8 @@ class ContentCacheService {
       if (response.isSuccess) {
         final List<dynamic> data = response.dataList;
         final sermons = data.map((json) => Sermon.fromJson(json)).toList();
+        
+        _memoryCachedRecommended = sermons; // Store in memory
         
         // Mark as recommended and cache in background
         Future.microtask(() async {
@@ -186,18 +234,19 @@ class ContentCacheService {
   }
 
   // Get events with cache-first strategy
+  // Only fetches from server on first install (no cache) or manual refresh
   Future<List<Event>> getEvents({bool forceRefresh = false}) async {
     await initialize();
     
     final cachedEvents = await _db.getCachedEvents();
-    final needsSync = await _db.needsSync('events');
     
-    if (cachedEvents.isNotEmpty && !forceRefresh && !needsSync) {
-      debugPrint('Returning ${cachedEvents.length} cached events');
-      _syncEventsInBackground();
+    // Return cached data if available and not forcing refresh
+    if (cachedEvents.isNotEmpty && !forceRefresh) {
+      debugPrint('Returning ${cachedEvents.length} cached events (offline-first)');
       return cachedEvents;
     }
     
+    // Only fetch from server on first install or manual refresh
     try {
       final hasConnection = await _checkConnectivity();
       if (!hasConnection) return cachedEvents;
@@ -231,82 +280,7 @@ class ContentCacheService {
     return;
   }
 
-  Future<void> _downloadAudioPartial(String sermonId, String audioUrl, {int startByte = 0}) async {
-    final filePath = '${_audioCacheDir!.path}/${_sanitizeFileName(sermonId)}.cache';
-    final file = File(filePath);
-    
-    try {
-      // Get total file size with HEAD request
-      int? totalBytes;
-      try {
-        final headResponse = await http.head(Uri.parse(audioUrl))
-            .timeout(const Duration(seconds: 10));
-        totalBytes = int.tryParse(headResponse.headers['content-length'] ?? '');
-      } catch (_) {}
-      
-      // Calculate how much we need to download
-      final targetBytes = _threeMinutesBytes;
-      final endByte = startByte + targetBytes - 1;
-      
-      // Create range request
-      final request = http.Request('GET', Uri.parse(audioUrl));
-      request.headers['Range'] = 'bytes=$startByte-$endByte';
-      
-      final streamedResponse = await request.send()
-          .timeout(const Duration(minutes: 2));
-      
-      if (streamedResponse.statusCode == 200 || streamedResponse.statusCode == 206) {
-        final sink = file.openWrite(mode: startByte > 0 ? FileMode.append : FileMode.write);
-        int downloadedBytes = startByte;
-        
-        await for (final chunk in streamedResponse.stream) {
-          sink.add(chunk);
-          downloadedBytes += chunk.length;
-          _downloadProgress[sermonId] = downloadedBytes / targetBytes;
-          
-          // Update progress in database periodically
-          if (downloadedBytes % (512 * 1024) == 0 || downloadedBytes >= targetBytes) {
-            await _db.updateAudioCacheProgress(
-              sermonId: sermonId,
-              cachedBytes: downloadedBytes,
-              cachedDurationSeconds: (downloadedBytes / totalBytes! * 180).round(),
-              isComplete: downloadedBytes >= targetBytes,
-            );
-          }
-        }
-        
-        await sink.close();
-        
-        // Save final metadata
-        await _db.saveAudioCacheMetadata(
-          sermonId: sermonId,
-          audioUrl: audioUrl,
-          filePath: filePath,
-          totalBytes: totalBytes,
-          cachedBytes: downloadedBytes,
-          cachedDurationSeconds: 180,
-          isComplete: true,
-        );
-        
-        debugPrint('Cached ${downloadedBytes ~/ 1024}KB audio for sermon: $sermonId');
-      }
-    } catch (e) {
-      debugPrint('Download error for $sermonId: $e');
-      
-      // Save progress for resume
-      if (await file.exists()) {
-        final currentSize = await file.length();
-        await _db.saveAudioCacheMetadata(
-          sermonId: sermonId,
-          audioUrl: audioUrl,
-          filePath: filePath,
-          cachedBytes: currentSize.toInt(),
-          isComplete: false,
-        );
-      }
-      rethrow;
-    }
-  }
+
 
   // Get cached audio file path
   Future<String?> getCachedAudioPath(String sermonId) async {
@@ -333,147 +307,12 @@ class ContentCacheService {
     return _downloadProgress[sermonId] ?? 0.0;
   }
 
-  // Check if currently downloading
+  // Check if currently downloading (audio pre-caching is disabled)
   bool isDownloading(String sermonId) {
-    return _downloadCompleters.containsKey(sermonId);
+    return false;
   }
 
-  // Throttle background syncs to prevent multiple simultaneous operations
-  bool _isSyncingSermons = false;
-  bool _isSyncingEvents = false;
-  bool _isSyncingCategories = false;
 
-  // Background sync methods - with throttling and delayed execution
-  void _syncSermonsInBackground() {
-    if (_isSyncingSermons) return;
-    _isSyncingSermons = true;
-    
-    // Delay background sync to let UI settle first
-    Future.delayed(const Duration(seconds: 3), () async {
-      try {
-        final hasConnection = await _checkConnectivity();
-        if (!hasConnection) {
-          _isSyncingSermons = false;
-          return;
-        }
-        
-        final response = await _api.get(ApiConstants.messages);
-        if (response.isSuccess) {
-          final data = response.data;
-          final List<dynamic> results = data['results'] ?? data;
-          final sermons = results.map((json) => Sermon.fromJson(json)).toList();
-          
-          await _db.cacheSermons(sermons);
-          await _db.updateSyncMetadata('sermons');
-        }
-      } catch (e) {
-        debugPrint('Background sync error: $e');
-      } finally {
-        _isSyncingSermons = false;
-      }
-    });
-  }
-
-  void _syncEventsInBackground() {
-    if (_isSyncingEvents) return;
-    _isSyncingEvents = true;
-    
-    Future.delayed(const Duration(seconds: 4), () async {
-      try {
-        final hasConnection = await _checkConnectivity();
-        if (!hasConnection) {
-          _isSyncingEvents = false;
-          return;
-        }
-        
-        final response = await _api.get(ApiConstants.events);
-        if (response.isSuccess) {
-          final data = response.data;
-          final List<dynamic> results = data['results'] ?? data;
-          final events = results.map((json) => Event.fromJson(json)).toList();
-          
-          await _db.cacheEvents(events);
-          await _db.updateSyncMetadata('events');
-        }
-      } catch (e) {
-        debugPrint('Background events sync error: $e');
-      } finally {
-        _isSyncingEvents = false;
-      }
-    });
-  }
-
-  void _syncCategoriesInBackground() {
-    if (_isSyncingCategories) return;
-    _isSyncingCategories = true;
-    
-    Future.delayed(const Duration(seconds: 5), () async {
-      try {
-        final hasConnection = await _checkConnectivity();
-        if (!hasConnection) {
-          _isSyncingCategories = false;
-          return;
-        }
-        
-        final response = await _api.get(ApiConstants.messageCategories);
-        if (response.isSuccess) {
-          final decoded = response.data;
-          final List<dynamic> data = decoded is List ? decoded : (decoded['results'] ?? decoded);
-          final categories = data.map((json) => MessageCategory.fromJson(json)).toList();
-          
-          await _db.cacheCategories(categories);
-          await _db.updateSyncMetadata('categories');
-        }
-      } catch (e) {
-        debugPrint('Background categories sync error: $e');
-      } finally {
-        _isSyncingCategories = false;
-      }
-    });
-  }
-
-  void _preCacheAudioInBackground(List<Sermon> sermons) {
-    Future.microtask(() async {
-      for (final sermon in sermons) {
-        try {
-          await preCacheAudio(sermon);
-          // Small delay between downloads to not overwhelm
-          await Future.delayed(const Duration(milliseconds: 500));
-        } catch (e) {
-          debugPrint('Background audio cache error: $e');
-        }
-      }
-    });
-  }
-
-  Future<void> _resumeIncompleteDownloads() async {
-    try {
-      final incomplete = await _db.getIncompleteAudioCaches();
-      
-      for (final cache in incomplete) {
-        final sermonId = cache['sermon_id'] as String;
-        final audioUrl = cache['audio_url'] as String;
-        final cachedBytes = cache['cached_bytes'] as int? ?? 0;
-        
-        if (cachedBytes > 0 && cachedBytes < _threeMinutesBytes) {
-          debugPrint('Resuming download for $sermonId from byte $cachedBytes');
-          
-          _downloadCompleters[sermonId] = Completer<void>();
-          
-          try {
-            await _downloadAudioPartial(sermonId, audioUrl, startByte: cachedBytes);
-          } catch (e) {
-            debugPrint('Resume download failed for $sermonId: $e');
-          } finally {
-            _downloadCompleters[sermonId]?.complete();
-            _downloadCompleters.remove(sermonId);
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error resuming downloads: $e');
-    }
-  }
 
   Future<bool> _checkConnectivity() async {
     try {
@@ -485,8 +324,128 @@ class ContentCacheService {
     }
   }
 
-  String _sanitizeFileName(String id) {
-    return id.replaceAll(RegExp(r'[^\w\-]'), '_');
+  // Teens categories with cache-first strategy
+  // Teens categories with cache-first strategy
+  // Only fetches from server on first install (no cache) or manual refresh
+  Future<List<TeensCategory>> getTeensCategories({bool forceRefresh = false}) async {
+    await initialize();
+    
+    final cachedCategories = await _db.getCachedTeensCategories();
+    
+    // Return cached data if available and not forcing refresh
+    if (cachedCategories.isNotEmpty && !forceRefresh) {
+      debugPrint('Returning ${cachedCategories.length} cached teens categories (offline-first)');
+      return cachedCategories;
+    }
+    
+    // Only fetch from server on first install or manual refresh
+    try {
+      final hasConnection = await _checkConnectivity();
+      if (!hasConnection) {
+        debugPrint('No connection, returning cached teens categories');
+        return cachedCategories;
+      }
+      
+      final response = await _api.get(ApiConstants.teensCategories);
+      if (response.isSuccess) {
+        final data = response.data;
+        final List<dynamic> results = data is List ? data : (data['results'] ?? data);
+        final categories = results.map((json) => TeensCategory.fromJson(json)).toList();
+        
+        // Cache in background
+        Future.microtask(() async {
+          await _db.cacheTeensCategories(categories);
+          await _db.updateSyncMetadata('teens_categories');
+        });
+        
+        debugPrint('Fetched and cached ${categories.length} teens categories');
+        return categories;
+      }
+    } catch (e) {
+      debugPrint('Error fetching teens categories: $e');
+    }
+    
+    return cachedCategories;
+  }
+
+  // Teens content with cache-first strategy (fetches ALL pages)
+  // Only fetches from server on first install (no cache) or manual refresh
+  Future<List<TeensContent>> getTeensContent({bool forceRefresh = false}) async {
+    await initialize();
+    
+    final cachedContent = await _db.getCachedTeensContent();
+    
+    // Return cached data if available and not forcing refresh
+    if (cachedContent.isNotEmpty && !forceRefresh) {
+      debugPrint('Returning ${cachedContent.length} cached teens content (offline-first)');
+      return cachedContent;
+    }
+    
+    // Only fetch from server on first install or manual refresh
+    try {
+      final hasConnection = await _checkConnectivity();
+      if (!hasConnection) {
+        debugPrint('No connection, returning cached teens content');
+        return cachedContent;
+      }
+      
+      // Use getAllPages to fetch ALL paginated results
+      final allResults = await _api.getAllPages(ApiConstants.teensContent);
+      final content = allResults.map((json) => TeensContent.fromJson(json)).toList();
+      
+      // Cache in background to not block UI
+      Future.microtask(() async {
+        await _db.cacheTeensContent(content);
+        await _db.updateSyncMetadata('teens_content');
+      });
+      
+      debugPrint('Fetched and cached ${content.length} teens content (all pages)');
+      return content;
+    } catch (e) {
+      debugPrint('Error fetching teens content: $e');
+    }
+    
+    return cachedContent;
+  }
+
+  // Teens content by category with cache-first strategy
+  // Only fetches from server on first install (no cache) or manual refresh
+  Future<List<TeensContent>> getTeensContentByCategory(int categoryId, {bool forceRefresh = false}) async {
+    await initialize();
+    
+    final cachedContent = await _db.getCachedTeensContent(categoryId: categoryId);
+    
+    // Return cached data if available and not forcing refresh
+    if (cachedContent.isNotEmpty && !forceRefresh) {
+      debugPrint('Returning ${cachedContent.length} cached teens content for category $categoryId (offline-first)');
+      return cachedContent;
+    }
+    
+    // Only fetch from server on first install or manual refresh
+    try {
+      final hasConnection = await _checkConnectivity();
+      if (!hasConnection) {
+        debugPrint('No connection, returning cached teens content');
+        return cachedContent;
+      }
+      
+      // Use getAllPages to fetch ALL paginated results (not just first page)
+      final allResults = await _api.getAllPages('${ApiConstants.teensContentByCategory}?category_id=$categoryId');
+      final content = allResults.map((json) => TeensContent.fromJson(json as Map<String, dynamic>)).toList();
+      
+      // Cache in background to not block UI
+      Future.microtask(() async {
+        await _db.cacheTeensContent(content, categoryId: categoryId);
+        await _db.updateSyncMetadata('teens_content_$categoryId');
+      });
+      
+      debugPrint('Fetched and cached ${content.length} teens content for category $categoryId (all pages)');
+      return content;
+    } catch (e) {
+      debugPrint('Error fetching teens content by category: $e');
+    }
+    
+    return cachedContent;
   }
 
   // Cleanup methods

@@ -7,6 +7,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/interests_service.dart';
+import '../../../data/services/download_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/event.dart';
 import '../audio/audio_player_page.dart';
@@ -24,6 +25,10 @@ class _HomePageState extends ConsumerState<HomePage> {
   final DataService _dataService = DataService();
   final InterestsService _interestsService = InterestsService();
   late final PageController _eventsPageController;
+  
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+  }
   
   List<Sermon> _sermons = [];
   List<Event> _events = [];
@@ -71,7 +76,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _loadData({bool forceRefresh = false}) async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
+    
     try {
       // Get user permissions for filtering
       final authProvider = ref.read(authChangeNotifierProvider);
@@ -80,59 +87,56 @@ class _HomePageState extends ConsumerState<HomePage> {
       final isGeneralMarried = user?.isGeneralMarried ?? false;
       final isInHouseMarried = user?.isInHouseMarried ?? false;
       
-      // Load data sequentially to avoid overwhelming the database
-      // This prevents ANR by not doing parallel DB reads
-      final allSermons = await _dataService.getMessages(forceRefresh: forceRefresh);
-      
-      // Filter out restricted messages
-      final sermons = allSermons.where((sermon) {
+      // Filter function to avoid code duplication
+      bool canAccessSermon(Sermon sermon) {
         if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
         if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
         if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
         return true;
-      }).toList();
+      }
+      
+      // Load sermons first (most important for home page)
+      final allSermons = await _dataService.getMessages(forceRefresh: forceRefresh);
+      final sermons = allSermons.where(canAccessSermon).toList();
       
       if (mounted) {
-        // Update UI with sermons first for faster perceived loading
         final pickedInterests = _interestsService.getRandomMessagesFromInterests(sermons, count: 3);
         setState(() {
           _sermons = sermons;
           _pickedInterestSermons = pickedInterests;
+          _isLoading = false; // Show content immediately
         });
       }
       
-      // Small delay to let UI render
-      await Future.delayed(const Duration(milliseconds: 50));
+      // Load events and recommended in parallel (non-blocking)
+      _loadEventsAsync(forceRefresh);
+      _loadRecommendedAsync(forceRefresh, canAccessSermon);
       
-      final events = await _dataService.getEvents(forceRefresh: forceRefresh);
-      if (mounted) {
-        setState(() {
-          _events = events;
-        });
-      }
-      
-      await Future.delayed(const Duration(milliseconds: 50));
-      
-      final allRecommended = await _dataService.getRecommendedMessages(forceRefresh: forceRefresh);
-      // Filter recommended messages too
-      final recommended = allRecommended.where((sermon) {
-        if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
-        if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
-        if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
-        return true;
-      }).toList();
-      
-      if (mounted) {
-        setState(() {
-          _recommendedSermons = recommended;
-          _isLoading = false;
-        });
-      }
     } catch (e) {
       debugPrint('Error loading home data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+  
+  // Async loaders that don't block UI
+  Future<void> _loadEventsAsync(bool forceRefresh) async {
+    try {
+      final events = await _dataService.getEvents(forceRefresh: forceRefresh);
+      if (mounted) setState(() => _events = events);
+    } catch (e) {
+      debugPrint('Events load error: $e');
+    }
+  }
+  
+  Future<void> _loadRecommendedAsync(bool forceRefresh, bool Function(Sermon) canAccessSermon) async {
+    try {
+      final allRecommended = await _dataService.getRecommendedMessages(forceRefresh: forceRefresh);
+      final recommended = allRecommended.where(canAccessSermon).toList();
+      if (mounted) setState(() => _recommendedSermons = recommended);
+    } catch (e) {
+      debugPrint('Recommended load error: $e');
     }
   }
   
@@ -714,10 +718,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       return CachedNetworkImage(
         imageUrl: sermon.imageUrl!,
         fit: BoxFit.cover,
-        memCacheWidth: 200,
-        memCacheHeight: 200,
-        fadeInDuration: const Duration(milliseconds: 150),
-        fadeOutDuration: const Duration(milliseconds: 150),
+        memCacheWidth: 150,
+        memCacheHeight: 150,
+        fadeInDuration: const Duration(milliseconds: 100),
+        fadeOutDuration: const Duration(milliseconds: 100),
         placeholder: (context, url) => Container(
           color: AppColors.primaryGold.withValues(alpha: 0.15),
         ),
@@ -761,6 +765,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     Sermon sermon,
   ) {
     final authProvider = ref.read(authChangeNotifierProvider);
+    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+    final downloadService = DownloadService();
     final user = authProvider.user;
     final isServiceTeamMember = user?.isServiceTeamMember ?? false;
     final isGeneralMarried = user?.isGeneralMarried ?? false;
@@ -768,6 +774,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     final isLocked = (sermon.isServiceTeamOnly && !isServiceTeamMember) ||
         (sermon.isGeneralMarriedOnly && !isGeneralMarried) ||
         (sermon.isInHouseMarriedOnly && !isInHouseMarried);
+    final isCurrentlyPlaying = audioProvider.currentSermon?.id == sermon.id && audioProvider.isPlaying;
+    final isPreBuffered = audioProvider.isPreBuffered(sermon.id);
+    final isDownloaded = downloadService.isDownloaded(sermon.id);
+    final isReadyToPlay = isPreBuffered || isDownloaded;
     
     final timeAgo = _getTimeAgo(sermon.date);
     
@@ -810,6 +820,44 @@ class _HomePageState extends ConsumerState<HomePage> {
                     child: _buildSermonImage(sermon, isDark),
                   ),
                 ),
+                // Wave animation when playing
+                if (isCurrentlyPlaying && !isLocked)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const _WaveAnimation(),
+                    ),
+                  ),
+                // Ready indicator (pre-buffered or downloaded) - only show when not playing
+                if (isReadyToPlay && !isLocked && !isCurrentlyPlaying)
+                  Positioned(
+                    bottom: 2,
+                    right: 2,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.green.withValues(alpha: 0.4),
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow,
+                        size: 12,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 if (isLocked)
                   Positioned.fill(
                     child: Container(
@@ -862,7 +910,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 ),
                               ],
                               TextSpan(
-                                text: sermon.title,
+                                text: '${_formatDate(sermon.date)} - ${sermon.title}',
                                 style: TextStyle(
                                   color: isDark ? Colors.white : Colors.black87,
                                   fontWeight: FontWeight.normal,
@@ -1103,6 +1151,60 @@ class _EventImageZoomDialogState extends State<_EventImageZoomDialog> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// Wave animation widget for playing indicator
+class _WaveAnimation extends StatefulWidget {
+  const _WaveAnimation();
+
+  @override
+  State<_WaveAnimation> createState() => _WaveAnimationState();
+}
+
+class _WaveAnimationState extends State<_WaveAnimation> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: List.generate(4, (index) {
+            final delay = index * 0.15;
+            final animValue = ((_controller.value + delay) % 1.0);
+            final height = 8 + (animValue * 12);
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+              width: 3,
+              height: height,
+              decoration: BoxDecoration(
+                color: AppColors.primaryGold,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }

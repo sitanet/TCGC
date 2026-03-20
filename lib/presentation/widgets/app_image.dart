@@ -52,15 +52,25 @@ class AppImage extends StatelessWidget {
 
     Widget image;
     if (_isNetworkImage) {
+      // Calculate memory cache dimensions to prevent OOM
+      final cacheWidth = width != null ? (width! * 2).toInt() : 400;
+      final cacheHeight = height != null ? (height! * 2).toInt() : 400;
+      
       image = CachedNetworkImage(
         imageUrl: imagePath!,
         width: width,
         height: height,
         fit: fit,
+        memCacheWidth: cacheWidth,
+        memCacheHeight: cacheHeight,
         placeholder: (context, url) => placeholder,
         errorWidget: (context, url, error) => placeholder,
-        fadeInDuration: const Duration(milliseconds: 200),
-        fadeOutDuration: const Duration(milliseconds: 200),
+        // Use 0 duration when image is in memory cache to show instantly
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
+        placeholderFadeInDuration: Duration.zero,
+        // Keep image in memory cache longer
+        useOldImageOnUrlChange: true,
       );
     } else {
       image = Image.asset(

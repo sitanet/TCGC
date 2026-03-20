@@ -1,8 +1,19 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/api_constants.dart';
+
+// Top-level function for compute isolate - parses JSON in background
+List<dynamic> _parseJsonList(String body) {
+  final decoded = jsonDecode(body);
+  if (decoded is List) return decoded;
+  if (decoded is Map) {
+    return decoded['results'] ?? decoded['data'] ?? [];
+  }
+  return [];
+}
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -213,6 +224,53 @@ class ApiService {
     }
   }
 
+  /// Fetches all pages from a paginated endpoint and returns combined results
+  /// Uses compute isolate for JSON parsing to prevent UI jank
+  Future<List<dynamic>> getAllPages(String endpoint) async {
+    final allResults = <dynamic>[];
+    String? nextUrl = '${ApiConstants.baseUrl}$endpoint';
+    int pageCount = 0;
+    const maxPages = 50; // Safety limit to prevent infinite loops
+    
+    while (nextUrl != null && pageCount < maxPages) {
+      pageCount++;
+      try {
+        var response = await http.get(
+          Uri.parse(nextUrl),
+          headers: _headers,
+        ).timeout(const Duration(seconds: 30));
+
+        if (response.statusCode == 401 && await _refreshAccessToken()) {
+          response = await http.get(
+            Uri.parse(nextUrl),
+            headers: _headers,
+          ).timeout(const Duration(seconds: 30));
+        }
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          // Parse JSON in isolate to prevent main thread blocking
+          final results = await compute(_parseJsonList, response.body);
+          allResults.addAll(results);
+          
+          // Check for next page
+          try {
+            final decoded = jsonDecode(response.body);
+            nextUrl = (decoded is Map) ? decoded['next'] : null;
+          } catch (_) {
+            nextUrl = null;
+          }
+        } else {
+          break;
+        }
+      } catch (e) {
+        debugPrint('Error fetching page $pageCount: $e');
+        break;
+      }
+    }
+    
+    return allResults;
+  }
+
   Future<ApiResponse> uploadFile(
     String endpoint,
     File file, {
@@ -296,5 +354,38 @@ class ApiResponse {
       }
     } catch (_) {}
     return null;
+  }
+  
+  /// Check if response has pagination info
+  bool get hasPagination {
+    try {
+      final decoded = jsonDecode(body);
+      return decoded is Map && decoded.containsKey('next');
+    } catch (_) {
+      return false;
+    }
+  }
+  
+  /// Get next page URL from paginated response
+  String? get nextPageUrl {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map) {
+        return decoded['next'];
+      }
+    } catch (_) {}
+    return null;
+  }
+  
+  /// Get results list from paginated response
+  List<dynamic> get paginatedResults {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is List) return decoded;
+      if (decoded is Map) {
+        return decoded['results'] ?? decoded['data'] ?? [];
+      }
+    } catch (_) {}
+    return [];
   }
 }

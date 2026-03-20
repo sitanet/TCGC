@@ -15,6 +15,10 @@ class PlaylistsPage extends StatefulWidget {
 
 class _PlaylistsPageState extends State<PlaylistsPage> {
   final PlaylistService _playlistService = PlaylistService();
+  
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+  }
 
   @override
   void initState() {
@@ -276,6 +280,10 @@ class PlaylistDetailPage extends StatefulWidget {
 class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   final PlaylistService _playlistService = PlaylistService();
   late Playlist _playlist;
+  
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+  }
 
   @override
   void initState() {
@@ -384,7 +392,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
           ),
         ),
         title: Text(
-          sermon.title,
+          '${_formatDate(sermon.date)} - ${sermon.title}',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),

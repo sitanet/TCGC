@@ -1,3 +1,4 @@
+import 'dart:async' show Future, StreamSubscription, TimeoutException;
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,8 @@ import '../../domain/entities/sermon.dart';
 import '../../data/services/audio_cache_service.dart';
 import '../../data/services/playback_position_service.dart';
 import '../../data/services/download_service.dart';
+import '../../data/services/played_audio_service.dart';
+import '../../data/services/app_rating_service.dart';
 import '../services/audio_handler.dart';
 
 MyAudioHandler? _audioHandler;
@@ -34,21 +37,35 @@ Future<void> initAudioService() async {
   try {
     _audioHandler = await AudioService.init(
       builder: () => MyAudioHandler(),
-      config: const AudioServiceConfig(
+      config: AudioServiceConfig(
         androidNotificationChannelId: 'com.tcgc.tcgc.audio',
         androidNotificationChannelName: 'TCGC Audio',
-        androidNotificationOngoing: false,
-        androidStopForegroundOnPause: true,
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: false,
         androidNotificationIcon: 'mipmap/ic_launcher',
+        fastForwardInterval: const Duration(seconds: 10),
+        rewindInterval: const Duration(seconds: 10),
+        androidShowNotificationBadge: false, // Disabled to reduce memory on low-end devices
+        notificationColor: const Color(0xFFD4A867),
       ),
+    ).timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        debugPrint('AudioService init timed out - using fallback');
+        throw TimeoutException('AudioService init timeout');
+      },
     );
     _useAudioService = true;
     debugPrint('AudioService initialized successfully');
   } catch (e) {
     debugPrint('AudioService init failed: $e');
     debugPrint('Using fallback audio player');
-    _fallbackPlayer = AudioPlayer();
-    _useAudioService = false;
+    try {
+      _fallbackPlayer = AudioPlayer();
+      _useAudioService = false;
+    } catch (e2) {
+      debugPrint('Fallback player init also failed: $e2');
+    }
   }
 }
 
@@ -59,6 +76,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool _isPlaying = false;
   bool _isLoading = false;
   String? _errorMessage;
+  double _playbackSpeed = 1.0;
   
   Directory? _cacheDir;
   List<Sermon> _queue = [];
@@ -67,6 +85,17 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   final AudioCacheService _audioCacheService = AudioCacheService();
   final PlaybackPositionService _positionService = PlaybackPositionService();
   final DownloadService _downloadService = DownloadService();
+  final PlayedAudioService _playedAudioService = PlayedAudioService();
+  final AppRatingService _appRatingService = AppRatingService();
+  
+  bool _hasMarkedFirstSuccessfulPlay = false;
+  
+  // Stream subscriptions to properly cancel on dispose
+  final List<StreamSubscription> _subscriptions = [];
+  
+  // Throttle position updates to reduce UI rebuilds (every 500ms instead of every frame)
+  DateTime _lastPositionNotify = DateTime.now();
+  static const _positionThrottleMs = 500;
 
   Sermon? get currentSermon => _currentSermon;
   Duration get duration => _duration;
@@ -75,6 +104,9 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get hasAudio => _currentSermon != null;
+  double get playbackSpeed => _playbackSpeed;
+  
+  static const List<double> availableSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
   
   List<Sermon> get queue => _queue;
   int get currentIndex => _currentIndex;
@@ -83,12 +115,44 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   AudioPlayerProvider() {
     WidgetsBinding.instance.addObserver(this);
-    // Initialize in background
+    // Initialize in background with error handling
     Future.microtask(() async {
-      await _initCacheDir();
-      await _initPositionService();
-      _setupListeners();
+      try {
+        await _initCacheDir();
+      } catch (e) {
+        debugPrint('Cache dir init error: $e');
+      }
+      try {
+        await _initPositionService();
+      } catch (e) {
+        debugPrint('Position service init error: $e');
+      }
+      try {
+        await _playedAudioService.initialize();
+      } catch (e) {
+        debugPrint('Played audio service init error: $e');
+      }
+      try {
+        await _appRatingService.initialize();
+      } catch (e) {
+        debugPrint('App rating service init error: $e');
+      }
+      try {
+        _setupListeners();
+      } catch (e) {
+        debugPrint('Listeners setup error: $e');
+      }
     });
+  }
+  
+  bool isAudioPlayed(String audioId) => _playedAudioService.isPlayed(audioId);
+  
+  bool get shouldShowRatingPopup => !_appRatingService.hasShownRatingPopup && _hasMarkedFirstSuccessfulPlay;
+  
+  Future<void> showRatingDialogIfNeeded(BuildContext context) async {
+    if (await _appRatingService.shouldShowRating()) {
+      await _appRatingService.showRatingDialog(context);
+    }
   }
   
   bool _positionServiceInitialized = false;
@@ -120,75 +184,131 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
   
   void _setupAudioServiceListeners() {
-    _audioHandler!.playerStateStream.listen((state) {
-      _isPlaying = state.playing;
-      _isLoading = state.processingState == ProcessingState.loading ||
-                   state.processingState == ProcessingState.buffering;
-      
-      if (state.processingState == ProcessingState.ready ||
-          state.processingState == ProcessingState.idle) {
+    _subscriptions.add(
+      _audioHandler!.playerStateStream.listen((state) {
+        final wasPlaying = _isPlaying;
+        final wasLoading = _isLoading;
+        
+        _isPlaying = state.playing;
+        _isLoading = state.processingState == ProcessingState.loading ||
+                     state.processingState == ProcessingState.buffering;
+        
+        if (state.processingState == ProcessingState.ready ||
+            state.processingState == ProcessingState.idle) {
+          _isLoading = false;
+        }
+        
+        // Mark first successful play for rating prompt
+        if (state.playing && state.processingState == ProcessingState.ready && !_hasMarkedFirstSuccessfulPlay) {
+          _hasMarkedFirstSuccessfulPlay = true;
+          _appRatingService.incrementPlayCount();
+        }
+        
+        if (state.processingState == ProcessingState.completed) {
+          _isLoading = false;
+          if (hasNext) skipToNext();
+        }
+        // Only notify if state actually changed
+        if (wasPlaying != _isPlaying || wasLoading != _isLoading) {
+          notifyListeners();
+        }
+      }, onError: (error) {
+        debugPrint('Player state stream error: $error');
         _isLoading = false;
-      }
-      
-      if (state.processingState == ProcessingState.completed) {
-        _isLoading = false;
-        if (hasNext) skipToNext();
-      }
-      notifyListeners();
-    }, onError: (error) {
-      debugPrint('Player state stream error: $error');
-      _isLoading = false;
-      _errorMessage = 'Playback error: $error';
-      notifyListeners();
-    });
+        _errorMessage = 'Playback error: $error';
+        notifyListeners();
+      }),
+    );
     
-    _audioHandler!.positionStream.listen((pos) {
-      _position = pos;
-      notifyListeners();
-    });
+    _subscriptions.add(
+      _audioHandler!.positionStream.listen((pos) {
+        _position = pos;
+        // Throttle position updates to reduce UI rebuilds
+        final now = DateTime.now();
+        if (now.difference(_lastPositionNotify).inMilliseconds >= _positionThrottleMs) {
+          _lastPositionNotify = now;
+          notifyListeners();
+        }
+      }, onError: (error) {
+        debugPrint('Position stream error: $error');
+      }),
+    );
     
-    _audioHandler!.durationStream.listen((dur) {
-      _duration = dur ?? Duration.zero;
-      notifyListeners();
-    });
+    _subscriptions.add(
+      _audioHandler!.durationStream.listen((dur) {
+        final newDuration = dur ?? Duration.zero;
+        if (_duration != newDuration) {
+          _duration = newDuration;
+          notifyListeners();
+        }
+      }, onError: (error) {
+        debugPrint('Duration stream error: $error');
+      }),
+    );
   }
   
   void _setupFallbackListeners() {
-    _fallbackPlayer!.playerStateStream.listen((state) {
-      _isPlaying = state.playing;
-      _isLoading = state.processingState == ProcessingState.loading ||
-                   state.processingState == ProcessingState.buffering;
-      
-      if (state.processingState == ProcessingState.ready ||
-          state.processingState == ProcessingState.idle) {
+    _subscriptions.add(
+      _fallbackPlayer!.playerStateStream.listen((state) {
+        final wasPlaying = _isPlaying;
+        final wasLoading = _isLoading;
+        
+        _isPlaying = state.playing;
+        _isLoading = state.processingState == ProcessingState.loading ||
+                     state.processingState == ProcessingState.buffering;
+        
+        if (state.processingState == ProcessingState.ready ||
+            state.processingState == ProcessingState.idle) {
+          _isLoading = false;
+        }
+        
+        // Mark first successful play for rating prompt
+        if (state.playing && state.processingState == ProcessingState.ready && !_hasMarkedFirstSuccessfulPlay) {
+          _hasMarkedFirstSuccessfulPlay = true;
+          _appRatingService.incrementPlayCount();
+        }
+        
+        if (state.processingState == ProcessingState.completed) {
+          _isLoading = false;
+          if (hasNext) skipToNext();
+        }
+        // Only notify if state actually changed
+        if (wasPlaying != _isPlaying || wasLoading != _isLoading) {
+          notifyListeners();
+        }
+      }, onError: (error) {
+        debugPrint('Fallback player state stream error: $error');
         _isLoading = false;
-      }
-      
-      if (state.processingState == ProcessingState.completed) {
-        _isLoading = false;
-        if (hasNext) skipToNext();
-      }
-      notifyListeners();
-    }, onError: (error) {
-      debugPrint('Fallback player state stream error: $error');
-      _isLoading = false;
-      _errorMessage = 'Playback error: $error';
-      notifyListeners();
-    });
+        _errorMessage = 'Playback error: $error';
+        notifyListeners();
+      }),
+    );
     
-    _fallbackPlayer!.positionStream.listen((pos) {
-      _position = pos;
-      notifyListeners();
-    }, onError: (error) {
-      debugPrint('Fallback position stream error: $error');
-    });
+    _subscriptions.add(
+      _fallbackPlayer!.positionStream.listen((pos) {
+        _position = pos;
+        // Throttle position updates to reduce UI rebuilds
+        final now = DateTime.now();
+        if (now.difference(_lastPositionNotify).inMilliseconds >= _positionThrottleMs) {
+          _lastPositionNotify = now;
+          notifyListeners();
+        }
+      }, onError: (error) {
+        debugPrint('Fallback position stream error: $error');
+      }),
+    );
     
-    _fallbackPlayer!.durationStream.listen((dur) {
-      _duration = dur ?? Duration.zero;
-      notifyListeners();
-    }, onError: (error) {
-      debugPrint('Fallback duration stream error: $error');
-    });
+    _subscriptions.add(
+      _fallbackPlayer!.durationStream.listen((dur) {
+        final newDuration = dur ?? Duration.zero;
+        if (_duration != newDuration) {
+          _duration = newDuration;
+          notifyListeners();
+        }
+      }, onError: (error) {
+        debugPrint('Fallback duration stream error: $error');
+      }),
+    );
   }
   
   Future<void> preBufferSermons(List<Sermon> sermons, {int count = 20}) async {
@@ -233,14 +353,21 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
 
+    // Mark audio as played (removes "NEW" badge)
+    _playedAudioService.markAsPlayed(sermon.id);
+
     // Update UI immediately - no loading state for pre-buffered content
     _errorMessage = null;
     _currentSermon = sermon;
     _position = Duration.zero;
     
     final audioUrl = sermon.audioUrl;
+    debugPrint('Playing sermon: ${sermon.title}');
+    debugPrint('Audio URL from sermon: $audioUrl');
+    
     if (audioUrl == null || audioUrl.isEmpty) {
-      _errorMessage = 'No audio URL available for this sermon';
+      _errorMessage = 'No audio URL available for this sermon. Please pull to refresh the list.';
+      debugPrint('ERROR: Audio URL is null or empty for sermon ${sermon.id}');
       notifyListeners();
       return;
     }
@@ -287,39 +414,71 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
 
       if (_useAudioService && _audioHandler != null) {
         // Stop previous without waiting
-        _audioHandler!.stop();
+        try {
+          await _audioHandler!.stop();
+        } catch (e) {
+          debugPrint('Error stopping previous audio: $e');
+        }
         
         if (downloadedPath != null) {
           debugPrint('Playing from local file');
           await _audioHandler!.setAudioSource('file://$downloadedPath', mediaItem);
+          await _audioHandler!.play();
         } else {
-          // Stream directly - large files may take time to buffer
+          // Stream from URL - set source and play without blocking
           debugPrint('Streaming from URL');
-          await _audioHandler!.setAudioSource(fixedAudioUrl, mediaItem).timeout(
-            const Duration(seconds: 180), // 3 minutes for large files
-            onTimeout: () {
-              throw Exception('Connection timeout - please check your internet connection or try downloading the audio.');
-            },
-          );
+          try {
+            // Use unawaited setAudioSource to start buffering while we show loading UI
+            // The play() will start as soon as enough data is buffered
+            _audioHandler!.setAudioSource(fixedAudioUrl, mediaItem).then((_) {
+              debugPrint('Audio source ready, starting playback');
+              _audioHandler!.play();
+            }).catchError((e) {
+              debugPrint('Error setting audio source: $e');
+              _isLoading = false;
+              _errorMessage = 'Unable to load audio. Check your connection.';
+              notifyListeners();
+            });
+          } catch (e) {
+            debugPrint('Error setting audio source: $e');
+            _isLoading = false;
+            _errorMessage = 'Unable to load audio. Check your connection.';
+            notifyListeners();
+            return;
+          }
         }
-        _audioHandler!.play();
       } else if (_fallbackPlayer != null) {
-        _fallbackPlayer!.stop();
+        try {
+          await _fallbackPlayer!.stop();
+        } catch (e) {
+          debugPrint('Error stopping fallback player: $e');
+        }
         
         if (downloadedPath != null) {
           debugPrint('Playing from local file (fallback)');
           await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse('file://$downloadedPath')));
+          await _fallbackPlayer!.play();
         } else {
-          // Stream directly - large files may take time to buffer
+          // Stream from URL - use async loading to not block
           debugPrint('Streaming from URL (fallback)');
-          await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(fixedAudioUrl))).timeout(
-            const Duration(seconds: 180), // 3 minutes for large files
-            onTimeout: () {
-              throw Exception('Connection timeout - please check your internet connection or try downloading the audio.');
-            },
-          );
+          try {
+            _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(fixedAudioUrl))).then((_) {
+              debugPrint('Audio source ready (fallback), starting playback');
+              _fallbackPlayer!.play();
+            }).catchError((e) {
+              debugPrint('Error setting audio source (fallback): $e');
+              _isLoading = false;
+              _errorMessage = 'Unable to load audio. Check your connection.';
+              notifyListeners();
+            });
+          } catch (e) {
+            debugPrint('Error setting audio source (fallback): $e');
+            _isLoading = false;
+            _errorMessage = 'Unable to load audio. Check your connection.';
+            notifyListeners();
+            return;
+          }
         }
-        _fallbackPlayer!.play();
       }
       _isLoading = false;
       notifyListeners();
@@ -353,10 +512,35 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> play() async {
-    if (_useAudioService && _audioHandler != null) {
-      await _audioHandler!.play();
-    } else {
-      await _fallbackPlayer?.play();
+    try {
+      if (_useAudioService && _audioHandler != null) {
+        // Check if the audio source is still loaded
+        final processingState = _audioHandler!.processingState;
+        if (processingState == ProcessingState.idle && _currentSermon != null) {
+          // Audio source was released, need to reload
+          debugPrint('Audio source released, reloading...');
+          await playSermonFromPosition(_currentSermon!, _position);
+          return;
+        }
+        await _audioHandler!.play();
+      } else if (_fallbackPlayer != null) {
+        // Check if the audio source is still loaded
+        final processingState = _fallbackPlayer!.processingState;
+        if (processingState == ProcessingState.idle && _currentSermon != null) {
+          // Audio source was released, need to reload
+          debugPrint('Audio source released (fallback), reloading...');
+          await playSermonFromPosition(_currentSermon!, _position);
+          return;
+        }
+        await _fallbackPlayer!.play();
+      }
+    } catch (e) {
+      debugPrint('Error in play(): $e');
+      // Try to reload the sermon if play fails
+      if (_currentSermon != null) {
+        debugPrint('Attempting to reload sermon after play error');
+        await playSermonFromPosition(_currentSermon!, _position);
+      }
     }
   }
 
@@ -404,6 +588,21 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> seekBackward() async {
     final newPosition = _position - const Duration(seconds: 10);
     await seek(newPosition > Duration.zero ? newPosition : Duration.zero);
+  }
+
+  Future<void> setPlaybackSpeed(double speed) async {
+    _playbackSpeed = speed;
+    if (_useAudioService && _audioHandler != null) {
+      await _audioHandler!.setSpeed(speed);
+    } else if (_fallbackPlayer != null) {
+      await _fallbackPlayer!.setSpeed(speed);
+    }
+    notifyListeners();
+  }
+
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
   }
   
   PlaybackPosition? getSavedPosition(String sermonId) {
@@ -465,35 +664,51 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
       debugPrint('Playing from position: $fixedAudioUrl');
 
       if (_useAudioService && _audioHandler != null) {
-        _audioHandler!.stop();
+        try {
+          await _audioHandler!.stop();
+        } catch (e) {
+          debugPrint('Error stopping previous audio: $e');
+        }
         
         if (downloadedPath != null) {
           await _audioHandler!.setAudioSourceWithPosition('file://$downloadedPath', mediaItem, startPosition);
+          await _audioHandler!.play();
         } else {
-          // Stream directly
-          await _audioHandler!.setAudioSourceWithPosition(fixedAudioUrl, mediaItem, startPosition).timeout(
-            const Duration(seconds: 180),
-            onTimeout: () {
-              throw Exception('Connection timeout - please check your internet connection.');
-            },
-          );
+          // Stream from URL with position
+          try {
+            await _audioHandler!.setAudioSourceWithPosition(fixedAudioUrl, mediaItem, startPosition);
+            await _audioHandler!.play();
+          } catch (e) {
+            debugPrint('Error setting audio source: $e');
+            _isLoading = false;
+            _errorMessage = 'Unable to load audio. Check your connection.';
+            notifyListeners();
+            return;
+          }
         }
-        _audioHandler!.play();
       } else if (_fallbackPlayer != null) {
-        _fallbackPlayer!.stop();
+        try {
+          await _fallbackPlayer!.stop();
+        } catch (e) {
+          debugPrint('Error stopping fallback player: $e');
+        }
         
         if (downloadedPath != null) {
           await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse('file://$downloadedPath')), initialPosition: startPosition);
+          await _fallbackPlayer!.play();
         } else {
-          // Stream directly
-          await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(fixedAudioUrl)), initialPosition: startPosition).timeout(
-            const Duration(seconds: 180),
-            onTimeout: () {
-              throw Exception('Connection timeout - please check your internet connection.');
-            },
-          );
+          // Stream from URL with position
+          try {
+            await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(fixedAudioUrl)), initialPosition: startPosition);
+            await _fallbackPlayer!.play();
+          } catch (e) {
+            debugPrint('Error setting audio source: $e');
+            _isLoading = false;
+            _errorMessage = 'Unable to load audio. Check your connection.';
+            notifyListeners();
+            return;
+          }
         }
-        _fallbackPlayer!.play();
       }
       _isLoading = false;
       notifyListeners();
@@ -667,6 +882,11 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _saveCurrentPosition();
+    // Cancel all stream subscriptions to prevent memory leaks
+    for (final sub in _subscriptions) {
+      sub.cancel();
+    }
+    _subscriptions.clear();
     _fallbackPlayer?.dispose();
     super.dispose();
   }

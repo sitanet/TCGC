@@ -24,6 +24,10 @@ class SermonCard extends StatelessWidget {
     required this.sermon,
     this.onTap,
   });
+  
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+  }
 
   Widget _buildPlaceholder(bool isDark) {
     return Container(
@@ -74,7 +78,7 @@ class SermonCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    sermon.title,
+                    '${_formatDate(sermon.date)} - ${sermon.title}',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),

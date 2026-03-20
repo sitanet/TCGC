@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/services/data_service.dart';
-import '../../../domain/entities/teens_content.dart';
+import '../../../domain/entities/teens_category.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'teens_content_list_page.dart';
@@ -18,10 +19,29 @@ class TeensPage extends ConsumerStatefulWidget {
 class _TeensPageState extends ConsumerState<TeensPage> {
   final DataService _dataService = DataService();
   
-  List<TeensContent> _devotionals = [];
-  List<TeensContent> _retreats = [];
-  List<TeensContent> _forgeCamp = [];
+  List<TeensCategory> _categories = [];
+  String? _bannerUrl;
   bool _isLoading = true;
+
+  // Colors for categories (cycles through)
+  final List<Color> _categoryColors = [
+    AppColors.orange,
+    const Color(0xFF8B0000),
+    AppColors.teal,
+    Colors.purple,
+    Colors.blue,
+    Colors.green,
+  ];
+
+  // Icons for categories (cycles through)
+  final List<IconData> _categoryIcons = [
+    Icons.menu_book,
+    Icons.hiking,
+    Icons.local_fire_department,
+    Icons.music_note,
+    Icons.video_library,
+    Icons.school,
+  ];
 
   @override
   void initState() {
@@ -29,18 +49,18 @@ class _TeensPageState extends ConsumerState<TeensPage> {
     _loadData();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     setState(() => _isLoading = true);
     try {
-      final devotionals = await _dataService.getDevotionals();
-      final retreats = await _dataService.getRetreats();
-      final forgeCamp = await _dataService.getForgeCamp();
+      final results = await Future.wait([
+        _dataService.getTeensCategories(forceRefresh: forceRefresh),
+        _dataService.getTeensBannerUrl(),
+      ]);
       
       if (mounted) {
         setState(() {
-          _devotionals = devotionals;
-          _retreats = retreats;
-          _forgeCamp = forgeCamp;
+          _categories = results[0] as List<TeensCategory>;
+          _bannerUrl = results[1] as String?;
           _isLoading = false;
         });
       }
@@ -72,7 +92,7 @@ class _TeensPageState extends ConsumerState<TeensPage> {
         onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
       ),
       body: RefreshIndicator(
-        onRefresh: _loadData,
+        onRefresh: () => _loadData(forceRefresh: true),
         color: AppColors.primaryGold,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -154,6 +174,31 @@ class _TeensPageState extends ConsumerState<TeensPage> {
     final borderRadius = Responsive.largeBorderRadius(context);
     final titleFontSize = Responsive.subtitleFontSize(context);
 
+    Widget fallbackBanner = Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFFFF9800),
+            Color(0xFFFFB74D),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          'YOUNG ADULTS & TEENS',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.9),
+            fontSize: titleFontSize,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ),
+    );
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: horizontalPadding),
       height: bannerHeight,
@@ -162,37 +207,27 @@ class _TeensPageState extends ConsumerState<TeensPage> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
-        child: Image.asset(
-          'assets/images/teens_banner.png',
-          fit: BoxFit.cover,
-          width: double.infinity,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(borderRadius),
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFFFF9800),
-                    Color(0xFFFFB74D),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  'YOUNG ADULTS & TEENS',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: titleFontSize,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
+        child: _bannerUrl != null && _bannerUrl!.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: _bannerUrl!,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                memCacheWidth: 600,
+                memCacheHeight: 400,
+                placeholder: (context, url) => Container(
+                  color: isDark ? AppColors.cardDark : Colors.grey[200],
+                  child: const Center(
+                    child: CircularProgressIndicator(color: AppColors.primaryGold),
                   ),
                 ),
+                errorWidget: (context, url, error) => fallbackBanner,
+              )
+            : Image.asset(
+                'assets/images/teens_banner.png',
+                fit: BoxFit.cover,
+                width: double.infinity,
+                errorBuilder: (context, error, stackTrace) => fallbackBanner,
               ),
-            );
-          },
-        ),
       ),
     );
   }
@@ -201,32 +236,19 @@ class _TeensPageState extends ConsumerState<TeensPage> {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final borderRadius = Responsive.borderRadius(context);
 
-    final categories = [
-      _CategoryItem(
-        title: 'Daily Devotional',
-        icon: Icons.menu_book,
-        color: AppColors.orange,
-        count: _devotionals.length,
-        contents: _devotionals,
-        contentType: TeensContentType.devotionals,
-      ),
-      _CategoryItem(
-        title: 'Teens Retreat',
-        icon: Icons.hiking,
-        color: const Color(0xFF8B0000),
-        count: _retreats.length,
-        contents: _retreats,
-        contentType: TeensContentType.retreats,
-      ),
-      _CategoryItem(
-        title: 'The Forge Teens Camp',
-        icon: Icons.local_fire_department,
-        color: AppColors.teal,
-        count: _forgeCamp.length,
-        contents: _forgeCamp,
-        contentType: TeensContentType.forgeCamp,
-      ),
-    ];
+    if (_categories.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+        child: Center(
+          child: Text(
+            'No categories available',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+          ),
+        ),
+      );
+    }
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
@@ -243,25 +265,30 @@ class _TeensPageState extends ConsumerState<TeensPage> {
           ],
         ),
         child: Column(
-          children: categories
-              .map((category) => Column(
-                    children: [
-                      _buildCategoryTile(context, isDark, category),
-                      if (categories.indexOf(category) < categories.length - 1)
-                        Divider(
-                          height: 1,
-                          indent: 72,
-                          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                        ),
-                    ],
-                  ))
-              .toList(),
+          children: _categories.asMap().entries.map((entry) {
+            final index = entry.key;
+            final category = entry.value;
+            final color = _categoryColors[index % _categoryColors.length];
+            final icon = _categoryIcons[index % _categoryIcons.length];
+            
+            return Column(
+              children: [
+                _buildCategoryTile(context, isDark, category, color, icon),
+                if (index < _categories.length - 1)
+                  Divider(
+                    height: 1,
+                    indent: 72,
+                    color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                  ),
+              ],
+            );
+          }).toList(),
         ),
       ),
     );
   }
 
-  Widget _buildCategoryTile(BuildContext context, bool isDark, _CategoryItem category) {
+  Widget _buildCategoryTile(BuildContext context, bool isDark, TeensCategory category, Color color, IconData icon) {
     final spacing = Responsive.verticalSpacing(context);
     final iconSize = Responsive.iconSize(context);
     final iconContainerSize = Responsive.value(context, mobile: 48.0, tablet: 56.0, desktop: 64.0);
@@ -275,24 +302,32 @@ class _TeensPageState extends ConsumerState<TeensPage> {
         width: iconContainerSize,
         height: iconContainerSize,
         decoration: BoxDecoration(
-          color: category.color.withOpacity(0.15),
+          color: color.withOpacity(0.15),
           borderRadius: BorderRadius.circular(borderRadius),
         ),
-        child: Icon(
-          category.icon,
-          color: category.color,
-          size: iconSize,
-        ),
+        child: category.imageUrl != null && category.imageUrl!.isNotEmpty
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(borderRadius),
+                child: CachedNetworkImage(
+                  imageUrl: category.imageUrl!,
+                  fit: BoxFit.cover,
+                  memCacheWidth: 128,
+                  memCacheHeight: 128,
+                  placeholder: (context, url) => Icon(icon, color: color, size: iconSize),
+                  errorWidget: (context, url, error) => Icon(icon, color: color, size: iconSize),
+                ),
+              )
+            : Icon(icon, color: color, size: iconSize),
       ),
       title: Text(
-        category.title,
+        category.name,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
               fontSize: bodyFontSize,
             ),
       ),
       subtitle: Text(
-        '${category.count} ${category.count == 1 ? 'item' : 'items'}',
+        '${category.contentCount} ${category.contentCount == 1 ? 'item' : 'items'}',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
               fontSize: smallFontSize,
@@ -303,39 +338,20 @@ class _TeensPageState extends ConsumerState<TeensPage> {
         color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
         size: iconSize,
       ),
-      onTap: () => _navigateToContentList(context, category),
+      onTap: () => _navigateToContentList(context, category, color),
     );
   }
 
-  void _navigateToContentList(BuildContext context, _CategoryItem category) {
+  void _navigateToContentList(BuildContext context, TeensCategory category, Color color) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => TeensContentListPage(
-          title: category.title,
-          contents: category.contents,
-          accentColor: category.color,
-          contentType: category.contentType,
+          title: category.name,
+          categoryId: category.id,
+          accentColor: color,
         ),
       ),
     );
   }
-}
-
-class _CategoryItem {
-  final String title;
-  final IconData icon;
-  final Color color;
-  final int count;
-  final List<TeensContent> contents;
-  final TeensContentType contentType;
-
-  _CategoryItem({
-    required this.title,
-    required this.icon,
-    required this.color,
-    required this.count,
-    required this.contents,
-    required this.contentType,
-  });
 }

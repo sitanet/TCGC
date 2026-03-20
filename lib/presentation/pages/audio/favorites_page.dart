@@ -15,6 +15,10 @@ class FavoritesPage extends StatefulWidget {
 
 class _FavoritesPageState extends State<FavoritesPage> {
   final FavoritesService _favoritesService = FavoritesService();
+  
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+  }
 
   @override
   void initState() {
@@ -124,7 +128,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
           ),
         ),
         title: Text(
-          sermon.title,
+          '${_formatDate(sermon.date)} - ${sermon.title}',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),

@@ -29,7 +29,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   String? _selectedGender;
   DateTime? _selectedDateOfBirth;
   String? _selectedKCC;
-  String? _selectedDepartment;
+  List<String> _selectedDepartments = [];
   CountryCode _selectedCountryCode = CountryCode.countries.first;
   String? _profilePhotoUrl;
   File? _selectedImageFile;
@@ -40,30 +40,36 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   final Map<String, String> _genderOptions = {
     'male': 'Male',
     'female': 'Female',
-    'other': 'Other',
   };
   final List<String> _kccOptions = [
+    'Agbowo KCC 1',
+    'Agbowo KCC 2',
+    'Agbowo KCC 3',
+    'Ajibode KCC',
     'Akobo KCC',
+    'Bashorun KCC',
     'Bodija1 KCC',
     'Bodija 2 KCC',
     'Ojoo KCC',
-    'Sango KCC',
+    'Orogun KCC 1',
+    'Orogun KCC 2',
     'Ring Road KCC',
-    'Agbowo KCC',
-    'Bashorun KCC',
+    'Sango KCC',
   ];
   final List<String> _departmentOptions = [
-    'Choir',
-    'Ushering',
-    'Technical',
-    'Media',
-    'Protocol',
     'Children Ministry',
-    'Welfare',
+    'Choir',
     'Evangelism',
-    'Prayer',
+    'Follow-Up',
     'Hospitality',
+    'Maintenance',
+    'Media',
+    'Prayer',
+    'Protocol',
     'Security',
+    'Technical',
+    'Ushering',
+    'Welfare',
   ];
   @override
   void initState() {
@@ -84,7 +90,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       _selectedGender = user.gender;
       _selectedDateOfBirth = user.dateOfBirth;
       _selectedKCC = user.kcc;
-      _selectedDepartment = user.department;
+      // Parse comma-separated departments
+      if (user.department != null && user.department!.isNotEmpty) {
+        _selectedDepartments = user.department!.split(',').map((d) => d.trim()).toList();
+      }
       _profilePhotoUrl = user.photoUrl;
       
       // Set country code if available
@@ -197,16 +206,11 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   },
                 ),
                 const SizedBox(height: 16),
-                _buildDropdownField(
+                _buildMultiSelectField(
                   label: 'Department/Unit',
-                  value: _selectedDepartment,
+                  selectedItems: _selectedDepartments,
                   items: _departmentOptions,
                   isDark: isDark,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedDepartment = value;
-                    });
-                  },
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
@@ -749,6 +753,127 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     );
   }
 
+  Widget _buildMultiSelectField({
+    required String label,
+    required List<String> selectedItems,
+    required List<String> items,
+    required bool isDark,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? AppColors.textSecondaryDark : Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => _showDepartmentSelector(isDark),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    selectedItems.isEmpty
+                        ? 'Select departments'
+                        : selectedItems.join(', '),
+                    style: TextStyle(
+                      color: selectedItems.isEmpty
+                          ? Colors.grey[400]
+                          : (isDark ? Colors.white : Colors.black),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_drop_down,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showDepartmentSelector(bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Select Departments',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Done',
+                        style: TextStyle(color: AppColors.primaryGold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _departmentOptions.length,
+                  itemBuilder: (context, index) {
+                    final department = _departmentOptions[index];
+                    final isSelected = _selectedDepartments.contains(department);
+                    return CheckboxListTile(
+                      title: Text(department),
+                      value: isSelected,
+                      activeColor: AppColors.primaryGold,
+                      onChanged: (bool? value) {
+                        setModalState(() {
+                          if (value == true) {
+                            _selectedDepartments.add(department);
+                          } else {
+                            _selectedDepartments.remove(department);
+                          }
+                        });
+                        setState(() {});
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDateField(BuildContext context, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -879,8 +1004,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         profileData['kcc'] = _selectedKCC;
       }
       
-      if (_selectedDepartment != null) {
-        profileData['department'] = _selectedDepartment;
+      if (_selectedDepartments.isNotEmpty) {
+        profileData['department'] = _selectedDepartments.join(', ');
       }
       
       if (_addressController.text.trim().isNotEmpty) {

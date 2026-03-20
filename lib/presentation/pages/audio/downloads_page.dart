@@ -1,20 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/download_service.dart';
+import '../../../data/services/playback_position_service.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_player_page.dart';
 
-class DownloadsPage extends StatefulWidget {
+class DownloadsPage extends ConsumerStatefulWidget {
   const DownloadsPage({super.key});
 
   @override
-  State<DownloadsPage> createState() => _DownloadsPageState();
+  ConsumerState<DownloadsPage> createState() => _DownloadsPageState();
 }
 
-class _DownloadsPageState extends State<DownloadsPage> {
+class _DownloadsPageState extends ConsumerState<DownloadsPage> {
   final DownloadService _downloadService = DownloadService();
+  final PlaybackPositionService _positionService = PlaybackPositionService();
   int _totalSize = 0;
+  
+  String _formatDateTitle(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+  }
 
   @override
   void initState() {
@@ -24,6 +32,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
 
   Future<void> _initialize() async {
     await _downloadService.initialize();
+    await _positionService.initialize();
     _downloadService.addListener(_onDownloadsChanged);
     _totalSize = await _downloadService.getTotalSize();
     if (mounted) setState(() {});
@@ -152,6 +161,8 @@ class _DownloadsPageState extends State<DownloadsPage> {
 
   Widget _buildDownloadTile(BuildContext context, DownloadedSermon download, bool isDark) {
     final sermon = download.sermon;
+    final savedPosition = _positionService.getPosition(sermon.id);
+    final hasResume = savedPosition != null && savedPosition.isSignificant;
     
     return Dismissible(
       key: Key(sermon.id),
@@ -171,35 +182,87 @@ class _DownloadsPageState extends State<DownloadsPage> {
       child: ListTile(
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            width: 50,
-            height: 50,
-            color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-            child: sermon.imageUrl != null && sermon.imageUrl!.startsWith('http')
-                ? CachedNetworkImage(
-                    imageUrl: sermon.imageUrl!,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) => _buildPlaceholder(isDark),
-                    errorWidget: (_, __, ___) => _buildPlaceholder(isDark),
-                  )
-                : _buildPlaceholder(isDark),
+          child: Stack(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                child: sermon.imageUrl != null && sermon.imageUrl!.startsWith('http')
+                    ? CachedNetworkImage(
+                        imageUrl: sermon.imageUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => _buildPlaceholder(isDark),
+                        errorWidget: (_, __, ___) => _buildPlaceholder(isDark),
+                      )
+                    : _buildPlaceholder(isDark),
+              ),
+              if (hasResume)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.3),
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(8),
+                        bottomRight: Radius.circular(8),
+                      ),
+                    ),
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: savedPosition.progress,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGold,
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
         title: Text(
-          sermon.title,
+          '${_formatDateTitle(sermon.date)} - ${sermon.title}',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        subtitle: Text(
-          '${_formatSize(download.fileSize)} • ${sermon.speaker ?? sermon.categoryName}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${_formatSize(download.fileSize)} • ${sermon.speaker ?? sermon.categoryName}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (hasResume)
+              Text(
+                'Resume at ${savedPosition.formattedPosition} / ${savedPosition.formattedDuration}',
+                style: TextStyle(
+                  color: AppColors.primaryGold,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+          ],
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.download_done, color: Colors.green, size: 20),
-            const SizedBox(width: 8),
+            if (hasResume)
+              IconButton(
+                icon: Icon(Icons.play_circle_filled, color: AppColors.primaryGold, size: 28),
+                onPressed: () => _playWithResume(sermon, savedPosition),
+                tooltip: 'Resume',
+              )
+            else
+              const Icon(Icons.download_done, color: Colors.green, size: 20),
             IconButton(
               icon: const Icon(Icons.delete_outline, size: 20),
               onPressed: () => _showDeleteDialog(context, download),
@@ -207,11 +270,61 @@ class _DownloadsPageState extends State<DownloadsPage> {
           ],
         ),
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: sermon)),
-          );
+          if (hasResume) {
+            _showResumeDialog(context, sermon, savedPosition, isDark);
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: sermon)),
+            );
+          }
         },
+      ),
+    );
+  }
+  
+  void _playWithResume(sermon, PlaybackPosition position) {
+    final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
+    audioProvider.playSermonFromPosition(sermon, position.position);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: sermon)),
+    );
+  }
+  
+  void _showResumeDialog(BuildContext context, sermon, PlaybackPosition position, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Resume Playback?'),
+        content: Text(
+          'You were at ${position.formattedPosition} of ${position.formattedDuration}.\n\nWould you like to resume or start from the beginning?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: sermon)),
+              );
+            },
+            child: const Text('Start Over'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _playWithResume(sermon, position);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGold,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Resume'),
+          ),
+        ],
       ),
     );
   }

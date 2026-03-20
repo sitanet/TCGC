@@ -1,5 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
@@ -20,7 +24,7 @@ String _stripHtmlTags(String htmlText) {
       .trim();
 }
 
-class TeensContentDetailPage extends StatelessWidget {
+class TeensContentDetailPage extends StatefulWidget {
   final TeensContent content;
   final Color accentColor;
 
@@ -30,59 +34,32 @@ class TeensContentDetailPage extends StatelessWidget {
     required this.accentColor,
   });
 
+  @override
+  State<TeensContentDetailPage> createState() => _TeensContentDetailPageState();
+}
+
+class _TeensContentDetailPageState extends State<TeensContentDetailPage> {
+  TeensContent get content => widget.content;
+  Color get accentColor => widget.accentColor;
+
   void _shareContent() {
-    // Strip HTML tags for sharing
-    final plainText = content.description
-        .replaceAll(RegExp(r'<[^>]*>'), '')
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"');
+    final plainText = _stripHtmlTags(content.description);
+    
+    // Get first 50 words
+    final words = plainText.split(RegExp(r'\s+'));
+    final excerpt = words.take(50).join(' ');
+    final hasMore = words.length > 50;
     
     final shareText = '''
-${content.title}
+*${content.title}*
 
-$plainText
+$excerpt${hasMore ? '... Read more' : ''}
 
 Category: ${content.category}
+
+Download Citygate Mobile: https://play.google.com/store/apps/details?id=com.tcgc.tcgc
 ''';
     Share.share(shareText, subject: content.title);
-  }
-
-  void _viewTranscript(BuildContext context) {
-    if (content.transcript == null || content.transcript!.isEmpty) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Transcript Not Available'),
-          content: const Text(
-            'The transcript for this content is not yet available. Please check back later.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'OK',
-                style: TextStyle(color: accentColor),
-              ),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => _TranscriptPage(
-          title: content.title,
-          transcript: content.transcript!,
-          accentColor: accentColor,
-        ),
-      ),
-    );
   }
 
   void _playAudio(BuildContext context) {
@@ -116,6 +93,172 @@ Category: ${content.category}
         builder: (context) => AudioPlayerPage(sermon: sermon),
       ),
     );
+  }
+
+  Future<void> _downloadTranscript(BuildContext context) async {
+    if (content.transcript == null || content.transcript!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transcript not available'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: accentColor),
+              const SizedBox(height: 16),
+              const Text('Preparing transcript...'),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      // Generate PDF
+      final pdf = pw.Document();
+      final plainText = _stripHtmlForPdf(content.transcript!);
+      
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(40),
+          build: (pw.Context context) => [
+            pw.Header(
+              level: 0,
+              child: pw.Text(
+                content.title,
+                style: pw.TextStyle(
+                  fontSize: 24,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ),
+            pw.SizedBox(height: 8),
+            pw.Row(
+              children: [
+                pw.Text('Category: ${content.category}', style: const pw.TextStyle(fontSize: 12)),
+                pw.SizedBox(width: 20),
+                pw.Text('Date: ${_formatDate(content.date)}', style: const pw.TextStyle(fontSize: 12)),
+              ],
+            ),
+            pw.Divider(),
+            pw.SizedBox(height: 16),
+            pw.Text(
+              plainText,
+              style: const pw.TextStyle(fontSize: 12, lineSpacing: 1.5),
+            ),
+            pw.SizedBox(height: 24),
+            pw.Divider(),
+            pw.SizedBox(height: 8),
+            pw.Text(
+              'Downloaded from Citygate Mobile',
+              style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic),
+            ),
+          ],
+        ),
+      );
+
+      // Save PDF file
+      final directory = await getApplicationDocumentsDirectory();
+      final fileName = '${_sanitizeFileName(content.title)}_transcript.pdf';
+      final file = File('${directory.path}/$fileName');
+      await file.writeAsBytes(await pdf.save());
+
+      // Close loading dialog
+      if (context.mounted) Navigator.pop(context);
+
+      // Share the file
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        subject: '${content.title} - Transcript',
+        text: 'Transcript from Citygate Mobile',
+      );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Transcript ready to share!'),
+              ],
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to download: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _stripHtmlForPdf(String htmlText) {
+    String text = htmlText
+        .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n\n')
+        .replaceAll(RegExp(r'<p[^>]*>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'</div>', caseSensitive: false), '\n\n')
+        .replaceAll(RegExp(r'<div[^>]*>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</h[1-6]>', caseSensitive: false), '\n\n')
+        .replaceAll(RegExp(r'<h[1-6][^>]*>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</li>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '• ')
+        .replaceAll(RegExp(r'</?ul[^>]*>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</?ol[^>]*>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<[^>]*>'), '')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&rsquo;', "'")
+        .replaceAll('&lsquo;', "'")
+        .replaceAll('&rdquo;', '"')
+        .replaceAll('&ldquo;', '"')
+        .replaceAll('&mdash;', '-')
+        .replaceAll('&ndash;', '-')
+        .replaceAll('&hellip;', '...')
+        .replaceAll(RegExp(r'[ \t]+'), ' ')
+        .replaceAll(RegExp(r'\n[ \t]+'), '\n')
+        .replaceAll(RegExp(r'[ \t]+\n'), '\n')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n');
+    return text.trim();
+  }
+
+  String _sanitizeFileName(String name) {
+    return name
+        .replaceAll(RegExp(r'[<>:"/\\|?*]'), '')
+        .replaceAll(RegExp(r'\s+'), '_')
+        .toLowerCase()
+        .substring(0, name.length > 50 ? 50 : name.length);
   }
 
   @override
@@ -365,50 +508,103 @@ Category: ${content.category}
   }
 
   Widget _buildMetaInfo(BuildContext context, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildMetaItem(
-            context,
-            isDark,
-            Icons.calendar_today_outlined,
-            'Date',
-            _formatDate(content.date),
-          ),
+    return Column(
+      children: [
+        // Speaker info (if available)
+        if (content.speaker != null && content.speaker!.isNotEmpty)
           Container(
-            height: 40,
-            width: 1,
-            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: accentColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.person_outline,
+                    color: accentColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Minister',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      content.speaker!,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          _buildMetaItem(
-            context,
-            isDark,
-            Icons.access_time_outlined,
-            'Duration',
-            content.duration != null
-                ? _formatDuration(content.duration!)
-                : 'N/A',
+        // Other meta info
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
           ),
-          Container(
-            height: 40,
-            width: 1,
-            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildMetaItem(
+                context,
+                isDark,
+                Icons.calendar_today_outlined,
+                'Date',
+                _formatDate(content.date),
+              ),
+              Container(
+                height: 40,
+                width: 1,
+                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+              ),
+              _buildMetaItem(
+                context,
+                isDark,
+                Icons.access_time_outlined,
+                'Duration',
+                content.duration != null
+                    ? _formatDuration(content.duration!)
+                    : 'N/A',
+              ),
+              Container(
+                height: 40,
+                width: 1,
+                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+              ),
+              _buildMetaItem(
+                context,
+                isDark,
+                Icons.category_outlined,
+                'Type',
+                _getContentType(),
+              ),
+            ],
           ),
-          _buildMetaItem(
-            context,
-            isDark,
-            Icons.category_outlined,
-            'Type',
-            _getContentType(),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -442,30 +638,26 @@ Category: ${content.category}
   }
 
   Widget _buildActionButtons(BuildContext context, bool isDark) {
+    final hasTranscript = content.transcript != null && content.transcript!.isNotEmpty;
+    
     return Column(
       children: [
-        if (content.videoUrl != null)
+        // Download Transcript Button
+        if (hasTranscript)
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Video playback coming soon'),
-                    backgroundColor: AppColors.primaryGold,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.play_circle_filled, color: Colors.white),
-              label: const Text(
-                'Watch Video',
+            child: OutlinedButton.icon(
+              onPressed: () => _downloadTranscript(context),
+              icon: Icon(Icons.download_rounded, color: accentColor),
+              label: Text(
+                'Download Transcript',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: accentColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentColor,
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: accentColor),
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -473,15 +665,13 @@ Category: ${content.category}
               ),
             ),
           ),
-        if (content.videoUrl != null && content.audioUrl != null)
-          const SizedBox(height: 12),
+        if (hasTranscript) const SizedBox(height: 12),
+        // Listen to Audio Button
         if (content.audioUrl != null)
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () {
-                _playAudio(context);
-              },
+              onPressed: () => _playAudio(context),
               icon: Icon(Icons.headphones, color: accentColor),
               label: Text(
                 'Listen to Audio',
@@ -499,58 +689,7 @@ Category: ${content.category}
               ),
             ),
           ),
-        if (content.videoUrl == null && content.audioUrl == null)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Content details viewed'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.bookmark_add_outlined, color: Colors.white),
-              label: const Text(
-                'Save for Later',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentColor,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () => _viewTranscript(context),
-            icon: Icon(Icons.article_outlined, color: accentColor),
-            label: Text(
-              'Read Transcript',
-              style: TextStyle(
-                color: accentColor,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: accentColor),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
+        if (content.audioUrl != null) const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
@@ -596,95 +735,5 @@ Category: ${content.category}
     if (content.videoUrl != null) return 'Video';
     if (content.audioUrl != null) return 'Audio';
     return 'Article';
-  }
-}
-
-class _TranscriptPage extends StatelessWidget {
-  final String title;
-  final String transcript;
-  final Color accentColor;
-
-  const _TranscriptPage({
-    required this.title,
-    required this.transcript,
-    required this.accentColor,
-  });
-
-  String _formatTranscript(String htmlText) {
-    String text = htmlText
-        .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n\n')
-        .replaceAll(RegExp(r'<p[^>]*>', caseSensitive: false), '')
-        .replaceAll(RegExp(r'</div>', caseSensitive: false), '\n\n')
-        .replaceAll(RegExp(r'<div[^>]*>', caseSensitive: false), '')
-        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
-        .replaceAll(RegExp(r'</h[1-6]>', caseSensitive: false), '\n\n')
-        .replaceAll(RegExp(r'<h[1-6][^>]*>', caseSensitive: false), '\n')
-        .replaceAll(RegExp(r'</li>', caseSensitive: false), '\n')
-        .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '• ')
-        .replaceAll(RegExp(r'</?ul[^>]*>', caseSensitive: false), '\n')
-        .replaceAll(RegExp(r'</?ol[^>]*>', caseSensitive: false), '\n');
-
-    text = text.replaceAll(RegExp(r'<[^>]*>'), '');
-
-    text = text
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#39;', "'")
-        .replaceAll('&rsquo;', "'")
-        .replaceAll('&lsquo;', "'")
-        .replaceAll('&rdquo;', '"')
-        .replaceAll('&ldquo;', '"')
-        .replaceAll('&mdash;', '—')
-        .replaceAll('&ndash;', '–')
-        .replaceAll('&hellip;', '...');
-
-    text = text
-        .replaceAll(RegExp(r'[ \t]+'), ' ')
-        .replaceAll(RegExp(r'\n[ \t]+'), '\n')
-        .replaceAll(RegExp(r'[ \t]+\n'), '\n')
-        .replaceAll(RegExp(r'\n{3,}'), '\n\n');
-
-    return text.trim();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final formattedTranscript = _formatTranscript(transcript);
-
-    return Scaffold(
-      appBar: CustomAppBar(
-        title: 'Transcript',
-        showBackButton: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: accentColor,
-                  ),
-            ),
-            const SizedBox(height: 20),
-            SelectableText(
-              formattedTranscript,
-              style: TextStyle(
-                fontSize: 16,
-                height: 1.8,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-              ),
-            ),
-            const SizedBox(height: 40),
-          ],
-        ),
-      ),
-    );
   }
 }

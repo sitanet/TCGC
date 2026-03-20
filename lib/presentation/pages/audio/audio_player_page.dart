@@ -44,6 +44,13 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   final PlaylistService _playlistService = PlaylistService();
   final DownloadService _downloadService = DownloadService();
   final DataService _dataService = DataService();
+  
+  SpeakerModel? _speaker;
+  List<Sermon> _otherMessages = [];
+  
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+  }
 
   @override
   void initState() {
@@ -51,7 +58,95 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     _initializeServices();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAccessAndPlay();
+      _loadSpeakerInfo();
     });
+  }
+  
+  Future<void> _loadSpeakerInfo() async {
+    debugPrint('=== LOADING SPEAKER INFO ===');
+    debugPrint('Sermon speaker: "${widget.sermon.speaker}"');
+    if (widget.sermon.speaker == null || widget.sermon.speaker!.isEmpty) {
+      debugPrint('Speaker is null or empty, skipping');
+      return;
+    }
+    
+    try {
+      List<SpeakerModel> speakers = [];
+      try {
+        speakers = await _dataService.getSpeakers();
+        debugPrint('Got ${speakers.length} speakers from API');
+      } catch (e) {
+        debugPrint('Failed to fetch speakers: $e');
+        // Continue without speaker profile - will try to get messages directly
+      }
+      
+      final sermonSpeaker = widget.sermon.speaker!.toLowerCase().trim();
+      
+      // More flexible speaker matching - check for partial matches and contains
+      SpeakerModel? speaker;
+      for (final s in speakers) {
+        final fullNameLower = s.fullName.toLowerCase().trim();
+        final nameLower = s.name.toLowerCase().trim();
+        
+        // Exact match
+        if (fullNameLower == sermonSpeaker || nameLower == sermonSpeaker) {
+          speaker = s;
+          break;
+        }
+        // Contains match (e.g., "Pastor John Doe" contains "John Doe")
+        if (fullNameLower.contains(sermonSpeaker) || sermonSpeaker.contains(fullNameLower)) {
+          speaker = s;
+          break;
+        }
+        if (nameLower.contains(sermonSpeaker) || sermonSpeaker.contains(nameLower)) {
+          speaker = s;
+          break;
+        }
+      }
+      
+      debugPrint('Match result: ${speaker != null ? "id=${speaker.id}, name=${speaker.fullName}" : "no match"}');
+      
+      // Show explore section for all matched speakers
+      if (speaker != null) {
+        debugPrint('Speaker matched! Loading other messages...');
+        
+        // Try to load messages by speaker name
+        final messages = await _dataService.getMessagesBySpeaker(widget.sermon.speaker!);
+        debugPrint('Got ${messages.length} total messages from speaker "${widget.sermon.speaker}"');
+        
+        final otherMessages = messages.where((m) => m.id != widget.sermon.id).take(5).toList();
+        debugPrint('Found ${otherMessages.length} other messages (excluding current)');
+        
+        if (mounted) {
+          setState(() {
+            _speaker = speaker;
+            _otherMessages = otherMessages;
+          });
+        }
+      } else {
+        debugPrint('Speaker not found in speakers list');
+        // Still try to get messages by speaker name even without a speaker profile match
+        final messages = await _dataService.getMessagesBySpeaker(widget.sermon.speaker!);
+        if (messages.isNotEmpty) {
+          debugPrint('Found ${messages.length} messages by speaker name (no profile)');
+          final otherMessages = messages.where((m) => m.id != widget.sermon.id).take(5).toList();
+          if (otherMessages.isNotEmpty && mounted) {
+            // Create a minimal speaker model for display
+            setState(() {
+              _speaker = SpeakerModel(
+                id: -1, // Mark as no profile
+                name: widget.sermon.speaker!,
+                fullName: widget.sermon.speaker!,
+              );
+              _otherMessages = otherMessages;
+            });
+          }
+        }
+      }
+    } catch (e, st) {
+      debugPrint('Error loading speaker info: $e');
+      debugPrint('Stack: $st');
+    }
   }
   
   void _checkAccessAndPlay() {
@@ -243,6 +338,17 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
     final errorMessage = audioProvider.errorMessage;
+    
+    // Show rating dialog after first successful play
+    ref.listen<AudioPlayerProvider>(audioPlayerChangeNotifierProvider, (previous, next) {
+      if (next.shouldShowRatingPopup && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            next.showRatingDialogIfNeeded(context);
+          }
+        });
+      }
+    });
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -274,48 +380,742 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
         ),
         body: Builder(
           builder: (context) {
-            if (errorMessage != null) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        _downloadService.isDownloaded(widget.sermon.id)
-                            ? 'Unable to play. The downloaded file may be corrupted. Try re-downloading.'
-                            : 'Unable to stream audio. Large files may take time to load. Try downloading for offline playback.',
-                      ),
-                      duration: const Duration(seconds: 5),
-                      action: SnackBarAction(
-                        label: _downloadService.isDownloaded(widget.sermon.id) ? 'Re-download' : 'Download',
-                        onPressed: () async {
-                          if (_downloadService.isDownloaded(widget.sermon.id)) {
-                            await _downloadService.deleteDownload(widget.sermon.id);
-                          }
-                          await _downloadService.downloadSermon(widget.sermon);
-                        },
-                      ),
-                    ),
-                  );
-                }
-              });
-            }
             return SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  const SizedBox(height: 16),
                   _buildAlbumArt(isDark),
                   const SizedBox(height: 32),
                   _buildSongInfo(context),
                   const SizedBox(height: 32),
                   _buildProgressBar(isDark, audioProvider),
                   const SizedBox(height: 24),
-                  _buildControls(isDark, audioProvider),
+                  _buildControlsWithSpeed(isDark, audioProvider),
+                  const SizedBox(height: 16),
+                  if (errorMessage != null) _buildCompactDownloadNotice(isDark, audioProvider),
                   const SizedBox(height: 24),
+                  if (_speaker != null)
+                    _buildExploreSection(isDark),
                 ],
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExploreSection(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(),
+        const SizedBox(height: 20),
+        
+        // Section 1: Related Messages
+        if (_otherMessages.isNotEmpty) ...[
+          Row(
+            children: [
+              Icon(
+                Icons.library_music,
+                size: 20,
+                color: AppColors.primaryGold,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'More from ${_speaker!.fullName}',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Text(
+                '${_otherMessages.length} messages',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Horizontal scrollable messages list
+          SizedBox(
+            height: 180,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _otherMessages.length,
+              itemBuilder: (context, index) {
+                final message = _otherMessages[index];
+                return _buildOtherMessageItem(message, isDark);
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+        
+        // Section 2: Minister Bio Card (only show if we have a real speaker profile)
+        if (_speaker!.id > 0) ...[
+        Row(
+          children: [
+            Icon(
+              Icons.person,
+              size: 20,
+              color: AppColors.primaryGold,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'About the Minister',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Minister bio card
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // Minister photo - tappable to show full image with bio
+              GestureDetector(
+                onTap: () => _showFullMinisterPhoto(isDark),
+                child: ClipOval(
+                  child: _speaker!.photoUrl != null && _speaker!.photoUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: _speaker!.photoUrl!,
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 200,
+                          memCacheHeight: 200,
+                          placeholder: (_, __) => Container(
+                            width: 100,
+                            height: 100,
+                            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                            child: const Icon(Icons.person, size: 50),
+                          ),
+                          errorWidget: (_, __, ___) => Container(
+                            width: 100,
+                            height: 100,
+                            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                            child: const Icon(Icons.person, size: 50),
+                          ),
+                        )
+                      : Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              _speaker!.fullName.isNotEmpty ? _speaker!.fullName[0].toUpperCase() : '?',
+                              style: TextStyle(
+                                fontSize: 40,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primaryGold,
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Name
+              Text(
+                _speaker!.fullName,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              // Title
+              if (_speaker!.title != null && _speaker!.title!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  _speaker!.title!,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.primaryGold,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              // Bio preview
+              if (_speaker!.bio != null && _speaker!.bio!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  _speaker!.bio!.length > 200 
+                      ? '${_speaker!.bio!.substring(0, 200)}...' 
+                      : _speaker!.bio!,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                if (_speaker!.bio!.length > 200) ...[
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => _showSpeakerBioDialog(isDark),
+                    child: Text(
+                      'Read Full Bio',
+                      style: TextStyle(
+                        color: AppColors.primaryGold,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ] else ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Minister at The Citygate Church',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        ], // End of if (_speaker!.id > 0)
+      ],
+    );
+  }
+
+  Widget _buildOtherMessageItem(Sermon message, bool isDark) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AudioPlayerPage(sermon: message),
+          ),
+        );
+      },
+      child: Container(
+        width: 150,
+        margin: const EdgeInsets.only(right: 14),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image with play button overlay
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                  child: message.imageUrl != null && message.imageUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: message.imageUrl!,
+                          width: 150,
+                          height: 95,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 300,
+                          memCacheHeight: 190,
+                          placeholder: (_, __) => Container(
+                            width: 150,
+                            height: 95,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.primaryGold.withOpacity(0.3),
+                                  isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: const Icon(Icons.music_note, size: 32),
+                          ),
+                          errorWidget: (_, __, ___) => Container(
+                            width: 150,
+                            height: 95,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.primaryGold.withOpacity(0.3),
+                                  isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: const Icon(Icons.music_note, size: 32),
+                          ),
+                        )
+                      : Container(
+                          width: 150,
+                          height: 95,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.primaryGold.withOpacity(0.3),
+                                isDark ? AppColors.cardDark : AppColors.dividerLight,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: const Icon(Icons.music_note, size: 32),
+                        ),
+                ),
+                // Play button overlay
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.4),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGold,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primaryGold.withOpacity(0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message.title,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.folder_outlined,
+                        size: 12,
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          message.categoryName.isNotEmpty ? message.categoryName : message.category,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSpeakerBioDialog(bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 24),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ClipOval(
+              child: _speaker!.photoUrl != null && _speaker!.photoUrl!.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: _speaker!.photoUrl!,
+                      width: 100,
+                      height: 100,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(
+                        width: 100,
+                        height: 100,
+                        color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                        child: const Icon(Icons.person, size: 50),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
+                        width: 100,
+                        height: 100,
+                        color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                        child: const Icon(Icons.person, size: 50),
+                      ),
+                    )
+                  : Container(
+                      width: 100,
+                      height: 100,
+                      color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                      child: Center(
+                        child: Text(
+                          _speaker!.fullName.isNotEmpty ? _speaker!.fullName[0].toUpperCase() : '?',
+                          style: TextStyle(
+                            fontSize: 40,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryGold,
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _speaker!.fullName,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            if (_speaker!.title != null && _speaker!.title!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                _speaker!.title!,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.primaryGold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            if (_speaker!.bio != null && _speaker!.bio!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Text(
+                    _speaker!.bio!,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          height: 1.5,
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: 16),
+              Text(
+                'No bio available',
+                style: TextStyle(
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGold,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Close'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFullMinisterPhoto(bool isDark) {
+    if (_speaker == null) return;
+    
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black87,
+        barrierDismissible: true,
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return FadeTransition(
+            opacity: animation,
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              body: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Full screen photo
+                    if (_speaker!.photoUrl != null && _speaker!.photoUrl!.isNotEmpty)
+                      CachedNetworkImage(
+                        imageUrl: _speaker!.photoUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          color: Colors.black,
+                          child: const Center(
+                            child: CircularProgressIndicator(color: Colors.white),
+                          ),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          color: Colors.black,
+                          child: Center(
+                            child: Icon(
+                              Icons.person,
+                              size: 100,
+                              color: Colors.white.withOpacity(0.5),
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                        child: Center(
+                          child: Text(
+                            _speaker!.fullName.isNotEmpty ? _speaker!.fullName[0].toUpperCase() : '?',
+                            style: TextStyle(
+                              fontSize: 120,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryGold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    // Gradient overlay at the bottom for bio
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.7),
+                              Colors.black.withOpacity(0.9),
+                            ],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                        ),
+                        padding: const EdgeInsets.fromLTRB(24, 60, 24, 40),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Name
+                            Text(
+                              _speaker!.fullName,
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            // Title
+                            if (_speaker!.title != null && _speaker!.title!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                _speaker!.title!,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: AppColors.primaryGold,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                            // Bio
+                            if (_speaker!.bio != null && _speaker!.bio!.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxHeight: MediaQuery.of(context).size.height * 0.3,
+                                ),
+                                child: SingleChildScrollView(
+                                  child: Text(
+                                    _speaker!.bio!,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.white.withOpacity(0.9),
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Close button
+                    Positioned(
+                      top: MediaQuery.of(context).padding.top + 16,
+                      right: 16,
+                      child: IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.5),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showSpeedBottomSheet(bool isDark, AudioPlayerProvider audioProvider) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'Playback Speed',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const Divider(),
+            ...AudioPlayerProvider.availableSpeeds.map((speed) => ListTile(
+              leading: Icon(
+                audioProvider.playbackSpeed == speed
+                    ? Icons.check_circle
+                    : Icons.circle_outlined,
+                color: audioProvider.playbackSpeed == speed
+                    ? AppColors.primaryGold
+                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+              ),
+              title: Text(
+                '${speed}x${speed == 1.0 ? ' (Normal)' : ''}',
+                style: TextStyle(
+                  fontWeight: audioProvider.playbackSpeed == speed
+                      ? FontWeight.w600
+                      : FontWeight.normal,
+                  color: audioProvider.playbackSpeed == speed
+                      ? AppColors.primaryGold
+                      : null,
+                ),
+              ),
+              onTap: () {
+                audioProvider.setPlaybackSpeed(speed);
+                Navigator.pop(context);
+              },
+            )),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
@@ -347,22 +1147,15 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     if (widget.sermon.imageUrl == null || widget.sermon.imageUrl!.isEmpty) {
       return _buildPlaceholderArt(isDark);
     }
-    if (widget.sermon.imageUrl!.startsWith('http')) {
-      return CachedNetworkImage(
-        imageUrl: widget.sermon.imageUrl!,
-        fit: BoxFit.cover,
-        width: 280,
-        height: 280,
-        placeholder: (context, url) => _buildPlaceholderArt(isDark),
-        errorWidget: (context, url, error) => _buildPlaceholderArt(isDark),
-      );
-    }
-    return Image.asset(
-      widget.sermon.imageUrl!,
-      fit: BoxFit.cover,
+    return CachedNetworkImage(
+      imageUrl: widget.sermon.imageUrl!,
       width: 280,
       height: 280,
-      errorBuilder: (context, error, stackTrace) => _buildPlaceholderArt(isDark),
+      fit: BoxFit.cover,
+      memCacheWidth: 560,
+      memCacheHeight: 560,
+      placeholder: (_, __) => _buildPlaceholderArt(isDark),
+      errorWidget: (_, __, ___) => _buildPlaceholderArt(isDark),
     );
   }
 
@@ -393,21 +1186,38 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   }
 
   Widget _buildSongInfo(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final speakerName = widget.sermon.speaker;
+    debugPrint('Building song info - speaker: $speakerName');
+    
     return Column(
       children: [
         Text(
-          widget.sermon.title,
+          '${_formatDate(widget.sermon.date)} - ${widget.sermon.title}',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 8),
+        if (speakerName != null && speakerName.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            speakerName,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: AppColors.primaryGold,
+                  fontWeight: FontWeight.w500,
+                ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+        const SizedBox(height: 4),
         Text(
           widget.sermon.categoryName.isNotEmpty
               ? widget.sermon.categoryName
               : widget.sermon.category,
-          style: Theme.of(context).textTheme.bodyMedium,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              ),
         ),
       ],
     );
@@ -468,91 +1278,215 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     );
   }
 
-  Widget _buildControls(bool isDark, AudioPlayerProvider audioProvider) {
+  Widget _buildControlsWithSpeed(bool isDark, AudioPlayerProvider audioProvider) {
     final isPlaying = audioProvider.isPlaying;
     final isLoading = audioProvider.isLoading;
     final hasNext = audioProvider.hasNext;
     final hasPrevious = audioProvider.hasPrevious || audioProvider.position.inSeconds > 3;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return Column(
       children: [
-        // Skip to Previous
-        IconButton(
-          onPressed: isLoading || !hasPrevious
-              ? null
-              : () async {
-                  await audioProvider.skipToPrevious();
-                  if (mounted && audioProvider.currentSermon != null &&
-                      audioProvider.currentSermon!.id != widget.sermon.id) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AudioPlayerPage(sermon: audioProvider.currentSermon!),
-                      ),
-                    );
-                  }
-                },
-          icon: Icon(
-            Icons.skip_previous,
-            size: 32,
-            color: hasPrevious
-                ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
-                : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            // Skip to Previous
+            IconButton(
+              onPressed: isLoading || !hasPrevious
+                  ? null
+                  : () async {
+                      await audioProvider.skipToPrevious();
+                      if (mounted && audioProvider.currentSermon != null &&
+                          audioProvider.currentSermon!.id != widget.sermon.id) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AudioPlayerPage(sermon: audioProvider.currentSermon!),
+                          ),
+                        );
+                      }
+                    },
+              icon: Icon(
+                Icons.skip_previous,
+                size: 32,
+                color: hasPrevious
+                    ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
+                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+              ),
+            ),
+            IconButton(
+              onPressed: isLoading ? null : () => audioProvider.seekBackward(),
+              icon: Icon(
+                Icons.replay_10,
+                size: 28,
+                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+              ),
+            ),
+            AnimatedPlayButton(
+              isPlaying: isPlaying,
+              isLoading: isLoading,
+              size: 64,
+              onTap: () {
+                if (isPlaying) {
+                  audioProvider.pause();
+                } else {
+                  audioProvider.play();
+                }
+              },
+            ),
+            IconButton(
+              onPressed: isLoading ? null : () => audioProvider.seekForward(),
+              icon: Icon(
+                Icons.forward_10,
+                size: 28,
+                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+              ),
+            ),
+            // Skip to Next
+            IconButton(
+              onPressed: isLoading || !hasNext
+                  ? null
+                  : () async {
+                      await audioProvider.skipToNext();
+                      if (mounted && audioProvider.currentSermon != null) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AudioPlayerPage(sermon: audioProvider.currentSermon!),
+                          ),
+                        );
+                      }
+                    },
+              icon: Icon(
+                Icons.skip_next,
+                size: 32,
+                color: hasNext
+                    ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
+                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+              ),
+            ),
+          ],
         ),
-        IconButton(
-          onPressed: isLoading ? null : () => audioProvider.seekBackward(),
-          icon: Icon(
-            Icons.replay_10,
-            size: 28,
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-          ),
-        ),
-        AnimatedPlayButton(
-          isPlaying: isPlaying,
-          isLoading: isLoading,
-          size: 64,
-          onTap: () {
-            if (isPlaying) {
-              audioProvider.pause();
-            } else {
-              audioProvider.play();
-            }
-          },
-        ),
-        IconButton(
-          onPressed: isLoading ? null : () => audioProvider.seekForward(),
-          icon: Icon(
-            Icons.forward_10,
-            size: 28,
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-          ),
-        ),
-        // Skip to Next
-        IconButton(
-          onPressed: isLoading || !hasNext
-              ? null
-              : () async {
-                  await audioProvider.skipToNext();
-                  if (mounted && audioProvider.currentSermon != null) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AudioPlayerPage(sermon: audioProvider.currentSermon!),
-                      ),
-                    );
-                  }
-                },
-          icon: Icon(
-            Icons.skip_next,
-            size: 32,
-            color: hasNext
-                ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
-                : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+        const SizedBox(height: 12),
+        // Speed control row
+        InkWell(
+          onTap: () => _showSpeedBottomSheet(isDark, audioProvider),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.speed, size: 16, color: AppColors.primaryGold),
+                const SizedBox(width: 6),
+                Text(
+                  '${audioProvider.playbackSpeed}x',
+                  style: TextStyle(
+                    color: AppColors.primaryGold,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCompactDownloadNotice(bool isDark, AudioPlayerProvider audioProvider) {
+    final isDownloaded = _downloadService.isDownloaded(widget.sermon.id);
+    final isDownloading = _downloadService.isDownloading(widget.sermon.id);
+    final downloadProgress = _downloadService.getProgress(widget.sermon.id);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : Colors.orange.shade200,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isDownloading ? Icons.downloading : Icons.cloud_off_outlined,
+                size: 18,
+                color: isDownloading 
+                    ? AppColors.primaryGold 
+                    : (isDark ? AppColors.textSecondaryDark : Colors.orange.shade700),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isDownloading
+                      ? 'Downloading... ${(downloadProgress * 100).toInt()}%'
+                      : 'Streaming issue',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? AppColors.textSecondaryDark : Colors.orange.shade900,
+                  ),
+                ),
+              ),
+              if (!isDownloading)
+                TextButton(
+                  onPressed: () {
+                    if (isDownloaded) {
+                      _downloadService.deleteDownload(widget.sermon.id);
+                    }
+                    _showDownloadProgressDialog(context, isDark);
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    isDownloaded ? 'Retry' : 'Download',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryGold,
+                    ),
+                  ),
+                ),
+              IconButton(
+                onPressed: () => audioProvider.clearError(),
+                icon: const Icon(Icons.close, size: 16),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                color: isDark ? AppColors.textSecondaryDark : Colors.orange.shade700,
+              ),
+            ],
+          ),
+          // Progress bar when downloading
+          if (isDownloading) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: downloadProgress,
+                minHeight: 4,
+                backgroundColor: isDark 
+                    ? AppColors.dividerDark 
+                    : Colors.orange.shade100,
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryGold),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -599,7 +1533,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Text(
-                    widget.sermon.title,
+                    '${_formatDate(widget.sermon.date)} - ${widget.sermon.title}',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -656,27 +1590,19 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                         ? 'Downloaded'
                         : (isDownloading
                             ? 'Downloading ${(downloadProgress * 100).toInt()}%'
-                            : 'Download'),
+                            : 'Download for Offline'),
                   ),
+                  subtitle: isDownloaded 
+                      ? const Text('Tap to delete') 
+                      : null,
                   onTap: isDownloading
                       ? null
-                      : () async {
+                      : () {
+                          Navigator.pop(context);
                           if (isDownloaded) {
-                            Navigator.pop(context);
                             _showDeleteDownloadDialog(context, isDark);
                           } else {
-                            Navigator.pop(context);
-                            final success = await _downloadService.downloadSermon(widget.sermon);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    success ? 'Download started' : 'Download failed',
-                                  ),
-                                ),
-                              );
-                              setState(() {});
-                            }
+                            _showDownloadProgressDialog(context, isDark);
                           }
                         },
                 ),
@@ -713,15 +1639,16 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   void _shareSermon() {
     const playStoreLink = 'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
     final sermon = widget.sermon;
+    final formattedTitle = '${_formatDate(sermon.date)} - ${sermon.title}';
     final shareText = '''
-Check out this message: "${sermon.title}"
+Check out this message: "$formattedTitle"
 
 ${sermon.description}
 
 Listen on Citygate Mobile
 
 Download Citygate mobile: $playStoreLink''';
-    Share.share(shareText, subject: sermon.title);
+    Share.share(shareText, subject: formattedTitle);
     // Track share action to backend
     _trackMessageStat('share', true);
   }
@@ -752,6 +1679,191 @@ Download Citygate mobile: $playStoreLink''';
           ),
         ],
       ),
+    );
+  }
+
+  void _showDownloadProgressDialog(BuildContext context, bool isDark) {
+    // Start the download
+    _downloadService.downloadSermon(widget.sermon);
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return ListenableBuilder(
+              listenable: _downloadService,
+              builder: (context, child) {
+                final progress = _downloadService.getProgress(widget.sermon.id);
+                final isDownloading = _downloadService.isDownloading(widget.sermon.id);
+                final isDownloaded = _downloadService.isDownloaded(widget.sermon.id);
+                final progressPercent = (progress * 100).toInt();
+                
+                // Auto close when done
+                if (isDownloaded && !isDownloading) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (Navigator.canPop(dialogContext)) {
+                      Navigator.pop(dialogContext);
+                    }
+                    if (mounted) {
+                      setState(() {});
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(
+                          content: const Row(
+                            children: [
+                              Icon(Icons.check_circle, color: Colors.white),
+                              SizedBox(width: 12),
+                              Expanded(child: Text('Download complete!')),
+                            ],
+                          ),
+                          backgroundColor: Colors.green,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  });
+                }
+                
+                return AlertDialog(
+                  backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 8),
+                      // Circular progress indicator with percentage
+                      SizedBox(
+                        width: 120,
+                        height: 120,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            SizedBox(
+                              width: 100,
+                              height: 100,
+                              child: CircularProgressIndicator(
+                                value: progress,
+                                strokeWidth: 8,
+                                backgroundColor: isDark 
+                                    ? AppColors.dividerDark 
+                                    : AppColors.dividerLight,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  isDownloaded ? Colors.green : AppColors.primaryGold,
+                                ),
+                              ),
+                            ),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isDownloaded 
+                                      ? Icons.check_circle 
+                                      : Icons.downloading,
+                                  size: 32,
+                                  color: isDownloaded 
+                                      ? Colors.green 
+                                      : AppColors.primaryGold,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$progressPercent%',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDownloaded 
+                                        ? Colors.green 
+                                        : AppColors.primaryGold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // Title
+                      Text(
+                        isDownloaded 
+                            ? 'Download Complete!' 
+                            : 'Downloading...',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Sermon title
+                      Text(
+                        '${_formatDate(widget.sermon.date)} - ${widget.sermon.title}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: isDark 
+                              ? AppColors.textSecondaryDark 
+                              : AppColors.textSecondaryLight,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 16),
+                      // Linear progress bar
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 8,
+                          backgroundColor: isDark 
+                              ? AppColors.dividerDark 
+                              : AppColors.dividerLight,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            isDownloaded ? Colors.green : AppColors.primaryGold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Status text
+                      Text(
+                        isDownloaded 
+                            ? 'Available for offline playback' 
+                            : 'Please wait while downloading...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark 
+                              ? AppColors.textSecondaryDark 
+                              : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                  actions: isDownloading ? null : [
+                    Center(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                          if (mounted) setState(() {});
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDownloaded 
+                              ? Colors.green 
+                              : AppColors.primaryGold,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32, 
+                            vertical: 12,
+                          ),
+                        ),
+                        child: Text(isDownloaded ? 'Done' : 'Close'),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 

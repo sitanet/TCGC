@@ -7,7 +7,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/audio_cache_service.dart';
+import '../../../data/services/played_audio_service.dart';
 import '../../../domain/entities/sermon.dart';
+import '../../../domain/entities/transcript.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_list_page.dart';
@@ -43,74 +45,45 @@ class _AudioPageState extends ConsumerState<AudioPage>
   
   List<MessageCategory> _categories = [];
   List<Sermon> _sermons = [];
+  List<Transcript> _transcripts = [];
   bool _isLoading = true;
+  bool _initialLoadDone = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // Load data after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _audioCacheService.initialize();
-      _loadData();
-    });
+    // Load cached data immediately, then refresh in background
+    _audioCacheService.initialize();
+    _loadCachedDataFirst();
   }
-
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  
+  /// Load cached data first for instant display, then refresh from server
+  Future<void> _loadCachedDataFirst() async {
     try {
-      // Get user permissions for filtering
+      // Get user permissions
       final authProvider = ref.read(authChangeNotifierProvider);
       final user = authProvider.user;
       final isServiceTeamMember = user?.isServiceTeamMember ?? false;
       final isGeneralMarried = user?.isGeneralMarried ?? false;
       final isInHouseMarried = user?.isInHouseMarried ?? false;
       
-      // Try to load from cache first for instant display
-      final cachedCategories = await _audioCacheService.getCachedCategories();
-      final cachedSermons = await _audioCacheService.getCachedSermons();
+      // Load categories and sermons from cache FIRST (instant)
+      // Don't wait for transcripts - load them in background
+      final results = await Future.wait([
+        _dataService.getMessageCategories(), // Uses cache-first
+        _dataService.getMessages(),          // Uses cache-first
+      ]);
       
-      if (cachedCategories != null && cachedSermons != null && mounted) {
-        // Filter cached categories based on user permissions
-        final filteredCategories = cachedCategories.where((category) {
-          if (category.isServiceTeamOnly && !isServiceTeamMember) return false;
-          return true;
-        }).toList();
-        
-        // Filter cached sermons based on user permissions
-        final filteredSermons = cachedSermons.where((sermon) {
-          if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
-          if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
-          if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
-          return true;
-        }).toList();
-        
-        setState(() {
-          _categories = filteredCategories;
-          _sermons = filteredSermons;
-          _isLoading = false;
-        });
-        debugPrint('Loaded from cache: ${cachedCategories.length} categories, ${filteredSermons.length} sermons (filtered)');
-        // Fetch fresh data in background to get new transcripts
-        _refreshDataInBackground();
-        return;
-      }
+      final categories = results[0] as List<MessageCategory>;
+      final allSermons = results[1] as List<Sermon>;
       
-      // Only fetch from API if no cache exists
-      final categories = await _dataService.getMessageCategories();
-      
-      // Small delay to let UI breathe
-      await Future.delayed(const Duration(milliseconds: 50));
-      
-      final allSermons = await _dataService.getMessages();
-      
-      // Filter categories based on user permissions
+      // Filter based on permissions
       final filteredCategories = categories.where((category) {
         if (category.isServiceTeamOnly && !isServiceTeamMember) return false;
         return true;
       }).toList();
       
-      // Filter sermons based on user permissions
       final sermons = allSermons.where((sermon) {
         if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
         if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
@@ -118,116 +91,138 @@ class _AudioPageState extends ConsumerState<AudioPage>
         return true;
       }).toList();
       
-      // Cache the metadata in background (don't await)
-      Future.microtask(() {
-        _audioCacheService.cacheMetadata(categories: filteredCategories, sermons: sermons);
-      });
-      
-      debugPrint('=== Audio Page Data ===');
-      debugPrint('Categories loaded: ${categories.length}');
-      for (var cat in categories) {
-        debugPrint('  Category: ${cat.name} (ID: ${cat.id})');
-      }
-      debugPrint('Sermons loaded: ${sermons.length}');
-      for (var s in sermons) {
-        debugPrint('  Sermon: ${s.title} - Category: ${s.category}, CategoryName: ${s.categoryName}');
-      }
-      
-      // Calculate latest message date for each category and sort
-      final now = DateTime.now();
-      final threeDaysAgo = now.subtract(const Duration(days: 3));
-      
-      final updatedCategories = filteredCategories.map((category) {
-        // Find sermons in this category
-        final categorySermons = sermons.where((s) => 
-          s.category == category.id || s.categoryName == category.name
-        ).toList();
-        
-        // Find the most recent message date
-        DateTime? latestDate;
-        for (var sermon in categorySermons) {
-          if (latestDate == null || sermon.date.isAfter(latestDate)) {
-            latestDate = sermon.date;
-          }
-        }
-        
-        // Check if there's a new message (within last 3 days)
-        final hasNew = latestDate != null && latestDate.isAfter(threeDaysAgo);
-        
-        return category.copyWith(
-          latestMessageDate: latestDate,
-          hasNewMessage: hasNew,
-        );
-      }).toList();
-      
-      // Sort categories: those with recent messages first, then by latest message date
-      updatedCategories.sort((a, b) {
-        // Categories with new messages come first
-        if (a.hasNewMessage && !b.hasNewMessage) return -1;
-        if (!a.hasNewMessage && b.hasNewMessage) return 1;
-        
-        // Then sort by latest message date (most recent first)
-        if (a.latestMessageDate != null && b.latestMessageDate != null) {
-          return b.latestMessageDate!.compareTo(a.latestMessageDate!);
-        }
-        if (a.latestMessageDate != null) return -1;
-        if (b.latestMessageDate != null) return 1;
-        
-        // Finally, sort alphabetically
-        return a.name.compareTo(b.name);
-      });
+      // Process and sort categories
+      final processedCategories = _processCategories(filteredCategories, sermons);
       
       if (mounted) {
         setState(() {
-          _categories = updatedCategories;
+          _categories = processedCategories;
           _sermons = sermons;
           _isLoading = false;
+          _initialLoadDone = true;
         });
         
-        // Pre-buffer first 3 sermons for instant playback (reduced to prevent memory issues)
+        // Pre-buffer in background
         _audioCacheService.preBufferCategory(sermons, count: 3);
       }
+      
+      // Load transcripts in background (non-blocking)
+      _loadTranscriptsInBackground();
     } catch (e) {
-      debugPrint('Error loading audio data: $e');
+      debugPrint('Error loading cached data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
+  
+  /// Load transcripts in background without blocking UI
+  Future<void> _loadTranscriptsInBackground() async {
+    try {
+      final transcripts = await _dataService.getTranscripts();
+      if (mounted) {
+        setState(() {
+          _transcripts = transcripts;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading transcripts: $e');
+    }
+  }
 
-  Future<void> _refreshDataInBackground() async {
+  /// Process categories with latest message dates and sorting
+  List<MessageCategory> _processCategories(List<MessageCategory> categories, List<Sermon> sermons) {
+    final now = DateTime.now();
+    final threeDaysAgo = now.subtract(const Duration(days: 3));
+    final playedAudioService = PlayedAudioService();
+    
+    final updatedCategories = categories.map((category) {
+      final categorySermons = sermons.where((s) {
+        final matchById = s.category == category.id || s.category.toString() == category.id.toString();
+        final matchByName = s.categoryName.toLowerCase() == category.name.toLowerCase();
+        return matchById || matchByName;
+      }).toList();
+      
+      DateTime? latestDate;
+      for (var sermon in categorySermons) {
+        if (latestDate == null || sermon.date.isAfter(latestDate)) {
+          latestDate = sermon.date;
+        }
+      }
+      
+      // Only show NEW if there are recent messages AND category hasn't been viewed
+      final hasRecentMessages = latestDate != null && latestDate.isAfter(threeDaysAgo);
+      final isCategoryViewed = playedAudioService.isCategoryViewed(category.id);
+      final hasNew = hasRecentMessages && !isCategoryViewed;
+      
+      return category.copyWith(
+        latestMessageDate: latestDate,
+        hasNewMessage: hasNew,
+      );
+    }).toList();
+    
+    updatedCategories.sort((a, b) {
+      if (a.hasNewMessage && !b.hasNewMessage) return -1;
+      if (!a.hasNewMessage && b.hasNewMessage) return 1;
+      if (a.latestMessageDate != null && b.latestMessageDate != null) {
+        return b.latestMessageDate!.compareTo(a.latestMessageDate!);
+      }
+      if (a.latestMessageDate != null) return -1;
+      if (b.latestMessageDate != null) return 1;
+      return a.name.compareTo(b.name);
+    });
+    
+    return updatedCategories;
+  }
+
+  /// Force refresh from server (for pull-to-refresh)
+  Future<void> _loadData() async {
+    // Don't show loading spinner on refresh - keep existing content visible
     try {
       final authProvider = ref.read(authChangeNotifierProvider);
       final user = authProvider.user;
       final isServiceTeamMember = user?.isServiceTeamMember ?? false;
       final isGeneralMarried = user?.isGeneralMarried ?? false;
       final isInHouseMarried = user?.isInHouseMarried ?? false;
-
-      final categories = await _dataService.getMessageCategories();
-      final allSermons = await _dataService.getMessages(forceRefresh: true);
-
-      // Filter categories based on user permissions
+      
+      final results = await Future.wait([
+        _dataService.getMessageCategories(forceRefresh: true),
+        _dataService.getMessages(forceRefresh: true),
+        _dataService.getTranscripts(),
+      ]);
+      
+      final categories = results[0] as List<MessageCategory>;
+      final allSermons = results[1] as List<Sermon>;
+      final transcripts = results[2] as List<Transcript>;
+      
       final filteredCategories = categories.where((category) {
         if (category.isServiceTeamOnly && !isServiceTeamMember) return false;
         return true;
       }).toList();
-
+      
       final sermons = allSermons.where((sermon) {
         if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
         if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
         if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
         return true;
       }).toList();
-
+      
+      Future.microtask(() {
+        _audioCacheService.cacheMetadata(categories: filteredCategories, sermons: sermons);
+      });
+      
+      final processedCategories = _processCategories(filteredCategories, sermons);
+      
       if (mounted) {
         setState(() {
-          _categories = filteredCategories;
+          _categories = processedCategories;
           _sermons = sermons;
+          _transcripts = transcripts;
         });
-        debugPrint('Background refresh complete: ${sermons.length} sermons');
+        _audioCacheService.preBufferCategory(sermons, count: 3);
       }
     } catch (e) {
-      debugPrint('Background refresh error: $e');
+      debugPrint('Error refreshing audio data: $e');
     }
   }
 
@@ -404,11 +399,11 @@ class _AudioPageState extends ConsumerState<AudioPage>
 
   Widget _buildCategoryCard(BuildContext context, bool isDark, MessageCategory category) {
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         final categoryNameToId = {
           for (var c in _categories) c.name: c.id
         };
-        Navigator.push(
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => AudioListPage(
@@ -420,6 +415,12 @@ class _AudioPageState extends ConsumerState<AudioPage>
             ),
           ),
         );
+        // Refresh categories to update "NEW" badge after returning
+        if (mounted) {
+          setState(() {
+            _categories = _processCategories(_categories, _sermons);
+          });
+        }
       },
       child: Container(
         margin: Responsive.isMobile(context) ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
@@ -537,13 +538,10 @@ class _AudioPageState extends ConsumerState<AudioPage>
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Filter categories that have sermons with actual transcript content
+    // Filter categories that have standalone transcripts
     final categoriesWithTranscripts = _categories.where((category) {
-      return _sermons.any((sermon) =>
-          (sermon.category == category.id || sermon.categoryName == category.name) &&
-          sermon.transcript != null &&
-          sermon.transcript!.trim().isNotEmpty &&
-          sermon.transcript!.trim().length > 10);
+      return _transcripts.any((transcript) =>
+          transcript.category == category.id || transcript.categoryName == category.name);
     }).toList();
 
     final padding = Responsive.horizontalPadding(context);
@@ -634,19 +632,14 @@ class _AudioPageState extends ConsumerState<AudioPage>
   }
 
   Widget _buildTranscriptCategoryCard(BuildContext context, bool isDark, MessageCategory category) {
-    final transcriptCount = _sermons.where((sermon) =>
-        (sermon.category == category.id || sermon.categoryName == category.name) &&
-        sermon.transcript != null &&
-        sermon.transcript!.trim().isNotEmpty &&
-        sermon.transcript!.trim().length > 10).length;
+    // Count standalone transcripts in this category
+    final transcriptCount = _transcripts.where((transcript) =>
+        transcript.category == category.id || transcript.categoryName == category.name).length;
 
     // Get categories that have transcripts for filter list
     final categoriesWithTranscripts = _categories.where((cat) {
-      return _sermons.any((sermon) =>
-          (sermon.category == cat.id || sermon.categoryName == cat.name) &&
-          sermon.transcript != null &&
-          sermon.transcript!.trim().isNotEmpty &&
-          sermon.transcript!.trim().length > 10);
+      return _transcripts.any((transcript) =>
+          transcript.category == cat.id || transcript.categoryName == cat.name);
     }).toList();
     
     final categoryNameToId = {

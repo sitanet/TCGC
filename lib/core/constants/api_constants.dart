@@ -8,10 +8,13 @@ class ApiConstants {
   
   // Web pages (for WebView)
   static String transcriptUrl(int messageId) => '$webBaseUrl/transcript/$messageId/';
+  static String standaloneTranscriptUrl(String transcriptId) => '$webBaseUrl/standalone-transcript/$transcriptId/';
   
   // Auth
   static const String register = '/auth/register/';
   static const String login = '/auth/login/';
+  static const String verifyOtp = '/auth/verify-otp/';
+  static const String resendOtp = '/auth/resend-otp/';
   static const String refreshToken = '/auth/refresh/';
   static const String resendConfirmation = '/auth/resend-confirmation/';
   static const String forgotPassword = '/auth/forgot-password/';
@@ -52,7 +55,10 @@ class ApiConstants {
   static const String liveEvents = '/events/live/';
   
   // Teens Content
+  static const String teensCategories = '/teens-categories/';
+  static const String teensBanner = '/teens/banner/';
   static const String teensContent = '/teens-content/';
+  static const String teensContentByCategory = '/teens-content/by_category/';
   static const String devotionals = '/teens-content/devotionals/';
   static const String retreats = '/teens-content/retreats/';
   static const String forgeCamp = '/teens-content/forge_camp/';

@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../data/services/data_service.dart';
+import '../../../data/services/download_service.dart';
+import '../../../data/services/played_audio_service.dart';
 import '../../../main.dart';
 import 'package:flutter/services.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -46,8 +49,10 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
   late FilterType _filterType;
   String? _selectedSpeaker;
   List<String> _speakers = [];
+  List<SpeakerModel> _speakerModels = [];
   int _preBufferedUpTo = 0;
   bool _isRefreshing = false;
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
@@ -62,9 +67,33 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
     _searchController.addListener(_filterAudio);
     _scrollController.addListener(_onScroll);
     
+    // Mark category as viewed immediately when page opens
+    if (widget.categoryId != null && widget.categoryId!.isNotEmpty) {
+      PlayedAudioService().markCategoryViewed(widget.categoryId!);
+    }
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _preBufferInitial();
+      _loadSpeakers();
     });
+    
+    // Auto-refresh every 5 minutes
+    _autoRefreshTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      _onRefresh();
+    });
+  }
+  
+  Future<void> _loadSpeakers() async {
+    try {
+      final speakers = await _dataService.getSpeakers();
+      if (mounted) {
+        setState(() {
+          _speakerModels = speakers;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading speakers: $e');
+    }
   }
 
   Future<void> _onRefresh() async {
@@ -72,7 +101,9 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
     setState(() => _isRefreshing = true);
     
     try {
-      final sermons = await _dataService.getMessages();
+      // Fetch fresh data from server (with forceRefresh to bypass cache)
+      final sermons = await _dataService.getMessages(forceRefresh: true);
+      debugPrint('Refresh got ${sermons.length} sermons');
       if (mounted) {
         setState(() {
           _allItems = sermons;
@@ -81,8 +112,12 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
           _isRefreshing = false;
         });
         _preBufferInitial();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Refreshed ${sermons.length} messages')),
+        );
       }
     } catch (e) {
+      debugPrint('Refresh error: $e');
       if (mounted) {
         setState(() => _isRefreshing = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -171,6 +206,7 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -183,8 +219,16 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
     });
   }
 
+  bool _isMainSpeaker(String? speakerName) {
+    if (speakerName == null) return false;
+    return _speakerModels.any((s) => 
+        s.isMainSpeaker && 
+        (s.fullName.toLowerCase() == speakerName.toLowerCase() || 
+         s.name.toLowerCase() == speakerName.toLowerCase()));
+  }
+
   List<Sermon> _getFilteredItems(String query) {
-    debugPrint('Filtering: filterType=$_filterType, category=$_selectedCategory, speaker=$_selectedSpeaker');
+    debugPrint('Filtering: filterType=$_filterType, category=$_selectedCategory, categoryId=$_selectedCategoryId, speaker=$_selectedSpeaker');
     debugPrint('Total audio items: ${_allItems.length}');
     
     // Get user permissions
@@ -206,6 +250,8 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
         // Filter by speaker
         if (_selectedSpeaker == null || _selectedSpeaker == 'All') {
           matchesFilter = true;
+        } else if (_selectedSpeaker == 'Others') {
+          matchesFilter = !_isMainSpeaker(audio.speaker);
         } else {
           matchesFilter = audio.speaker?.toLowerCase() == _selectedSpeaker?.toLowerCase();
         }
@@ -214,17 +260,26 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
         matchesFilter = _selectedCategory == 'All';
         
         if (!matchesFilter) {
-          // Try matching by category ID first
+          // Try matching by category ID (audio.category could be ID)
           if (_selectedCategoryId != null && _selectedCategoryId!.isNotEmpty) {
-            matchesFilter = audio.category == _selectedCategoryId;
+            matchesFilter = audio.category == _selectedCategoryId ||
+                audio.category.toString() == _selectedCategoryId.toString();
           }
-          // Also try matching by category name
+          // Try matching by category name (case-insensitive)
           if (!matchesFilter && audio.categoryName.isNotEmpty) {
             matchesFilter = audio.categoryName.toLowerCase() == _selectedCategory.toLowerCase();
           }
-          // Last resort: try matching category field against name
-          if (!matchesFilter) {
+          // Try matching category field against name (case-insensitive)
+          if (!matchesFilter && audio.category.isNotEmpty) {
             matchesFilter = audio.category.toLowerCase() == _selectedCategory.toLowerCase();
+          }
+          // Also check if audio.category matches the name via categoryNameToId lookup
+          if (!matchesFilter && widget.categoryNameToId != null) {
+            final categoryIdFromName = widget.categoryNameToId![_selectedCategory];
+            if (categoryIdFromName != null) {
+              matchesFilter = audio.category == categoryIdFromName ||
+                  audio.category.toString() == categoryIdFromName.toString();
+            }
           }
         }
       }
@@ -233,6 +288,10 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
           audio.title.toLowerCase().contains(query) ||
           audio.description.toLowerCase().contains(query) ||
           (audio.speaker?.toLowerCase().contains(query) ?? false);
+      
+      if (!matchesFilter && _filterType == FilterType.category && _selectedCategory != 'All') {
+        debugPrint('No match for: ${audio.title}, category=${audio.category}, categoryName=${audio.categoryName}, selectedCategoryId=$_selectedCategoryId, selectedCategory=$_selectedCategory');
+      }
       
       return matchesFilter && matchesSearch;
     }).toList();
@@ -312,14 +371,14 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
               children: [
                 _buildFilterToggle('Category', FilterType.category, isDark),
                 const SizedBox(width: 12),
-                _buildFilterToggle('Speaker', FilterType.speaker, isDark),
+                _buildFilterToggle('Minister', FilterType.speaker, isDark),
               ],
             ),
           ),
           const SizedBox(height: 12),
           // Category or Speaker filter list
           SizedBox(
-            height: 32,
+            height: _filterType == FilterType.speaker ? 90 : 32,
             child: _filterType == FilterType.category
                 ? _buildCategoryFilterList(isDark)
                 : _buildSpeakerFilterList(isDark),
@@ -351,32 +410,49 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                       builder: (context) {
                         final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
                         final authProvider = ref.watch(authChangeNotifierProvider);
+                        final downloadService = DownloadService();
                         final user = authProvider.user;
                         final isServiceTeamMember = user?.isServiceTeamMember ?? false;
                         final isGeneralMarried = user?.isGeneralMarried ?? false;
                         final isInHouseMarried = user?.isInHouseMarried ?? false;
                         return ListView.builder(
                           controller: _scrollController,
+                          physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           itemCount: _filteredItems.length,
                           itemBuilder: (context, index) {
                             final audio = _filteredItems[index];
                             final isPreBuffered = audioProvider.isPreBuffered(audio.id);
+                            final isDownloaded = downloadService.isDownloaded(audio.id);
+                            final isReadyToPlay = isPreBuffered || isDownloaded;
                             final isBuffering = audioProvider.isBuffering(audio.id);
                             final bufferProgress = audioProvider.getBufferProgress(audio.id);
                             final isLocked = (audio.isServiceTeamOnly && !isServiceTeamMember) ||
                                 (audio.isGeneralMarriedOnly && !isGeneralMarried) ||
                                 (audio.isInHouseMarriedOnly && !isInHouseMarried);
+                            final threeDaysAgo = DateTime.now().subtract(const Duration(days: 3));
+                            final isNew = audio.date.isAfter(threeDaysAgo) && !audioProvider.isAudioPlayed(audio.id);
+                            final isCurrentlyPlaying = audioProvider.currentSermon?.id == audio.id && audioProvider.isPlaying;
                             return _AudioListItem(
                               sermon: audio,
                               isDark: isDark,
-                              isPreBuffered: isPreBuffered,
+                              isReadyToPlay: isReadyToPlay,
                               isBuffering: isBuffering,
                               bufferProgress: bufferProgress,
                               isServiceTeamMember: isServiceTeamMember,
                               isGeneralMarried: isGeneralMarried,
                               isInHouseMarried: isInHouseMarried,
-                              onTap: () {
+                              isNew: isNew,
+                              isPlaying: isCurrentlyPlaying,
+                              onThumbnailTap: () {
+                                if (isLocked) {
+                                  _showLockedMessage(context, isDark);
+                                  return;
+                                }
+                                audioProvider.setQueue(_filteredItems, index);
+                                audioProvider.playSermon(audio);
+                              },
+                              onTitleTap: () {
                                 if (isLocked) {
                                   _showLockedMessage(context, isDark);
                                   return;
@@ -473,7 +549,13 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
   }
 
   Widget _buildSpeakerFilterList(bool isDark) {
-    if (_speakers.isEmpty) {
+    // Get main speakers only
+    final mainSpeakers = _speakerModels.where((s) => s.isMainSpeaker).toList();
+    
+    // Check if there are any non-main speakers in the content
+    final hasOtherSpeakers = _speakers.any((speakerName) => !_isMainSpeaker(speakerName));
+    
+    if (mainSpeakers.isEmpty && !hasOtherSpeakers) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Text(
@@ -486,55 +568,216 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
       );
     }
 
-    final speakersWithAll = ['All', ..._speakers];
-    return ListView.separated(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: speakersWithAll.length,
-      separatorBuilder: (_, __) => const SizedBox(width: 16),
-      itemBuilder: (context, index) {
-        final speaker = speakersWithAll[index];
-        final isSelected = (speaker == 'All' && _selectedSpeaker == null) ||
-            speaker == _selectedSpeaker;
-        return GestureDetector(
-          onTap: () => _selectSpeaker(speaker == 'All' ? 'All' : speaker),
-          child: Text(
-            speaker,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              color: isSelected
-                  ? AppColors.maroon
-                  : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-            ),
-          ),
-        );
-      },
+    // Total count: All + main speakers + Others (if exists)
+    final itemCount = 1 + mainSpeakers.length + (hasOtherSpeakers ? 1 : 0);
+
+    return SizedBox(
+      height: 100,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: itemCount,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            final isSelected = _selectedSpeaker == null || _selectedSpeaker == 'All';
+            return _buildSpeakerChip(
+              name: 'All',
+              photoUrl: null,
+              isSelected: isSelected,
+              isDark: isDark,
+              onTap: () => _selectSpeaker('All'),
+            );
+          }
+          
+          // Main speakers
+          if (index <= mainSpeakers.length) {
+            final speaker = mainSpeakers[index - 1];
+            final isSelected = speaker.fullName == _selectedSpeaker;
+            return _buildSpeakerChip(
+              name: speaker.fullName,
+              photoUrl: speaker.photoUrl,
+              isSelected: isSelected,
+              isDark: isDark,
+              onTap: () => _selectSpeaker(speaker.fullName),
+              isFullName: true,
+            );
+          }
+          
+          // "Others" option (last item if hasOtherSpeakers)
+          final isSelected = _selectedSpeaker == 'Others';
+          return _buildSpeakerChip(
+            name: 'Others',
+            photoUrl: null,
+            isSelected: isSelected,
+            isDark: isDark,
+            onTap: () => _selectSpeaker('Others'),
+            isOthers: true,
+          );
+        },
+      ),
     );
+  }
+  
+  Widget _buildSpeakerChip({
+    required String name,
+    String? photoUrl,
+    required bool isSelected,
+    required bool isDark,
+    required VoidCallback onTap,
+    bool isFullName = false,
+    bool isOthers = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 80,
+        margin: const EdgeInsets.only(right: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? AppColors.primaryGold : Colors.transparent,
+                  width: 3,
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.primaryGold.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        )
+                      ]
+                    : null,
+              ),
+              child: ClipOval(
+                child: name == 'All'
+                    ? Container(
+                        color: isSelected
+                            ? AppColors.primaryGold
+                            : (isDark ? AppColors.cardDark : AppColors.dividerLight),
+                        child: Icon(
+                          Icons.people,
+                          size: 28,
+                          color: isSelected
+                              ? Colors.white
+                              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                        ),
+                      )
+                    : isOthers
+                        ? Container(
+                            color: isSelected
+                                ? AppColors.primaryGold
+                                : (isDark ? AppColors.cardDark : AppColors.dividerLight),
+                            child: Icon(
+                              Icons.more_horiz,
+                              size: 28,
+                              color: isSelected
+                                  ? Colors.white
+                                  : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                            ),
+                          )
+                        : photoUrl != null && photoUrl.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: photoUrl,
+                                fit: BoxFit.cover,
+                                memCacheWidth: 112,
+                                memCacheHeight: 112,
+                                placeholder: (_, __) => Container(
+                                  color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                  child: Icon(
+                                    Icons.person,
+                                    size: 28,
+                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                  ),
+                                ),
+                                errorWidget: (_, __, ___) => Container(
+                                  color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                  child: Icon(
+                                    Icons.person,
+                                    size: 28,
+                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                child: Center(
+                                  child: Text(
+                                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: isSelected
+                                          ? AppColors.primaryGold
+                                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                    ),
+                                  ),
+                                ),
+                              ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              name == 'All' || isOthers ? name : _formatSpeakerName(name),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected
+                    ? AppColors.primaryGold
+                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  String _formatSpeakerName(String fullName) {
+    final parts = fullName.split(' ');
+    if (parts.length >= 2) {
+      // Return first name on first line, last name on second line
+      return '${parts.first}\n${parts.last}';
+    }
+    return fullName;
   }
 }
 
 class _AudioListItem extends StatelessWidget {
   final Sermon sermon;
   final bool isDark;
-  final VoidCallback? onTap;
-  final bool isPreBuffered;
+  final VoidCallback? onThumbnailTap;
+  final VoidCallback? onTitleTap;
+  final bool isReadyToPlay;
   final bool isBuffering;
   final double bufferProgress;
   final bool isServiceTeamMember;
   final bool isGeneralMarried;
   final bool isInHouseMarried;
+  final bool isNew;
+  final bool isPlaying;
 
   const _AudioListItem({
     required this.sermon,
     required this.isDark,
-    this.onTap,
-    this.isPreBuffered = false,
+    this.onThumbnailTap,
+    this.onTitleTap,
+    this.isReadyToPlay = false,
     this.isBuffering = false,
     this.bufferProgress = 0.0,
     this.isServiceTeamMember = false,
     this.isGeneralMarried = false,
     this.isInHouseMarried = false,
+    this.isNew = false,
+    this.isPlaying = false,
   });
   
   bool get _isLocked => 
@@ -566,6 +809,10 @@ class _AudioListItem extends StatelessWidget {
     return '';
   }
 
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+  }
+
   String _getSpeakerAndTime() {
     final parts = <String>[];
     if (sermon.speaker != null && sermon.speaker!.isNotEmpty) {
@@ -577,44 +824,41 @@ class _AudioListItem extends StatelessWidget {
 
   Widget _buildImage(bool isDark) {
     if (sermon.imageUrl == null || sermon.imageUrl!.isEmpty) {
-      return Container(
-        color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-        child: Icon(
-          Icons.music_note,
-          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-        ),
+      return Icon(
+        Icons.music_note,
+        size: 20,
+        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
       );
     }
-    if (sermon.imageUrl!.startsWith('http')) {
-      return CachedNetworkImage(
-        imageUrl: sermon.imageUrl!,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => Container(
-          color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-        ),
-        errorWidget: (context, url, error) => Container(
-          color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-        ),
-      );
-    }
-    return Image.asset(
-      sermon.imageUrl!,
+    
+    return CachedNetworkImage(
+      imageUrl: sermon.imageUrl!,
       fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => Container(
-        color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+      memCacheWidth: 100,
+      memCacheHeight: 100,
+      placeholder: (_, __) => Icon(
+        Icons.music_note,
+        size: 20,
+        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+      ),
+      errorWidget: (_, __, ___) => Icon(
+        Icons.music_note,
+        size: 20,
+        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          children: [
-            Stack(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          // Thumbnail - tap to play/pause without opening player
+          GestureDetector(
+            onTap: onThumbnailTap,
+            child: Stack(
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
@@ -625,8 +869,46 @@ class _AudioListItem extends StatelessWidget {
                     child: _buildImage(isDark),
                   ),
                 ),
+                // Wave animation when playing
+                if (isPlaying && !_isLocked)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const _WaveAnimation(),
+                    ),
+                  ),
+                // Ready indicator (pre-buffered or downloaded) - only show when not playing
+                if (isReadyToPlay && !_isLocked && !isPlaying)
+                  Positioned(
+                    bottom: 2,
+                    right: 2,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.green.withValues(alpha: 0.4),
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow,
+                        size: 12,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 // Buffering progress indicator
-                if (isBuffering && !isPreBuffered)
+                if (isBuffering && !isReadyToPlay && !isPlaying)
                   Positioned(
                     bottom: 0,
                     left: 0,
@@ -673,8 +955,13 @@ class _AudioListItem extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(width: 16),
-            Expanded(
+          ),
+          const SizedBox(width: 16),
+          // Title area - tap to open player
+          Expanded(
+            child: GestureDetector(
+              onTap: onTitleTap,
+              behavior: HitTestBehavior.opaque,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -703,7 +990,7 @@ class _AudioListItem extends StatelessWidget {
                           ),
                         ],
                         TextSpan(
-                          text: sermon.title,
+                          text: '${_formatDate(sermon.date)} - ${sermon.title}',
                           style: TextStyle(
                             color: isDark ? Colors.white : Colors.black87,
                             fontWeight: FontWeight.normal,
@@ -729,9 +1016,80 @@ class _AudioListItem extends StatelessWidget {
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+          if (isNew)
+            Container(
+              margin: const EdgeInsets.only(left: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'NEW',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+        ],
       ),
+    );
+  }
+}
+
+// Wave animation widget for playing indicator
+class _WaveAnimation extends StatefulWidget {
+  const _WaveAnimation();
+
+  @override
+  State<_WaveAnimation> createState() => _WaveAnimationState();
+}
+
+class _WaveAnimationState extends State<_WaveAnimation> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: List.generate(4, (index) {
+            final delay = index * 0.15;
+            final animValue = ((_controller.value + delay) % 1.0);
+            final height = 8 + (animValue * 12);
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+              width: 3,
+              height: height,
+              decoration: BoxDecoration(
+                color: AppColors.primaryGold,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }
