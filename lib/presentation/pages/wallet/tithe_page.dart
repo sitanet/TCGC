@@ -302,46 +302,96 @@ class _TithePageState extends ConsumerState<TithePage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        'Enter Amount',
-                        style: TextStyle(
-                          color: AppColors.primaryGold,
-                          fontSize: bodyFontSize,
-                          fontWeight: FontWeight.w500,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGold.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          widget.title,
+                          style: TextStyle(
+                            color: AppColors.primaryGold,
+                            fontSize: smallFontSize,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: spacing * 1.5),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              '₦',
+                              style: TextStyle(
+                                color: AppColors.primaryGold,
+                                fontSize: amountFontSize * 0.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            amount,
+                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: amountFontSize,
+                                  letterSpacing: -1,
+                                ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: spacing),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isDark 
+                              ? AppColors.cardDark 
+                              : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              'To',
+                              style: TextStyle(
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                fontSize: smallFontSize * 0.9,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'The CityGate Apostolic Kingdom Ministry',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: bodyFontSize * 0.95,
+                                  ),
+                            ),
+                          ],
                         ),
                       ),
                       SizedBox(height: spacing),
-                      Text(
-                        '₦$amount',
-                        style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: amountFontSize,
-                            ),
-                      ),
-                      SizedBox(height: spacing * 0.5),
-                      Text(
-                        'To',
-                        style: TextStyle(
-                          color: AppColors.primaryGold,
-                          fontSize: smallFontSize,
-                        ),
-                      ),
-                      SizedBox(height: spacing * 0.5),
-                      Text(
-                        'The CityGate Apostolic\nKingdom Ministry',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.account_balance_wallet_outlined,
+                            color: AppColors.primaryGold,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Balance: ₦${walletProvider.balance.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              color: AppColors.primaryGold,
+                              fontSize: bodyFontSize * 0.9,
                               fontWeight: FontWeight.w500,
-                              fontSize: bodyFontSize,
                             ),
-                      ),
-                      SizedBox(height: spacing),
-                      Text(
-                        'Balance: ₦${walletProvider.balance.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                          fontSize: bodyFontSize,
-                        ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -350,24 +400,47 @@ class _TithePageState extends ConsumerState<TithePage> {
                 SizedBox(height: spacing * 1.25),
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                  child: SizedBox(
+                  child: Container(
                     width: double.infinity,
-                    height: buttonHeight,
+                    height: buttonHeight + 4,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppColors.primaryGold, AppColors.goldVariant1],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                      borderRadius: BorderRadius.circular(borderRadius + 4),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primaryGold.withOpacity(0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
                     child: ElevatedButton(
                       onPressed: _processPayment,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryGold,
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(borderRadius),
+                          borderRadius: BorderRadius.circular(borderRadius + 4),
                         ),
                       ),
-                      child: Text(
-                        'Pay now',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: bodyFontSize,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.check_circle_outline, color: Colors.white, size: 22),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Pay ₦$amount',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: bodyFontSize,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -382,11 +455,21 @@ class _TithePageState extends ConsumerState<TithePage> {
   }
 
   Widget _buildNumpad(bool isDark) {
-    final spacing = Responsive.verticalSpacing(context);
-    final keySize = Responsive.value(context, mobile: 70.0, tablet: 80.0, desktop: 90.0);
+    final spacing = Responsive.verticalSpacing(context) * 0.6;
+    final keySize = Responsive.value(context, mobile: 72.0, tablet: 82.0, desktop: 92.0);
     
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: Responsive.wp(context, 10)),
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: Responsive.wp(context, 6),
+        vertical: spacing,
+      ),
+      margin: EdgeInsets.symmetric(horizontal: Responsive.wp(context, 4)),
+      decoration: BoxDecoration(
+        color: isDark 
+            ? AppColors.cardDark.withOpacity(0.5) 
+            : Colors.grey.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(24),
+      ),
       child: Column(
         children: [
           Row(
@@ -419,7 +502,7 @@ class _TithePageState extends ConsumerState<TithePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              SizedBox(width: keySize),
+              _buildClearKey(isDark, keySize),
               _buildNumKey('0', isDark, keySize),
               _buildBackspaceKey(isDark, keySize),
             ],
@@ -430,31 +513,80 @@ class _TithePageState extends ConsumerState<TithePage> {
   }
 
   Widget _buildNumKey(String num, bool isDark, double keySize) {
-    final fontSize = Responsive.value(context, mobile: 24.0, tablet: 28.0, desktop: 32.0);
-    final borderRadius = Responsive.borderRadius(context);
+    final fontSize = Responsive.value(context, mobile: 26.0, tablet: 30.0, desktop: 34.0);
     
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          final cleanAmount = amount.replaceAll(',', '');
-          final newAmount = cleanAmount + num;
-          amount = _formatAmount(newAmount);
-        });
-      },
-      child: Container(
-        width: keySize,
-        height: keySize,
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.cardDark : AppColors.dividerLight.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(borderRadius),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            final cleanAmount = amount.replaceAll(',', '');
+            final newAmount = cleanAmount + num;
+            amount = _formatAmount(newAmount);
+          });
+        },
+        borderRadius: BorderRadius.circular(keySize / 2),
+        splashColor: AppColors.primaryGold.withOpacity(0.2),
+        highlightColor: AppColors.primaryGold.withOpacity(0.1),
+        child: Container(
+          width: keySize,
+          height: keySize,
+          decoration: BoxDecoration(
+            color: isDark 
+                ? AppColors.surfaceDark 
+                : Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              num,
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w600,
+                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+              ),
+            ),
+          ),
         ),
-        child: Center(
-          child: Text(
-            num,
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.w500,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+      ),
+    );
+  }
+
+  Widget _buildClearKey(bool isDark, double keySize) {
+    final fontSize = Responsive.value(context, mobile: 14.0, tablet: 16.0, desktop: 18.0);
+    
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            amount = '0';
+          });
+        },
+        borderRadius: BorderRadius.circular(keySize / 2),
+        splashColor: AppColors.primaryGold.withOpacity(0.2),
+        child: Container(
+          width: keySize,
+          height: keySize,
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              'Clear',
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w500,
+                color: AppColors.primaryGold,
+              ),
             ),
           ),
         ),
@@ -463,31 +595,40 @@ class _TithePageState extends ConsumerState<TithePage> {
   }
 
   Widget _buildBackspaceKey(bool isDark, double keySize) {
-    final borderRadius = Responsive.borderRadius(context);
     final iconSize = Responsive.iconSize(context);
     
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          final cleanAmount = amount.replaceAll(',', '');
-          if (cleanAmount.isNotEmpty) {
-            final newAmount = cleanAmount.substring(0, cleanAmount.length - 1);
-            amount = newAmount.isEmpty ? '0' : _formatAmount(newAmount);
-          }
-        });
-      },
-      child: Container(
-        width: keySize,
-        height: keySize,
-        decoration: BoxDecoration(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(borderRadius),
-        ),
-        child: Center(
-          child: Icon(
-            Icons.backspace_outlined,
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-            size: iconSize,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            final cleanAmount = amount.replaceAll(',', '');
+            if (cleanAmount.isNotEmpty) {
+              final newAmount = cleanAmount.substring(0, cleanAmount.length - 1);
+              amount = newAmount.isEmpty ? '0' : _formatAmount(newAmount);
+            }
+          });
+        },
+        onLongPress: () {
+          setState(() {
+            amount = '0';
+          });
+        },
+        borderRadius: BorderRadius.circular(keySize / 2),
+        splashColor: Colors.red.withOpacity(0.2),
+        child: Container(
+          width: keySize,
+          height: keySize,
+          decoration: const BoxDecoration(
+            color: Colors.transparent,
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Icon(
+              Icons.backspace_outlined,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              size: iconSize,
+            ),
           ),
         ),
       ),

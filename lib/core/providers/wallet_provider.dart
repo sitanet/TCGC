@@ -537,6 +537,36 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> resetTransactionPin(String password, String newPin, String confirmPin) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.post(ApiConstants.resetTransactionPin, {
+        'password': password,
+        'new_pin': newPin,
+        'confirm_pin': confirmPin,
+      });
+      
+      _isLoading = false;
+      if (response.isSuccess) {
+        notifyListeners();
+        return true;
+      }
+      
+      _error = response.errorMessage;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      debugPrint('Error resetting PIN: $e');
+      _error = 'Failed to reset transaction PIN';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> fetchTierInfo() async {
     try {
       final response = await _api.get(ApiConstants.walletTiers);

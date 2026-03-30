@@ -26,6 +26,7 @@ class ApiConstants {
   static const String verifyPassword = '/user/verify-password/';
   static const String transactionPin = '/user/transaction-pin/';
   static const String changeTransactionPin = '/user/transaction-pin/change/';
+  static const String resetTransactionPin = '/user/transaction-pin/reset/';
   static const String deleteAccount = '/user/delete-account/';
   
   // Messages

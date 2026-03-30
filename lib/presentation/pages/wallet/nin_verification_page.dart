@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/providers/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
-import 'set_transaction_pin_page.dart';
+import 'give_page.dart';
 
 class NinVerificationPage extends ConsumerStatefulWidget {
   const NinVerificationPage({super.key});
@@ -340,6 +339,10 @@ class _NinVerificationPageState extends ConsumerState<NinVerificationPage> {
     if (!mounted) return;
 
     if (result.success) {
+      // Refresh wallet data
+      final walletProvider = ref.read(walletChangeNotifierProvider);
+      await walletProvider.fetchWallet();
+      
       // Show success popup
       await showDialog(
         context: context,
@@ -365,7 +368,7 @@ class _NinVerificationPageState extends ConsumerState<NinVerificationPage> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'NIN Verified Successfully!',
+                'Wallet Created Successfully!',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -374,7 +377,7 @@ class _NinVerificationPageState extends ConsumerState<NinVerificationPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Your identity has been verified. Please set your transaction PIN to continue.',
+                'Your identity has been verified and your wallet is ready. You can now make givings and offerings.',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[600],
@@ -407,15 +410,11 @@ class _NinVerificationPageState extends ConsumerState<NinVerificationPage> {
         ),
       );
 
-      // Navigate to Set Transaction PIN page
+      // Navigate to wallet details (GivePage)
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => SetTransactionPinPage(
-              nin: _ninController.text,
-              verifiedData: result.verifiedData,
-            ),
-          ),
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const GivePage()),
+          (route) => route.isFirst,
         );
       }
     } else {

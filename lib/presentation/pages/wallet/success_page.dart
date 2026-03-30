@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -31,9 +32,12 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
   late AnimationController _checkController;
   late AnimationController _scaleController;
   late AnimationController _confettiController;
+  late AnimationController _shimmerController;
+  late AnimationController _pulseController;
   late Animation<double> _checkAnimation;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
+  late Animation<double> _slideAnimation;
   
   bool _isGeneratingReceipt = false;
 
@@ -47,14 +51,24 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
     );
 
     _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
 
     _confettiController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 2500),
       vsync: this,
     );
+
+    _shimmerController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat();
+
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
 
     _checkAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _checkController, curve: Curves.elasticOut),
@@ -65,7 +79,11 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
     );
 
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _scaleController, curve: Curves.easeIn),
+      CurvedAnimation(parent: _scaleController, curve: const Interval(0.3, 1.0, curve: Curves.easeOut)),
+    );
+
+    _slideAnimation = Tween<double>(begin: 50, end: 0).animate(
+      CurvedAnimation(parent: _scaleController, curve: const Interval(0.3, 1.0, curve: Curves.easeOut)),
     );
 
     _startAnimations();
@@ -74,7 +92,7 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
   void _startAnimations() async {
     await Future.delayed(const Duration(milliseconds: 100));
     _scaleController.forward();
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 200));
     _checkController.forward();
     _confettiController.forward();
   }
@@ -84,6 +102,8 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
     _checkController.dispose();
     _scaleController.dispose();
     _confettiController.dispose();
+    _shimmerController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -108,8 +128,23 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
         body: SafeArea(
           child: Stack(
             children: [
+              // Background gradient overlay
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: const Alignment(0, -0.3),
+                      radius: 1.5,
+                      colors: [
+                        AppColors.primaryGold.withOpacity(0.1),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               // Confetti particles
-              ...List.generate(20, (index) => _buildConfettiParticle(index)),
+              ...List.generate(30, (index) => _buildConfettiParticle(index)),
               // Main content
               Center(
                 child: ConstrainedBox(
@@ -132,39 +167,58 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
-                              // Outer glow
-                              Container(
-                                width: iconContainerSize * 1.3,
-                                height: iconContainerSize * 1.3,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: RadialGradient(
-                                    colors: [
-                                      AppColors.success.withOpacity(0.3),
-                                      AppColors.success.withOpacity(0.0),
-                                    ],
-                                  ),
-                                ),
+                              // Animated pulse rings
+                              ..._buildSuccessRings(iconContainerSize),
+                              // Outer glow with gold accent
+                              AnimatedBuilder(
+                                animation: _pulseController,
+                                builder: (context, child) {
+                                  final pulse = 1.0 + (_pulseController.value * 0.1);
+                                  return Transform.scale(
+                                    scale: pulse,
+                                    child: Container(
+                                      width: iconContainerSize * 1.4,
+                                      height: iconContainerSize * 1.4,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: RadialGradient(
+                                          colors: [
+                                            AppColors.primaryGold.withOpacity(0.3),
+                                            AppColors.primaryGold.withOpacity(0.1),
+                                            Colors.transparent,
+                                          ],
+                                          stops: const [0.0, 0.5, 1.0],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                              // Main circle
+                              // Main circle with gold-green gradient
                               Container(
                                 width: iconContainerSize,
                                 height: iconContainerSize,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  gradient: LinearGradient(
+                                  gradient: const LinearGradient(
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                     colors: [
-                                      AppColors.success,
-                                      AppColors.success.withOpacity(0.8),
+                                      Color(0xFF4CAF50),
+                                      Color(0xFF2E7D32),
                                     ],
                                   ),
                                   boxShadow: [
                                     BoxShadow(
                                       color: AppColors.success.withOpacity(0.4),
-                                      blurRadius: 20,
+                                      blurRadius: 30,
+                                      spreadRadius: 5,
                                       offset: const Offset(0, 10),
+                                    ),
+                                    BoxShadow(
+                                      color: AppColors.primaryGold.withOpacity(0.2),
+                                      blurRadius: 40,
+                                      spreadRadius: 10,
                                     ),
                                   ],
                                 ),
@@ -173,7 +227,10 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                                   builder: (context, child) {
                                     return Transform.scale(
                                       scale: _checkAnimation.value,
-                                      child: child,
+                                      child: Transform.rotate(
+                                        angle: (1 - _checkAnimation.value) * 0.5,
+                                        child: child,
+                                      ),
                                     );
                                   },
                                   child: Icon(
@@ -187,17 +244,36 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                           ),
                         ),
                         SizedBox(height: spacing * 2.5),
-                        // Success text
-                        FadeTransition(
-                          opacity: _fadeAnimation,
+                        // Success text with slide animation
+                        AnimatedBuilder(
+                          animation: _slideAnimation,
+                          builder: (context, child) {
+                            return Transform.translate(
+                              offset: Offset(0, _slideAnimation.value),
+                              child: FadeTransition(
+                                opacity: _fadeAnimation,
+                                child: child,
+                              ),
+                            );
+                          },
                           child: Column(
                             children: [
-                              Text(
-                                'Payment Successful!',
-                                style: TextStyle(
-                                  fontSize: titleFontSize,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.success,
+                              ShaderMask(
+                                shaderCallback: (bounds) {
+                                  return const LinearGradient(
+                                    colors: [
+                                      Color(0xFF4CAF50),
+                                      AppColors.primaryGold,
+                                    ],
+                                  ).createShader(bounds);
+                                },
+                                child: Text(
+                                  'Payment Successful!',
+                                  style: TextStyle(
+                                    fontSize: titleFontSize * 1.1,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                               SizedBox(height: spacing),
@@ -825,15 +901,50 @@ God bless you abundantly.
     );
   }
 
+  List<Widget> _buildSuccessRings(double size) {
+    return List.generate(3, (index) {
+      return AnimatedBuilder(
+        animation: _confettiController,
+        builder: (context, child) {
+          final delay = index * 0.15;
+          final progress = ((_confettiController.value - delay) / (1 - delay)).clamp(0.0, 1.0);
+          final scale = 1.0 + progress * 0.6;
+          final opacity = (0.6 - progress * 0.6).clamp(0.0, 0.6);
+          return Transform.scale(
+            scale: scale,
+            child: Container(
+              width: size * 1.1,
+              height: size * 1.1,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.primaryGold.withOpacity(opacity),
+                  width: 3 - index.toDouble(),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    });
+  }
+
   Widget _buildConfettiParticle(int index) {
     final colors = [
       AppColors.primaryGold,
+      const Color(0xFFFFD700),
       AppColors.success,
-      Colors.blue,
-      Colors.purple,
-      Colors.pink,
+      const Color(0xFF4CAF50),
+      Colors.amber,
       Colors.orange,
+      const Color(0xFFB8860B),
     ];
+
+    final random = math.Random(index);
+    final angle = random.nextDouble() * math.pi * 2;
+    final speed = 100 + random.nextDouble() * 200;
+    final rotationSpeed = (random.nextDouble() - 0.5) * 10;
+    final size = 6 + random.nextDouble() * 10;
 
     return AnimatedBuilder(
       animation: _confettiController,
@@ -843,16 +954,19 @@ God bless you abundantly.
         final screenHeight = MediaQuery.of(context).size.height;
 
         final startX = screenWidth / 2;
-        final startY = screenHeight * 0.3;
+        final startY = screenHeight * 0.25;
 
-        final distance = 150 + (index % 3) * 50;
+        final gravity = progress * progress * 400;
+        final x = startX + math.cos(angle) * speed * progress;
+        final y = startY + math.sin(angle) * speed * progress * 0.5 + gravity;
 
-        final x = startX + (distance * progress * (index.isEven ? 1 : -1) * 
-            (0.5 + (index % 5) * 0.2)) * (index.isEven ? 1 : -1);
-        final y = startY + (progress * 300) + (50 * progress * (index % 4));
+        final fadeStart = 0.6;
+        final opacity = progress < fadeStart ? 1.0 : (1 - (progress - fadeStart) / (1 - fadeStart)).clamp(0.0, 1.0);
+        final rotation = progress * rotationSpeed;
 
-        final opacity = (1 - progress).clamp(0.0, 1.0);
-        final rotation = progress * 6.28 * (index.isEven ? 1 : -1);
+        if (y > screenHeight || x < -50 || x > screenWidth + 50) {
+          return const SizedBox.shrink();
+        }
 
         return Positioned(
           left: x,
@@ -862,13 +976,17 @@ God bless you abundantly.
             child: Transform.rotate(
               angle: rotation,
               child: Container(
-                width: 8 + (index % 3) * 4,
-                height: 8 + (index % 3) * 4,
+                width: size,
+                height: size * (index % 3 == 0 ? 1.5 : 1),
                 decoration: BoxDecoration(
                   color: colors[index % colors.length],
-                  borderRadius: index % 2 == 0
-                      ? BorderRadius.circular(10)
-                      : BorderRadius.zero,
+                  borderRadius: BorderRadius.circular(index % 3 == 0 ? 1 : size / 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colors[index % colors.length].withOpacity(0.5),
+                      blurRadius: 4,
+                    ),
+                  ],
                 ),
               ),
             ),

@@ -177,41 +177,50 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     final bodyFontSize = Responsive.bodyFontSize(context);
     
     return Container(
-      padding: EdgeInsets.all(spacing),
+      padding: EdgeInsets.all(spacing * 0.5),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(borderRadius),
+        color: isDark ? AppColors.cardDark : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(borderRadius + 4),
       ),
-      child: Wrap(
-        spacing: spacing * 0.5,
-        runSpacing: spacing * 0.5,
+      child: Row(
         children: filters.map((filter) {
           final isSelected = filter == selectedFilter;
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                selectedFilter = filter;
-              });
-            },
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: spacing, vertical: spacing * 0.5),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.primaryGold : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isSelected
-                      ? AppColors.primaryGold
-                      : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  selectedFilter = filter;
+                });
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: EdgeInsets.symmetric(vertical: spacing * 0.7),
+                decoration: BoxDecoration(
+                  color: isSelected 
+                      ? AppColors.primaryGold 
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(borderRadius),
+                  boxShadow: isSelected 
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primaryGold.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ] 
+                      : null,
                 ),
-              ),
-              child: Text(
-                filter,
-                style: TextStyle(
-                  color: isSelected
-                      ? Colors.white
-                      : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
-                  fontWeight: FontWeight.w500,
-                  fontSize: bodyFontSize * 0.93,
+                child: Center(
+                  child: Text(
+                    filter,
+                    style: TextStyle(
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      fontSize: bodyFontSize * 0.9,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -228,7 +237,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     final iconSize = Responsive.iconSize(context);
     final bodyFontSize = Responsive.bodyFontSize(context);
     final smallFontSize = Responsive.smallFontSize(context);
-    final iconContainerSize = Responsive.value(context, mobile: 44.0, tablet: 52.0, desktop: 60.0);
+    final iconContainerSize = Responsive.value(context, mobile: 48.0, tablet: 54.0, desktop: 62.0);
     
     if (selectedFilter == 'Money In') {
       transactions = transactions.where((t) => t.isMoneyIn).toList();
@@ -238,21 +247,41 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
 
     if (transactions.isEmpty) {
       return Container(
-        padding: EdgeInsets.all(spacing * 2.5),
+        padding: EdgeInsets.all(spacing * 3),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.white,
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
         child: Center(
           child: Column(
             children: [
-              Icon(
-                Icons.receipt_long_outlined,
-                size: iconSize * 2.5,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.receipt_long_outlined,
+                  size: iconSize * 2,
+                  color: AppColors.primaryGold,
+                ),
               ),
               SizedBox(height: spacing),
               Text(
                 'No transactions yet',
                 style: TextStyle(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
                   fontSize: bodyFontSize,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: spacing * 0.5),
+              Text(
+                'Your transaction history will appear here',
+                style: TextStyle(
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  fontSize: smallFontSize,
                 ),
               ),
             ],
@@ -261,60 +290,242 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
       );
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(borderRadius),
-      ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: transactions.length,
-        separatorBuilder: (_, __) => Divider(
-          height: 1,
-          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: transactions.length,
+      itemBuilder: (context, index) {
+        final transaction = transactions[index];
+        final isMoneyIn = transaction.isMoneyIn;
+        
+        return Container(
+          margin: EdgeInsets.only(bottom: spacing * 0.75),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : Colors.white,
+            borderRadius: BorderRadius.circular(borderRadius),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _showTransactionDetails(context, isDark, transaction),
+              borderRadius: BorderRadius.circular(borderRadius),
+              child: Padding(
+                padding: EdgeInsets.all(spacing),
+                child: Row(
+                  children: [
+                    Container(
+                      width: iconContainerSize,
+                      height: iconContainerSize,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isMoneyIn 
+                              ? [Colors.green.shade400, Colors.green.shade600]
+                              : [Colors.red.shade400, Colors.red.shade600],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(borderRadius),
+                      ),
+                      child: Icon(
+                        isMoneyIn ? Icons.south_west_rounded : Icons.north_east_rounded,
+                        color: Colors.white,
+                        size: iconSize,
+                      ),
+                    ),
+                    SizedBox(width: spacing),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            transaction.title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: bodyFontSize,
+                              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(height: spacing * 0.25),
+                          Text(
+                            _formatDate(transaction.date),
+                            style: TextStyle(
+                              fontSize: smallFontSize,
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${isMoneyIn ? '+' : '-'}${_formatCurrency(transaction.amount, transaction.currency)}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isMoneyIn ? Colors.green.shade600 : Colors.red.shade600,
+                            fontSize: bodyFontSize,
+                          ),
+                        ),
+                        SizedBox(height: spacing * 0.25),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (isMoneyIn ? Colors.green : Colors.red).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            isMoneyIn ? 'Credit' : 'Debit',
+                            style: TextStyle(
+                              fontSize: smallFontSize * 0.85,
+                              fontWeight: FontWeight.w500,
+                              color: isMoneyIn ? Colors.green.shade700 : Colors.red.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showTransactionDetails(BuildContext context, bool isDark, dynamic transaction) {
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    final smallFontSize = Responsive.smallFontSize(context);
+    final isMoneyIn = transaction.isMoneyIn;
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        itemBuilder: (context, index) {
-          final transaction = transactions[index];
-          final isMoneyIn = transaction.isMoneyIn;
-          
-          return ListTile(
-            contentPadding: EdgeInsets.symmetric(horizontal: spacing, vertical: spacing * 0.5),
-            leading: Container(
-              width: iconContainerSize,
-              height: iconContainerSize,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
-                color: (isMoneyIn ? Colors.green : Colors.red).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(borderRadius),
+                color: Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isMoneyIn 
+                      ? [Colors.green.shade400, Colors.green.shade600]
+                      : [Colors.red.shade400, Colors.red.shade600],
+                ),
+                shape: BoxShape.circle,
               ),
               child: Icon(
-                isMoneyIn ? Icons.arrow_downward : Icons.arrow_upward,
-                color: isMoneyIn ? Colors.green : Colors.red,
-                size: iconSize,
+                isMoneyIn ? Icons.south_west_rounded : Icons.north_east_rounded,
+                color: Colors.white,
+                size: 32,
               ),
             ),
-            title: Text(
+            const SizedBox(height: 16),
+            Text(
               transaction.title,
-              style: TextStyle(fontWeight: FontWeight.w500, fontSize: bodyFontSize),
-            ),
-            subtitle: Text(
-              _formatDate(transaction.date),
               style: TextStyle(
-                fontSize: smallFontSize,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                fontSize: bodyFontSize * 1.1,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : Colors.black87,
               ),
+              textAlign: TextAlign.center,
             ),
-            trailing: Text(
+            const SizedBox(height: 8),
+            Text(
               '${isMoneyIn ? '+' : '-'}${_formatCurrency(transaction.amount, transaction.currency)}',
               style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: isMoneyIn ? Colors.green : Colors.red,
-                fontSize: bodyFontSize,
+                fontSize: bodyFontSize * 1.5,
+                fontWeight: FontWeight.w700,
+                color: isMoneyIn ? Colors.green.shade600 : Colors.red.shade600,
               ),
             ),
-          );
-        },
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  _buildDetailRow('Date', _formatDate(transaction.date), isDark, smallFontSize),
+                  const Divider(height: 24),
+                  _buildDetailRow('Type', isMoneyIn ? 'Money In' : 'Money Out', isDark, smallFontSize),
+                  const Divider(height: 24),
+                  _buildDetailRow('Status', 'Completed', isDark, smallFontSize),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGold,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, bool isDark, double fontSize) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            fontSize: fontSize,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : Colors.black87,
+            fontSize: fontSize,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -24,6 +24,14 @@ class _GivePageState extends ConsumerState<GivePage> {
   final currencies = ['NGN', 'USD', 'EUR', 'GBP'];
   bool _isBalanceHidden = true;
 
+  void _handleBackNavigation() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      ref.read(mainTabIndexProvider.notifier).state = 0;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -755,9 +763,7 @@ class _GivePageState extends ConsumerState<GivePage> {
         title: '',
         showBackButton: true,
         lightBackground: true,
-        onBackPressed: () {
-          ref.read(mainTabIndexProvider.notifier).state = 0;
-        },
+        onBackPressed: _handleBackNavigation,
       ),
       body: SingleChildScrollView(
         child: Center(
@@ -940,56 +946,80 @@ class _GivePageState extends ConsumerState<GivePage> {
 
   Widget _buildCurrencySelector(bool isDark) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.primaryGold.withValues(alpha: 0.3),
-          width: 1,
-        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Your Wallet',
-            style: TextStyle(
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 12),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              Icon(
+                Icons.account_balance_wallet_outlined,
+                color: AppColors.primaryGold,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Select Currency',
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
             children: currencies.map((currency) {
               final isSelected = currency == selectedCurrency;
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    selectedCurrency = currency;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primaryGold : Colors.transparent,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      selectedCurrency = currency;
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
                       color: isSelected 
                           ? AppColors.primaryGold 
-                          : (isDark ? Colors.grey[600]! : Colors.grey[300]!),
-                      width: 1,
+                          : (isDark ? AppColors.surfaceDark : Colors.grey.shade100),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: isSelected 
+                          ? [
+                              BoxShadow(
+                                color: AppColors.primaryGold.withOpacity(0.4),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
                     ),
-                  ),
-                  child: Text(
-                    currency,
-                    style: TextStyle(
-                      color: isSelected 
-                          ? Colors.white 
-                          : (isDark ? Colors.white : Colors.black87),
-                      fontWeight: FontWeight.w500,
-                      fontSize: 12,
+                    child: Center(
+                      child: Text(
+                        currency,
+                        style: TextStyle(
+                          color: isSelected 
+                              ? Colors.white 
+                              : (isDark ? Colors.white70 : Colors.black54),
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1002,43 +1032,62 @@ class _GivePageState extends ConsumerState<GivePage> {
   }
 
   Widget _buildMenuItems(BuildContext context, bool isDark) {
-    return Column(
-      children: [
-        // Add Fund Section
-        _buildMenuItem(
-          context: context,
-          isDark: isDark,
-          icon: Icons.add_circle_outline,
-          iconColor: AppColors.primaryGold,
-          title: 'Add Fund',
-          onTap: () => _showAddFundOptions(context, isDark),
-        ),
-        const SizedBox(height: 8),
-        
-        // Give Section
-        _buildMenuItem(
-          context: context,
-          isDark: isDark,
-          icon: Icons.monetization_on_outlined,
-          iconColor: AppColors.primaryGold,
-          title: 'Give',
-          onTap: () => _showGiveOptions(context, isDark),
-        ),
-        const SizedBox(height: 8),
-        
-        // Transactions Section
-        _buildMenuItem(
-          context: context,
-          isDark: isDark,
-          icon: Icons.swap_horiz,
-          iconColor: AppColors.primaryGold,
-          title: 'Transactions',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const TransactionsPage()),
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
-        ),
-      ],
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildMenuItem(
+            context: context,
+            isDark: isDark,
+            icon: Icons.add_circle_outline,
+            gradientColors: [Colors.blue.shade400, Colors.blue.shade600],
+            title: 'Add Fund',
+            subtitle: 'Top up your wallet',
+            onTap: () => _showAddFundOptions(context, isDark),
+          ),
+          Divider(
+            height: 1,
+            indent: 72,
+            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+          ),
+          _buildMenuItem(
+            context: context,
+            isDark: isDark,
+            icon: Icons.volunteer_activism_outlined,
+            gradientColors: [AppColors.primaryGold, AppColors.goldVariant1],
+            title: 'Give',
+            subtitle: 'Tithe, Offerings & Seeds',
+            onTap: () => _showGiveOptions(context, isDark),
+          ),
+          Divider(
+            height: 1,
+            indent: 72,
+            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+          ),
+          _buildMenuItem(
+            context: context,
+            isDark: isDark,
+            icon: Icons.history_rounded,
+            gradientColors: [Colors.purple.shade400, Colors.purple.shade600],
+            title: 'Transactions',
+            subtitle: 'View transaction history',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TransactionsPage()),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1046,35 +1095,80 @@ class _GivePageState extends ConsumerState<GivePage> {
     required BuildContext context,
     required bool isDark,
     required IconData icon,
-    required Color iconColor,
+    required List<Color> gradientColors,
     required String title,
+    required String subtitle,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
-        child: Row(
-          children: [
-            Icon(icon, color: iconColor, size: 24),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: isDark ? Colors.white : Colors.black87,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: gradientColors,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: gradientColors[0].withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            Icon(
-              Icons.chevron_right,
-              color: Colors.grey[400],
-              size: 24,
-            ),
-          ],
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isDark 
+                      ? Colors.white.withOpacity(0.1)
+                      : Colors.grey.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: isDark ? Colors.white54 : Colors.grey.shade400,
+                  size: 14,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

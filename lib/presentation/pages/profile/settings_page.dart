@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/biometric_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'change_password_page.dart';
+import 'change_pin_page.dart';
 import '../interests/edit_interests_page.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -242,6 +244,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                   _buildNavigationTile(
                       context, isDark, 'Change Password', Icons.lock_outline),
+                  Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: isDark
+                        ? Colors.white.withAlpha(25)
+                        : Colors.black.withAlpha(13),
+                  ),
+                  _buildNavigationTile(
+                      context, isDark, 'Change Transaction PIN', Icons.pin_outlined),
+                  Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: isDark
+                        ? Colors.white.withAlpha(25)
+                        : Colors.black.withAlpha(13),
+                  ),
+                  _buildNavigationTile(
+                      context, isDark, 'Reset Transaction PIN', Icons.lock_reset_outlined),
                 ],
               ),
               const SizedBox(height: 100),
@@ -331,6 +353,237 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 : 'Fingerprint for transactions disabled')),
       );
     }
+  }
+
+  void _showResetPinDialog(bool isDark) {
+    final currentPinController = TextEditingController();
+    final newPinController = TextEditingController();
+    final confirmPinController = TextEditingController();
+    bool isLoading = false;
+    bool isVerified = false;
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+
+    final biometricProvider = ref.read(biometricChangeNotifierProvider);
+    final canUseBiometric = biometricProvider.isAvailable && biometricProvider.biometricTransactionEnabled;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(isVerified ? 'Set New PIN' : 'Verify Identity'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!isVerified) ...[
+                Text(
+                  'Verify your identity using your current PIN${canUseBiometric ? " or fingerprint" : ""}.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: currentPinController,
+                  obscureText: obscureCurrent,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: 'Current PIN',
+                    counterText: '',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureCurrent ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                      onPressed: () => setDialogState(() => obscureCurrent = !obscureCurrent),
+                    ),
+                  ),
+                ),
+                if (canUseBiometric) ...[
+                  const SizedBox(height: 16),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: isLoading
+                          ? null
+                          : () async {
+                              setDialogState(() => isLoading = true);
+                              final authenticated = await biometricProvider.authenticateForTransaction();
+                              if (authenticated) {
+                                setDialogState(() {
+                                  isVerified = true;
+                                  isLoading = false;
+                                });
+                              } else {
+                                setDialogState(() => isLoading = false);
+                                if (mounted) {
+                                  ScaffoldMessenger.of(this.context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Biometric authentication failed'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                      icon: const Icon(Icons.fingerprint, color: AppColors.primaryGold),
+                      label: const Text('Use Fingerprint', style: TextStyle(color: AppColors.primaryGold)),
+                    ),
+                  ),
+                ],
+              ] else ...[
+                Text(
+                  'Enter a new 4-digit PIN for your wallet transactions.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: newPinController,
+                  obscureText: obscureNew,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: 'New PIN',
+                    counterText: '',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureNew ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                      onPressed: () => setDialogState(() => obscureNew = !obscureNew),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: confirmPinController,
+                  obscureText: obscureConfirm,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: 'Confirm PIN',
+                    counterText: '',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                      onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      final walletProvider = ref.read(walletChangeNotifierProvider);
+
+                      if (!isVerified) {
+                        // Verify current PIN
+                        if (currentPinController.text.length != 4) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            const SnackBar(
+                              content: Text('PIN must be 4 digits'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        setDialogState(() => isLoading = true);
+                        final isValid = await walletProvider.verifyPin(currentPinController.text);
+                        
+                        if (isValid) {
+                          setDialogState(() {
+                            isVerified = true;
+                            isLoading = false;
+                          });
+                        } else {
+                          setDialogState(() => isLoading = false);
+                          if (mounted) {
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(
+                                content: Text(walletProvider.error ?? 'Invalid PIN'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      } else {
+                        // Set new PIN
+                        if (newPinController.text.length != 4) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            const SnackBar(
+                              content: Text('PIN must be 4 digits'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+                        if (newPinController.text != confirmPinController.text) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            const SnackBar(
+                              content: Text('PINs do not match'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        setDialogState(() => isLoading = true);
+
+                        final success = await walletProvider.setTransactionPin(
+                          newPinController.text,
+                          confirmPinController.text,
+                        );
+
+                        if (!mounted) return;
+                        Navigator.pop(dialogContext);
+
+                        if (success) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Transaction PIN reset successfully'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text(walletProvider.error ?? 'Failed to reset PIN'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(isVerified ? 'Reset PIN' : 'Verify', style: const TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showEnableBiometricLoginDialog(
@@ -501,6 +754,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             MaterialPageRoute(
                 builder: (context) => const ChangePasswordPage()),
           );
+        } else if (title == 'Change Transaction PIN') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const ChangePinPage()),
+          );
+        } else if (title == 'Reset Transaction PIN') {
+          _showResetPinDialog(isDark);
         } else if (title == 'Interests') {
           Navigator.push(
             context,

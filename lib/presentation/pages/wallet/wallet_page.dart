@@ -6,7 +6,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'give_page.dart';
-import 'nin_verification_page.dart';
+
 import 'set_transaction_pin_page.dart';
 
 class WalletPage extends ConsumerStatefulWidget {
@@ -21,10 +21,22 @@ class _WalletPageState extends ConsumerState<WalletPage> {
   bool _acceptedDataPolicy = false;
   bool _isAuthenticated = false;
 
+  void _handleBackNavigation() {
+    // Check if we can pop (i.e., there's a previous route)
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      // If can't pop, go to home tab
+      ref.read(mainTabIndexProvider.notifier).state = 0;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Refresh app config to get latest wallet page status
+      ref.read(appConfigChangeNotifierProvider).fetchConfig();
       _authenticateUser();
     });
   }
@@ -179,9 +191,10 @@ class _WalletPageState extends ConsumerState<WalletPage> {
   }
 
   void _navigateToCreateWallet() {
+    // Navigate to PIN setup first, then NIN verification
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const NinVerificationPage(),
+        builder: (context) => const SetTransactionPinPage(),
       ),
     );
   }
@@ -357,12 +370,6 @@ class _WalletPageState extends ConsumerState<WalletPage> {
   @override
   Widget build(BuildContext context) {
     final walletProvider = ref.watch(walletChangeNotifierProvider);
-    final appConfig = ref.watch(appConfigChangeNotifierProvider);
-    
-    // Check if wallet page is disabled
-    if (appConfig.config.walletPageDisabled) {
-      return _buildDisabledPage(context, appConfig.config.walletPageDisabledMessage);
-    }
     
     // Show loading while authenticating or loading wallet
     if (!_isAuthenticated || (walletProvider.isLoading && !walletProvider.isInitialized)) {
@@ -371,7 +378,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
           title: '',
           showBackButton: true,
           lightBackground: true,
-          onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+          onBackPressed: _handleBackNavigation,
         ),
         body: const Center(
           child: CircularProgressIndicator(
@@ -383,7 +390,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
     
     // If wallet exists but PIN not set, go to PIN setup
     if (walletProvider.hasWallet && _needsPinSetup) {
-      return const SetTransactionPinPage(nin: '', verifiedData: null);
+      return const SetTransactionPinPage();
     }
     
     // If user has wallet with PIN, go to GivePage (wallet details)
@@ -404,7 +411,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
         title: 'Wallet',
         showBackButton: true,
         lightBackground: true,
-        onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+        onBackPressed: _handleBackNavigation,
       ),
       body: Center(
         child: Padding(
@@ -463,7 +470,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
         title: 'Wallet',
         showBackButton: true,
         lightBackground: true,
-        onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+        onBackPressed: _handleBackNavigation,
       ),
       body: SingleChildScrollView(
         child: Center(

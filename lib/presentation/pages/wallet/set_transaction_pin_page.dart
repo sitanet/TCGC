@@ -6,17 +6,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../main.dart' show walletChangeNotifierProvider;
 import '../../widgets/custom_app_bar.dart';
-import 'give_page.dart';
+import 'nin_verification_page.dart';
 
 class SetTransactionPinPage extends ConsumerStatefulWidget {
-  final String nin;
-  final Map<String, dynamic>? verifiedData;
-
-  const SetTransactionPinPage({
-    super.key,
-    required this.nin,
-    this.verifiedData,
-  });
+  const SetTransactionPinPage({super.key});
 
   @override
   ConsumerState<SetTransactionPinPage> createState() => _SetTransactionPinPageState();
@@ -29,6 +22,30 @@ class _SetTransactionPinPageState extends ConsumerState<SetTransactionPinPage> {
   bool _obscurePin = true;
   bool _obscureConfirmPin = true;
   bool _isLoading = false;
+  bool _checkingPin = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkExistingPin();
+  }
+
+  Future<void> _checkExistingPin() async {
+    final walletProvider = ref.read(walletChangeNotifierProvider);
+    final hasPin = await walletProvider.checkHasPin();
+    
+    if (hasPin && mounted) {
+      // PIN already exists, skip to NIN verification
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const NinVerificationPage()),
+      );
+      return;
+    }
+    
+    if (mounted) {
+      setState(() => _checkingPin = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -37,15 +54,13 @@ class _SetTransactionPinPageState extends ConsumerState<SetTransactionPinPage> {
     super.dispose();
   }
 
-  Future<void> _createWalletAndSetPin() async {
+  Future<void> _setPin() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() => _isLoading = true);
 
     final walletProvider = ref.read(walletChangeNotifierProvider);
 
-    // Wallet should already be created during NIN verification
-    // Just set the transaction PIN directly
     debugPrint('SetTransactionPinPage: Starting PIN setup...');
     debugPrint('SetTransactionPinPage: PIN length: ${_pinController.text.length}');
     
@@ -83,8 +98,6 @@ class _SetTransactionPinPageState extends ConsumerState<SetTransactionPinPage> {
     }
 
     if (pinSuccess) {
-      // Refresh wallet data to ensure state is synced
-      await walletProvider.fetchWallet();
       // Show success popup
       await showDialog(
         context: context,
@@ -110,7 +123,7 @@ class _SetTransactionPinPageState extends ConsumerState<SetTransactionPinPage> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Wallet Created Successfully!',
+                'PIN Set Successfully!',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -119,7 +132,7 @@ class _SetTransactionPinPageState extends ConsumerState<SetTransactionPinPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Your wallet is ready. You can now make givings and offerings.',
+                'Your transaction PIN has been set. Now verify your identity to create your wallet.',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[600],
@@ -152,11 +165,10 @@ class _SetTransactionPinPageState extends ConsumerState<SetTransactionPinPage> {
         ),
       );
 
-      // Navigate to wallet details (GivePage)
+      // Navigate to NIN verification page to create wallet
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const GivePage()),
-          (route) => route.isFirst,
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const NinVerificationPage()),
         );
       }
     } else {
@@ -179,6 +191,15 @@ class _SetTransactionPinPageState extends ConsumerState<SetTransactionPinPage> {
     final bodyFontSize = Responsive.bodyFontSize(context);
     final borderRadius = Responsive.borderRadius(context);
     final iconContainerSize = Responsive.value(context, mobile: 100.0, tablet: 120.0, desktop: 140.0);
+
+    if (_checkingPin) {
+      return Scaffold(
+        appBar: const CustomAppBar(title: 'Set Transaction PIN', showBackButton: false),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primaryGold),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: const CustomAppBar(title: 'Set Transaction PIN', showBackButton: false),
@@ -292,7 +313,7 @@ class _SetTransactionPinPageState extends ConsumerState<SetTransactionPinPage> {
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _createWalletAndSetPin,
+                        onPressed: _isLoading ? null : _setPin,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryGold,
                           foregroundColor: Colors.white,
@@ -311,7 +332,7 @@ class _SetTransactionPinPageState extends ConsumerState<SetTransactionPinPage> {
                                 ),
                               )
                             : Text(
-                                'Create Wallet',
+                                'Set PIN & Continue',
                                 style: TextStyle(
                                   fontSize: bodyFontSize,
                                   fontWeight: FontWeight.w600,

@@ -18,6 +18,8 @@ class AppUser {
   final String? transactionPin;
   final String? address;
   final bool isOnline;
+  final bool ninVerified;
+  final bool bvnVerified;
   final String role;
   final bool isServiceTeamMember;
   final bool isGeneralMarried;
@@ -43,6 +45,8 @@ class AppUser {
     this.transactionPin,
     this.address,
     this.isOnline = false,
+    this.ninVerified = false,
+    this.bvnVerified = false,
     this.role = 'user',
     this.isServiceTeamMember = false,
     this.isGeneralMarried = false,
@@ -71,6 +75,8 @@ class AppUser {
       bvn: json['bvn'],
       address: json['address'],
       isOnline: json['is_online'] ?? false,
+      ninVerified: json['nin_verified'] ?? (json['nin'] != null && json['nin'].toString().isNotEmpty),
+      bvnVerified: json['bvn_verified'] ?? (json['bvn'] != null && json['bvn'].toString().isNotEmpty),
       role: json['role'] ?? 'user',
       isServiceTeamMember: json['is_service_team_member'] ?? false,
       isGeneralMarried: json['is_general_married'] ?? false,
@@ -121,6 +127,8 @@ class AppUser {
     String? transactionPin,
     String? address,
     bool? isOnline,
+    bool? ninVerified,
+    bool? bvnVerified,
     String? role,
     bool? isServiceTeamMember,
     bool? isGeneralMarried,
@@ -146,6 +154,8 @@ class AppUser {
       transactionPin: transactionPin ?? this.transactionPin,
       address: address ?? this.address,
       isOnline: isOnline ?? this.isOnline,
+      ninVerified: ninVerified ?? this.ninVerified,
+      bvnVerified: bvnVerified ?? this.bvnVerified,
       role: role ?? this.role,
       isServiceTeamMember: isServiceTeamMember ?? this.isServiceTeamMember,
       isGeneralMarried: isGeneralMarried ?? this.isGeneralMarried,
