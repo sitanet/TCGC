@@ -89,6 +89,7 @@ class _TithePageState extends ConsumerState<TithePage> {
           processTransaction: () async {
             return await walletProvider.giveWithBiometric(widget.giveOptionId, amountValue);
           },
+          getErrorMessage: () => walletProvider.error,
           successPage: SuccessPage(
             title: widget.title,
             amount: currentAmount,
@@ -195,52 +196,142 @@ class _TithePageState extends ConsumerState<TithePage> {
   void _showPinDialog(double amountValue) {
     final pinController = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    bool isProcessing = false;
     
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-        title: const Text('Enter Transaction PIN'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Amount: ₦$amount'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: pinController,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              obscureText: true,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'PIN',
-                counterText: '',
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.lock_outline, color: AppColors.primaryGold, size: 24),
+              const SizedBox(width: 8),
+              const Text('Enter Transaction PIN'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Amount: ',
+                      style: TextStyle(
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                    ),
+                    Text(
+                      '₦$amount',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: AppColors.primaryGold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: pinController,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                obscureText: true,
+                autofocus: true,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 24,
+                  letterSpacing: 8,
+                  fontWeight: FontWeight.bold,
+                ),
+                decoration: InputDecoration(
+                  hintText: '••••',
+                  hintStyle: TextStyle(
+                    color: Colors.grey[400],
+                    letterSpacing: 8,
+                  ),
+                  counterText: '',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.primaryGold, width: 2),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                ),
+                onSubmitted: (_) async {
+                  if (pinController.text.isEmpty || isProcessing) return;
+                  if (pinController.text.length < 4) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('PIN must be at least 4 digits')),
+                    );
+                    return;
+                  }
+                  setDialogState(() => isProcessing = true);
+                  Navigator.pop(dialogContext);
+                  await _executePayment(amountValue, pinController.text);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isProcessing ? null : () => Navigator.pop(dialogContext),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: isProcessing ? null : () async {
+                if (pinController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter your PIN')),
+                  );
+                  return;
+                }
+                
+                if (pinController.text.length < 4) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('PIN must be at least 4 digits')),
+                  );
+                  return;
+                }
+                
+                setDialogState(() => isProcessing = true);
+                Navigator.pop(dialogContext);
+                await _executePayment(amountValue, pinController.text);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGold,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: isProcessing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Pay Now', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (pinController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter your PIN')),
-                );
-                return;
-              }
-              
-              Navigator.pop(dialogContext);
-              await _executePayment(amountValue, pinController.text);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
-            child: const Text('Confirm', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
@@ -258,6 +349,7 @@ class _TithePageState extends ConsumerState<TithePage> {
           processTransaction: () async {
             return await walletProvider.give(widget.giveOptionId, amountValue, pin);
           },
+          getErrorMessage: () => walletProvider.error,
           successPage: SuccessPage(
             title: widget.title,
             amount: currentAmount,

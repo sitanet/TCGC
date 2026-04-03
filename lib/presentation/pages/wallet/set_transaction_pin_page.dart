@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../main.dart' show walletChangeNotifierProvider;
 import '../../widgets/custom_app_bar.dart';
+import 'give_page.dart';
 import 'nin_verification_page.dart';
 
 class SetTransactionPinPage extends ConsumerStatefulWidget {
@@ -32,10 +33,23 @@ class _SetTransactionPinPageState extends ConsumerState<SetTransactionPinPage> {
 
   Future<void> _checkExistingPin() async {
     final walletProvider = ref.read(walletChangeNotifierProvider);
+    
+    // First check if wallet already exists
+    await walletProvider.fetchWallet();
+    
+    if (walletProvider.hasWallet && mounted) {
+      // Wallet already exists, go to give page
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const GivePage()),
+        (route) => route.isFirst,
+      );
+      return;
+    }
+    
     final hasPin = await walletProvider.checkHasPin();
     
     if (hasPin && mounted) {
-      // PIN already exists, skip to NIN verification
+      // PIN already exists but no wallet, go to NIN verification
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const NinVerificationPage()),
       );

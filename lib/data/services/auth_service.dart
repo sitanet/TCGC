@@ -317,10 +317,20 @@ class AuthService {
     });
 
     if (response.isSuccess) {
+      // Check if wallet creation failed even though NIN verification succeeded
+      final walletError = response.data['wallet_error'];
+      if (walletError != null) {
+        return KycResult(
+          success: false,
+          error: 'NIN verified but wallet creation failed: $walletError',
+          verifiedData: response.data['data'],
+        );
+      }
       return KycResult(
         success: true,
         message: response.data['message'],
         verifiedData: response.data['data'],
+        walletData: response.data['wallet'],
       );
     }
     return KycResult(
@@ -391,6 +401,7 @@ class KycResult {
   final String? error;
   final String? message;
   final Map<String, dynamic>? verifiedData;
+  final Map<String, dynamic>? walletData;
   final bool ninVerified;
   final bool bvnVerified;
   final List<String> mismatches;
@@ -402,6 +413,7 @@ class KycResult {
     this.error,
     this.message,
     this.verifiedData,
+    this.walletData,
     this.ninVerified = false,
     this.bvnVerified = false,
     this.mismatches = const [],

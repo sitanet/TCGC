@@ -10,6 +10,7 @@ class TransactionProcessingPage extends StatefulWidget {
   final Future<bool> Function() processTransaction;
   final Widget successPage;
   final String? errorMessage;
+  final String? Function()? getErrorMessage; // Callback to get error message after processing
 
   const TransactionProcessingPage({
     super.key,
@@ -18,6 +19,7 @@ class TransactionProcessingPage extends StatefulWidget {
     required this.processTransaction,
     required this.successPage,
     this.errorMessage,
+    this.getErrorMessage,
   });
 
   @override
@@ -140,6 +142,9 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
 
         if (!mounted) return;
 
+        // Get the error message from callback or use default
+        final errorMsg = widget.getErrorMessage?.call() ?? widget.errorMessage;
+
         // Navigate to failure page instead of just returning
         Navigator.pushReplacement(
           context,
@@ -147,7 +152,7 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
             builder: (_) => FailurePage(
               title: widget.title,
               amount: widget.amount,
-              errorMessage: widget.errorMessage,
+              errorMessage: errorMsg,
               onRetry: () {
                 // Pop back to the amount entry page
                 Navigator.pop(context);
@@ -168,6 +173,9 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
 
       if (!mounted) return;
 
+      // Get the error message from callback or use exception message
+      final errorMsg = widget.getErrorMessage?.call() ?? e.toString();
+
       // Navigate to failure page on error
       Navigator.pushReplacement(
         context,
@@ -175,7 +183,7 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
           builder: (_) => FailurePage(
             title: widget.title,
             amount: widget.amount,
-            errorMessage: e.toString(),
+            errorMessage: errorMsg,
             onRetry: () {
               Navigator.pop(context);
             },

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../../data/services/api_service.dart';
 import '../../core/constants/api_constants.dart';
@@ -163,6 +164,9 @@ class WalletProvider extends ChangeNotifier {
   Future<void> fetchWallet() async {
     try {
       final response = await _api.get(ApiConstants.walletDetails);
+      
+      // Debug: Log API response to diagnose wallet detection
+      debugPrint('WalletProvider.fetchWallet: status=${response.statusCode}, body=${response.body}');
       
       if (response.isSuccess) {
         final data = response.data;
@@ -391,14 +395,25 @@ class WalletProvider extends ChangeNotifier {
         return true;
       }
       
-      _error = response.errorMessage;
+      // Extract detailed error message from response
+      try {
+        final data = response.data;
+        _error = data['error'] ?? data['detail'] ?? data['message'] ?? response.errorMessage ?? 'Transaction failed';
+        // Include error code if available
+        if (data['error_code'] != null) {
+          debugPrint('WalletProvider.give: Error code=${data['error_code']}');
+        }
+      } catch (_) {
+        _error = response.errorMessage ?? 'Transaction failed';
+      }
+      
       debugPrint('WalletProvider.give: Failed - error=$_error');
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
       debugPrint('WalletProvider.give: Exception - $e');
-      _error = 'Failed to process giving';
+      _error = 'Failed to process giving: ${e.toString()}';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -492,16 +507,34 @@ class WalletProvider extends ChangeNotifier {
   Future<bool> verifyPin(String pin) async {
     _error = null;
     try {
+      debugPrint('WalletProvider.verifyPin: Verifying PIN...');
+      debugPrint('WalletProvider.verifyPin: Endpoint: ${ApiConstants.transactionPin}verify/');
+      
       final response = await _api.post('${ApiConstants.transactionPin}verify/', {
         'pin': pin,
       });
+      
+      debugPrint('WalletProvider.verifyPin: Response statusCode=${response.statusCode}');
+      debugPrint('WalletProvider.verifyPin: Response isSuccess=${response.isSuccess}');
+      debugPrint('WalletProvider.verifyPin: Response body=${response.body}');
+      
       if (response.isSuccess && response.data['valid'] == true) {
+        debugPrint('WalletProvider.verifyPin: PIN verified successfully');
         return true;
       }
-      _error = response.errorMessage ?? 'Invalid PIN';
+      
+      // Try to get more specific error
+      try {
+        final data = response.data;
+        _error = data['error'] ?? data['message'] ?? data['detail'] ?? response.errorMessage ?? 'Invalid PIN';
+      } catch (_) {
+        _error = response.errorMessage ?? 'Invalid PIN';
+      }
+      
+      debugPrint('WalletProvider.verifyPin: PIN verification failed - $_error');
       return false;
     } catch (e) {
-      debugPrint('Error verifying PIN: $e');
+      debugPrint('WalletProvider.verifyPin: Exception - $e');
       _error = 'Failed to verify PIN';
       return false;
     }
@@ -594,6 +627,126 @@ class WalletProvider extends ChangeNotifier {
       debugPrint('Error fetching upgrade status: $e');
     }
     notifyListeners();
+  }
+
+  Future<bool> upgradeWallet({
+    required int targetTier,
+    required String bvn,
+    required String nin,
+    required int idType,
+    required String idNumber,
+    required String idIssueDate,
+    String? idExpiryDate,
+    required String houseNumber,
+    required String streetName,
+    required String city,
+    required String state,
+    required String localGovernment,
+    required String nearestLandmark,
+    required File userPhoto,
+    required File idCardFront,
+    File? idCardBack,
+    required File customerSignature,
+    required File utilityBill,
+    File? proofOfAddress,
+    bool isPep = false,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      debugPrint('WalletProvider.upgradeWallet: Starting upgrade to tier $targetTier');
+      
+      final fields = {
+        'tier': targetTier.toString(),
+        'bvn': bvn,
+        'nin': nin,
+        'id_type': idType.toString(),
+        'id_number': idNumber,
+        'id_issue_date': idIssueDate,
+        'id_expiry_date': idExpiryDate ?? '',
+        'house_number': houseNumber,
+        'street_name': streetName,
+        'city': city,
+        'state': state,
+        'local_government': localGovernment,
+        'nearest_landmark': nearestLandmark,
+        'pep': isPep ? 'YES' : 'NO',
+      };
+
+      final files = <String, File>{
+        'user_photo': userPhoto,
+        'id_card_front': idCardFront,
+        'customer_signature': customerSignature,
+        'utility_bill': utilityBill,
+      };
+
+      if (idCardBack != null) {
+        files['id_card_back'] = idCardBack;
+      }
+
+      if (targetTier == 3 && proofOfAddress != null) {
+        files['proof_of_address'] = proofOfAddress;
+      }
+
+      debugPrint('WalletProvider.upgradeWallet: Sending request to ${ApiConstants.walletUpgrade}');
+      debugPrint('WalletProvider.upgradeWallet: Fields: $fields');
+      debugPrint('WalletProvider.upgradeWallet: Files: ${files.keys.toList()}');
+
+      final response = await _api.postMultipart(
+        ApiConstants.walletUpgrade,
+        fields: fields,
+        files: files,
+      );
+
+      debugPrint('WalletProvider.upgradeWallet: Response statusCode=${response.statusCode}');
+      debugPrint('WalletProvider.upgradeWallet: Response isSuccess=${response.isSuccess}');
+      debugPrint('WalletProvider.upgradeWallet: Response body=${response.body}');
+
+      _isLoading = false;
+      if (response.isSuccess) {
+        _hasPendingUpgrade = true;
+        debugPrint('WalletProvider.upgradeWallet: Upgrade request submitted successfully');
+        notifyListeners();
+        return true;
+      }
+
+      // Extract detailed error message from response
+      try {
+        final data = response.data;
+        if (data is Map) {
+          // Check for field-specific errors
+          final errors = <String>[];
+          data.forEach((key, value) {
+            if (value is List && value.isNotEmpty) {
+              errors.add('$key: ${value.join(', ')}');
+            } else if (value is String) {
+              errors.add(value);
+            }
+          });
+          if (errors.isNotEmpty) {
+            _error = errors.join('\n');
+          } else {
+            _error = data['error'] ?? data['detail'] ?? data['message'] ?? response.errorMessage ?? 'Failed to submit upgrade request';
+          }
+        } else {
+          _error = response.errorMessage ?? 'Failed to submit upgrade request';
+        }
+      } catch (_) {
+        _error = response.errorMessage ?? 'Failed to submit upgrade request';
+      }
+      
+      debugPrint('WalletProvider.upgradeWallet: Failed - $_error');
+      notifyListeners();
+      return false;
+    } catch (e) {
+      debugPrint('WalletProvider.upgradeWallet: Exception - $e');
+      _error = 'Failed to submit upgrade request: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   void setCurrency(String currency) {

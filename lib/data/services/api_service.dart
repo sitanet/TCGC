@@ -331,6 +331,66 @@ class ApiService {
       );
     }
   }
+
+  Future<ApiResponse> postMultipart(
+    String endpoint, {
+    required Map<String, String> fields,
+    Map<String, File>? files,
+  }) async {
+    try {
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${ApiConstants.baseUrl}$endpoint'),
+      );
+
+      if (_accessToken != null) {
+        request.headers['Authorization'] = 'Bearer $_accessToken';
+      }
+
+      request.fields.addAll(fields);
+
+      if (files != null) {
+        for (var entry in files.entries) {
+          request.files.add(
+            await http.MultipartFile.fromPath(entry.key, entry.value.path),
+          );
+        }
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 401 && await _refreshAccessToken()) {
+        request = http.MultipartRequest(
+          'POST',
+          Uri.parse('${ApiConstants.baseUrl}$endpoint'),
+        );
+        request.headers['Authorization'] = 'Bearer $_accessToken';
+        request.fields.addAll(fields);
+        if (files != null) {
+          for (var entry in files.entries) {
+            request.files.add(
+              await http.MultipartFile.fromPath(entry.key, entry.value.path),
+            );
+          }
+        }
+        streamedResponse = await request.send();
+        response = await http.Response.fromStream(streamedResponse);
+      }
+
+      return ApiResponse(
+        statusCode: response.statusCode,
+        body: response.body,
+        isSuccess: response.statusCode >= 200 && response.statusCode < 300,
+      );
+    } catch (e) {
+      return ApiResponse(
+        statusCode: 0,
+        body: jsonEncode({'error': e.toString()}),
+        isSuccess: false,
+      );
+    }
+  }
 }
 
 class ApiResponse {

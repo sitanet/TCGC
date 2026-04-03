@@ -11,6 +11,7 @@ import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'tithe_page.dart';
 import 'transactions_page.dart';
+import 'wallet_upgrade_page.dart';
 
 class GivePage extends ConsumerStatefulWidget {
   const GivePage({super.key});
@@ -1032,6 +1033,8 @@ class _GivePageState extends ConsumerState<GivePage> {
   }
 
   Widget _buildMenuItems(BuildContext context, bool isDark) {
+    final walletProvider = ref.watch(walletChangeNotifierProvider);
+    
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : Colors.white,
@@ -1085,6 +1088,75 @@ class _GivePageState extends ConsumerState<GivePage> {
               context,
               MaterialPageRoute(builder: (_) => const TransactionsPage()),
             ),
+          ),
+          // Upgrade Wallet (only show if tier < 3)
+          if (walletProvider.tier < 3) ...[
+            Divider(
+              height: 1,
+              indent: 72,
+              color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+            ),
+            _buildMenuItem(
+              context: context,
+              isDark: isDark,
+              icon: Icons.upgrade_rounded,
+              gradientColors: [Colors.teal.shade400, Colors.teal.shade600],
+              title: 'Upgrade Wallet',
+              subtitle: walletProvider.hasPendingUpgrade 
+                  ? 'Upgrade pending review' 
+                  : 'Increase your transaction limits',
+              onTap: walletProvider.hasPendingUpgrade
+                  ? () => _showPendingUpgradeInfo(context, isDark)
+                  : () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const WalletUpgradePage()),
+                    ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  void _showPendingUpgradeInfo(BuildContext context, bool isDark) {
+    final walletProvider = ref.read(walletChangeNotifierProvider);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.hourglass_empty, color: Colors.orange[600]),
+            const SizedBox(width: 8),
+            const Text('Upgrade Pending'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your wallet upgrade request is being reviewed by 9PSB.',
+              style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[700]),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Current Tier: ${walletProvider.tierName}',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This process typically takes 1-3 business days.',
+              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK', style: TextStyle(color: AppColors.primaryGold)),
           ),
         ],
       ),

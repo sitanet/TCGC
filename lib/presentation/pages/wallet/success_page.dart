@@ -4,8 +4,11 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
@@ -706,32 +709,233 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
   }
 
   Future<void> _generatePdfReceipt(BuildContext context) async {
-    // For PDF, we'll generate a simple text-based share for now
-    // You can add pdf package later for proper PDF generation
-    final receiptText = '''
-THE CITYGATE CHURCH
-━━━━━━━━━━━━━━━━━━━━━━
-PAYMENT RECEIPT
-━━━━━━━━━━━━━━━━━━━━━━
-
-Type: ${widget.title}
-Amount: ₦${widget.amount}
-Date: ${_formatDate(DateTime.now())}
-${widget.reference != null ? 'Reference: ${widget.reference}' : ''}
-Recipient: The CityGate Apostolic Kingdom Ministry
-
-━━━━━━━━━━━━━━━━━━━━━━
-"Give, and it will be given to you..."
-- Luke 6:38
-━━━━━━━━━━━━━━━━━━━━━━
-
-Thank you for your generosity!
-God bless you abundantly.
-''';
+    final pdf = pw.Document();
     
-    await Share.share(
-      receiptText,
+    // Gold color for PDF
+    final goldColor = PdfColor.fromHex('#D4AF37');
+    final successColor = PdfColor.fromHex('#4CAF50');
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(40),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              // Header
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(20),
+                decoration: pw.BoxDecoration(
+                  color: goldColor,
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Column(
+                  children: [
+                    pw.Text(
+                      'THE CITYGATE CHURCH',
+                      style: pw.TextStyle(
+                        fontSize: 24,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    pw.SizedBox(height: 8),
+                    pw.Text(
+                      'Apostolic Kingdom Ministry',
+                      style: const pw.TextStyle(
+                        fontSize: 12,
+                        color: PdfColors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 30),
+              
+              // Receipt Title
+              pw.Text(
+                'PAYMENT RECEIPT',
+                style: pw.TextStyle(
+                  fontSize: 18,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.grey800,
+                  letterSpacing: 3,
+                ),
+              ),
+              pw.SizedBox(height: 30),
+              
+              // Success Badge
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: pw.BoxDecoration(
+                  color: successColor,
+                  borderRadius: pw.BorderRadius.circular(20),
+                ),
+                child: pw.Text(
+                  'PAYMENT SUCCESSFUL',
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.white,
+                  ),
+                ),
+              ),
+              pw.SizedBox(height: 30),
+              
+              // Amount
+              pw.Text(
+                'NGN ${widget.amount}',
+                style: pw.TextStyle(
+                  fontSize: 36,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.grey900,
+                ),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Text(
+                widget.title,
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  color: goldColor,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 40),
+              
+              // Divider
+              pw.Container(
+                width: double.infinity,
+                height: 1,
+                color: PdfColors.grey300,
+              ),
+              pw.SizedBox(height: 30),
+              
+              // Details
+              _buildPdfDetailRow('Date', _formatDate(DateTime.now())),
+              pw.SizedBox(height: 15),
+              _buildPdfDetailRow('Type', widget.title),
+              pw.SizedBox(height: 15),
+              _buildPdfDetailRow('Recipient', 'The CityGate Church'),
+              if (widget.reference != null) ...[
+                pw.SizedBox(height: 15),
+                _buildPdfDetailRow('Reference', widget.reference!),
+              ],
+              pw.SizedBox(height: 30),
+              
+              // Divider
+              pw.Container(
+                width: double.infinity,
+                height: 1,
+                color: PdfColors.grey300,
+              ),
+              pw.SizedBox(height: 30),
+              
+              // Quote
+              pw.Container(
+                padding: const pw.EdgeInsets.all(20),
+                decoration: pw.BoxDecoration(
+                  color: PdfColor.fromHex('#FFF8E1'),
+                  borderRadius: pw.BorderRadius.circular(8),
+                  border: pw.Border.all(color: goldColor, width: 1),
+                ),
+                child: pw.Column(
+                  children: [
+                    pw.Text(
+                      '"Give, and it will be given to you. A good measure, pressed down, shaken together and running over, will be poured into your lap."',
+                      style: pw.TextStyle(
+                        fontSize: 12,
+                        fontStyle: pw.FontStyle.italic,
+                        color: PdfColors.grey700,
+                      ),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                    pw.SizedBox(height: 8),
+                    pw.Text(
+                      '- Luke 6:38',
+                      style: pw.TextStyle(
+                        fontSize: 11,
+                        fontWeight: pw.FontWeight.bold,
+                        color: goldColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 30),
+              
+              // Footer
+              pw.Text(
+                'Thank you for your generosity!',
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.grey700,
+                ),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Text(
+                'God bless you abundantly.',
+                style: const pw.TextStyle(
+                  fontSize: 12,
+                  color: PdfColors.grey600,
+                ),
+              ),
+              pw.Spacer(),
+              
+              // Generated timestamp
+              pw.Text(
+                'Generated on ${DateTime.now().toString().substring(0, 19)}',
+                style: const pw.TextStyle(
+                  fontSize: 9,
+                  color: PdfColors.grey400,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    
+    // Save PDF to temp directory
+    final tempDir = await getTemporaryDirectory();
+    final fileName = 'TCGC_Receipt_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final file = File('${tempDir.path}/$fileName');
+    await file.writeAsBytes(await pdf.save());
+    
+    // Share the PDF file
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      text: 'My ${widget.title} receipt from The CityGate Church',
       subject: 'TCGC ${widget.title} Receipt',
+    );
+  }
+  
+  pw.Widget _buildPdfDetailRow(String label, String value) {
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        pw.Text(
+          label,
+          style: const pw.TextStyle(
+            fontSize: 12,
+            color: PdfColors.grey600,
+          ),
+        ),
+        pw.Flexible(
+          child: pw.Text(
+            value,
+            style: pw.TextStyle(
+              fontSize: 12,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.grey800,
+            ),
+            textAlign: pw.TextAlign.right,
+          ),
+        ),
+      ],
     );
   }
 
