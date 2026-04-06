@@ -43,6 +43,7 @@ class _GivePageState extends ConsumerState<GivePage> {
       provider.fetchTransactions();
       provider.fetchGivings();
       provider.fetchGiveOptions();
+      provider.fetchUpgradeStatus(); // Check for pending/approved upgrades
     });
   }
 
@@ -774,6 +775,9 @@ class _GivePageState extends ConsumerState<GivePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 10),
+                // Show upgrade status banner if pending or recently approved
+                if (walletProvider.hasPendingUpgrade || walletProvider.upgradeRequest != null)
+                  _buildUpgradeStatusBanner(context, isDark, walletProvider),
                 _buildPortfolioCard(context, isDark, walletProvider),
                 const SizedBox(height: 24),
                 Padding(
@@ -1118,6 +1122,102 @@ class _GivePageState extends ConsumerState<GivePage> {
     );
   }
   
+  Widget _buildUpgradeStatusBanner(BuildContext context, bool isDark, WalletProvider walletProvider) {
+    final upgradeRequest = walletProvider.upgradeRequest;
+    final status = upgradeRequest?['status'] ?? 'pending';
+    final targetTier = upgradeRequest?['target_tier'] ?? upgradeRequest?['tier'];
+    
+    final bool isPending = status == 'pending' || status == 'submitted' || status == 'under_review';
+    final bool isApproved = status == 'approved' || status == 'completed';
+    final bool isRejected = status == 'rejected' || status == 'declined';
+    
+    if (!isPending && !isApproved && !isRejected && !walletProvider.hasPendingUpgrade) {
+      return const SizedBox.shrink();
+    }
+    
+    Color backgroundColor;
+    Color borderColor;
+    Color iconColor;
+    IconData icon;
+    String title;
+    String subtitle;
+    
+    if (isApproved) {
+      backgroundColor = Colors.green.withValues(alpha: 0.1);
+      borderColor = Colors.green.withValues(alpha: 0.3);
+      iconColor = Colors.green;
+      icon = Icons.check_circle;
+      title = 'Upgrade Approved';
+      subtitle = targetTier != null 
+          ? 'Your wallet has been upgraded to Tier $targetTier'
+          : 'Your wallet upgrade has been approved';
+    } else if (isRejected) {
+      backgroundColor = Colors.red.withValues(alpha: 0.1);
+      borderColor = Colors.red.withValues(alpha: 0.3);
+      iconColor = Colors.red;
+      icon = Icons.cancel;
+      title = 'Upgrade Declined';
+      subtitle = upgradeRequest?['rejection_reason'] ?? 'Your upgrade request was not approved. Please try again.';
+    } else {
+      backgroundColor = Colors.orange.withValues(alpha: 0.1);
+      borderColor = Colors.orange.withValues(alpha: 0.3);
+      iconColor = Colors.orange;
+      icon = Icons.hourglass_empty;
+      title = 'Upgrade Pending';
+      subtitle = targetTier != null 
+          ? 'Your Tier $targetTier upgrade is being reviewed'
+          : 'Your upgrade request is being reviewed';
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(23, 0, 23, 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showPendingUpgradeInfo(BuildContext context, bool isDark) {
     final walletProvider = ref.read(walletChangeNotifierProvider);
     

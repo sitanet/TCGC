@@ -2090,19 +2090,9 @@ Download Citygate mobile: $playStoreLink''';
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   Navigator.pop(context);
-                  if (walletProvider.hasWallet) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const GivePage()),
-                    );
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const WalletPage()),
-                    );
-                  }
+                  await _authenticateAndNavigateToGive(walletProvider.hasWallet);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryGold,
@@ -2140,6 +2130,202 @@ Download Citygate mobile: $playStoreLink''';
               ),
             ),
             const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _authenticateAndNavigateToGive(bool hasWallet) async {
+    if (!mounted) return;
+    
+    final walletProvider = ref.read(walletChangeNotifierProvider);
+    
+    // If no wallet, just navigate to wallet page (no auth needed yet)
+    if (!hasWallet) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const WalletPage()),
+      );
+      return;
+    }
+    
+    // Check if PIN is set
+    final hasPin = await walletProvider.checkHasPin();
+    if (!hasPin) {
+      // No PIN set, just navigate to give page
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const GivePage()),
+        );
+      }
+      return;
+    }
+    
+    // Try biometric authentication first
+    final biometricProvider = ref.read(biometricChangeNotifierProvider);
+    await biometricProvider.initialize();
+    
+    if (biometricProvider.biometricTransactionEnabled && biometricProvider.isAvailable) {
+      final authenticated = await biometricProvider.authenticateForTransaction();
+      if (authenticated && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const GivePage()),
+        );
+        return;
+      }
+    }
+    
+    // Fall back to PIN dialog
+    if (mounted) {
+      _showGivePinDialog();
+    }
+  }
+
+  void _showGivePinDialog() {
+    final pinController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    bool isVerifying = false;
+
+    showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.lock_outline, color: AppColors.primaryGold, size: 24),
+              const SizedBox(width: 8),
+              const Text('Enter Transaction PIN'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Enter your PIN to continue',
+                style: TextStyle(
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: pinController,
+                keyboardType: TextInputType.number,
+                maxLength: 4,
+                obscureText: true,
+                autofocus: true,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 24,
+                  letterSpacing: 8,
+                  fontWeight: FontWeight.bold,
+                ),
+                decoration: InputDecoration(
+                  hintText: '••••',
+                  hintStyle: TextStyle(
+                    color: Colors.grey[400],
+                    letterSpacing: 8,
+                  ),
+                  counterText: '',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.primaryGold, width: 2),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                ),
+                onSubmitted: (_) async {
+                  if (pinController.text.isEmpty || isVerifying) return;
+                  setDialogState(() => isVerifying = true);
+                  
+                  final walletProvider = ref.read(walletChangeNotifierProvider);
+                  final isValid = await walletProvider.verifyPin(pinController.text);
+                  
+                  if (!mounted) return;
+                  
+                  if (isValid) {
+                    Navigator.pop(dialogContext, true);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const GivePage()),
+                    );
+                  } else {
+                    setDialogState(() => isVerifying = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Invalid PIN. Please try again.'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    pinController.clear();
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: isVerifying
+                  ? null
+                  : () async {
+                      if (pinController.text.isEmpty) return;
+                      setDialogState(() => isVerifying = true);
+                      
+                      final walletProvider = ref.read(walletChangeNotifierProvider);
+                      final isValid = await walletProvider.verifyPin(pinController.text);
+                      
+                      if (!mounted) return;
+                      
+                      if (isValid) {
+                        Navigator.pop(dialogContext, true);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const GivePage()),
+                        );
+                      } else {
+                        setDialogState(() => isVerifying = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Invalid PIN. Please try again.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        pinController.clear();
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGold,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: isVerifying
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Verify'),
+            ),
           ],
         ),
       ),

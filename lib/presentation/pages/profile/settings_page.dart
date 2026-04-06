@@ -590,77 +590,111 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       BiometricProvider biometricProvider, String email) {
     final passwordController = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    bool isVerifying = false;
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-        title: const Text('Enable Fingerprint Login'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Enter the password you created when you registered for the app. '
-              'This is NOT your phone unlock pattern or PIN.',
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Account Password',
-                border: OutlineInputBorder(),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+          title: const Text('Enable Fingerprint Login'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter the password you created when you registered for the app. '
+                'This is NOT your phone unlock pattern or PIN.',
               ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                enabled: !isVerifying,
+                decoration: const InputDecoration(
+                  labelText: 'Account Password',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isVerifying ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isVerifying
+                  ? null
+                  : () async {
+                      if (passwordController.text.isEmpty) {
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Please enter your password')),
+                        );
+                        return;
+                      }
+                      
+                      setDialogState(() => isVerifying = true);
+                      
+                      // Verify password with backend first
+                      final authProvider = ref.read(authChangeNotifierProvider);
+                      final isValid = await authProvider.verifyPassword(passwordController.text);
+                      
+                      if (!isValid) {
+                        setDialogState(() => isVerifying = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text(authProvider.error ?? 'Invalid password'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                      
+                      final password = passwordController.text;
+                      Navigator.pop(dialogContext);
+                      
+                      await biometricProvider.setBiometricLoginEnabled(
+                        true,
+                        email: email,
+                        password: password,
+                      );
+                      
+                      if (!mounted) return;
+                      
+                      if (biometricProvider.biometricLoginEnabled) {
+                        setState(() => _biometricLogin = true);
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Fingerprint login enabled')),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Fingerprint authentication failed or was cancelled. Please try again.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGold),
+              child: isVerifying
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Enable', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (passwordController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Please enter your password')),
-                );
-                return;
-              }
-              final password = passwordController.text;
-              Navigator.pop(dialogContext);
-              
-              await biometricProvider.setBiometricLoginEnabled(
-                true,
-                email: email,
-                password: password,
-              );
-              
-              if (!mounted) return;
-              
-              if (biometricProvider.biometricLoginEnabled) {
-                setState(() => _biometricLogin = true);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Fingerprint login enabled')),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Fingerprint authentication failed or was cancelled. Please try again.'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGold),
-            child:
-                const Text('Enable', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }

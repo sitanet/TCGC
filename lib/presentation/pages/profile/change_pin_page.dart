@@ -435,7 +435,7 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Enter your current PIN and create a new 6-digit PIN.',
+                  'Enter your current PIN and create a new 4-digit PIN.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: isDark
                             ? AppColors.textSecondaryDark
@@ -454,11 +454,12 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your current PIN';
                     }
-                    if (value.length != 6) {
-                      return 'PIN must be 6 digits';
+                    if (value.length != 4) {
+                      return 'PIN must be 4 digits';
                     }
                     return null;
                   },
+                  maxLength: 4,
                 ),
                 const SizedBox(height: 20),
                 _buildPinField(
@@ -472,14 +473,15 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                     if (value == null || value.isEmpty) {
                       return 'Please enter a new PIN';
                     }
-                    if (value.length != 6) {
-                      return 'PIN must be 6 digits';
+                    if (value.length != 4) {
+                      return 'PIN must be 4 digits';
                     }
                     if (value == _currentPinController.text) {
                       return 'New PIN must be different from current PIN';
                     }
                     return null;
                   },
+                  maxLength: 4,
                 ),
                 const SizedBox(height: 20),
                 _buildPinField(
@@ -498,6 +500,7 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                     }
                     return null;
                   },
+                  maxLength: 4,
                 ),
                 const SizedBox(height: 40),
                 SizedBox(

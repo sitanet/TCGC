@@ -129,13 +129,14 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
     final isDark = Theme.of(context).brightness == Brightness.dark;
     bool isVerifying = false;
 
-    showDialog(
+    showDialog<bool>(
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) => PopScope(
         canPop: true,
         onPopInvokedWithResult: (didPop, result) {
-          if (didPop) {
+          if (didPop && result != true) {
+            // Only go to home if user cancelled (result is null or false), not if PIN was verified (result is true)
             _authenticationInProgress = false;
             ref.read(mainTabIndexProvider.notifier).state = 0;
           }
@@ -164,7 +165,7 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
                 TextField(
                   controller: pinController,
                   keyboardType: TextInputType.number,
-                  maxLength: 6,
+                  maxLength: 4,
                   obscureText: true,
                   autofocus: true,
                   textAlign: TextAlign.center,
@@ -199,7 +200,7 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
 
                     if (isValid && mounted) {
                       _authenticationInProgress = false;
-                      Navigator.pop(dialogContext);
+                      Navigator.pop(dialogContext, true);
                       setState(() => _isAuthenticated = true);
                       _checkWalletStatus();
                     } else if (mounted) {
@@ -250,7 +251,7 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
 
                   if (isValid && mounted) {
                     _authenticationInProgress = false;
-                    Navigator.pop(dialogContext);
+                    Navigator.pop(dialogContext, true);
                     setState(() => _isAuthenticated = true);
                     _checkWalletStatus();
                   } else if (mounted) {

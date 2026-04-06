@@ -740,9 +740,17 @@ class WalletProvider extends ChangeNotifier {
       debugPrint('WalletProvider.upgradeWallet: Failed - $_error');
       notifyListeners();
       return false;
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('WalletProvider.upgradeWallet: Exception - $e');
-      _error = 'Failed to submit upgrade request: ${e.toString()}';
+      debugPrint('WalletProvider.upgradeWallet: StackTrace - $stackTrace');
+      // Show detailed error for debugging on device
+      String errorDetail = e.toString();
+      if (e is SocketException) {
+        errorDetail = 'Network error: Unable to connect to server. Check your internet connection.';
+      } else if (errorDetail.contains('TimeoutException')) {
+        errorDetail = 'Request timed out. The files may be too large or your connection is slow.';
+      }
+      _error = 'Upgrade failed: $errorDetail';
       _isLoading = false;
       notifyListeners();
       return false;

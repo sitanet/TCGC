@@ -67,6 +67,11 @@ class _WalletUpgradePageState extends ConsumerState<WalletUpgradePage> {
     final walletProvider = ref.read(walletChangeNotifierProvider);
     _targetTier = walletProvider.tier == 1 ? 2 : 3;
     
+    // Check if there's already a pending upgrade - redirect back
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingUpgrade();
+    });
+    
     // Pre-fill BVN and NIN from auth provider if available
     final authProvider = ref.read(authChangeNotifierProvider);
     if (authProvider.user?.bvn != null) {
@@ -74,6 +79,23 @@ class _WalletUpgradePageState extends ConsumerState<WalletUpgradePage> {
     }
     if (authProvider.user?.nin != null) {
       _ninController.text = authProvider.user!.nin!;
+    }
+  }
+  
+  Future<void> _checkPendingUpgrade() async {
+    final walletProvider = ref.read(walletChangeNotifierProvider);
+    await walletProvider.fetchUpgradeStatus();
+    
+    if (walletProvider.hasPendingUpgrade && mounted) {
+      // Show message and navigate back
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You already have a pending upgrade request. Please wait for it to be reviewed.'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      Navigator.pop(context);
     }
   }
 

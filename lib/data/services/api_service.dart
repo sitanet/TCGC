@@ -22,9 +22,24 @@ class ApiService {
 
   String? _accessToken;
   String? _refreshToken;
+  
+  // Current app build number - update this when releasing new versions
+  static const String currentBuildNumber = '4';
+  static const String _buildNumberKey = 'auth_build_number';
 
   Future<void> loadTokens() async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // Check if app was updated - if so, clear tokens and force re-login
+    final storedBuildNumber = prefs.getString(_buildNumberKey);
+    if (storedBuildNumber != null && storedBuildNumber != currentBuildNumber) {
+      // App was updated, clear auth tokens
+      debugPrint('App updated from build $storedBuildNumber to $currentBuildNumber - clearing auth cache');
+      await clearTokens();
+      await prefs.setString(_buildNumberKey, currentBuildNumber);
+      return;
+    }
+    
     _accessToken = prefs.getString('access_token');
     _refreshToken = prefs.getString('refresh_token');
   }
@@ -33,6 +48,8 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('access_token', access);
     await prefs.setString('refresh_token', refresh);
+    // Save current build number when user logs in
+    await prefs.setString(_buildNumberKey, currentBuildNumber);
     _accessToken = access;
     _refreshToken = refresh;
   }
@@ -338,6 +355,10 @@ class ApiService {
     Map<String, File>? files,
   }) async {
     try {
+      debugPrint('ApiService postMultipart: ${ApiConstants.baseUrl}$endpoint');
+      debugPrint('ApiService postMultipart fields: $fields');
+      debugPrint('ApiService postMultipart files: ${files?.keys.toList()}');
+      
       var request = http.MultipartRequest(
         'POST',
         Uri.parse('${ApiConstants.baseUrl}$endpoint'),
@@ -351,14 +372,19 @@ class ApiService {
 
       if (files != null) {
         for (var entry in files.entries) {
+          final file = entry.value;
+          debugPrint('ApiService postMultipart: Adding file ${entry.key} from ${file.path}, exists: ${file.existsSync()}');
           request.files.add(
-            await http.MultipartFile.fromPath(entry.key, entry.value.path),
+            await http.MultipartFile.fromPath(entry.key, file.path),
           );
         }
       }
 
-      var streamedResponse = await request.send();
+      var streamedResponse = await request.send().timeout(const Duration(seconds: 120));
       var response = await http.Response.fromStream(streamedResponse);
+      
+      debugPrint('ApiService postMultipart response: ${response.statusCode}');
+      debugPrint('ApiService postMultipart body: ${response.body}');
 
       if (response.statusCode == 401 && await _refreshAccessToken()) {
         request = http.MultipartRequest(
@@ -374,8 +400,9 @@ class ApiService {
             );
           }
         }
-        streamedResponse = await request.send();
+        streamedResponse = await request.send().timeout(const Duration(seconds: 120));
         response = await http.Response.fromStream(streamedResponse);
+        debugPrint('ApiService postMultipart retry response: ${response.statusCode}');
       }
 
       return ApiResponse(
@@ -383,7 +410,9 @@ class ApiService {
         body: response.body,
         isSuccess: response.statusCode >= 200 && response.statusCode < 300,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('ApiService postMultipart error: $e');
+      debugPrint('ApiService postMultipart stackTrace: $stackTrace');
       return ApiResponse(
         statusCode: 0,
         body: jsonEncode({'error': e.toString()}),
