@@ -70,6 +70,38 @@ class ApiService {
         if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
       };
 
+  // Headers without authentication - for public endpoints like login/register
+  Map<String, String> get _publicHeaders => {
+        'Content-Type': 'application/json',
+      };
+
+  /// POST request without authentication header - use for login/register
+  Future<ApiResponse> postPublic(String endpoint, Map<String, dynamic> data) async {
+    try {
+      print('ApiService POST (public): ${ApiConstants.baseUrl}$endpoint');
+      final response = await http.post(
+        Uri.parse('${ApiConstants.baseUrl}$endpoint'),
+        headers: _publicHeaders,
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 60));
+
+      print('ApiService POST (public) response: ${response.statusCode}');
+
+      return ApiResponse(
+        statusCode: response.statusCode,
+        body: response.body,
+        isSuccess: response.statusCode >= 200 && response.statusCode < 300,
+      );
+    } catch (e) {
+      print('ApiService POST (public) error: $e');
+      return ApiResponse(
+        statusCode: 0,
+        body: jsonEncode({'error': e.toString()}),
+        isSuccess: false,
+      );
+    }
+  }
+
   Future<bool> _refreshAccessToken() async {
     if (_refreshToken == null) return false;
     

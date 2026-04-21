@@ -9,7 +9,8 @@ class AuthService {
 
   Future<AuthResult> login(String email, String password) async {
     final normalizedEmail = email.toLowerCase();
-    final response = await _api.post(ApiConstants.login, {
+    // Use postPublic to avoid sending expired tokens with login request
+    final response = await _api.postPublic(ApiConstants.login, {
       'email': normalizedEmail,
       'password': password,
     });
@@ -48,7 +49,8 @@ class AuthService {
     final normalizedEmail = email.toLowerCase();
     print('Register API: Starting registration for $normalizedEmail');
     
-    final response = await _api.post(ApiConstants.register, {
+    // Use postPublic for registration (public endpoint)
+    final response = await _api.postPublic(ApiConstants.register, {
       'email': normalizedEmail,
       'username': username,
       'password': password,
@@ -78,7 +80,8 @@ class AuthService {
 
   Future<AuthResult> resendConfirmationEmail(String email) async {
     final normalizedEmail = email.toLowerCase();
-    final response = await _api.post(ApiConstants.resendConfirmation, {
+    // Use postPublic for public endpoint
+    final response = await _api.postPublic(ApiConstants.resendConfirmation, {
       'email': normalizedEmail,
     });
 
@@ -229,7 +232,8 @@ class AuthService {
 
   Future<AuthResult> forgotPassword(String email) async {
     final normalizedEmail = email.toLowerCase();
-    final response = await _api.post(ApiConstants.forgotPassword, {
+    // Use postPublic for public endpoint
+    final response = await _api.postPublic(ApiConstants.forgotPassword, {
       'email': normalizedEmail,
     });
 

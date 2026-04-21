@@ -18,12 +18,18 @@ class SuccessPage extends ConsumerStatefulWidget {
   final String title;
   final String amount;
   final String? reference;
+  final String? donorName;
+  final String? accountNumber;
+  final String? accountName;
 
   const SuccessPage({
     super.key,
     required this.title,
     required this.amount,
     this.reference,
+    this.donorName,
+    this.accountNumber,
+    this.accountName,
   });
 
   @override
@@ -459,7 +465,7 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                               onPressed: () {
                                 // Go back to wallet page (GivePage)
                                 Navigator.popUntil(context, (route) => route.isFirst);
-                                ref.read(mainTabIndexProvider.notifier).state = 2; // Wallet tab
+                                ref.read(mainTabIndexProvider.notifier).state = 3; // Wallet tab
                               },
                               style: OutlinedButton.styleFrom(
                                 side: BorderSide(color: AppColors.primaryGold, width: 1.5),
@@ -710,11 +716,12 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
 
   Future<void> _generatePdfReceipt(BuildContext context) async {
     final pdf = pw.Document();
-    
-    // Gold color for PDF
     final goldColor = PdfColor.fromHex('#D4AF37');
     final successColor = PdfColor.fromHex('#4CAF50');
-    
+    final lightGold = PdfColor.fromHex('#FFF8E1');
+    final receiptNumber = widget.reference ??
+        'TCGC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -726,223 +733,182 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
               // Header
               pw.Container(
                 width: double.infinity,
-                padding: const pw.EdgeInsets.all(20),
+                padding: const pw.EdgeInsets.symmetric(vertical: 24, horizontal: 20),
                 decoration: pw.BoxDecoration(
                   color: goldColor,
                   borderRadius: pw.BorderRadius.circular(8),
                 ),
                 child: pw.Column(
                   children: [
-                    pw.Text(
-                      'THE CITYGATE CHURCH',
-                      style: pw.TextStyle(
-                        fontSize: 24,
-                        fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.white,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    pw.SizedBox(height: 8),
-                    pw.Text(
-                      'Apostolic Kingdom Ministry',
-                      style: const pw.TextStyle(
-                        fontSize: 12,
-                        color: PdfColors.white,
-                      ),
-                    ),
+                    pw.Text('THE CITYGATE CHURCH',
+                        style: pw.TextStyle(
+                            fontSize: 22, fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.white, letterSpacing: 2)),
+                    pw.SizedBox(height: 6),
+                    pw.Text('Apostolic Kingdom Ministry',
+                        style: const pw.TextStyle(fontSize: 12, color: PdfColors.white)),
+                    pw.SizedBox(height: 4),
+                    pw.Text('www.thecitygatechurch.org',
+                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.white)),
                   ],
                 ),
               ),
-              pw.SizedBox(height: 30),
-              
-              // Receipt Title
-              pw.Text(
-                'PAYMENT RECEIPT',
-                style: pw.TextStyle(
-                  fontSize: 18,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.grey800,
-                  letterSpacing: 3,
-                ),
-              ),
-              pw.SizedBox(height: 30),
-              
-              // Success Badge
+              pw.SizedBox(height: 24),
+
+              // Title + badge
+              pw.Text('OFFICIAL DONATION RECEIPT',
+                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.grey800, letterSpacing: 2)),
+              pw.SizedBox(height: 12),
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 decoration: pw.BoxDecoration(
-                  color: successColor,
-                  borderRadius: pw.BorderRadius.circular(20),
-                ),
-                child: pw.Text(
-                  'PAYMENT SUCCESSFUL',
-                  style: pw.TextStyle(
-                    fontSize: 12,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.white,
-                  ),
-                ),
+                    color: successColor, borderRadius: pw.BorderRadius.circular(20)),
+                child: pw.Text('PAYMENT SUCCESSFUL',
+                    style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white)),
               ),
-              pw.SizedBox(height: 30),
-              
-              // Amount
-              pw.Text(
-                'NGN ${widget.amount}',
-                style: pw.TextStyle(
-                  fontSize: 36,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.grey900,
-                ),
-              ),
-              pw.SizedBox(height: 8),
-              pw.Text(
-                widget.title,
-                style: pw.TextStyle(
-                  fontSize: 16,
-                  color: goldColor,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              pw.SizedBox(height: 40),
-              
-              // Divider
+              pw.SizedBox(height: 24),
+
+              // Amount block
               pw.Container(
                 width: double.infinity,
-                height: 1,
-                color: PdfColors.grey300,
-              ),
-              pw.SizedBox(height: 30),
-              
-              // Details
-              _buildPdfDetailRow('Date', _formatDate(DateTime.now())),
-              pw.SizedBox(height: 15),
-              _buildPdfDetailRow('Type', widget.title),
-              pw.SizedBox(height: 15),
-              _buildPdfDetailRow('Recipient', 'The CityGate Church'),
-              if (widget.reference != null) ...[
-                pw.SizedBox(height: 15),
-                _buildPdfDetailRow('Reference', widget.reference!),
-              ],
-              pw.SizedBox(height: 30),
-              
-              // Divider
-              pw.Container(
-                width: double.infinity,
-                height: 1,
-                color: PdfColors.grey300,
-              ),
-              pw.SizedBox(height: 30),
-              
-              // Quote
-              pw.Container(
                 padding: const pw.EdgeInsets.all(20),
                 decoration: pw.BoxDecoration(
-                  color: PdfColor.fromHex('#FFF8E1'),
+                  color: lightGold,
                   borderRadius: pw.BorderRadius.circular(8),
-                  border: pw.Border.all(color: goldColor, width: 1),
+                  border: pw.Border.all(color: goldColor),
+                ),
+                child: pw.Column(
+                  children: [
+                    pw.Text('AMOUNT DONATED',
+                        style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey600)),
+                    pw.SizedBox(height: 6),
+                    pw.Text('NGN ${widget.amount}',
+                        style: pw.TextStyle(fontSize: 36, fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.grey900)),
+                    pw.SizedBox(height: 4),
+                    pw.Text(widget.title,
+                        style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold,
+                            color: goldColor)),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 28),
+
+              // Divider
+              pw.Container(width: double.infinity, height: 1, color: PdfColors.grey300),
+              pw.SizedBox(height: 20),
+
+              // Details table
+              _buildPdfDetailRow('Receipt No.', receiptNumber, goldColor),
+              pw.SizedBox(height: 12),
+              _buildPdfDetailRow('Date & Time', _formatDate(DateTime.now()), goldColor),
+              pw.SizedBox(height: 12),
+              _buildPdfDetailRow('Giving Type', widget.title, goldColor),
+              pw.SizedBox(height: 12),
+              _buildPdfDetailRow('Recipient', 'The CityGate Church', goldColor),
+              if (widget.donorName != null) ...[
+                pw.SizedBox(height: 12),
+                _buildPdfDetailRow('Donor Name', widget.donorName!, goldColor),
+              ],
+              if (widget.accountNumber != null) ...[
+                pw.SizedBox(height: 12),
+                _buildPdfDetailRow('Wallet Number', widget.accountNumber!, goldColor),
+              ],
+              if (widget.accountName != null) ...[
+                pw.SizedBox(height: 12),
+                _buildPdfDetailRow('Account Name', widget.accountName!, goldColor),
+              ],
+              if (widget.reference != null) ...[
+                pw.SizedBox(height: 12),
+                _buildPdfDetailRow('Transaction Ref', widget.reference!, goldColor),
+              ],
+              pw.SizedBox(height: 20),
+
+              // Divider
+              pw.Container(width: double.infinity, height: 1, color: PdfColors.grey300),
+              pw.SizedBox(height: 20),
+
+              // Scripture
+              pw.Container(
+                padding: const pw.EdgeInsets.all(16),
+                decoration: pw.BoxDecoration(
+                  color: lightGold,
+                  borderRadius: pw.BorderRadius.circular(8),
+                  border: pw.Border.all(color: goldColor),
                 ),
                 child: pw.Column(
                   children: [
                     pw.Text(
                       '"Give, and it will be given to you. A good measure, pressed down, shaken together and running over, will be poured into your lap."',
-                      style: pw.TextStyle(
-                        fontSize: 12,
-                        fontStyle: pw.FontStyle.italic,
-                        color: PdfColors.grey700,
-                      ),
+                      style: pw.TextStyle(fontSize: 11, fontStyle: pw.FontStyle.italic,
+                          color: PdfColors.grey700),
                       textAlign: pw.TextAlign.center,
                     ),
-                    pw.SizedBox(height: 8),
-                    pw.Text(
-                      '- Luke 6:38',
-                      style: pw.TextStyle(
-                        fontSize: 11,
-                        fontWeight: pw.FontWeight.bold,
-                        color: goldColor,
-                      ),
-                    ),
+                    pw.SizedBox(height: 6),
+                    pw.Text('- Luke 6:38',
+                        style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold,
+                            color: goldColor)),
                   ],
                 ),
               ),
-              pw.SizedBox(height: 30),
-              
+              pw.SizedBox(height: 20),
+
+              pw.Text('Thank you for your generosity! God bless you abundantly.',
+                  style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.grey700)),
+              pw.Spacer(),
+
               // Footer
-              pw.Text(
-                'Thank you for your generosity!',
-                style: pw.TextStyle(
-                  fontSize: 14,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.grey700,
-                ),
-              ),
+              pw.Container(width: double.infinity, height: 1, color: PdfColors.grey300),
               pw.SizedBox(height: 8),
               pw.Text(
-                'God bless you abundantly.',
-                style: const pw.TextStyle(
-                  fontSize: 12,
-                  color: PdfColors.grey600,
-                ),
-              ),
-              pw.Spacer(),
-              
-              // Generated timestamp
-              pw.Text(
-                'Generated on ${DateTime.now().toString().substring(0, 19)}',
-                style: const pw.TextStyle(
-                  fontSize: 9,
-                  color: PdfColors.grey400,
-                ),
+                'This is an official receipt from The CityGate Church. '
+                'Wallet services powered by 9 Payment Service Bank (9PSB). '
+                'Generated: ${DateTime.now().toString().substring(0, 19)}',
+                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey500),
+                textAlign: pw.TextAlign.center,
               ),
             ],
           );
         },
       ),
     );
-    
-    // Save PDF to temp directory
+
     final tempDir = await getTemporaryDirectory();
     final fileName = 'TCGC_Receipt_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File('${tempDir.path}/$fileName');
     await file.writeAsBytes(await pdf.save());
-    
-    // Share the PDF file
+
     await Share.shareXFiles(
       [XFile(file.path)],
       text: 'My ${widget.title} receipt from The CityGate Church',
       subject: 'TCGC ${widget.title} Receipt',
     );
   }
-  
-  pw.Widget _buildPdfDetailRow(String label, String value) {
+
+  pw.Widget _buildPdfDetailRow(String label, String value, PdfColor goldColor) {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
-        pw.Text(
-          label,
-          style: const pw.TextStyle(
-            fontSize: 12,
-            color: PdfColors.grey600,
-          ),
-        ),
+        pw.Text(label,
+            style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey600)),
         pw.Flexible(
-          child: pw.Text(
-            value,
-            style: pw.TextStyle(
-              fontSize: 12,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.grey800,
-            ),
-            textAlign: pw.TextAlign.right,
-          ),
+          child: pw.Text(value,
+              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.grey800),
+              textAlign: pw.TextAlign.right),
         ),
       ],
     );
   }
 
   Widget _buildReceiptWidget(bool isDark) {
+    final receiptNumber = widget.reference ?? 'TCGC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
     return Container(
       width: 350,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(0),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -950,127 +916,159 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Church Logo/Header
+          // Gold header
           Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppColors.primaryGold.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.church,
-              size: 40,
-              color: AppColors.primaryGold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'THE CITYGATE CHURCH',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primaryGold,
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Payment Receipt',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 24),
-          // Divider
-          Container(
-            height: 1,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(height: 20),
-          // Success Icon
-          Container(
-            width: 60,
-            height: 60,
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
             decoration: const BoxDecoration(
-              color: AppColors.success,
-              shape: BoxShape.circle,
+              color: AppColors.primaryGold,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
             ),
-            child: const Icon(
-              Icons.check,
-              size: 36,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Payment Successful',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.success,
-            ),
-          ),
-          const SizedBox(height: 24),
-          // Amount
-          Text(
-            '₦${widget.amount}',
-            style: const TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            widget.title,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
+            child: Column(
+              children: [
+                const Text(
+                  'THE CITYGATE CHURCH',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Apostolic Kingdom Ministry',
+                  style: TextStyle(fontSize: 11, color: Colors.white70),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'www.thecitygatechurch.org',
+                  style: TextStyle(fontSize: 10, color: Colors.white60),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 24),
-          // Details
-          _buildReceiptDetailRow('Date', _formatDate(DateTime.now())),
-          const SizedBox(height: 8),
-          _buildReceiptDetailRow('To', 'The CityGate Church'),
-          if (widget.reference != null) ...[
-            const SizedBox(height: 8),
-            _buildReceiptDetailRow('Ref', widget.reference!),
-          ],
-          const SizedBox(height: 24),
-          // Divider
-          Container(
-            height: 1,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(height: 16),
-          // Quote
-          Text(
-            '"Give, and it will be given to you..."',
-            style: TextStyle(
-              fontSize: 12,
-              fontStyle: FontStyle.italic,
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '- Luke 6:38',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey[500],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Thank you for your generosity!',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[700],
+
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                // Success badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green, size: 16),
+                      SizedBox(width: 6),
+                      Text('PAYMENT SUCCESSFUL',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Amount
+                Text(
+                  '₦${widget.amount}',
+                  style: const TextStyle(
+                    fontSize: 38,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryGold,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Divider
+                Container(height: 1, color: Colors.grey[200]),
+                const SizedBox(height: 16),
+
+                // Details
+                _buildReceiptDetailRow('Receipt No.', receiptNumber),
+                const SizedBox(height: 10),
+                _buildReceiptDetailRow('Date', _formatDate(DateTime.now())),
+                const SizedBox(height: 10),
+                _buildReceiptDetailRow('Giving Type', widget.title),
+                const SizedBox(height: 10),
+                _buildReceiptDetailRow('Recipient', 'The CityGate Church'),
+                if (widget.donorName != null) ...[
+                  const SizedBox(height: 10),
+                  _buildReceiptDetailRow('Donor', widget.donorName!),
+                ],
+                if (widget.accountNumber != null) ...[
+                  const SizedBox(height: 10),
+                  _buildReceiptDetailRow('Wallet No.', widget.accountNumber!),
+                ],
+                if (widget.accountName != null) ...[
+                  const SizedBox(height: 10),
+                  _buildReceiptDetailRow('Account', widget.accountName!),
+                ],
+                if (widget.reference != null) ...[
+                  const SizedBox(height: 10),
+                  _buildReceiptDetailRow('Reference', widget.reference!),
+                ],
+                const SizedBox(height: 16),
+
+                // Divider
+                Container(height: 1, color: Colors.grey[200]),
+                const SizedBox(height: 16),
+
+                // Scripture
+                Text(
+                  '"Give, and it will be given to you. A good measure, pressed down, shaken together and running over..."',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text('- Luke 6:38',
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[500])),
+                const SizedBox(height: 16),
+
+                Text(
+                  'Thank you for your generosity! God bless you.',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[700]),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Generated: ${_formatDate(DateTime.now())}',
+                  style: TextStyle(fontSize: 9, color: Colors.grey[400]),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
         ],

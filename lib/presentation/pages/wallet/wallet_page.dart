@@ -56,6 +56,10 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
     if (state == AppLifecycleState.resumed && _hasInitialized && !_isAuthenticated) {
       _startAuthentication();
     }
+    // Always refresh upgrade status on resume so tier updates are picked up
+    if (state == AppLifecycleState.resumed && _isAuthenticated) {
+      ref.read(walletChangeNotifierProvider).fetchUpgradeStatus();
+    }
   }
 
   void _startAuthentication() {

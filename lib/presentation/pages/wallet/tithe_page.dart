@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/wallet_provider.dart';
 import '../../../core/providers/biometric_provider.dart';
+import '../../../core/providers/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
@@ -78,8 +79,9 @@ class _TithePageState extends ConsumerState<TithePage> {
   
   Future<void> _executePaymentWithBiometric(double amountValue) async {
     final walletProvider = ref.read(walletChangeNotifierProvider);
-    final currentAmount = amount; // Capture current amount
-    
+    final authProvider = ref.read(authChangeNotifierProvider);
+    final currentAmount = amount;
+
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -93,6 +95,12 @@ class _TithePageState extends ConsumerState<TithePage> {
           successPage: SuccessPage(
             title: widget.title,
             amount: currentAmount,
+            reference: walletProvider.transactions.isNotEmpty
+                ? walletProvider.transactions.first.reference
+                : null,
+            donorName: authProvider.user?.fullName,
+            accountNumber: walletProvider.accountNumber,
+            accountName: walletProvider.accountName,
           ),
         ),
       ),
@@ -338,8 +346,9 @@ class _TithePageState extends ConsumerState<TithePage> {
   
   Future<void> _executePayment(double amountValue, String pin) async {
     final walletProvider = ref.read(walletChangeNotifierProvider);
-    final currentAmount = amount; // Capture current amount
-    
+    final authProvider = ref.read(authChangeNotifierProvider);
+    final currentAmount = amount;
+
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -353,6 +362,12 @@ class _TithePageState extends ConsumerState<TithePage> {
           successPage: SuccessPage(
             title: widget.title,
             amount: currentAmount,
+            reference: walletProvider.transactions.isNotEmpty
+                ? walletProvider.transactions.first.reference
+                : null,
+            donorName: authProvider.user?.fullName,
+            accountNumber: walletProvider.accountNumber,
+            accountName: walletProvider.accountName,
           ),
         ),
       ),

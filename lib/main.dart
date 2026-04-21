@@ -37,7 +37,11 @@ import 'domain/entities/promotion.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/widgets/network_aware_widget.dart';
 import 'data/services/biometric_service.dart';
+import 'core/providers/community_provider.dart';
+import 'presentation/pages/community/community_page.dart';
 import 'core/services/image_cache_service.dart';
+
+final communityChangeNotifierProvider = ChangeNotifierProvider<CommunityProvider>((ref) => CommunityProvider());
 
 const String appVersion = '1.0.0';
 
@@ -215,6 +219,8 @@ class _MyAppState extends ConsumerState<MyApp> {
             }
           });
           _startBackgroundPreBuffering();
+          // Start community heartbeat
+          ref.read(communityChangeNotifierProvider).startHeartbeat();
         }
         
         _initializeNotifications();
@@ -386,6 +392,8 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
         return const WalletPage();
       case 4:
         return const TeensPage();
+      case 5:
+        return const CommunityPage();
       default:
         return const HomePage();
     }

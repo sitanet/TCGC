@@ -104,8 +104,11 @@ class ApiConstants {
   static const String checkAppUpdate = '/app/check-update/';
   static const String appConfig = '/app/config/';
   
-  // KYC Verification
-  static const String verifyNin = '/kyc/verify-nin/';
+  // Community
+  static const String communityOnline = '/community/online/';
+  static const String communityRooms = '/community/rooms/';
+  static String communityMessages(int roomId) => '/community/rooms/$roomId/messages/';
+  static String communityDeleteMessage(int messageId) => '/community/messages/$messageId/delete/';
   static const String verifyBvn = '/kyc/verify-bvn/';
   static const String validateIdentity = '/kyc/validate-identity/';
 }

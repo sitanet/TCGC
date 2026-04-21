@@ -17,7 +17,7 @@ class BottomNavBar extends StatelessWidget {
     
     return Center(
       child: Container(
-        width: 344,
+        width: 380,
         height: 70,
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -43,6 +43,7 @@ class BottomNavBar extends StatelessWidget {
             _buildNavItem(2, Icons.play_circle_outline, Icons.play_circle),
             _buildNavItem(3, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet),
             _buildNavItem(4, Icons.groups_outlined, Icons.groups),
+            _buildNavItem(5, Icons.forum_outlined, Icons.forum),
           ],
         ),
       ),

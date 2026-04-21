@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,10 +21,12 @@ class GivePage extends ConsumerStatefulWidget {
   ConsumerState<GivePage> createState() => _GivePageState();
 }
 
-class _GivePageState extends ConsumerState<GivePage> {
+class _GivePageState extends ConsumerState<GivePage> with WidgetsBindingObserver {
   String selectedCurrency = 'NGN';
   final currencies = ['NGN', 'USD', 'EUR', 'GBP'];
   bool _isBalanceHidden = true;
+  bool _showApprovedBanner = false;
+  Timer? _approvedBannerTimer;
 
   void _handleBackNavigation() {
     if (Navigator.of(context).canPop()) {
@@ -36,15 +39,50 @@ class _GivePageState extends ConsumerState<GivePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = ref.read(walletChangeNotifierProvider);
-      // Always fetch fresh wallet data to get account name/number
       provider.fetchWallet();
       provider.fetchTransactions();
       provider.fetchGivings();
       provider.fetchGiveOptions();
-      provider.fetchUpgradeStatus(); // Check for pending/approved upgrades
+      // Check upgrade status and show approved banner if needed
+      provider.fetchUpgradeStatus().then((_) {
+        final upgradeRequest = provider.upgradeRequest;
+        final status = upgradeRequest?['status'] ?? '';
+        final isApproved = status == 'approved' || status == 'completed';
+        if (isApproved && mounted) {
+          setState(() => _showApprovedBanner = true);
+          _startApprovedBannerTimer();
+        }
+      });
     });
+  }
+
+  void _startApprovedBannerTimer() {
+    _approvedBannerTimer?.cancel();
+    _approvedBannerTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() => _showApprovedBanner = false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _approvedBannerTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh upgrade status and wallet when app resumes
+    if (state == AppLifecycleState.resumed) {
+      final provider = ref.read(walletChangeNotifierProvider);
+      provider.fetchUpgradeStatus();
+      provider.fetchWallet();
+    }
   }
 
   String _formatCurrency(double amount, String currency) {
@@ -776,8 +814,14 @@ class _GivePageState extends ConsumerState<GivePage> {
               children: [
                 const SizedBox(height: 10),
                 // Show upgrade status banner if pending or recently approved
-                if (walletProvider.hasPendingUpgrade || walletProvider.upgradeRequest != null)
-                  _buildUpgradeStatusBanner(context, isDark, walletProvider),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 500),
+                  child: (walletProvider.hasPendingUpgrade ||
+                          (walletProvider.upgradeRequest != null && _showApprovedBanner) ||
+                          (walletProvider.upgradeRequest?['status'] == 'declined'))
+                      ? _buildUpgradeStatusBanner(context, isDark, walletProvider)
+                      : const SizedBox.shrink(),
+                ),
                 _buildPortfolioCard(context, isDark, walletProvider),
                 const SizedBox(height: 24),
                 Padding(
@@ -1125,11 +1169,19 @@ class _GivePageState extends ConsumerState<GivePage> {
   Widget _buildUpgradeStatusBanner(BuildContext context, bool isDark, WalletProvider walletProvider) {
     final upgradeRequest = walletProvider.upgradeRequest;
     final status = upgradeRequest?['status'] ?? 'pending';
-    final targetTier = upgradeRequest?['target_tier'] ?? upgradeRequest?['tier'];
+    // Backend returns 'requested_tier', fallback to 'target_tier' or 'tier'
+    final targetTier = upgradeRequest?['requested_tier'] ?? upgradeRequest?['target_tier'] ?? upgradeRequest?['tier'];
     
     final bool isPending = status == 'pending' || status == 'submitted' || status == 'under_review';
     final bool isApproved = status == 'approved' || status == 'completed';
     final bool isRejected = status == 'rejected' || status == 'declined';
+    
+    // Don't show banner if status is approved and wallet tier already matches the requested tier
+    // This means the upgrade is complete and user has seen it
+    if (isApproved && walletProvider.tier >= (targetTier ?? 0)) {
+      // Clear the banner after user has seen the approval and tier is updated
+      return const SizedBox.shrink();
+    }
     
     if (!isPending && !isApproved && !isRejected && !walletProvider.hasPendingUpgrade) {
       return const SizedBox.shrink();
@@ -1157,7 +1209,7 @@ class _GivePageState extends ConsumerState<GivePage> {
       iconColor = Colors.red;
       icon = Icons.cancel;
       title = 'Upgrade Declined';
-      subtitle = upgradeRequest?['rejection_reason'] ?? 'Your upgrade request was not approved. Please try again.';
+      subtitle = upgradeRequest?['decline_reason'] ?? upgradeRequest?['rejection_reason'] ?? 'Your upgrade request was not approved. Please try again.';
     } else {
       backgroundColor = Colors.orange.withValues(alpha: 0.1);
       borderColor = Colors.orange.withValues(alpha: 0.3);

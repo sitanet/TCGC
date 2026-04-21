@@ -619,9 +619,30 @@ class WalletProvider extends ChangeNotifier {
       final response = await _api.get(ApiConstants.walletUpgradeStatus);
       
       if (response.isSuccess) {
-        _hasPendingUpgrade = response.data['has_pending_upgrade'] == true;
         _upgradeRequest = response.data['upgrade_request'];
-        _tier = response.data['current_tier'] ?? _tier;
+        final newTier = response.data['current_tier'] ?? _tier;
+        
+        // If tier has changed (upgrade approved), refresh wallet to get updated limits
+        if (newTier != _tier) {
+          _tier = newTier;
+          await fetchWallet(); // Refresh all limits from backend
+        } else {
+          _tier = newTier;
+        }
+
+        // hasPendingUpgrade should only be true when status is actually pending
+        final upgradeStatus = _upgradeRequest?['status'];
+        final requestedTier = _upgradeRequest?['requested_tier'];
+        final isApproved = upgradeStatus == 'approved';
+        final tierMatches = _tier >= (requestedTier ?? 0);
+
+        if (isApproved && tierMatches) {
+          // Upgrade complete — no longer pending
+          _hasPendingUpgrade = false;
+          debugPrint('WalletProvider: Upgrade approved and tier synced to $_tier');
+        } else {
+          _hasPendingUpgrade = response.data['has_pending_upgrade'] == true;
+        }
       }
     } catch (e) {
       debugPrint('Error fetching upgrade status: $e');
