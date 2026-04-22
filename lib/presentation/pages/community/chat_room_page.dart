@@ -1,13 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/community_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../../widgets/app_image.dart';
-
+import 'call_page.dart';
 class ChatRoomPage extends ConsumerStatefulWidget {
   final CommunityRoom room;
-  const ChatRoomPage({super.key, required this.room});
+  final String? dmUserName;
+  final String? dmUserPhoto;
+  final int? dmUserId;
+  final bool? dmUserOnline;
+  final String? dmUserLastSeen;
+
+  const ChatRoomPage({
+    super.key,
+    required this.room,
+    this.dmUserName,
+    this.dmUserPhoto,
+    this.dmUserId,
+    this.dmUserOnline,
+    this.dmUserLastSeen,
+  });
 
   @override
   ConsumerState<ChatRoomPage> createState() => _ChatRoomPageState();
@@ -46,8 +61,29 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     }
   }
 
-  Future<void> _sendMessage() async {
-    final text = _textController.text.trim();
+  Future<void> _startCall({required bool isVideo}) async {
+    if (widget.dmUserId == null) return;
+    final p = ref.read(communityChangeNotifierProvider);
+    final channelName = await p.callUser(widget.dmUserId!, isVideo: isVideo);
+    if (!mounted) return;
+    if (channelName != null) {
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => CallPage(
+          channelName: channelName,
+          callerName: widget.dmUserName ?? 'User',
+          callerPhoto: widget.dmUserPhoto,
+          isVideo: isVideo,
+          isIncoming: false,
+          remoteUserId: widget.dmUserId!,
+        ),
+      ));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not start call'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _sendMessage() async {    final text = _textController.text.trim();
     if (text.isEmpty || _isSending) return;
 
     setState(() => _isSending = true);
@@ -80,26 +116,71 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
       appBar: AppBar(
         backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
         elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+        ),
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new,
               color: isDark ? Colors.white : Colors.black87, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.room.name,
-                style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87)),
-            if (widget.room.description != null)
-              Text(widget.room.description!,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
-          ],
-        ),
+        title: widget.dmUserName != null
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    if (widget.dmUserPhoto != null) ...[
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: AppColors.primaryGold.withValues(alpha: 0.2),
+                        child: ClipOval(child: AppImage(imagePath: widget.dmUserPhoto!, width: 32, height: 32)),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(widget.dmUserName!,
+                        style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87)),
+                  ]),
+                  Text(
+                    widget.dmUserOnline == true
+                        ? 'Online'
+                        : formatLastSeen(widget.dmUserLastSeen),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: widget.dmUserOnline == true
+                          ? Colors.green
+                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
+                  ),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.room.name,
+                      style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87)),
+                  if (widget.room.description != null)
+                    Text(widget.room.description!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
+                ],
+              ),
         actions: [
+          if (widget.dmUserId != null) ...[
+            IconButton(
+              icon: const Icon(Icons.call, color: AppColors.primaryGold),
+              onPressed: () => _startCall(isVideo: false),
+            ),
+            IconButton(
+              icon: const Icon(Icons.videocam, color: AppColors.primaryGold),
+              onPressed: () => _startCall(isVideo: true),
+            ),
+          ],
           IconButton(
             icon: const Icon(Icons.refresh, color: AppColors.primaryGold),
             onPressed: () => p.fetchMessages(widget.room.id),

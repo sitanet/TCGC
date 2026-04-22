@@ -8,14 +8,18 @@ class OnlineMember {
   final String? photoUrl;
   final String? department;
   final bool isOnline;
+  final String? lastSeen;
 
   OnlineMember({required this.id, required this.name,
-      this.photoUrl, this.department, this.isOnline = false});
+      this.photoUrl, this.department, this.isOnline = false, this.lastSeen});
 
   factory OnlineMember.fromJson(Map<String, dynamic> j) => OnlineMember(
         id: j['id'], name: j['name'] ?? '',
         photoUrl: j['photo_url'], department: j['department'],
-        isOnline: j['is_online'] ?? false);
+        isOnline: j['is_online'] ?? false,
+        lastSeen: j['last_seen']);
+
+  String get statusText => isOnline ? 'Online' : formatLastSeen(lastSeen);
 }
 
 class CommunityRoom {
@@ -116,6 +120,31 @@ class CommunityProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('fetchOnlineMembers: $e');
     }
+  }
+
+  Future<String?> callUser(int userId, {bool isVideo = false}) async {
+    try {
+      final channelName = 'tcgc_${userId}_${DateTime.now().millisecondsSinceEpoch}';
+      final res = await _api.post('/community/call/$userId/', {
+        'call_type': isVideo ? 'video' : 'voice',
+        'channel_name': channelName,
+      });
+      if (res.isSuccess) return channelName;
+    } catch (e) {
+      debugPrint('callUser: $e');
+    }
+    return null;
+  }
+
+  Future<CommunityRoom?> openDm(int userId) async {    try {
+      final res = await _api.post(ApiConstants.communityDm(userId), {});
+      if (res.isSuccess) {
+        return CommunityRoom.fromJson(res.data);
+      }
+    } catch (e) {
+      debugPrint('openDm: $e');
+    }
+    return null;
   }
 
   Future<void> fetchAllMembers() async {
@@ -254,4 +283,17 @@ class CommunityProvider extends ChangeNotifier {
     _hasAccess = true;
     notifyListeners();
   }
+}
+
+// Helper to format last seen time
+String formatLastSeen(String? lastSeenIso) {
+  if (lastSeenIso == null) return 'Offline';
+  final dt = DateTime.tryParse(lastSeenIso);
+  if (dt == null) return 'Offline';
+  final diff = DateTime.now().difference(dt.toLocal());
+  if (diff.inMinutes < 5) return 'Online';
+  if (diff.inMinutes < 60) return 'Last seen ${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return 'Last seen ${diff.inHours}h ago';
+  if (diff.inDays == 1) return 'Last seen yesterday';
+  return 'Last seen ${diff.inDays}d ago';
 }

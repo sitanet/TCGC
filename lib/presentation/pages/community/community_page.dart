@@ -15,6 +15,8 @@ class CommunityPage extends ConsumerStatefulWidget {
 }
 
 class _CommunityPageState extends ConsumerState<CommunityPage> {
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
@@ -39,7 +41,11 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
-      appBar: const CustomAppBar(title: 'Community', showBackButton: false),
+      appBar: CustomAppBar(
+        title: 'Community',
+        showBackButton: false,
+        lightBackground: !isDark,
+      ),
       body: !p.hasAccess
           ? _buildNoAccessScreen(isDark)
           : RefreshIndicator(
@@ -50,6 +56,8 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
         },
         child: CustomScrollView(
           slivers: [
+            // Search bar
+            SliverToBoxAdapter(child: _buildSearchBar(isDark)),
             // Members Strip (all members with online/offline)
             SliverToBoxAdapter(child: _buildMembersStrip(context, isDark, p)),
             // Section header
@@ -81,8 +89,48 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     );
   }
 
-  Widget _buildNoAccessScreen(bool isDark) {
-    return Center(
+  Widget _buildSearchBar(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: TextField(
+        onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+        style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: 'Search members...',
+          hintStyle: TextStyle(
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            fontSize: 14),
+          prefixIcon: const Icon(Icons.search, color: AppColors.primaryGold, size: 20),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.close,
+                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      size: 18),
+                  onPressed: () => setState(() => _searchQuery = ''),
+                )
+              : null,
+          filled: true,
+          fillColor: isDark ? AppColors.cardDark : Colors.white,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(
+              color: AppColors.primaryGold.withValues(alpha: 0.2)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoAccessScreen(bool isDark) {    return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
@@ -111,7 +159,12 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
   }
 
   Widget _buildMembersStrip(BuildContext context, bool isDark, CommunityProvider p) {
-    final onlineCount = p.allMembers.where((m) => m.isOnline).length;
+    final filtered = _searchQuery.isEmpty
+        ? p.allMembers
+        : p.allMembers
+            .where((m) => m.name.toLowerCase().contains(_searchQuery))
+            .toList();
+    final onlineCount = filtered.where((m) => m.isOnline).length;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.all(16),
@@ -134,25 +187,26 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             ),
             const SizedBox(width: 8),
             Text(
-              '$onlineCount online · ${p.allMembers.length} members',
+              '$onlineCount online · ${filtered.length} members',
               style: TextStyle(
                 fontWeight: FontWeight.w600, fontSize: 14,
                 color: isDark ? Colors.white : Colors.black87),
             ),
           ]),
-          if (p.allMembers.isNotEmpty) ...[
+          if (filtered.isNotEmpty) ...[
             const SizedBox(height: 12),
             SizedBox(
               height: 70,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                itemCount: p.allMembers.length,
-                itemBuilder: (ctx, i) => _buildMemberAvatar(isDark, p.allMembers[i]),
+                itemCount: filtered.length,
+                itemBuilder: (ctx, i) => _buildMemberAvatar(isDark, filtered[i]),
               ),
             ),
           ] else ...[
             const SizedBox(height: 8),
-            Text('No members yet',
+            Text(
+              _searchQuery.isNotEmpty ? 'No members found' : 'No members yet',
                 style: TextStyle(
                   fontSize: 13,
                   color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
@@ -163,51 +217,103 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
   }
 
   Widget _buildMemberAvatar(bool isDark, OnlineMember m) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 12),
-      child: Column(
-        children: [
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: AppColors.primaryGold.withValues(alpha: 0.2),
-                child: m.photoUrl != null
-                    ? ClipOval(child: AppImage(imagePath: m.photoUrl!, width: 48, height: 48))
-                    : Text(
-                        m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
-                        style: const TextStyle(
-                          color: AppColors.primaryGold,
-                          fontWeight: FontWeight.bold, fontSize: 18)),
-              ),
-              Positioned(
-                bottom: 0, right: 0,
-                child: Container(
-                  width: 12, height: 12,
-                  decoration: BoxDecoration(
-                    color: m.isOnline ? Colors.green : Colors.grey,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDark ? AppColors.cardDark : Colors.white, width: 2)),
+    return GestureDetector(
+      onTap: () => _openDm(m),
+      child: Padding(
+        padding: const EdgeInsets.only(right: 12),
+        child: Column(
+          children: [
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppColors.primaryGold.withValues(alpha: 0.2),
+                  child: m.photoUrl != null
+                      ? ClipOval(child: AppImage(imagePath: m.photoUrl!, width: 48, height: 48))
+                      : Text(
+                          m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                          style: const TextStyle(
+                            color: AppColors.primaryGold,
+                            fontWeight: FontWeight.bold, fontSize: 18)),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: 52,
-            child: Text(
-              m.name.split(' ').first,
-              style: TextStyle(
-                fontSize: 11,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
+                Positioned(
+                  bottom: 0, right: 0,
+                  child: Container(
+                    width: 12, height: 12,
+                    decoration: BoxDecoration(
+                      color: m.isOnline ? Colors.green : Colors.grey,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark ? AppColors.cardDark : Colors.white, width: 2)),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            SizedBox(
+              width: 56,
+              child: Column(
+                children: [
+                  Text(
+                    m.name.split(' ').first,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    m.isOnline ? 'Online' : 'Offline',
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: m.isOnline ? Colors.green : Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _openDm(OnlineMember member) async {
+    final p = ref.read(communityChangeNotifierProvider);
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: AppColors.primaryGold)),
+    );
+
+    final room = await p.openDm(member.id);
+    if (!mounted) return;
+    Navigator.pop(context); // close loading
+
+    if (room != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatRoomPage(
+            room: room,
+            dmUserName: member.name,
+            dmUserPhoto: member.photoUrl,
+            dmUserId: member.id,
+            dmUserOnline: member.isOnline,
+            dmUserLastSeen: member.lastSeen,
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open chat. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Widget _buildRoomTile(BuildContext context, bool isDark, CommunityRoom room) {
