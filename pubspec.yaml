@@ -62,8 +62,14 @@ dependencies:
   # Deep Links
   app_links: ^6.3.2
 
+  # Connectivity
+  connectivity_plus: ^6.1.1
+
   # Voice & Video Calling
   agora_rtc_engine: ^6.3.2
+  
+  # Audio Recording
+  record: ^5.1.2
   
   # Local Database
   sqflite: ^2.3.3

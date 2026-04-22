@@ -11,7 +11,7 @@ class CallPage extends StatefulWidget {
   final String? callerPhoto;
   final bool isVideo;
   final bool isIncoming;
-  final int remoteUserId; // backend user id for signaling
+  final int remoteUserId;
 
   const CallPage({
     super.key,
@@ -37,6 +37,8 @@ class _CallPageState extends State<CallPage> {
   int? _remoteUid;
   Duration _callDuration = Duration.zero;
   Timer? _timer;
+  // Auto-end if remote never joins within 45 seconds
+  Timer? _noAnswerTimer;
 
   @override
   void initState() {
@@ -45,52 +47,82 @@ class _CallPageState extends State<CallPage> {
   }
 
   Future<void> _initAgora() async {
-    // Request permissions
     await [Permission.microphone, if (widget.isVideo) Permission.camera].request();
 
     _engine = createAgoraRtcEngine();
     await _engine!.initialize(RtcEngineContext(appId: ApiConstants.agoraAppId));
 
+    // Always enable audio
+    await _engine!.enableAudio();
+    await _engine!.setAudioProfile(
+      profile: AudioProfileType.audioProfileDefault,
+      scenario: AudioScenarioType.audioScenarioChatroom,
+    );
+
     _engine!.registerEventHandler(RtcEngineEventHandler(
       onJoinChannelSuccess: (connection, elapsed) {
+        if (!mounted) return;
         setState(() => _joined = true);
-        _startTimer();
+        // Start no-answer timeout — end call if remote never joins
+        _noAnswerTimer = Timer(const Duration(seconds: 45), () {
+          if (!_remoteJoined && mounted) _endCall();
+        });
       },
       onUserJoined: (connection, remoteUid, elapsed) {
+        if (!mounted) return;
+        _noAnswerTimer?.cancel();
         setState(() {
           _remoteUid = remoteUid;
           _remoteJoined = true;
         });
+        _startTimer();
       },
       onUserOffline: (connection, remoteUid, reason) {
+        if (!mounted) return;
         setState(() {
           _remoteUid = null;
           _remoteJoined = false;
         });
-        // End call when remote leaves
         Future.delayed(const Duration(seconds: 1), () => _endCall());
       },
     ));
 
     if (widget.isVideo) {
       await _engine!.enableVideo();
-      await _engine!.startPreview();
     }
 
     await _engine!.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
     await _engine!.joinChannel(
-      token: '',  // Use token server in production
+      token: '',
       channelId: widget.channelName,
       uid: 0,
       options: const ChannelMediaOptions(
         channelProfile: ChannelProfileType.channelProfileCommunication,
+        publishMicrophoneTrack: true,
+        publishCameraTrack: false, // enabled per-call below
+        autoSubscribeAudio: true,
+        autoSubscribeVideo: true,
       ),
     );
+
+    // Start local video preview only after joining
+    if (widget.isVideo) {
+      await _engine!.enableLocalVideo(true);
+      await _engine!.startPreview();
+      // Re-join with camera track enabled
+      await _engine!.updateChannelMediaOptions(const ChannelMediaOptions(
+        publishCameraTrack: true,
+      ));
+    }
+
+    // Default to speakerphone on
+    await _engine!.setEnableSpeakerphone(true);
   }
 
   void _startTimer() {
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() => _callDuration += const Duration(seconds: 1));
+      if (mounted) setState(() => _callDuration += const Duration(seconds: 1));
     });
   }
 
@@ -102,6 +134,7 @@ class _CallPageState extends State<CallPage> {
 
   Future<void> _endCall() async {
     _timer?.cancel();
+    _noAnswerTimer?.cancel();
     await _engine?.leaveChannel();
     await _engine?.release();
     if (mounted) Navigator.pop(context);
@@ -125,6 +158,7 @@ class _CallPageState extends State<CallPage> {
   @override
   void dispose() {
     _timer?.cancel();
+    _noAnswerTimer?.cancel();
     _engine?.leaveChannel();
     _engine?.release();
     super.dispose();
@@ -136,22 +170,74 @@ class _CallPageState extends State<CallPage> {
       backgroundColor: const Color(0xFF1A0505),
       body: SafeArea(
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            // Video views
-            if (widget.isVideo) ...[
-              if (_remoteUid != null)
-                AgoraVideoView(
-                  controller: VideoViewController.remote(
-                    rtcEngine: _engine!,
-                    canvas: VideoCanvas(uid: _remoteUid),
-                    connection: RtcConnection(channelId: widget.channelName),
+            // Remote video — full screen background
+            if (widget.isVideo && _remoteJoined && _remoteUid != null && _engine != null)
+              AgoraVideoView(
+                controller: VideoViewController.remote(
+                  rtcEngine: _engine!,
+                  canvas: VideoCanvas(uid: _remoteUid),
+                  connection: RtcConnection(channelId: widget.channelName),
+                ),
+              ),
+
+            // Waiting / voice call overlay
+            if (!widget.isVideo || !_remoteJoined)
+              Container(
+                color: const Color(0xFF1A0505),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 60,
+                        backgroundColor: AppColors.primaryGold.withValues(alpha: 0.2),
+                        child: Text(
+                          widget.callerName.isNotEmpty
+                              ? widget.callerName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            fontSize: 48,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryGold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        widget.callerName,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _remoteJoined
+                            ? _formatDuration(_callDuration)
+                            : 'Calling...',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.white.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              if (!_videoOff)
-                Positioned(
-                  top: 16, right: 16,
-                  child: SizedBox(
-                    width: 100, height: 150,
+              ),
+
+            // Local video pip — only show when engine is ready and joined
+            if (widget.isVideo && _joined && !_videoOff && _engine != null)
+              Positioned(
+                top: 16,
+                right: 16,
+                child: SizedBox(
+                  width: 100,
+                  height: 150,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
                     child: AgoraVideoView(
                       controller: VideoViewController(
                         rtcEngine: _engine!,
@@ -160,42 +246,13 @@ class _CallPageState extends State<CallPage> {
                     ),
                   ),
                 ),
-            ],
-
-            // Voice call UI
-            if (!widget.isVideo || !_remoteJoined)
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircleAvatar(
-                      radius: 60,
-                      backgroundColor: AppColors.primaryGold.withValues(alpha: 0.2),
-                      child: Text(
-                        widget.callerName.isNotEmpty ? widget.callerName[0].toUpperCase() : '?',
-                        style: const TextStyle(
-                          fontSize: 48, fontWeight: FontWeight.bold,
-                          color: AppColors.primaryGold),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(widget.callerName,
-                        style: const TextStyle(
-                          fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-                    const SizedBox(height: 8),
-                    Text(
-                      _joined && _remoteJoined
-                          ? _formatDuration(_callDuration)
-                          : _remoteJoined ? 'Connected' : 'Calling...',
-                      style: TextStyle(fontSize: 16, color: Colors.white.withValues(alpha: 0.7)),
-                    ),
-                  ],
-                ),
               ),
 
             // Controls
             Positioned(
-              bottom: 40, left: 0, right: 0,
+              bottom: 40,
+              left: 0,
+              right: 0,
               child: Column(
                 children: [
                   Row(
@@ -223,13 +280,15 @@ class _CallPageState extends State<CallPage> {
                     ],
                   ),
                   const SizedBox(height: 32),
-                  // End call button
                   GestureDetector(
                     onTap: _endCall,
                     child: Container(
-                      width: 72, height: 72,
+                      width: 72,
+                      height: 72,
                       decoration: const BoxDecoration(
-                        color: Colors.red, shape: BoxShape.circle),
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
                       child: const Icon(Icons.call_end, color: Colors.white, size: 32),
                     ),
                   ),
@@ -253,7 +312,8 @@ class _CallPageState extends State<CallPage> {
       child: Column(
         children: [
           Container(
-            width: 56, height: 56,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
               color: active
                   ? Colors.white.withValues(alpha: 0.3)
@@ -263,9 +323,10 @@ class _CallPageState extends State<CallPage> {
             child: Icon(icon, color: Colors.white, size: 26),
           ),
           const SizedBox(height: 6),
-          Text(label,
-              style: TextStyle(
-                fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7)),
+          ),
         ],
       ),
     );

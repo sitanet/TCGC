@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../../data/services/api_service.dart';
 import '../constants/api_constants.dart';
@@ -55,11 +56,21 @@ class ChatMessage {
   final String? resourceType;
   final int? resourceId;
   final String? resourceTitle;
+  final String? fileUrl;
+  final String? fileType;
+  final String? fileName;
+  final bool isDelivered;
+  final bool isRead;
+  final String? resourceAudioUrl; // resolved streamable URL for listen-together
   final DateTime createdAt;
 
   ChatMessage({required this.id, required this.text, required this.isDeleted,
       required this.senderId, required this.senderName, this.senderPhoto,
-      this.resourceType, this.resourceId, this.resourceTitle, required this.createdAt});
+      this.resourceType, this.resourceId, this.resourceTitle,
+      this.fileUrl, this.fileType, this.fileName,
+      this.isDelivered = false, this.isRead = false,
+      this.resourceAudioUrl,
+      required this.createdAt});
 
   factory ChatMessage.fromJson(Map<String, dynamic> j) {
     final sender = j['sender'] ?? {};
@@ -69,10 +80,15 @@ class ChatMessage {
       senderPhoto: sender['photo_url'],
       resourceType: j['resource_type'], resourceId: j['resource_id'],
       resourceTitle: j['resource_title'],
+      fileUrl: j['file_url'], fileType: j['file_type'], fileName: j['file_name'],
+      isDelivered: j['is_delivered'] ?? false,
+      isRead: j['is_read'] ?? false,
+      resourceAudioUrl: j['resource_audio_url'],
       createdAt: DateTime.parse(j['created_at']));
   }
 
   bool get hasResource => resourceType != null && resourceId != null;
+  bool get hasFile => fileUrl != null && fileType != null;
 }
 
 class CommunityProvider extends ChangeNotifier {
@@ -225,6 +241,35 @@ class CommunityProvider extends ChangeNotifier {
 
   void stopPolling() => _pollTimer?.cancel();
 
+  Future<bool> sendFileMessage(int roomId, File file, String fileType, {String? text}) async {
+    _isSending = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final fields = <String, String>{
+        'text': text ?? '',
+        'file_type': fileType,
+      };
+      final res = await _api.postMultipart(
+        ApiConstants.communityMessageUpload(roomId),
+        fields: fields,
+        files: {'file': file},
+      );
+      if (res.isSuccess) {
+        _messages.add(ChatMessage.fromJson(res.data));
+        _isSending = false;
+        notifyListeners();
+        return true;
+      }
+      _error = res.errorMessage ?? 'Failed to send file';
+    } catch (e) {
+      _error = 'Failed to send file';
+    }
+    _isSending = false;
+    notifyListeners();
+    return false;
+  }
+
   Future<bool> sendMessage(int roomId, String text,
       {String? resourceType, int? resourceId, String? resourceTitle}) async {
     _isSending = true;
@@ -283,6 +328,73 @@ class CommunityProvider extends ChangeNotifier {
     _hasAccess = true;
     notifyListeners();
   }
+
+  // ── Listen Together ──────────────────────────────────────────────────────
+
+  Future<ListenSession?> startListenSession(int roomId, {
+    required String resourceType,
+    required int resourceId,
+    required String resourceTitle,
+    required String audioUrl,
+  }) async {
+    try {
+      final res = await _api.post(ApiConstants.communityListenSession(roomId), {
+        'resource_type': resourceType,
+        'resource_id': resourceId,
+        'resource_title': resourceTitle,
+        'audio_url': audioUrl,
+        'is_playing': false,
+        'position_seconds': 0,
+      });
+      if (res.isSuccess) return ListenSession.fromJson(res.data);
+    } catch (e) {
+      debugPrint('startListenSession: $e');
+    }
+    return null;
+  }
+
+  Future<void> pushPlaybackState(int roomId, {
+    required bool isPlaying,
+    required double positionSeconds,
+    required String resourceType,
+    required int resourceId,
+    required String resourceTitle,
+    required String audioUrl,
+  }) async {
+    try {
+      await _api.post(ApiConstants.communityListenSession(roomId), {
+        'resource_type': resourceType,
+        'resource_id': resourceId,
+        'resource_title': resourceTitle,
+        'audio_url': audioUrl,
+        'is_playing': isPlaying,
+        'position_seconds': positionSeconds,
+      });
+    } catch (e) {
+      debugPrint('pushPlaybackState: $e');
+    }
+  }
+
+  Future<ListenSession?> pollListenSession(int roomId) async {
+    try {
+      final res = await _api.get(ApiConstants.communityListenSession(roomId));
+      if (res.isSuccess) {
+        final data = res.data['session'];
+        if (data != null) return ListenSession.fromJson(data);
+      }
+    } catch (e) {
+      debugPrint('pollListenSession: $e');
+    }
+    return null;
+  }
+
+  Future<void> endListenSession(int roomId) async {
+    try {
+      await _api.post(ApiConstants.communityListenSession(roomId), {'end_session': true});
+    } catch (e) {
+      debugPrint('endListenSession: $e');
+    }
+  }
 }
 
 // Helper to format last seen time
@@ -296,4 +408,46 @@ String formatLastSeen(String? lastSeenIso) {
   if (diff.inHours < 24) return 'Last seen ${diff.inHours}h ago';
   if (diff.inDays == 1) return 'Last seen yesterday';
   return 'Last seen ${diff.inDays}d ago';
+}
+
+class ListenSession {
+  final int id;
+  final int hostId;
+  final String hostName;
+  final String resourceType;
+  final int resourceId;
+  final String resourceTitle;
+  final String audioUrl;
+  final bool isPlaying;
+  final double positionSeconds;
+  final DateTime updatedAt;
+  final bool isActive;
+
+  ListenSession({
+    required this.id,
+    required this.hostId,
+    required this.hostName,
+    required this.resourceType,
+    required this.resourceId,
+    required this.resourceTitle,
+    required this.audioUrl,
+    required this.isPlaying,
+    required this.positionSeconds,
+    required this.updatedAt,
+    required this.isActive,
+  });
+
+  factory ListenSession.fromJson(Map<String, dynamic> j) => ListenSession(
+        id: j['id'],
+        hostId: j['host_id'],
+        hostName: j['host_name'] ?? '',
+        resourceType: j['resource_type'] ?? '',
+        resourceId: j['resource_id'] ?? 0,
+        resourceTitle: j['resource_title'] ?? '',
+        audioUrl: j['audio_url'] ?? '',
+        isPlaying: j['is_playing'] ?? false,
+        positionSeconds: (j['position_seconds'] as num?)?.toDouble() ?? 0.0,
+        updatedAt: DateTime.parse(j['updated_at']),
+        isActive: j['is_active'] ?? true,
+      );
 }

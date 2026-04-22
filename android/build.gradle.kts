@@ -2,6 +2,21 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://agora-sdk.oss-cn-hangzhou.aliyuncs.com/artifactory/libs-release") }
+    }
+    // Force a resolvable protobuf version — iris_method_channel pins AGP 7.1.2
+    // which requests protobuf-java:3.10.0, a version no longer on Maven Central.
+    configurations.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "com.google.protobuf" && requested.name == "protobuf-java") {
+                useVersion("3.21.12")
+                because("protobuf-java 3.10.0 is unavailable on Maven Central")
+            }
+            if (requested.group == "com.google.protobuf" && requested.name == "protobuf-java-util") {
+                useVersion("3.21.12")
+                because("protobuf-java-util 3.10.0 is unavailable on Maven Central")
+            }
+        }
     }
 }
 

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/community_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../../widgets/app_image.dart';
 import 'call_page.dart';
+import 'listen_together_page.dart';
 class ChatRoomPage extends ConsumerStatefulWidget {
   final CommunityRoom room;
   final String? dmUserName;
@@ -32,6 +34,8 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   bool _isSending = false;
+  ListenSession? _activeSession;
+  Timer? _sessionPollTimer;
 
   @override
   void initState() {
@@ -40,11 +44,21 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
       final p = ref.read(communityChangeNotifierProvider);
       p.fetchMessages(widget.room.id);
       p.startPolling(widget.room.id);
+      _startSessionPolling();
+    });
+  }
+
+  void _startSessionPolling() {
+    _sessionPollTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+      final session = await ref.read(communityChangeNotifierProvider)
+          .pollListenSession(widget.room.id);
+      if (mounted) setState(() => _activeSession = session);
     });
   }
 
   @override
   void dispose() {
+    _sessionPollTimer?.cancel();
     ref.read(communityChangeNotifierProvider).stopPolling();
     _textController.dispose();
     _scrollController.dispose();
@@ -139,10 +153,13 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                       ),
                       const SizedBox(width: 8),
                     ],
-                    Text(widget.dmUserName!,
-                        style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black87)),
+                    Flexible(
+                      child: Text(widget.dmUserName!,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87)),
+                    ),
                   ]),
                   Text(
                     widget.dmUserOnline == true
@@ -189,6 +206,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
       ),
       body: Column(
         children: [
+          // Active listen-together session banner
+          if (_activeSession != null && _activeSession!.isActive)
+            _buildSessionBanner(),
           // Messages
           Expanded(
             child: p.isLoading && p.messages.isEmpty
@@ -218,6 +238,70 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
           // Input bar
           _buildInputBar(isDark),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSessionBanner() {
+    final session = _activeSession!;
+    final me = ref.read(authChangeNotifierProvider).user;
+    final isHost = me != null && session.hostId.toString() == me.id;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(context, MaterialPageRoute(
+          builder: (_) => ListenTogetherPage(
+            roomId: widget.room.id,
+            initialSession: session,
+            isHost: isHost,
+            myUserId: me?.id,
+          ),
+        ));
+      },
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.primaryGold.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.headphones_rounded, color: AppColors.primaryGold, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isHost ? 'Your listen session is live' : '${session.hostName} started a listen session',
+                    style: TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87),
+                  ),
+                  Text(
+                    session.resourceTitle.isNotEmpty ? session.resourceTitle : 'Tap to join',
+                    style: const TextStyle(fontSize: 11, color: AppColors.primaryGold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primaryGold,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                isHost ? 'Open' : 'Join',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -351,11 +435,21 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                   ),
                   Padding(
                     padding: const EdgeInsets.only(top: 3, left: 4, right: 4),
-                    child: Text(
-                      _formatTime(msg.createdAt),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                      children: [
+                        Text(
+                          _formatTime(msg.createdAt),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                        ),
+                        if (isMe && !msg.isDeleted) ...[
+                          const SizedBox(width: 4),
+                          _buildReceiptIcon(msg),
+                        ],
+                      ],
                     ),
                   ),
                 ],
@@ -367,9 +461,27 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     );
   }
 
+  /// ✓ sent  ✓✓ delivered (grey)  ✓✓ seen (blue/gold)
+  Widget _buildReceiptIcon(ChatMessage msg) {
+    if (msg.isRead) {
+      // Double tick — gold = seen
+      return const Icon(Icons.done_all_rounded, size: 14, color: AppColors.primaryGold);
+    } else if (msg.isDelivered) {
+      // Double tick — grey = delivered
+      return Icon(Icons.done_all_rounded, size: 14,
+          color: Colors.grey.withValues(alpha: 0.7));
+    } else {
+      // Single tick — sent
+      return Icon(Icons.done_rounded, size: 14,
+          color: Colors.grey.withValues(alpha: 0.7));
+    }
+  }
+
   Widget _buildResourceCard(bool isDark, ChatMessage msg, bool isMe) {
     final iconMap = {'audio': Icons.headphones, 'event': Icons.event, 'transcript': Icons.article};
     final icon = iconMap[msg.resourceType] ?? Icons.link;
+    final isAudio = msg.resourceType == 'audio';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -389,27 +501,104 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                 : AppColors.primaryGold.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon,
-                  size: 18,
-                  color: isMe ? Colors.white : AppColors.primaryGold),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  msg.resourceTitle ?? msg.resourceType ?? 'Shared resource',
-                  style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w500,
-                    color: isMe ? Colors.white : AppColors.primaryGold),
-                  maxLines: 2, overflow: TextOverflow.ellipsis,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 18, color: isMe ? Colors.white : AppColors.primaryGold),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      msg.resourceTitle ?? msg.resourceType ?? 'Shared resource',
+                      style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w500,
+                        color: isMe ? Colors.white : AppColors.primaryGold),
+                      maxLines: 2, overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
+              // Listen Together button — only for audio resources
+              if (isAudio && msg.resourceId != null) ...[
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () => _startListenTogether(msg),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isMe
+                          ? Colors.white.withValues(alpha: 0.25)
+                          : AppColors.primaryGold,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.headphones_rounded,
+                            size: 14,
+                            color: isMe ? Colors.white : Colors.black87),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Listen Together',
+                          style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600,
+                            color: isMe ? Colors.white : Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _startListenTogether(ChatMessage msg) async {
+    if (msg.resourceId == null) return;
+
+    final audioUrl = msg.resourceAudioUrl ?? '';
+    if (audioUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Audio URL not available for this message'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final me = ref.read(authChangeNotifierProvider).user;
+    final p = ref.read(communityChangeNotifierProvider);
+
+    final session = await p.startListenSession(
+      widget.room.id,
+      resourceType: msg.resourceType!,
+      resourceId: msg.resourceId!,
+      resourceTitle: msg.resourceTitle ?? '',
+      audioUrl: audioUrl,
+    );
+
+    if (!mounted) return;
+    if (session == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not start session'), backgroundColor: Colors.red));
+      return;
+    }
+
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => ListenTogetherPage(
+        roomId: widget.room.id,
+        initialSession: session,
+        isHost: true,
+        myUserId: me?.id,
+      ),
+    ));
   }
 
   Widget _buildInputBar(bool isDark) {

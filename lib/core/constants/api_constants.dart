@@ -111,6 +111,8 @@ class ApiConstants {
   static String communityMessages(int roomId) => '/community/rooms/$roomId/messages/';
   static String communityDeleteMessage(int messageId) => '/community/messages/$messageId/delete/';
   static String communityDm(int userId) => '/community/dm/$userId/';
+  static String communityMessageUpload(int roomId) => '/community/rooms/$roomId/messages/upload/';
+  static String communityListenSession(int roomId) => '/community/rooms/$roomId/listen-session/';
 
   // KYC Verification
   static const String verifyNin = '/kyc/verify-nin/';

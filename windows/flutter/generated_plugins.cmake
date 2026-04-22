@@ -5,12 +5,14 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   agora_rtc_engine
   app_links
+  connectivity_plus
   file_selector_windows
   firebase_core
   flutter_inappwebview_windows
   iris_method_channel
   local_auth_windows
   permission_handler_windows
+  record_windows
   share_plus
   url_launcher_windows
 )
