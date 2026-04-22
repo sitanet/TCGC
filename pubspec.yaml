@@ -58,6 +58,9 @@ dependencies:
   
   # Biometric Authentication
   local_auth: ^2.3.0
+
+  # Deep Links
+  app_links: ^6.3.2
   
   # Network Connectivity
   connectivity_plus: ^6.0.3

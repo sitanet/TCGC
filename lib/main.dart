@@ -1,5 +1,6 @@
-import 'dart:async' show Future, TimeoutException, runZonedGuarded;
+import 'dart:async' show Future, StreamSubscription, TimeoutException, runZonedGuarded;
 import 'dart:io';
+import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -376,7 +377,8 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
   List<Promotion> _activePromotions = [];
   final DataService _dataService = DataService();
   AppUpdateInfo? _updateInfo;
-  
+  StreamSubscription? _deepLinkSub;
+
   static const String _lastTabKey = 'last_tab_index';
 
   // Pages are built lazily to prevent ANR from heavy pages like LiveStreamPage
@@ -412,7 +414,8 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     WidgetsBinding.instance.addObserver(this);
     _setupNotificationHandler();
     _restoreLastTab();
-    
+    _initDeepLinks();
+
     // Delay non-critical operations to let UI render first
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) _initializeWallet();
@@ -452,6 +455,47 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       _handleNotificationNavigation(data);
     };
   }
+
+  void _initDeepLinks() async {
+    final appLinks = AppLinks();
+
+    // Handle link that launched the app from terminated state
+    try {
+      final initialUri = await appLinks.getInitialLink();
+      if (initialUri != null) {
+        _handleDeepLink(initialUri);
+      }
+    } catch (e) {
+      debugPrint('Deep link initial error: $e');
+    }
+
+    // Handle links while app is running
+    _deepLinkSub = appLinks.uriLinkStream.listen(
+      (uri) => _handleDeepLink(uri),
+      onError: (e) => debugPrint('Deep link stream error: $e'),
+    );
+  }
+
+  void _handleDeepLink(Uri uri) {
+    debugPrint('Deep link received: $uri');
+    // tcgc://app or https://thecitygatechurch.org/app
+    final path = uri.path.replaceAll('/', '');
+    final host = uri.host;
+
+    // Navigate based on path/host
+    if (host == 'wallet' || path == 'wallet') {
+      ref.read(mainTabIndexProvider.notifier).state = 3;
+    } else if (host == 'audio' || path == 'audio') {
+      ref.read(mainTabIndexProvider.notifier).state = 1;
+    } else if (host == 'community' || path == 'community') {
+      ref.read(mainTabIndexProvider.notifier).state = 5;
+    } else if (host == 'teens' || path == 'teens') {
+      ref.read(mainTabIndexProvider.notifier).state = 4;
+    } else {
+      // Default — open home
+      ref.read(mainTabIndexProvider.notifier).state = 0;
+    }
+  }
   
   Future<void> _handleNotificationNavigation(Map<String, dynamic> data) async {
     final type = data['type'];
@@ -473,6 +517,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
   
   @override
   void dispose() {
+    _deepLinkSub?.cancel();
     NotificationService.onNotificationTapped = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -655,75 +700,90 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     
     if (_showUpdateDialog && _updateInfo != null) {
       return Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.system_update,
-                  size: 80,
-                  color: AppColors.primaryGold,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Update Available',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.system_update,
+                    size: 80,
+                    color: AppColors.primaryGold,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Version ${_updateInfo!.latestVersion}',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    _updateInfo!.updateMessage,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _openUpdateUrl,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryGold,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Update Now',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Update Available',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
-                if (!_updateInfo!.forceUpdate) ...[
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: _closeUpdateDialog,
+                  const SizedBox(height: 8),
+                  Text(
+                    'Version ${_updateInfo!.latestVersion}',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      'Later',
-                      style: TextStyle(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      _updateInfo!.updateMessage,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _openUpdateUrl,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryGold,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Update Now',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
+                  if (!_updateInfo!.forceUpdate) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: _closeUpdateDialog,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(
+                            color: isDark ? AppColors.textSecondaryDark : Colors.grey,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Later',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

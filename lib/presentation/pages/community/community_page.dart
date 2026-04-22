@@ -21,7 +21,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final p = ref.read(communityChangeNotifierProvider);
       p.fetchRooms();
-      p.fetchOnlineMembers();
+      p.fetchAllMembers();
       p.startHeartbeat();
     });
   }
@@ -40,16 +40,18 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
       appBar: const CustomAppBar(title: 'Community', showBackButton: false),
-      body: RefreshIndicator(
+      body: !p.hasAccess
+          ? _buildNoAccessScreen(isDark)
+          : RefreshIndicator(
         color: AppColors.primaryGold,
         onRefresh: () async {
           await p.fetchRooms();
-          await p.fetchOnlineMembers();
+          await p.fetchAllMembers();
         },
         child: CustomScrollView(
           slivers: [
-            // Online Members Strip
-            SliverToBoxAdapter(child: _buildOnlineStrip(context, isDark, p)),
+            // Members Strip (all members with online/offline)
+            SliverToBoxAdapter(child: _buildMembersStrip(context, isDark, p)),
             // Section header
             SliverToBoxAdapter(
               child: Padding(
@@ -79,7 +81,37 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     );
   }
 
-  Widget _buildOnlineStrip(BuildContext context, bool isDark, CommunityProvider p) {
+  Widget _buildNoAccessScreen(bool isDark) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.lock_outline,
+                size: 72, color: AppColors.primaryGold.withValues(alpha: 0.5)),
+            const SizedBox(height: 20),
+            Text('Community Access Required',
+                style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            Text(
+              'You do not have access to the community chat yet.\nPlease contact an admin to enable your access.',
+              style: TextStyle(
+                fontSize: 14, height: 1.5,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMembersStrip(BuildContext context, bool isDark, CommunityProvider p) {
+    final onlineCount = p.allMembers.where((m) => m.isOnline).length;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.all(16),
@@ -102,25 +134,25 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             ),
             const SizedBox(width: 8),
             Text(
-              '${p.onlineCount} Online Now',
+              '$onlineCount online · ${p.allMembers.length} members',
               style: TextStyle(
                 fontWeight: FontWeight.w600, fontSize: 14,
                 color: isDark ? Colors.white : Colors.black87),
             ),
           ]),
-          if (p.onlineMembers.isNotEmpty) ...[
+          if (p.allMembers.isNotEmpty) ...[
             const SizedBox(height: 12),
             SizedBox(
               height: 70,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                itemCount: p.onlineMembers.length,
-                itemBuilder: (ctx, i) => _buildOnlineAvatar(isDark, p.onlineMembers[i]),
+                itemCount: p.allMembers.length,
+                itemBuilder: (ctx, i) => _buildMemberAvatar(isDark, p.allMembers[i]),
               ),
             ),
           ] else ...[
             const SizedBox(height: 8),
-            Text('No other members online right now',
+            Text('No members yet',
                 style: TextStyle(
                   fontSize: 13,
                   color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
@@ -130,7 +162,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     );
   }
 
-  Widget _buildOnlineAvatar(bool isDark, OnlineMember m) {
+  Widget _buildMemberAvatar(bool isDark, OnlineMember m) {
     return Padding(
       padding: const EdgeInsets.only(right: 12),
       child: Column(
@@ -153,7 +185,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                 child: Container(
                   width: 12, height: 12,
                   decoration: BoxDecoration(
-                    color: Colors.green,
+                    color: m.isOnline ? Colors.green : Colors.grey,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: isDark ? AppColors.cardDark : Colors.white, width: 2)),

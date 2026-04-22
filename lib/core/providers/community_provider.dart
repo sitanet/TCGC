@@ -7,13 +7,15 @@ class OnlineMember {
   final String name;
   final String? photoUrl;
   final String? department;
+  final bool isOnline;
 
   OnlineMember({required this.id, required this.name,
-      this.photoUrl, this.department});
+      this.photoUrl, this.department, this.isOnline = false});
 
   factory OnlineMember.fromJson(Map<String, dynamic> j) => OnlineMember(
         id: j['id'], name: j['name'] ?? '',
-        photoUrl: j['photo_url'], department: j['department']);
+        photoUrl: j['photo_url'], department: j['department'],
+        isOnline: j['is_online'] ?? false);
 }
 
 class CommunityRoom {
@@ -74,28 +76,38 @@ class CommunityProvider extends ChangeNotifier {
 
   List<OnlineMember> _onlineMembers = [];
   int _onlineCount = 0;
+  List<OnlineMember> _allMembers = [];
   List<CommunityRoom> _rooms = [];
   List<ChatMessage> _messages = [];
-  int? _currentRoomId;
+  int? _currentRoomId = 0;
   bool _isLoading = false;
   bool _isSending = false;
   String? _error;
+  bool _hasAccess = true; // assume true until backend says otherwise
   Timer? _heartbeatTimer;
   Timer? _pollTimer;
 
   List<OnlineMember> get onlineMembers => _onlineMembers;
   int get onlineCount => _onlineCount;
+  List<OnlineMember> get allMembers => _allMembers;
   List<CommunityRoom> get rooms => _rooms;
   List<ChatMessage> get messages => _messages;
   int? get currentRoomId => _currentRoomId;
   bool get isLoading => _isLoading;
   bool get isSending => _isSending;
   String? get error => _error;
+  bool get hasAccess => _hasAccess;
 
   Future<void> fetchOnlineMembers() async {
     try {
       final res = await _api.get(ApiConstants.communityOnline);
+      if (res.statusCode == 403) {
+        _hasAccess = false;
+        notifyListeners();
+        return;
+      }
       if (res.isSuccess) {
+        _hasAccess = true;
         _onlineCount = res.data['online_count'] ?? 0;
         final list = res.data['members'] as List? ?? [];
         _onlineMembers = list.map((e) => OnlineMember.fromJson(e)).toList();
@@ -103,6 +115,25 @@ class CommunityProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('fetchOnlineMembers: $e');
+    }
+  }
+
+  Future<void> fetchAllMembers() async {
+    try {
+      final res = await _api.get(ApiConstants.communityMembers);
+      if (res.statusCode == 403) {
+        _hasAccess = false;
+        notifyListeners();
+        return;
+      }
+      if (res.isSuccess) {
+        _hasAccess = true;
+        final list = res.data['members'] as List? ?? [];
+        _allMembers = list.map((e) => OnlineMember.fromJson(e)).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('fetchAllMembers: $e');
     }
   }
 
@@ -216,9 +247,11 @@ class CommunityProvider extends ChangeNotifier {
     stopPolling();
     _onlineMembers = [];
     _onlineCount = 0;
+    _allMembers = [];
     _rooms = [];
     _messages = [];
     _currentRoomId = null;
+    _hasAccess = true;
     notifyListeners();
   }
 }
