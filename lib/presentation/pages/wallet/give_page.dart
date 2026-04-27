@@ -805,36 +805,48 @@ class _GivePageState extends ConsumerState<GivePage> with WidgetsBindingObserver
         lightBackground: true,
         onBackPressed: _handleBackNavigation,
       ),
-      body: SingleChildScrollView(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxWidth),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 10),
-                // Show upgrade status banner if pending or recently approved
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 500),
-                  child: (walletProvider.hasPendingUpgrade ||
-                          (walletProvider.upgradeRequest != null && _showApprovedBanner) ||
-                          (walletProvider.upgradeRequest?['status'] == 'declined'))
-                      ? _buildUpgradeStatusBanner(context, isDark, walletProvider)
-                      : const SizedBox.shrink(),
-                ),
-                _buildPortfolioCard(context, isDark, walletProvider),
-                const SizedBox(height: 24),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 23),
-                  child: _buildCurrencySelector(isDark),
-                ),
-                const SizedBox(height: 24),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 23),
-                  child: _buildMenuItems(context, isDark),
-                ),
-                const SizedBox(height: 100),
-              ],
+      body: RefreshIndicator(
+        color: AppColors.primaryGold,
+        onRefresh: () async {
+          final p = ref.read(walletChangeNotifierProvider);
+          await Future.wait([
+            p.fetchWallet(),
+            p.fetchTransactions(),
+            p.fetchGivings(),
+            p.fetchUpgradeStatus(),
+          ]);
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 10),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 500),
+                    child: (walletProvider.hasPendingUpgrade ||
+                            (walletProvider.upgradeRequest != null && _showApprovedBanner) ||
+                            (walletProvider.upgradeRequest?['status'] == 'declined'))
+                        ? _buildUpgradeStatusBanner(context, isDark, walletProvider)
+                        : const SizedBox.shrink(),
+                  ),
+                  _buildPortfolioCard(context, isDark, walletProvider),
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 23),
+                    child: _buildCurrencySelector(isDark),
+                  ),
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 23),
+                    child: _buildMenuItems(context, isDark),
+                  ),
+                  const SizedBox(height: 100),
+                ],
+              ),
             ),
           ),
         ),

@@ -15,7 +15,7 @@ class TransactionsPage extends ConsumerStatefulWidget {
 
 class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   String selectedFilter = 'All';
-  final filters = ['All', 'Money In', 'Money Out'];
+  final filters = ['All', 'Money In', 'Money Out', 'Fees'];
 
   @override
   void initState() {
@@ -242,7 +242,9 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     if (selectedFilter == 'Money In') {
       transactions = transactions.where((t) => t.isMoneyIn).toList();
     } else if (selectedFilter == 'Money Out') {
-      transactions = transactions.where((t) => !t.isMoneyIn).toList();
+      transactions = transactions.where((t) => !t.isMoneyIn && !t.isFee).toList();
+    } else if (selectedFilter == 'Fees') {
+      transactions = transactions.where((t) => t.isFee).toList();
     }
 
     if (transactions.isEmpty) {
@@ -297,6 +299,18 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
       itemBuilder: (context, index) {
         final transaction = transactions[index];
         final isMoneyIn = transaction.isMoneyIn;
+        final isFee = transaction.isFee;
+        final itemColor = isMoneyIn
+            ? Colors.green
+            : isFee
+                ? Colors.orange
+                : Colors.red;
+        final itemIcon = isMoneyIn
+            ? Icons.south_west_rounded
+            : isFee
+                ? Icons.receipt_outlined
+                : Icons.north_east_rounded;
+        final itemLabel = isMoneyIn ? 'Credit' : isFee ? 'Fee' : 'Debit';
         
         return Container(
           margin: EdgeInsets.only(bottom: spacing * 0.75),
@@ -325,16 +339,14 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                       height: iconContainerSize,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: isMoneyIn 
-                              ? [Colors.green.shade400, Colors.green.shade600]
-                              : [Colors.red.shade400, Colors.red.shade600],
+                          colors: [itemColor.shade400, itemColor.shade600],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(borderRadius),
                       ),
                       child: Icon(
-                        isMoneyIn ? Icons.south_west_rounded : Icons.north_east_rounded,
+                        itemIcon,
                         color: Colors.white,
                         size: iconSize,
                       ),
@@ -372,7 +384,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                           '${isMoneyIn ? '+' : '-'}${_formatCurrency(transaction.amount, transaction.currency)}',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
-                            color: isMoneyIn ? Colors.green.shade600 : Colors.red.shade600,
+                            color: itemColor.shade600,
                             fontSize: bodyFontSize,
                           ),
                         ),
@@ -380,15 +392,15 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: (isMoneyIn ? Colors.green : Colors.red).withOpacity(0.1),
+                            color: itemColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
-                            isMoneyIn ? 'Credit' : 'Debit',
+                            itemLabel,
                             style: TextStyle(
                               fontSize: smallFontSize * 0.85,
                               fontWeight: FontWeight.w500,
-                              color: isMoneyIn ? Colors.green.shade700 : Colors.red.shade700,
+                              color: itemColor.shade700,
                             ),
                           ),
                         ),
@@ -408,7 +420,14 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     final bodyFontSize = Responsive.bodyFontSize(context);
     final smallFontSize = Responsive.smallFontSize(context);
     final isMoneyIn = transaction.isMoneyIn;
-    
+    final isFee = transaction.isFee;
+    final detailColor = isMoneyIn ? Colors.green : isFee ? Colors.orange : Colors.red;
+    final detailIcon = isMoneyIn
+        ? Icons.south_west_rounded
+        : isFee
+            ? Icons.receipt_outlined
+            : Icons.north_east_rounded;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -435,17 +454,11 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: isMoneyIn 
-                      ? [Colors.green.shade400, Colors.green.shade600]
-                      : [Colors.red.shade400, Colors.red.shade600],
+                  colors: [detailColor.shade400, detailColor.shade600],
                 ),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                isMoneyIn ? Icons.south_west_rounded : Icons.north_east_rounded,
-                color: Colors.white,
-                size: 32,
-              ),
+              child: Icon(detailIcon, color: Colors.white, size: 32),
             ),
             const SizedBox(height: 16),
             Text(
@@ -463,7 +476,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
               style: TextStyle(
                 fontSize: bodyFontSize * 1.5,
                 fontWeight: FontWeight.w700,
-                color: isMoneyIn ? Colors.green.shade600 : Colors.red.shade600,
+                color: detailColor.shade600,
               ),
             ),
             const SizedBox(height: 24),
@@ -477,7 +490,9 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                 children: [
                   _buildDetailRow('Date', _formatDate(transaction.date), isDark, smallFontSize),
                   const Divider(height: 24),
-                  _buildDetailRow('Type', isMoneyIn ? 'Money In' : 'Money Out', isDark, smallFontSize),
+                  _buildDetailRow('Type', isMoneyIn ? 'Money In' : isFee ? 'Fee' : 'Money Out', isDark, smallFontSize),
+                  const Divider(height: 24),
+                  _buildDetailRow('Category', transaction.category.replaceAll('_', ' ').toUpperCase(), isDark, smallFontSize),
                   const Divider(height: 24),
                   _buildDetailRow('Status', 'Completed', isDark, smallFontSize),
                 ],

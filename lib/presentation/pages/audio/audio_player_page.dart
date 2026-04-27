@@ -5,7 +5,6 @@ import 'package:share_plus/share_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/audio_player_provider.dart';
-import '../../../core/providers/community_provider.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../data/services/favorites_service.dart';
 import '../../../data/services/playlist_service.dart';
@@ -1194,9 +1193,17 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     return Column(
       children: [
         Text(
-          '${_formatDate(widget.sermon.date)} - ${widget.sermon.title}',
+          widget.sermon.title,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
+              ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _formatDate(widget.sermon.date),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
               ),
           textAlign: TextAlign.center,
         ),
@@ -1616,16 +1623,6 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                     _shareSermon();
                   },
                 ),
-                // Share to Chat
-                ListTile(
-                  leading: const Icon(Icons.chat_rounded, color: AppColors.primaryGold),
-                  title: const Text('Share to Chat'),
-                  subtitle: const Text('Send to a DM or group room'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _shareToChat(context, isDark);
-                  },
-                ),
                 const SizedBox(height: 8),
               ],
             ),
@@ -1662,44 +1659,6 @@ Download Citygate mobile: $playStoreLink''';
     Share.share(shareText, subject: formattedTitle);
     // Track share action to backend
     _trackMessageStat('share', true);
-  }
-
-  Future<void> _shareToChat(BuildContext context, bool isDark) async {
-    final p = ref.read(communityChangeNotifierProvider);
-
-    // Fetch rooms if not loaded yet
-    if (p.rooms.isEmpty) await p.fetchRooms();
-
-    if (!mounted) return;
-
-    // Show room picker
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => _ShareToChatSheet(
-        sermon: widget.sermon,
-        isDark: isDark,
-        rooms: p.rooms,
-        onSend: (roomId, roomName) async {
-          final success = await p.sendMessage(
-            roomId,
-            '',
-            resourceType: 'audio',
-            resourceId: int.tryParse(widget.sermon.id),
-            resourceTitle: widget.sermon.title,
-          );
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(success
-                ? 'Shared to $roomName'
-                : 'Failed to share'),
-            backgroundColor: success ? Colors.green : Colors.red,
-            duration: const Duration(seconds: 2),
-          ));
-        },
-      ),
-    );
   }
 
   void _showDeleteDownloadDialog(BuildContext context, bool isDark) {
@@ -2382,140 +2341,3 @@ Download Citygate mobile: $playStoreLink''';
   }
 }
 
-
-// Room picker sheet for sharing audio to chat
-class _ShareToChatSheet extends StatelessWidget {
-  final Sermon sermon;
-  final bool isDark;
-  final List<CommunityRoom> rooms;
-  final Function(int roomId, String roomName) onSend;
-
-  const _ShareToChatSheet({
-    required this.sermon,
-    required this.isDark,
-    required this.rooms,
-    required this.onSend,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.7,
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                const Icon(Icons.chat_rounded, color: AppColors.primaryGold),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Share to Chat',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        sermon.title,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(),
-          if (rooms.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                children: [
-                  Icon(Icons.chat_bubble_outline,
-                      size: 48, color: AppColors.primaryGold.withValues(alpha: 0.4)),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No chat rooms available',
-                    style: TextStyle(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: rooms.length,
-                itemBuilder: (ctx, i) {
-                  final room = rooms[i];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: AppColors.primaryGold.withValues(alpha: 0.2),
-                      child: Icon(
-                        _getRoomIcon(room.roomType),
-                        color: AppColors.primaryGold,
-                        size: 20,
-                      ),
-                    ),
-                    title: Text(room.name),
-                    subtitle: room.description != null && room.description!.isNotEmpty
-                        ? Text(
-                            room.description!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          )
-                        : null,
-                    trailing: const Icon(Icons.send_rounded, color: AppColors.primaryGold),
-                    onTap: () {
-                      Navigator.pop(context);
-                      onSend(room.id, room.name);
-                    },
-                  );
-                },
-              ),
-            ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-
-  IconData _getRoomIcon(String roomType) {
-    switch (roomType) {
-      case 'dm':
-        return Icons.person;
-      case 'group':
-        return Icons.group;
-      case 'private':
-        return Icons.lock;
-      default:
-        return Icons.chat_bubble;
-    }
-  }
-}

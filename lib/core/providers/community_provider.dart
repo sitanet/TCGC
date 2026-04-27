@@ -88,7 +88,7 @@ class ChatMessage {
   }
 
   bool get hasResource => resourceType != null && resourceId != null;
-  bool get hasFile => fileUrl != null && fileType != null;
+  bool get hasFile => fileUrl != null && fileUrl!.isNotEmpty;
 }
 
 class CommunityProvider extends ChangeNotifier {
@@ -138,20 +138,6 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> callUser(int userId, {bool isVideo = false}) async {
-    try {
-      final channelName = 'tcgc_${userId}_${DateTime.now().millisecondsSinceEpoch}';
-      final res = await _api.post('/community/call/$userId/', {
-        'call_type': isVideo ? 'video' : 'voice',
-        'channel_name': channelName,
-      });
-      if (res.isSuccess) return channelName;
-    } catch (e) {
-      debugPrint('callUser: $e');
-    }
-    return null;
-  }
-
   Future<CommunityRoom?> openDm(int userId) async {    try {
       final res = await _api.post(ApiConstants.communityDm(userId), {});
       if (res.isSuccess) {
@@ -164,22 +150,29 @@ class CommunityProvider extends ChangeNotifier {
   }
 
   Future<void> fetchAllMembers() async {
+    _error = null;
     try {
-      final res = await _api.get(ApiConstants.communityMembers);
-      if (res.statusCode == 403) {
-        _hasAccess = false;
-        notifyListeners();
-        return;
-      }
+      debugPrint('fetchAllMembers: calling API...');
+      final res = await _api.get(ApiConstants.communityMembers)
+          .timeout(const Duration(seconds: 8));
+      debugPrint('fetchAllMembers: status=${res.statusCode}, success=${res.isSuccess}');
       if (res.isSuccess) {
-        _hasAccess = true;
         final list = res.data['members'] as List? ?? [];
         _allMembers = list.map((e) => OnlineMember.fromJson(e)).toList();
+        debugPrint('fetchAllMembers: loaded ${_allMembers.length} members');
         notifyListeners();
+      } else {
+        _error = 'Could not load members (${res.statusCode})';
+        debugPrint('fetchAllMembers error: ${res.body}');
       }
+    } on TimeoutException catch (_) {
+      _error = 'Request timed out. Check your connection.';
+      debugPrint('fetchAllMembers: timed out');
     } catch (e) {
+      _error = 'Failed to load members: $e';
       debugPrint('fetchAllMembers: $e');
     }
+    notifyListeners();
   }
 
   void startHeartbeat() {
@@ -203,15 +196,27 @@ class CommunityProvider extends ChangeNotifier {
 
   Future<void> fetchRooms() async {
     _isLoading = true;
+    _error = null;
     notifyListeners();
     try {
-      final res = await _api.get(ApiConstants.communityRooms);
+      debugPrint('fetchRooms: calling API...');
+      final res = await _api.get(ApiConstants.communityRooms)
+          .timeout(const Duration(seconds: 8));
+      debugPrint('fetchRooms: status=${res.statusCode}, success=${res.isSuccess}');
       if (res.isSuccess) {
         final list = res.data as List? ?? [];
         _rooms = list.map((e) => CommunityRoom.fromJson(e)).toList();
+        debugPrint('fetchRooms: loaded ${_rooms.length} rooms');
+      } else {
+        _error = 'Server error (${res.statusCode}). Try again.';
+        debugPrint('fetchRooms: error=$_error, body=${res.body}');
       }
+    } on TimeoutException catch (_) {
+      _error = 'Request timed out. Check your connection.';
+      debugPrint('fetchRooms: timed out');
     } catch (e) {
-      debugPrint('fetchRooms: $e');
+      _error = 'Failed to load rooms: $e';
+      debugPrint('fetchRooms exception: $e');
     }
     _isLoading = false;
     notifyListeners();

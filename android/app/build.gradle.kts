@@ -36,6 +36,20 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        ndk {
+            // Specify ABIs to reduce APK size - most devices use arm64-v8a
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+    }
+
+    // Split APKs by ABI to reduce individual APK size
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true  // Also generate a universal APK
+        }
     }
 
     signingConfigs {
@@ -59,6 +73,27 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            
+            // Additional optimizations for smaller APK
+            ndk {
+                debugSymbolLevel = "NONE"  // Remove debug symbols
+            }
+        }
+    }
+    
+    // Packaging options to exclude unnecessary files
+    packaging {
+        resources {
+            excludes += listOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/license.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/notice.txt",
+                "META-INF/*.kotlin_module"
+            )
         }
     }
 }

@@ -23,6 +23,15 @@ class TithePage extends ConsumerStatefulWidget {
 class _TithePageState extends ConsumerState<TithePage> {
   String amount = '1,000';
 
+  /// Estimated 9PSB transaction fee (CBN NIP schedule)
+  /// 9PSB deducts this silently — not reported in API response
+  double _calculatePlatformFee(double amount) {
+    if (amount <= 0) return 0;
+    if (amount <= 5000) return 10;
+    if (amount <= 50000) return 25;
+    return 50;
+  }
+
   Future<void> _processPayment() async {
     final cleanAmount = amount.replaceAll(',', '');
     final amountValue = double.tryParse(cleanAmount) ?? 0;
@@ -204,8 +213,11 @@ class _TithePageState extends ConsumerState<TithePage> {
   void _showPinDialog(double amountValue) {
     final pinController = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final walletProvider = ref.read(walletChangeNotifierProvider);
     bool isProcessing = false;
-    
+    final fee = _calculatePlatformFee(amountValue);
+    final total = amountValue + fee;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -217,111 +229,139 @@ class _TithePageState extends ConsumerState<TithePage> {
             children: [
               Icon(Icons.lock_outline, color: AppColors.primaryGold, size: 24),
               const SizedBox(width: 8),
-              const Text('Enter Transaction PIN'),
+              const Expanded(child: Text('Confirm Payment')),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGold.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Transaction details
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppColors.backgroundDark
+                        : const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Transaction Details',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                            color: AppColors.primaryGold,
+                          )),
+                      const SizedBox(height: 12),
+                      _detailRow('From', walletProvider.accountName ?? 'Your Wallet', isDark),
+                      const SizedBox(height: 8),
+                      _detailRow('Account No.', walletProvider.accountNumber ?? 'N/A', isDark),
+                      const SizedBox(height: 8),
+                      _detailRow('Bank', '9 Payment Service Bank', isDark),
+                      Divider(height: 20, color: isDark ? AppColors.dividerDark : AppColors.dividerLight),
+                      _detailRow('To', 'The CityGate Apostolic Kingdom Ministry', isDark),
+                      const SizedBox(height: 8),
+                      _detailRow('Purpose', widget.title, isDark),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Amount: ',
-                      style: TextStyle(
-                        color: isDark ? Colors.grey[400] : Colors.grey[600],
-                      ),
-                    ),
-                    Text(
-                      '₦$amount',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: AppColors.primaryGold,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 12),
+                // Amount breakdown
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: AppColors.primaryGold.withOpacity(0.25)),
+                  ),
+                  child: Column(
+                    children: [
+                      _feeRow('Giving amount', '₦${_fmt(amountValue)}', isDark),
+                      const SizedBox(height: 6),
+                      _feeRow('Est. transaction fee (9PSB)', '~₦${_fmt(fee)}', isDark,
+                          isSubtle: true),
+                      Divider(height: 16, color: AppColors.primaryGold.withOpacity(0.3)),
+                      _feeRow('Est. total deducted', '~₦${_fmt(total)}', isDark, isBold: true),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: pinController,
-                keyboardType: TextInputType.number,
-                maxLength: 6,
-                obscureText: true,
-                autofocus: true,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 24,
-                  letterSpacing: 8,
-                  fontWeight: FontWeight.bold,
-                ),
-                decoration: InputDecoration(
-                  hintText: '••••',
-                  hintStyle: TextStyle(
-                    color: Colors.grey[400],
+                const SizedBox(height: 16),
+                // PIN field
+                TextField(
+                  controller: pinController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  obscureText: true,
+                  autofocus: true,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 24,
                     letterSpacing: 8,
+                    fontWeight: FontWeight.bold,
                   ),
-                  counterText: '',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  decoration: InputDecoration(
+                    hintText: '••••',
+                    hintStyle: TextStyle(color: Colors.grey[400], letterSpacing: 8),
+                    counterText: '',
+                    labelText: 'Enter Transaction PIN',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.primaryGold, width: 2),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primaryGold, width: 2),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                  onSubmitted: (_) async {
+                    if (pinController.text.isEmpty || isProcessing) return;
+                    if (pinController.text.length < 4) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('PIN must be at least 4 digits')),
+                      );
+                      return;
+                    }
+                    setDialogState(() => isProcessing = true);
+                    Navigator.pop(dialogContext);
+                    await _executePayment(amountValue, pinController.text);
+                  },
                 ),
-                onSubmitted: (_) async {
-                  if (pinController.text.isEmpty || isProcessing) return;
-                  if (pinController.text.length < 4) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('PIN must be at least 4 digits')),
-                    );
-                    return;
-                  }
-                  setDialogState(() => isProcessing = true);
-                  Navigator.pop(dialogContext);
-                  await _executePayment(amountValue, pinController.text);
-                },
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: isProcessing ? null : () => Navigator.pop(dialogContext),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
-              ),
+              child: Text('Cancel',
+                  style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600])),
             ),
             ElevatedButton(
-              onPressed: isProcessing ? null : () async {
-                if (pinController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter your PIN')),
-                  );
-                  return;
-                }
-                
-                if (pinController.text.length < 4) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('PIN must be at least 4 digits')),
-                  );
-                  return;
-                }
-                
-                setDialogState(() => isProcessing = true);
-                Navigator.pop(dialogContext);
-                await _executePayment(amountValue, pinController.text);
-              },
+              onPressed: isProcessing
+                  ? null
+                  : () async {
+                      if (pinController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please enter your PIN')),
+                        );
+                        return;
+                      }
+                      if (pinController.text.length < 4) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('PIN must be at least 4 digits')),
+                        );
+                        return;
+                      }
+                      setDialogState(() => isProcessing = true);
+                      Navigator.pop(dialogContext);
+                      await _executePayment(amountValue, pinController.text);
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGold,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -329,8 +369,7 @@ class _TithePageState extends ConsumerState<TithePage> {
               ),
               child: isProcessing
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
+                      width: 20, height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -343,6 +382,60 @@ class _TithePageState extends ConsumerState<TithePage> {
       ),
     );
   }
+
+  Widget _detailRow(String label, String value, bool isDark) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 90,
+          child: Text(label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              )),
+        ),
+        Expanded(
+          child: Text(value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : Colors.black87,
+              )),
+        ),
+      ],
+    );
+  }
+
+  Widget _feeRow(String label, String value, bool isDark,
+      {bool isSubtle = false, bool isBold = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: TextStyle(
+              fontSize: isSubtle ? 12 : 13,
+              color: isSubtle
+                  ? (isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight)
+                  : (isDark ? Colors.white : Colors.black87),
+            )),
+        Text(value,
+            style: TextStyle(
+              fontSize: isBold ? 15 : 13,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              color: isBold
+                  ? AppColors.primaryGold
+                  : (isDark ? Colors.white : Colors.black87),
+            )),
+      ],
+    );
+  }
+
+  String _fmt(double v) =>
+      v.toStringAsFixed(0).replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
   
   Future<void> _executePayment(double amountValue, String pin) async {
     final walletProvider = ref.read(walletChangeNotifierProvider);

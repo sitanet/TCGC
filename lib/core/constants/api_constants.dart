@@ -79,6 +79,7 @@ class ApiConstants {
   static const String givingReport = '/wallet/giving-report/';
   static const String addMoney = '/wallet/add-money/';
   static const String sendMoney = '/wallet/send-money/';
+  static const String walletPsbHistory = '/wallet/psb-history/';
   
   // Giving
   static const String giveOptions = '/give-options/';

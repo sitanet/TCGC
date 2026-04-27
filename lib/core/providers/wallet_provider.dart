@@ -23,8 +23,10 @@ class TransactionModel {
   final int id;
   final String title;
   final double amount;
+  final double fee;
   final String currency;
   final String transactionType;
+  final String category;
   final DateTime date;
   final String? reference;
 
@@ -32,8 +34,10 @@ class TransactionModel {
     required this.id,
     required this.title,
     required this.amount,
+    required this.fee,
     required this.currency,
     required this.transactionType,
+    required this.category,
     required this.date,
     this.reference,
   });
@@ -43,14 +47,17 @@ class TransactionModel {
       id: json['id'],
       title: json['title'],
       amount: double.tryParse(json['amount']?.toString() ?? '0') ?? 0.0,
+      fee: double.tryParse(json['fee']?.toString() ?? '0') ?? 0.0,
       currency: json['currency'] ?? 'NGN',
       transactionType: json['transaction_type'],
+      category: json['category'] ?? 'other',
       date: DateTime.parse(json['date']),
       reference: json['reference'],
     );
   }
 
   bool get isMoneyIn => transactionType == 'money_in';
+  bool get isFee => category == 'fee';
 }
 
 class GivingModel {
@@ -260,11 +267,10 @@ class WalletProvider extends ChangeNotifier {
   Future<void> fetchTransactions() async {
     try {
       final response = await _api.get(ApiConstants.transactions);
-      
       if (response.isSuccess) {
         final decoded = response.data;
-        final List<dynamic> data = decoded is List 
-            ? decoded 
+        final List<dynamic> data = decoded is List
+            ? decoded
             : (decoded['results'] ?? decoded['data'] ?? []);
         _transactions = data.map((item) => TransactionModel.fromJson(item)).toList();
       }

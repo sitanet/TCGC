@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/providers/community_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../../widgets/app_image.dart';
-import 'call_page.dart';
 import 'listen_together_page.dart';
 class ChatRoomPage extends ConsumerStatefulWidget {
   final CommunityRoom room;
@@ -75,29 +78,207 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     }
   }
 
-  Future<void> _startCall({required bool isVideo}) async {
-    if (widget.dmUserId == null) return;
-    final p = ref.read(communityChangeNotifierProvider);
-    final channelName = await p.callUser(widget.dmUserId!, isVideo: isVideo);
-    if (!mounted) return;
-    if (channelName != null) {
-      Navigator.push(context, MaterialPageRoute(
-        builder: (_) => CallPage(
-          channelName: channelName,
-          callerName: widget.dmUserName ?? 'User',
-          callerPhoto: widget.dmUserPhoto,
-          isVideo: isVideo,
-          isIncoming: false,
-          remoteUserId: widget.dmUserId!,
+  void _showAttachmentOptions() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
-      ));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not start call'), backgroundColor: Colors.red));
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _attachOption(
+                  icon: Icons.photo_library_rounded,
+                  label: 'Gallery',
+                  color: Colors.purple,
+                  onTap: () { Navigator.pop(ctx); _pickImage(ImageSource.gallery); },
+                ),
+                _attachOption(
+                  icon: Icons.camera_alt_rounded,
+                  label: 'Camera',
+                  color: Colors.blue,
+                  onTap: () { Navigator.pop(ctx); _pickImage(ImageSource.camera); },
+                ),
+                _attachOption(
+                  icon: Icons.insert_drive_file_rounded,
+                  label: 'Document',
+                  color: Colors.orange,
+                  onTap: () { Navigator.pop(ctx); _pickDocument(); },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _attachOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 60, height: 60,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(label, style: TextStyle(
+            fontSize: 12,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          )),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      debugPrint('=== PICKING IMAGE ===');
+      debugPrint('Source: $source');
+      
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: source, imageQuality: 80);
+      
+      if (picked == null) {
+        debugPrint('Image picker cancelled by user');
+        return;
+      }
+      
+      debugPrint('Image picked: ${picked.path}');
+      final file = File(picked.path);
+      
+      if (!file.existsSync()) {
+        debugPrint('ERROR: File does not exist at path: ${picked.path}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('File not found'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+      
+      debugPrint('File exists, size: ${file.lengthSync()} bytes');
+      await _sendFile(file, 'image');
+    } catch (e, stackTrace) {
+      debugPrint('ERROR picking image: $e');
+      debugPrint('Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not pick image: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
-  Future<void> _sendMessage() async {    final text = _textController.text.trim();
+  Future<void> _pickDocument() async {
+    try {
+      debugPrint('=== PICKING DOCUMENT ===');
+      
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'],
+      );
+      
+      if (result == null || result.files.single.path == null) {
+        debugPrint('Document picker cancelled by user');
+        return;
+      }
+      
+      debugPrint('Document picked: ${result.files.single.path}');
+      final file = File(result.files.single.path!);
+      
+      if (!file.existsSync()) {
+        debugPrint('ERROR: File does not exist at path: ${result.files.single.path}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('File not found'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+      
+      debugPrint('File exists, size: ${file.lengthSync()} bytes');
+      await _sendFile(file, 'document');
+    } catch (e, stackTrace) {
+      debugPrint('ERROR picking document: $e');
+      debugPrint('Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not pick document: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _sendFile(File file, String fileType) async {
+    debugPrint('=== SENDING FILE ===');
+    debugPrint('File path: ${file.path}');
+    debugPrint('File type: $fileType');
+    debugPrint('Room ID: ${widget.room.id}');
+    
+    setState(() => _isSending = true);
+    
+    try {
+      final p = ref.read(communityChangeNotifierProvider);
+      final success = await p.sendFileMessage(widget.room.id, file, fileType);
+      
+      debugPrint('Send file result: $success');
+      
+      if (mounted) {
+        setState(() => _isSending = false);
+        if (!success) {
+          final error = p.error ?? 'Failed to send file';
+          debugPrint('Send file error: $error');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error), backgroundColor: Colors.red),
+          );
+        } else {
+          debugPrint('File sent successfully');
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      }
+    } catch (e, stackTrace) {
+      debugPrint('ERROR sending file: $e');
+      debugPrint('Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() => _isSending = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _sendMessage() async {
+    final text = _textController.text.trim();
     if (text.isEmpty || _isSending) return;
 
     setState(() => _isSending = true);
@@ -188,16 +369,6 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                 ],
               ),
         actions: [
-          if (widget.dmUserId != null) ...[
-            IconButton(
-              icon: const Icon(Icons.call, color: AppColors.primaryGold),
-              onPressed: () => _startCall(isVideo: false),
-            ),
-            IconButton(
-              icon: const Icon(Icons.videocam, color: AppColors.primaryGold),
-              onPressed: () => _startCall(isVideo: true),
-            ),
-          ],
           IconButton(
             icon: const Icon(Icons.refresh, color: AppColors.primaryGold),
             onPressed: () => p.fetchMessages(widget.room.id),
@@ -422,16 +593,18 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                     ),
                     child: msg.hasResource
                         ? _buildResourceCard(isDark, msg, isMe)
-                        : Text(
-                            msg.text,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: isMe
-                                  ? Colors.white
-                                  : (isDark ? Colors.white : Colors.black87),
-                              fontStyle: msg.isDeleted ? FontStyle.italic : FontStyle.normal,
-                            ),
-                          ),
+                        : msg.hasFile
+                            ? _buildFileCard(isDark, msg, isMe)
+                            : Text(
+                                msg.text,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isMe
+                                      ? Colors.white
+                                      : (isDark ? Colors.white : Colors.black87),
+                                  fontStyle: msg.isDeleted ? FontStyle.italic : FontStyle.normal,
+                                ),
+                              ),
                   ),
                   Padding(
                     padding: const EdgeInsets.only(top: 3, left: 4, right: 4),
@@ -559,6 +732,168 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     );
   }
 
+  Widget _buildFileCard(bool isDark, ChatMessage msg, bool isMe) {
+    final isImage = msg.fileType == 'image';
+    final textColor = isMe ? Colors.white : (isDark ? Colors.white : Colors.black87);
+    final subColor = isMe
+        ? Colors.white.withValues(alpha: 0.7)
+        : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Optional caption text
+        if (msg.text.isNotEmpty) ...[
+          Text(msg.text, style: TextStyle(fontSize: 14, color: textColor)),
+          const SizedBox(height: 8),
+        ],
+        if (isImage && msg.fileUrl != null)
+          // Image preview
+          GestureDetector(
+            onTap: () => _showFullImage(msg.fileUrl!),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.network(
+                msg.fileUrl!,
+                width: 220,
+                fit: BoxFit.cover,
+                loadingBuilder: (_, child, progress) => progress == null
+                    ? child
+                    : Container(
+                        width: 220, height: 140,
+                        decoration: BoxDecoration(
+                          color: isMe
+                              ? Colors.white.withValues(alpha: 0.15)
+                              : AppColors.primaryGold.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                              color: AppColors.primaryGold, strokeWidth: 2),
+                        ),
+                      ),
+                errorBuilder: (_, __, ___) => Container(
+                  width: 220, height: 80,
+                  decoration: BoxDecoration(
+                    color: isMe
+                        ? Colors.white.withValues(alpha: 0.15)
+                        : AppColors.primaryGold.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.broken_image_outlined, color: subColor, size: 28),
+                      const SizedBox(height: 4),
+                      Text('Could not load image',
+                          style: TextStyle(fontSize: 11, color: subColor)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          )
+        else
+          // Document row
+          GestureDetector(
+            onTap: () => _openFile(msg.fileUrl),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: isMe
+                    ? Colors.white.withValues(alpha: 0.18)
+                    : AppColors.primaryGold.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _docIcon(msg.fileName),
+                    color: isMe ? Colors.white : AppColors.primaryGold,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          msg.fileName ?? 'Document',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: textColor),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text('Tap to open',
+                            style: TextStyle(fontSize: 11, color: subColor)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  IconData _docIcon(String? fileName) {
+    final ext = (fileName ?? '').split('.').last.toLowerCase();
+    switch (ext) {
+      case 'pdf': return Icons.picture_as_pdf_rounded;
+      case 'doc':
+      case 'docx': return Icons.description_rounded;
+      case 'xls':
+      case 'xlsx': return Icons.table_chart_rounded;
+      case 'ppt':
+      case 'pptx': return Icons.slideshow_rounded;
+      default: return Icons.insert_drive_file_rounded;
+    }
+  }
+
+  void _showFullImage(String url) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: InteractiveViewer(
+            child: Image.network(url, fit: BoxFit.contain),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openFile(String? url) async {
+    if (url == null) return;
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cannot open this file')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error opening file: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _startListenTogether(ChatMessage msg) async {
     if (msg.resourceId == null) return;
 
@@ -617,6 +952,23 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
       ),
       child: Row(
         children: [
+          // Attach button
+          GestureDetector(
+            onTap: _showAttachmentOptions,
+            child: Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.backgroundDark : const Color(0xFFF0F0F0),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.attach_file_rounded,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                size: 20,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Container(
               decoration: BoxDecoration(

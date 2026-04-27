@@ -2,7 +2,6 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven { url = uri("https://agora-sdk.oss-cn-hangzhou.aliyuncs.com/artifactory/libs-release") }
     }
     // Force a resolvable protobuf version — iris_method_channel pins AGP 7.1.2
     // which requests protobuf-java:3.10.0, a version no longer on Maven Central.
