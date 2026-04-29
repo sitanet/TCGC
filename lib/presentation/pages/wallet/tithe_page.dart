@@ -60,6 +60,23 @@ class _TithePageState extends ConsumerState<TithePage> {
       }
       return;
     }
+
+    // Enforce single transaction limit
+    if (walletProvider.singleLimit > 0 && amountValue > walletProvider.singleLimit) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Amount exceeds your Tier ${walletProvider.tier} limit of ₦${_fmtLimit(walletProvider.singleLimit)} per transaction. '
+              'Please upgrade your wallet.',
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
     
     // Check if biometric is enabled for transactions
     if (biometricProvider.biometricTransactionEnabled) {
@@ -436,6 +453,10 @@ class _TithePageState extends ConsumerState<TithePage> {
   String _fmt(double v) =>
       v.toStringAsFixed(0).replaceAllMapped(
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+
+  String _fmtLimit(double v) =>
+      v <= 0 ? 'Unlimited' : '${v.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
+
   
   Future<void> _executePayment(double amountValue, String pin) async {
     final walletProvider = ref.read(walletChangeNotifierProvider);
@@ -592,6 +613,37 @@ class _TithePageState extends ConsumerState<TithePage> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Tier limits info
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? AppColors.cardDark
+                              : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.info_outline,
+                                size: 13,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Tier ${walletProvider.tier} limit: ₦${_fmtLimit(walletProvider.singleLimit)} per transaction',
+                              style: TextStyle(
+                                fontSize: smallFontSize * 0.85,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),

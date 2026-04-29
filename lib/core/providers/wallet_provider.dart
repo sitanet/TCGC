@@ -404,10 +404,23 @@ class WalletProvider extends ChangeNotifier {
       // Extract detailed error message from response
       try {
         final data = response.data;
-        _error = data['error'] ?? data['detail'] ?? data['message'] ?? response.errorMessage ?? 'Transaction failed';
-        // Include error code if available
-        if (data['error_code'] != null) {
-          debugPrint('WalletProvider.give: Error code=${data['error_code']}');
+        final errorCode = data['error_code']?.toString() ?? '';
+        final rawError = data['error'] ?? data['detail'] ?? data['message'] ?? response.errorMessage ?? 'Transaction failed';
+        
+        // Format tier-related error messages for better user understanding
+        if (errorCode.contains('TIER_LIMIT') || 
+            errorCode.contains('SINGLE_LIMIT') || 
+            errorCode.contains('DAILY_LIMIT') ||
+            rawError.toString().toLowerCase().contains('tier') ||
+            rawError.toString().toLowerCase().contains('limit exceeded') ||
+            rawError.toString().toLowerCase().contains('transaction limit')) {
+          _error = _formatTierLimitError(rawError.toString(), data);
+        } else {
+          _error = rawError.toString();
+        }
+        
+        if (errorCode.isNotEmpty) {
+          debugPrint('WalletProvider.give: Error code=$errorCode');
         }
       } catch (_) {
         _error = response.errorMessage ?? 'Transaction failed';
@@ -447,7 +460,27 @@ class WalletProvider extends ChangeNotifier {
         return true;
       }
       
-      _error = response.errorMessage;
+      // Extract detailed error message from response
+      try {
+        final data = response.data;
+        final errorCode = data['error_code']?.toString() ?? '';
+        final rawError = data['error'] ?? data['detail'] ?? data['message'] ?? response.errorMessage ?? 'Transaction failed';
+        
+        // Format tier-related error messages for better user understanding
+        if (errorCode.contains('TIER_LIMIT') || 
+            errorCode.contains('SINGLE_LIMIT') || 
+            errorCode.contains('DAILY_LIMIT') ||
+            rawError.toString().toLowerCase().contains('tier') ||
+            rawError.toString().toLowerCase().contains('limit exceeded') ||
+            rawError.toString().toLowerCase().contains('transaction limit')) {
+          _error = _formatTierLimitError(rawError.toString(), data);
+        } else {
+          _error = rawError.toString();
+        }
+      } catch (_) {
+        _error = response.errorMessage ?? 'Transaction failed';
+      }
+      
       _isLoading = false;
       notifyListeners();
       return false;
@@ -742,23 +775,19 @@ class WalletProvider extends ChangeNotifier {
       // Extract detailed error message from response
       try {
         final data = response.data;
-        if (data is Map) {
-          // Check for field-specific errors
-          final errors = <String>[];
-          data.forEach((key, value) {
-            if (value is List && value.isNotEmpty) {
-              errors.add('$key: ${value.join(', ')}');
-            } else if (value is String) {
-              errors.add(value);
-            }
-          });
-          if (errors.isNotEmpty) {
-            _error = errors.join('\n');
-          } else {
-            _error = data['error'] ?? data['detail'] ?? data['message'] ?? response.errorMessage ?? 'Failed to submit upgrade request';
+        // Check for field-specific errors
+        final errors = <String>[];
+        data.forEach((key, value) {
+          if (value is List && value.isNotEmpty) {
+            errors.add('$key: ${value.join(', ')}');
+          } else if (value is String) {
+            errors.add(value);
           }
+        });
+        if (errors.isNotEmpty) {
+          _error = errors.join('\n');
         } else {
-          _error = response.errorMessage ?? 'Failed to submit upgrade request';
+          _error = data['error'] ?? data['detail'] ?? data['message'] ?? response.errorMessage ?? 'Failed to submit upgrade request';
         }
       } catch (_) {
         _error = response.errorMessage ?? 'Failed to submit upgrade request';
@@ -787,6 +816,51 @@ class WalletProvider extends ChangeNotifier {
   void setCurrency(String currency) {
     _currency = currency;
     notifyListeners();
+  }
+
+  String _formatTierLimitError(String rawError, Map<String, dynamic>? data) {
+    // Try to extract specific limit info from data
+    final limit = data?['limit'] ?? data?['max_amount'] ?? data?['single_limit'];
+    final dailyLimit = data?['daily_limit'];
+    final currentTier = data?['tier'] ?? data?['current_tier'] ?? _tier;
+    
+    // Check for single transaction limit exceeded
+    if (rawError.toLowerCase().contains('single') || 
+        rawError.toLowerCase().contains('per transaction')) {
+      if (limit != null) {
+        return 'This amount exceeds your Tier $currentTier single transaction limit of ₦${_formatLimit(limit)}. Please upgrade your wallet for higher limits.';
+      }
+      return 'This amount exceeds your single transaction limit. Please upgrade your wallet or enter a smaller amount.';
+    }
+    
+    // Check for daily limit exceeded
+    if (rawError.toLowerCase().contains('daily')) {
+      if (dailyLimit != null) {
+        return 'You have reached your Tier $currentTier daily transaction limit of ₦${_formatLimit(dailyLimit)}. Please try again tomorrow or upgrade your wallet.';
+      }
+      return 'You have reached your daily transaction limit. Please try again tomorrow or upgrade your wallet.';
+    }
+    
+    // Check for balance limit
+    if (rawError.toLowerCase().contains('balance')) {
+      return 'This transaction would exceed your wallet balance limit. Please upgrade your wallet for a higher balance limit.';
+    }
+    
+    // Generic tier limit message
+    if (limit != null) {
+      return 'Amount exceeds your Tier $currentTier limit of ₦${_formatLimit(limit)}. Please upgrade your wallet.';
+    }
+    
+    // Return original error if we can't improve it
+    return rawError.isNotEmpty ? rawError : 'Transaction limit exceeded. Please upgrade your wallet or try a smaller amount.';
+  }
+  
+  String _formatLimit(dynamic value) {
+    final numValue = double.tryParse(value.toString()) ?? 0;
+    return numValue.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]},',
+    );
   }
 
   void clearError() {

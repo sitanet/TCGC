@@ -41,6 +41,8 @@ class ApiConstants {
   static const String transcripts = '/transcripts/';
   static const String transcriptsByCategory = '/transcripts/by_category/';
   static const String featuredTranscripts = '/transcripts/featured/';
+  static const String ebooks = '/ebooks/';
+  static const String featuredEbooks = '/ebooks/featured/';
   
   // Favorites (synced to backend)
   static const String favorites = '/favorites/';

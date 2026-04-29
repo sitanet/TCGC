@@ -17,6 +17,7 @@ import 'favorites_page.dart';
 import 'playlists_page.dart';
 import 'downloads_page.dart';
 import 'transcript_list_page.dart';
+import 'ebook_list_page.dart';
 
 String _stripHtmlTags(String htmlText) {
   return htmlText
@@ -52,7 +53,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     // Load cached data immediately, then refresh in background
     _audioCacheService.initialize();
     _loadCachedDataFirst();
@@ -283,6 +284,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
               controller: _tabController,
               children: [
                 _buildCategoryList(context, isDark),
+                const EbookListPage(),
                 _buildTranscriptList(context, isDark),
               ],
             ),
@@ -317,6 +319,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
         labelStyle: const TextStyle(fontWeight: FontWeight.w600),
         tabs: const [
           Tab(text: 'Audio'),
+          Tab(text: 'Library'),
           Tab(text: 'Transcript'),
         ],
       ),
