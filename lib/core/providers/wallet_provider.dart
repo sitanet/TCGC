@@ -23,41 +23,66 @@ class TransactionModel {
   final int id;
   final String title;
   final double amount;
-  final double fee;
+  final double fee; // legacy field
+  final double totalFee; // correct total fee
+  final double psbFee;
+  final double stampDuty;
+  final double vatAmount;
+  final double partnerFee;
   final String currency;
   final String transactionType;
   final String category;
   final DateTime date;
   final String? reference;
+  final String? narration;
+  final String? counterpartyName;
 
   TransactionModel({
     required this.id,
     required this.title,
     required this.amount,
-    required this.fee,
+    this.fee = 0.0,
+    this.totalFee = 0.0,
+    this.psbFee = 0.0,
+    this.stampDuty = 0.0,
+    this.vatAmount = 0.0,
+    this.partnerFee = 0.0,
     required this.currency,
     required this.transactionType,
     required this.category,
     required this.date,
     this.reference,
+    this.narration,
+    this.counterpartyName,
   });
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
     return TransactionModel(
       id: json['id'],
-      title: json['title'],
+      title: json['title'] ?? '',
       amount: double.tryParse(json['amount']?.toString() ?? '0') ?? 0.0,
       fee: double.tryParse(json['fee']?.toString() ?? '0') ?? 0.0,
+      totalFee: double.tryParse(json['total_fee']?.toString() ?? '0') ?? 0.0,
+      psbFee: double.tryParse(json['psb_fee']?.toString() ?? '0') ?? 0.0,
+      stampDuty: double.tryParse(json['stamp_duty']?.toString() ?? '0') ?? 0.0,
+      vatAmount: double.tryParse(json['vat_amount']?.toString() ?? '0') ?? 0.0,
+      partnerFee:
+          double.tryParse(json['partner_fee']?.toString() ?? '0') ?? 0.0,
       currency: json['currency'] ?? 'NGN',
-      transactionType: json['transaction_type'],
+      transactionType: json['transaction_type'] ?? 'money_out',
       category: json['category'] ?? 'other',
       date: DateTime.parse(json['date']),
-      reference: json['reference'],
+      reference: json['reference'] as String?,
+      narration: json['narration'] as String?,
+      counterpartyName: json['counterparty_name'] as String?,
     );
   }
 
   bool get isMoneyIn => transactionType == 'money_in';
   bool get isFee => category == 'fee';
+
+  /// Effective total fee — prefer total_fee, fall back to fee
+  double get effectiveFee => totalFee > 0 ? totalFee : fee;
 }
 
 class GivingModel {
@@ -91,7 +116,7 @@ class GivingModel {
 
 class WalletProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
-  
+
   bool _hasWallet = false;
   bool _isLoading = false;
   bool _isInitialized = false;
@@ -101,7 +126,7 @@ class WalletProvider extends ChangeNotifier {
   List<GiveOptionModel> _giveOptions = [];
   List<TransactionModel> _transactions = [];
   List<GivingModel> _givings = [];
-  
+
   // 9PSB Wallet Details
   String? _accountNumber;
   String? _accountName;
@@ -113,7 +138,18 @@ class WalletProvider extends ChangeNotifier {
   bool _hasPendingUpgrade = false;
   Map<String, dynamic>? _upgradeRequest;
   List<Map<String, dynamic>> _tierInfo = [];
-  
+
+  // Fee config from backend (used in UI to show correct fees)
+  double _psbFeeRate = 0.003; // 0.3%
+  double _psbFeeCap = 50.0; // ₦50 cap
+  double _stampDutyAmount = 50.0; // ₦50
+  double _stampDutyThreshold = 10000.0; // applies on ≥ ₦10,000
+  double _vatRate = 0.075; // 7.5%
+  bool _vatEnabled = true;
+  double _partnerFeeFlat = 0.0;
+  double _partnerFeePercentage = 0.0;
+  bool _partnerFeeEnabled = false;
+
   // Report data
   Map<String, dynamic>? _transactionReport;
   Map<String, dynamic>? _givingReport;
@@ -129,7 +165,7 @@ class WalletProvider extends ChangeNotifier {
   List<GivingModel> get givings => _givings;
   Map<String, dynamic>? get transactionReport => _transactionReport;
   Map<String, dynamic>? get givingReport => _givingReport;
-  
+
   // 9PSB Getters
   String? get accountNumber => _accountNumber;
   String? get accountName => _accountName;
@@ -141,28 +177,72 @@ class WalletProvider extends ChangeNotifier {
   bool get hasPendingUpgrade => _hasPendingUpgrade;
   Map<String, dynamic>? get upgradeRequest => _upgradeRequest;
   List<Map<String, dynamic>> get tierInfo => _tierInfo;
-  
+
+  // Fee config getters
+  double get psbFeeRate => _psbFeeRate;
+  double get psbFeeCap => _psbFeeCap;
+  double get stampDutyAmount => _stampDutyAmount;
+  double get stampDutyThreshold => _stampDutyThreshold;
+  double get vatRate => _vatRate;
+  bool get vatEnabled => _vatEnabled;
+  double get partnerFeeFlat => _partnerFeeFlat;
+  double get partnerFeePercentage => _partnerFeePercentage;
+  bool get partnerFeeEnabled => _partnerFeeEnabled;
+
+  /// Calculate the full fee breakdown for a giving amount using live backend config.
+  /// Returns a map with: psbFee, stampDuty, vat, partnerFee, totalFee
+  Map<String, double> calculateFees(double amount) {
+    if (amount <= 0) {
+      return {
+        'psbFee': 0,
+        'stampDuty': 0,
+        'vat': 0,
+        'partnerFee': 0,
+        'totalFee': 0,
+      };
+    }
+    final psbFee = (amount * _psbFeeRate).clamp(0, _psbFeeCap);
+    final stampDuty = amount >= _stampDutyThreshold ? _stampDutyAmount : 0.0;
+    final vat = _vatEnabled ? psbFee * _vatRate : 0.0;
+    final partnerFee = _partnerFeeEnabled
+        ? _partnerFeeFlat + (amount * _partnerFeePercentage)
+        : 0.0;
+    final totalFee = psbFee + stampDuty + vat + partnerFee;
+    return {
+      'psbFee': double.parse(psbFee.toStringAsFixed(2)),
+      'stampDuty': double.parse(stampDuty.toStringAsFixed(2)),
+      'vat': double.parse(vat.toStringAsFixed(2)),
+      'partnerFee': double.parse(partnerFee.toStringAsFixed(2)),
+      'totalFee': double.parse(totalFee.toStringAsFixed(2)),
+    };
+  }
+
   String get tierName {
     switch (_tier) {
-      case 0: return 'Tier 0 - Unverified';
-      case 1: return 'Tier 1 - Basic';
-      case 2: return 'Tier 2 - Standard';
-      case 3: return 'Tier 3 - Premium';
-      default: return 'Unknown';
+      case 0:
+        return 'Tier 0 - Unverified';
+      case 1:
+        return 'Tier 1 - Basic';
+      case 2:
+        return 'Tier 2 - Standard';
+      case 3:
+        return 'Tier 3 - Premium';
+      default:
+        return 'Unknown';
     }
   }
-  
+
   bool get canTransact => _tier > 0 && _status == 'active';
 
   Future<void> initialize() async {
     if (_isInitialized) return;
-    
+
     _isLoading = true;
     notifyListeners();
-    
+
     await fetchWallet();
     await fetchGiveOptions();
-    
+
     _isInitialized = true;
     _isLoading = false;
     notifyListeners();
@@ -171,25 +251,64 @@ class WalletProvider extends ChangeNotifier {
   Future<void> fetchWallet() async {
     try {
       final response = await _api.get(ApiConstants.walletDetails);
-      
+
       // Debug: Log API response to diagnose wallet detection
-      debugPrint('WalletProvider.fetchWallet: status=${response.statusCode}, body=${response.body}');
-      
+      debugPrint(
+        'WalletProvider.fetchWallet: status=${response.statusCode}, body=${response.body}',
+      );
+
       if (response.isSuccess) {
         final data = response.data;
         _hasWallet = data['has_wallet'] == true;
-        
+
         if (_hasWallet && data['wallet'] != null) {
           final wallet = data['wallet'];
-          _balance = double.tryParse(wallet['balance']?.toString() ?? '0') ?? 0.0;
+          _balance =
+              double.tryParse(wallet['balance']?.toString() ?? '0') ?? 0.0;
           _currency = wallet['currency'] ?? 'NGN';
           _accountNumber = wallet['psb_account_number'];
           _accountName = wallet['psb_account_name'];
           _tier = wallet['tier'] ?? 0;
           _status = wallet['status'] ?? 'pending';
-          _singleLimit = double.tryParse(wallet['single_transaction_limit']?.toString() ?? '0') ?? 0;
-          _dailyLimit = double.tryParse(wallet['daily_transaction_limit']?.toString() ?? '0') ?? 0;
-          _balanceLimit = double.tryParse(wallet['balance_limit']?.toString() ?? '0') ?? 0;
+          _singleLimit =
+              double.tryParse(
+                wallet['single_transaction_limit']?.toString() ?? '0',
+              ) ??
+              0;
+          _dailyLimit =
+              double.tryParse(
+                wallet['daily_transaction_limit']?.toString() ?? '0',
+              ) ??
+              0;
+          _balanceLimit =
+              double.tryParse(wallet['balance_limit']?.toString() ?? '0') ?? 0;
+
+          // Fee config from backend — always use these, never hardcode
+          _psbFeeRate =
+              double.tryParse(wallet['psb_fee_rate']?.toString() ?? '') ??
+              0.003;
+          _psbFeeCap =
+              double.tryParse(wallet['psb_fee_cap']?.toString() ?? '') ?? 50.0;
+          _stampDutyAmount =
+              double.tryParse(wallet['stamp_duty_amount']?.toString() ?? '') ??
+              50.0;
+          _stampDutyThreshold =
+              double.tryParse(
+                wallet['stamp_duty_threshold']?.toString() ?? '',
+              ) ??
+              10000.0;
+          _vatRate =
+              double.tryParse(wallet['vat_rate']?.toString() ?? '') ?? 0.075;
+          _vatEnabled = wallet['vat_enabled'] ?? true;
+          _partnerFeeFlat =
+              double.tryParse(wallet['partner_fee_flat']?.toString() ?? '') ??
+              0.0;
+          _partnerFeePercentage =
+              double.tryParse(
+                wallet['partner_fee_percentage']?.toString() ?? '',
+              ) ??
+              0.0;
+          _partnerFeeEnabled = wallet['partner_fee_enabled'] ?? false;
         }
         _error = null;
       } else if (response.statusCode == 404) {
@@ -211,7 +330,7 @@ class WalletProvider extends ChangeNotifier {
 
     try {
       final response = await _api.post(ApiConstants.walletOpen, userData);
-      
+
       if (response.isSuccess) {
         final wallet = response.data['wallet'];
         _hasWallet = true;
@@ -221,14 +340,23 @@ class WalletProvider extends ChangeNotifier {
         _accountName = wallet['psb_account_name'];
         _tier = wallet['tier'] ?? 1;
         _status = wallet['status'] ?? 'active';
-        _singleLimit = double.tryParse(wallet['single_transaction_limit']?.toString() ?? '0') ?? 0;
-        _dailyLimit = double.tryParse(wallet['daily_transaction_limit']?.toString() ?? '0') ?? 0;
-        _balanceLimit = double.tryParse(wallet['balance_limit']?.toString() ?? '0') ?? 0;
+        _singleLimit =
+            double.tryParse(
+              wallet['single_transaction_limit']?.toString() ?? '0',
+            ) ??
+            0;
+        _dailyLimit =
+            double.tryParse(
+              wallet['daily_transaction_limit']?.toString() ?? '0',
+            ) ??
+            0;
+        _balanceLimit =
+            double.tryParse(wallet['balance_limit']?.toString() ?? '0') ?? 0;
         _isLoading = false;
         notifyListeners();
         return true;
       }
-      
+
       _error = response.errorMessage ?? 'Failed to create wallet';
       _isLoading = false;
       notifyListeners();
@@ -250,13 +378,15 @@ class WalletProvider extends ChangeNotifier {
   Future<void> fetchGiveOptions() async {
     try {
       final response = await _api.get(ApiConstants.giveOptions);
-      
+
       if (response.isSuccess) {
         final decoded = response.data;
-        final List<dynamic> data = decoded is List 
-            ? decoded 
+        final List<dynamic> data = decoded is List
+            ? decoded
             : (decoded['results'] ?? decoded['data'] ?? []);
-        _giveOptions = data.map((item) => GiveOptionModel.fromJson(item)).toList();
+        _giveOptions = data
+            .map((item) => GiveOptionModel.fromJson(item))
+            .toList();
       }
     } catch (e) {
       debugPrint('Error fetching give options: $e');
@@ -272,7 +402,9 @@ class WalletProvider extends ChangeNotifier {
         final List<dynamic> data = decoded is List
             ? decoded
             : (decoded['results'] ?? decoded['data'] ?? []);
-        _transactions = data.map((item) => TransactionModel.fromJson(item)).toList();
+        _transactions = data
+            .map((item) => TransactionModel.fromJson(item))
+            .toList();
       }
     } catch (e) {
       debugPrint('Error fetching transactions: $e');
@@ -283,11 +415,11 @@ class WalletProvider extends ChangeNotifier {
   Future<void> fetchGivings() async {
     try {
       final response = await _api.get(ApiConstants.givings);
-      
+
       if (response.isSuccess) {
         final decoded = response.data;
-        final List<dynamic> data = decoded is List 
-            ? decoded 
+        final List<dynamic> data = decoded is List
+            ? decoded
             : (decoded['results'] ?? decoded['data'] ?? []);
         _givings = data.map((item) => GivingModel.fromJson(item)).toList();
       }
@@ -297,7 +429,11 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchTransactionReport({String? startDate, String? endDate, String? type}) async {
+  Future<void> fetchTransactionReport({
+    String? startDate,
+    String? endDate,
+    String? type,
+  }) async {
     _isLoading = true;
     notifyListeners();
 
@@ -308,9 +444,9 @@ class WalletProvider extends ChangeNotifier {
       if (endDate != null) params.add('end_date=$endDate');
       if (type != null) params.add('type=$type');
       if (params.isNotEmpty) url += '?${params.join('&')}';
-      
+
       final response = await _api.get(url);
-      
+
       if (response.isSuccess) {
         _transactionReport = response.data;
       }
@@ -321,7 +457,11 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchGivingReport({String? startDate, String? endDate, int? giveOptionId}) async {
+  Future<void> fetchGivingReport({
+    String? startDate,
+    String? endDate,
+    int? giveOptionId,
+  }) async {
     _isLoading = true;
     notifyListeners();
 
@@ -332,9 +472,9 @@ class WalletProvider extends ChangeNotifier {
       if (endDate != null) params.add('end_date=$endDate');
       if (giveOptionId != null) params.add('give_option=$giveOptionId');
       if (params.isNotEmpty) url += '?${params.join('&')}';
-      
+
       final response = await _api.get(url);
-      
+
       if (response.isSuccess) {
         _givingReport = response.data;
       }
@@ -354,15 +494,17 @@ class WalletProvider extends ChangeNotifier {
       final response = await _api.post(ApiConstants.walletFund, {
         'amount': amount,
       });
-      
+
       if (response.isSuccess) {
-        _balance = double.tryParse(response.data['new_balance']?.toString() ?? '0') ?? _balance;
+        _balance =
+            double.tryParse(response.data['new_balance']?.toString() ?? '0') ??
+            _balance;
         await fetchTransactions();
         _isLoading = false;
         notifyListeners();
         return true;
       }
-      
+
       _error = response.errorMessage;
       _isLoading = false;
       notifyListeners();
@@ -382,34 +524,45 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('WalletProvider.give: Sending request - giveOptionId=$giveOptionId, amount=$amount');
+      debugPrint(
+        'WalletProvider.give: Sending request - giveOptionId=$giveOptionId, amount=$amount',
+      );
       final response = await _api.post(ApiConstants.walletGive, {
         'give_option': giveOptionId,
         'amount': amount,
         'pin': pin,
       });
-      
-      debugPrint('WalletProvider.give: Response statusCode=${response.statusCode}, isSuccess=${response.isSuccess}');
+
+      debugPrint(
+        'WalletProvider.give: Response statusCode=${response.statusCode}, isSuccess=${response.isSuccess}',
+      );
       debugPrint('WalletProvider.give: Response body=${response.body}');
-      
+
       if (response.isSuccess) {
-        _balance = double.tryParse(response.data['new_balance']?.toString() ?? '0') ?? _balance;
+        _balance =
+            double.tryParse(response.data['new_balance']?.toString() ?? '0') ??
+            _balance;
         await fetchTransactions();
         await fetchGivings();
         _isLoading = false;
         notifyListeners();
         return true;
       }
-      
+
       // Extract detailed error message from response
       try {
         final data = response.data;
         final errorCode = data['error_code']?.toString() ?? '';
-        final rawError = data['error'] ?? data['detail'] ?? data['message'] ?? response.errorMessage ?? 'Transaction failed';
-        
+        final rawError =
+            data['error'] ??
+            data['detail'] ??
+            data['message'] ??
+            response.errorMessage ??
+            'Transaction failed';
+
         // Format tier-related error messages for better user understanding
-        if (errorCode.contains('TIER_LIMIT') || 
-            errorCode.contains('SINGLE_LIMIT') || 
+        if (errorCode.contains('TIER_LIMIT') ||
+            errorCode.contains('SINGLE_LIMIT') ||
             errorCode.contains('DAILY_LIMIT') ||
             rawError.toString().toLowerCase().contains('tier') ||
             rawError.toString().toLowerCase().contains('limit exceeded') ||
@@ -418,14 +571,14 @@ class WalletProvider extends ChangeNotifier {
         } else {
           _error = rawError.toString();
         }
-        
+
         if (errorCode.isNotEmpty) {
           debugPrint('WalletProvider.give: Error code=$errorCode');
         }
       } catch (_) {
         _error = response.errorMessage ?? 'Transaction failed';
       }
-      
+
       debugPrint('WalletProvider.give: Failed - error=$_error');
       _isLoading = false;
       notifyListeners();
@@ -450,25 +603,32 @@ class WalletProvider extends ChangeNotifier {
         'amount': amount,
         'biometric_auth': true,
       });
-      
+
       if (response.isSuccess) {
-        _balance = double.tryParse(response.data['new_balance']?.toString() ?? '0') ?? _balance;
+        _balance =
+            double.tryParse(response.data['new_balance']?.toString() ?? '0') ??
+            _balance;
         await fetchTransactions();
         await fetchGivings();
         _isLoading = false;
         notifyListeners();
         return true;
       }
-      
+
       // Extract detailed error message from response
       try {
         final data = response.data;
         final errorCode = data['error_code']?.toString() ?? '';
-        final rawError = data['error'] ?? data['detail'] ?? data['message'] ?? response.errorMessage ?? 'Transaction failed';
-        
+        final rawError =
+            data['error'] ??
+            data['detail'] ??
+            data['message'] ??
+            response.errorMessage ??
+            'Transaction failed';
+
         // Format tier-related error messages for better user understanding
-        if (errorCode.contains('TIER_LIMIT') || 
-            errorCode.contains('SINGLE_LIMIT') || 
+        if (errorCode.contains('TIER_LIMIT') ||
+            errorCode.contains('SINGLE_LIMIT') ||
             errorCode.contains('DAILY_LIMIT') ||
             rawError.toString().toLowerCase().contains('tier') ||
             rawError.toString().toLowerCase().contains('limit exceeded') ||
@@ -480,7 +640,7 @@ class WalletProvider extends ChangeNotifier {
       } catch (_) {
         _error = response.errorMessage ?? 'Transaction failed';
       }
-      
+
       _isLoading = false;
       notifyListeners();
       return false;
@@ -492,7 +652,7 @@ class WalletProvider extends ChangeNotifier {
       return false;
     }
   }
-  
+
   Future<bool> checkHasPin() async {
     try {
       final response = await _api.get(ApiConstants.transactionPin);
@@ -505,7 +665,7 @@ class WalletProvider extends ChangeNotifier {
       return false;
     }
   }
-  
+
   Future<bool> setTransactionPin(String pin, String confirmPin) async {
     _isLoading = true;
     _error = null;
@@ -514,22 +674,24 @@ class WalletProvider extends ChangeNotifier {
     try {
       debugPrint('WalletProvider: Setting transaction PIN...');
       debugPrint('WalletProvider: Endpoint: ${ApiConstants.transactionPin}');
-      
+
       final response = await _api.post(ApiConstants.transactionPin, {
         'pin': pin,
         'confirm_pin': confirmPin,
       });
-      
-      debugPrint('WalletProvider: PIN response - success: ${response.isSuccess}, status: ${response.statusCode}');
+
+      debugPrint(
+        'WalletProvider: PIN response - success: ${response.isSuccess}, status: ${response.statusCode}',
+      );
       debugPrint('WalletProvider: PIN response body: ${response.body}');
-      
+
       _isLoading = false;
       if (response.isSuccess) {
         debugPrint('WalletProvider: PIN set successfully');
         notifyListeners();
         return true;
       }
-      
+
       _error = response.errorMessage;
       debugPrint('WalletProvider: PIN error: $_error');
       notifyListeners();
@@ -547,29 +709,41 @@ class WalletProvider extends ChangeNotifier {
     _error = null;
     try {
       debugPrint('WalletProvider.verifyPin: Verifying PIN...');
-      debugPrint('WalletProvider.verifyPin: Endpoint: ${ApiConstants.transactionPin}verify/');
-      
-      final response = await _api.post('${ApiConstants.transactionPin}verify/', {
-        'pin': pin,
-      });
-      
-      debugPrint('WalletProvider.verifyPin: Response statusCode=${response.statusCode}');
-      debugPrint('WalletProvider.verifyPin: Response isSuccess=${response.isSuccess}');
+      debugPrint(
+        'WalletProvider.verifyPin: Endpoint: ${ApiConstants.transactionPin}verify/',
+      );
+
+      final response = await _api.post(
+        '${ApiConstants.transactionPin}verify/',
+        {'pin': pin},
+      );
+
+      debugPrint(
+        'WalletProvider.verifyPin: Response statusCode=${response.statusCode}',
+      );
+      debugPrint(
+        'WalletProvider.verifyPin: Response isSuccess=${response.isSuccess}',
+      );
       debugPrint('WalletProvider.verifyPin: Response body=${response.body}');
-      
+
       if (response.isSuccess && response.data['valid'] == true) {
         debugPrint('WalletProvider.verifyPin: PIN verified successfully');
         return true;
       }
-      
+
       // Try to get more specific error
       try {
         final data = response.data;
-        _error = data['error'] ?? data['message'] ?? data['detail'] ?? response.errorMessage ?? 'Invalid PIN';
+        _error =
+            data['error'] ??
+            data['message'] ??
+            data['detail'] ??
+            response.errorMessage ??
+            'Invalid PIN';
       } catch (_) {
         _error = response.errorMessage ?? 'Invalid PIN';
       }
-      
+
       debugPrint('WalletProvider.verifyPin: PIN verification failed - $_error');
       return false;
     } catch (e) {
@@ -578,8 +752,12 @@ class WalletProvider extends ChangeNotifier {
       return false;
     }
   }
-  
-  Future<bool> changeTransactionPin(String oldPin, String newPin, String confirmPin) async {
+
+  Future<bool> changeTransactionPin(
+    String oldPin,
+    String newPin,
+    String confirmPin,
+  ) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -590,13 +768,13 @@ class WalletProvider extends ChangeNotifier {
         'new_pin': newPin,
         'confirm_pin': confirmPin,
       });
-      
+
       _isLoading = false;
       if (response.isSuccess) {
         notifyListeners();
         return true;
       }
-      
+
       _error = response.errorMessage;
       notifyListeners();
       return false;
@@ -609,7 +787,11 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> resetTransactionPin(String password, String newPin, String confirmPin) async {
+  Future<bool> resetTransactionPin(
+    String password,
+    String newPin,
+    String confirmPin,
+  ) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -620,13 +802,13 @@ class WalletProvider extends ChangeNotifier {
         'new_pin': newPin,
         'confirm_pin': confirmPin,
       });
-      
+
       _isLoading = false;
       if (response.isSuccess) {
         notifyListeners();
         return true;
       }
-      
+
       _error = response.errorMessage;
       notifyListeners();
       return false;
@@ -642,10 +824,11 @@ class WalletProvider extends ChangeNotifier {
   Future<void> fetchTierInfo() async {
     try {
       final response = await _api.get(ApiConstants.walletTiers);
-      
+
       if (response.isSuccess) {
         final tiers = response.data['tiers'] as List<dynamic>?;
-        _tierInfo = tiers?.map((t) => Map<String, dynamic>.from(t)).toList() ?? [];
+        _tierInfo =
+            tiers?.map((t) => Map<String, dynamic>.from(t)).toList() ?? [];
       }
     } catch (e) {
       debugPrint('Error fetching tier info: $e');
@@ -656,11 +839,11 @@ class WalletProvider extends ChangeNotifier {
   Future<void> fetchUpgradeStatus() async {
     try {
       final response = await _api.get(ApiConstants.walletUpgradeStatus);
-      
+
       if (response.isSuccess) {
         _upgradeRequest = response.data['upgrade_request'];
         final newTier = response.data['current_tier'] ?? _tier;
-        
+
         // If tier has changed (upgrade approved), refresh wallet to get updated limits
         if (newTier != _tier) {
           _tier = newTier;
@@ -678,7 +861,9 @@ class WalletProvider extends ChangeNotifier {
         if (isApproved && tierMatches) {
           // Upgrade complete — no longer pending
           _hasPendingUpgrade = false;
-          debugPrint('WalletProvider: Upgrade approved and tier synced to $_tier');
+          debugPrint(
+            'WalletProvider: Upgrade approved and tier synced to $_tier',
+          );
         } else {
           _hasPendingUpgrade = response.data['has_pending_upgrade'] == true;
         }
@@ -716,8 +901,10 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('WalletProvider.upgradeWallet: Starting upgrade to tier $targetTier');
-      
+      debugPrint(
+        'WalletProvider.upgradeWallet: Starting upgrade to tier $targetTier',
+      );
+
       final fields = {
         'tier': targetTier.toString(),
         'bvn': bvn,
@@ -750,7 +937,9 @@ class WalletProvider extends ChangeNotifier {
         files['proof_of_address'] = proofOfAddress;
       }
 
-      debugPrint('WalletProvider.upgradeWallet: Sending request to ${ApiConstants.walletUpgrade}');
+      debugPrint(
+        'WalletProvider.upgradeWallet: Sending request to ${ApiConstants.walletUpgrade}',
+      );
       debugPrint('WalletProvider.upgradeWallet: Fields: $fields');
       debugPrint('WalletProvider.upgradeWallet: Files: ${files.keys.toList()}');
 
@@ -760,14 +949,22 @@ class WalletProvider extends ChangeNotifier {
         files: files,
       );
 
-      debugPrint('WalletProvider.upgradeWallet: Response statusCode=${response.statusCode}');
-      debugPrint('WalletProvider.upgradeWallet: Response isSuccess=${response.isSuccess}');
-      debugPrint('WalletProvider.upgradeWallet: Response body=${response.body}');
+      debugPrint(
+        'WalletProvider.upgradeWallet: Response statusCode=${response.statusCode}',
+      );
+      debugPrint(
+        'WalletProvider.upgradeWallet: Response isSuccess=${response.isSuccess}',
+      );
+      debugPrint(
+        'WalletProvider.upgradeWallet: Response body=${response.body}',
+      );
 
       _isLoading = false;
       if (response.isSuccess) {
         _hasPendingUpgrade = true;
-        debugPrint('WalletProvider.upgradeWallet: Upgrade request submitted successfully');
+        debugPrint(
+          'WalletProvider.upgradeWallet: Upgrade request submitted successfully',
+        );
         notifyListeners();
         return true;
       }
@@ -787,12 +984,17 @@ class WalletProvider extends ChangeNotifier {
         if (errors.isNotEmpty) {
           _error = errors.join('\n');
         } else {
-          _error = data['error'] ?? data['detail'] ?? data['message'] ?? response.errorMessage ?? 'Failed to submit upgrade request';
+          _error =
+              data['error'] ??
+              data['detail'] ??
+              data['message'] ??
+              response.errorMessage ??
+              'Failed to submit upgrade request';
         }
       } catch (_) {
         _error = response.errorMessage ?? 'Failed to submit upgrade request';
       }
-      
+
       debugPrint('WalletProvider.upgradeWallet: Failed - $_error');
       notifyListeners();
       return false;
@@ -802,9 +1004,11 @@ class WalletProvider extends ChangeNotifier {
       // Show detailed error for debugging on device
       String errorDetail = e.toString();
       if (e is SocketException) {
-        errorDetail = 'Network error: Unable to connect to server. Check your internet connection.';
+        errorDetail =
+            'Network error: Unable to connect to server. Check your internet connection.';
       } else if (errorDetail.contains('TimeoutException')) {
-        errorDetail = 'Request timed out. The files may be too large or your connection is slow.';
+        errorDetail =
+            'Request timed out. The files may be too large or your connection is slow.';
       }
       _error = 'Upgrade failed: $errorDetail';
       _isLoading = false;
@@ -820,19 +1024,20 @@ class WalletProvider extends ChangeNotifier {
 
   String _formatTierLimitError(String rawError, Map<String, dynamic>? data) {
     // Try to extract specific limit info from data
-    final limit = data?['limit'] ?? data?['max_amount'] ?? data?['single_limit'];
+    final limit =
+        data?['limit'] ?? data?['max_amount'] ?? data?['single_limit'];
     final dailyLimit = data?['daily_limit'];
     final currentTier = data?['tier'] ?? data?['current_tier'] ?? _tier;
-    
+
     // Check for single transaction limit exceeded
-    if (rawError.toLowerCase().contains('single') || 
+    if (rawError.toLowerCase().contains('single') ||
         rawError.toLowerCase().contains('per transaction')) {
       if (limit != null) {
         return 'This amount exceeds your Tier $currentTier single transaction limit of ₦${_formatLimit(limit)}. Please upgrade your wallet for higher limits.';
       }
       return 'This amount exceeds your single transaction limit. Please upgrade your wallet or enter a smaller amount.';
     }
-    
+
     // Check for daily limit exceeded
     if (rawError.toLowerCase().contains('daily')) {
       if (dailyLimit != null) {
@@ -840,27 +1045,31 @@ class WalletProvider extends ChangeNotifier {
       }
       return 'You have reached your daily transaction limit. Please try again tomorrow or upgrade your wallet.';
     }
-    
+
     // Check for balance limit
     if (rawError.toLowerCase().contains('balance')) {
       return 'This transaction would exceed your wallet balance limit. Please upgrade your wallet for a higher balance limit.';
     }
-    
+
     // Generic tier limit message
     if (limit != null) {
       return 'Amount exceeds your Tier $currentTier limit of ₦${_formatLimit(limit)}. Please upgrade your wallet.';
     }
-    
+
     // Return original error if we can't improve it
-    return rawError.isNotEmpty ? rawError : 'Transaction limit exceeded. Please upgrade your wallet or try a smaller amount.';
+    return rawError.isNotEmpty
+        ? rawError
+        : 'Transaction limit exceeded. Please upgrade your wallet or try a smaller amount.';
   }
-  
+
   String _formatLimit(dynamic value) {
     final numValue = double.tryParse(value.toString()) ?? 0;
-    return numValue.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]},',
-    );
+    return numValue
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]},',
+        );
   }
 
   void clearError() {

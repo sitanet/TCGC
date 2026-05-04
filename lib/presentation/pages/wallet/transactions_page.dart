@@ -27,15 +27,30 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
 
   String _formatCurrency(double amount, String currency) {
     final symbols = {'NGN': '₦', 'USD': '\$', 'EUR': '€', 'GBP': '£'};
-    final formatted = amount.toStringAsFixed(2).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
+    final formatted = amount
+        .toStringAsFixed(2)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
+        );
     return '${symbols[currency] ?? currency}$formatted';
   }
 
   String _formatDate(DateTime date) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${date.day} ${months[date.month - 1]}, ${date.year}';
   }
 
@@ -47,7 +62,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     final maxWidth = Responsive.maxContentWidth(context);
 
     final walletProvider = ref.watch(walletChangeNotifierProvider);
-    
+
     return Scaffold(
       appBar: const CustomAppBar(title: 'Transactions'),
       body: SingleChildScrollView(
@@ -74,10 +89,19 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     );
   }
 
-  Widget _buildSummaryCard(BuildContext context, bool isDark, WalletProvider walletProvider) {
+  Widget _buildSummaryCard(
+    BuildContext context,
+    bool isDark,
+    WalletProvider walletProvider,
+  ) {
     final smallFontSize = Responsive.smallFontSize(context);
-    final balanceFontSize = Responsive.value(context, mobile: 32.0, tablet: 38.0, desktop: 44.0);
-    
+    final balanceFontSize = Responsive.value(
+      context,
+      mobile: 32.0,
+      tablet: 38.0,
+      desktop: 44.0,
+    );
+
     return Container(
       width: double.infinity,
       height: 178,
@@ -105,7 +129,10 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
             // Content
             Positioned.fill(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 35,
+                  vertical: 20,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -142,7 +169,10 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _formatCurrency(walletProvider.balance, walletProvider.currency),
+                            _formatCurrency(
+                              walletProvider.balance,
+                              walletProvider.currency,
+                            ),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: balanceFontSize,
@@ -175,7 +205,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     final spacing = Responsive.verticalSpacing(context);
     final borderRadius = Responsive.borderRadius(context);
     final bodyFontSize = Responsive.bodyFontSize(context);
-    
+
     return Container(
       padding: EdgeInsets.all(spacing * 0.5),
       decoration: BoxDecoration(
@@ -196,18 +226,18 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                 duration: const Duration(milliseconds: 200),
                 padding: EdgeInsets.symmetric(vertical: spacing * 0.7),
                 decoration: BoxDecoration(
-                  color: isSelected 
-                      ? AppColors.primaryGold 
+                  color: isSelected
+                      ? AppColors.primaryGold
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(borderRadius),
-                  boxShadow: isSelected 
+                  boxShadow: isSelected
                       ? [
                           BoxShadow(
                             color: AppColors.primaryGold.withOpacity(0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
-                        ] 
+                        ]
                       : null,
                 ),
                 child: Center(
@@ -216,8 +246,12 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                     style: TextStyle(
                       color: isSelected
                           ? Colors.white
-                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          : (isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight),
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
                       fontSize: bodyFontSize * 0.9,
                     ),
                   ),
@@ -230,21 +264,33 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     );
   }
 
-  Widget _buildTransactionsList(BuildContext context, bool isDark, WalletProvider walletProvider) {
-    var transactions = walletProvider.transactions;
+  Widget _buildTransactionsList(
+    BuildContext context,
+    bool isDark,
+    WalletProvider walletProvider,
+  ) {
+    // Fees tab shows fee transactions AND giving transactions that have fees charged
+    var transactions = selectedFilter == 'Fees'
+        ? walletProvider.transactions
+              .where((t) => t.isFee || (t.effectiveFee > 0 && !t.isMoneyIn))
+              .toList()
+        : walletProvider.transactions.where((t) => !t.isFee).toList();
     final spacing = Responsive.verticalSpacing(context);
     final borderRadius = Responsive.borderRadius(context);
     final iconSize = Responsive.iconSize(context);
     final bodyFontSize = Responsive.bodyFontSize(context);
     final smallFontSize = Responsive.smallFontSize(context);
-    final iconContainerSize = Responsive.value(context, mobile: 48.0, tablet: 54.0, desktop: 62.0);
-    
+    final iconContainerSize = Responsive.value(
+      context,
+      mobile: 48.0,
+      tablet: 54.0,
+      desktop: 62.0,
+    );
+
     if (selectedFilter == 'Money In') {
       transactions = transactions.where((t) => t.isMoneyIn).toList();
     } else if (selectedFilter == 'Money Out') {
-      transactions = transactions.where((t) => !t.isMoneyIn && !t.isFee).toList();
-    } else if (selectedFilter == 'Fees') {
-      transactions = transactions.where((t) => t.isFee).toList();
+      transactions = transactions.where((t) => !t.isMoneyIn).toList();
     }
 
     if (transactions.isEmpty) {
@@ -273,7 +319,9 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
               Text(
                 'No transactions yet',
                 style: TextStyle(
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimaryLight,
                   fontSize: bodyFontSize,
                   fontWeight: FontWeight.w600,
                 ),
@@ -282,7 +330,9 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
               Text(
                 'Your transaction history will appear here',
                 style: TextStyle(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                   fontSize: smallFontSize,
                 ),
               ),
@@ -303,15 +353,19 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
         final itemColor = isMoneyIn
             ? Colors.green
             : isFee
-                ? Colors.orange
-                : Colors.red;
+            ? Colors.orange
+            : Colors.red;
         final itemIcon = isMoneyIn
             ? Icons.south_west_rounded
             : isFee
-                ? Icons.receipt_outlined
-                : Icons.north_east_rounded;
-        final itemLabel = isMoneyIn ? 'Credit' : isFee ? 'Fee' : 'Debit';
-        
+            ? Icons.receipt_outlined
+            : Icons.north_east_rounded;
+        final itemLabel = isMoneyIn
+            ? 'Credit'
+            : isFee
+            ? 'Fee'
+            : 'Debit';
+
         return Container(
           margin: EdgeInsets.only(bottom: spacing * 0.75),
           decoration: BoxDecoration(
@@ -328,7 +382,8 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () => _showTransactionDetails(context, isDark, transaction),
+              onTap: () =>
+                  _showTransactionDetails(context, isDark, transaction),
               borderRadius: BorderRadius.circular(borderRadius),
               child: Padding(
                 padding: EdgeInsets.all(spacing),
@@ -361,7 +416,9 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: bodyFontSize,
-                              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                              color: isDark
+                                  ? AppColors.textPrimaryDark
+                                  : AppColors.textPrimaryLight,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -371,7 +428,9 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                             _formatDate(transaction.date),
                             style: TextStyle(
                               fontSize: smallFontSize,
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
                             ),
                           ),
                         ],
@@ -381,7 +440,11 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '${isMoneyIn ? '+' : '-'}${_formatCurrency(transaction.amount, transaction.currency)}',
+                          '${isFee
+                              ? ''
+                              : isMoneyIn
+                              ? '+'
+                              : '-'}${_formatCurrency(transaction.amount, transaction.currency)}',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: itemColor.shade600,
@@ -390,7 +453,10 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                         ),
                         SizedBox(height: spacing * 0.25),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: itemColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(10),
@@ -416,17 +482,25 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     );
   }
 
-  void _showTransactionDetails(BuildContext context, bool isDark, dynamic transaction) {
+  void _showTransactionDetails(
+    BuildContext context,
+    bool isDark,
+    dynamic transaction,
+  ) {
     final bodyFontSize = Responsive.bodyFontSize(context);
     final smallFontSize = Responsive.smallFontSize(context);
     final isMoneyIn = transaction.isMoneyIn;
     final isFee = transaction.isFee;
-    final detailColor = isMoneyIn ? Colors.green : isFee ? Colors.orange : Colors.red;
+    final detailColor = isMoneyIn
+        ? Colors.green
+        : isFee
+        ? Colors.orange
+        : Colors.red;
     final detailIcon = isMoneyIn
         ? Icons.south_west_rounded
         : isFee
-            ? Icons.receipt_outlined
-            : Icons.north_east_rounded;
+        ? Icons.receipt_outlined
+        : Icons.north_east_rounded;
 
     showModalBottomSheet(
       context: context,
@@ -472,7 +546,11 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              '${isMoneyIn ? '+' : '-'}${_formatCurrency(transaction.amount, transaction.currency)}',
+              '${isFee
+                  ? ''
+                  : isMoneyIn
+                  ? '+'
+                  : '-'}${_formatCurrency(transaction.amount, transaction.currency)}',
               style: TextStyle(
                 fontSize: bodyFontSize * 1.5,
                 fontWeight: FontWeight.w700,
@@ -488,13 +566,75 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
               ),
               child: Column(
                 children: [
-                  _buildDetailRow('Date', _formatDate(transaction.date), isDark, smallFontSize),
+                  _buildDetailRow(
+                    'Date',
+                    _formatDate(transaction.date),
+                    isDark,
+                    smallFontSize,
+                  ),
                   const Divider(height: 24),
-                  _buildDetailRow('Type', isMoneyIn ? 'Money In' : isFee ? 'Fee' : 'Money Out', isDark, smallFontSize),
+                  _buildDetailRow(
+                    'Type',
+                    isMoneyIn
+                        ? 'Money In'
+                        : isFee
+                        ? 'Fee'
+                        : 'Money Out',
+                    isDark,
+                    smallFontSize,
+                  ),
                   const Divider(height: 24),
-                  _buildDetailRow('Category', transaction.category.replaceAll('_', ' ').toUpperCase(), isDark, smallFontSize),
+                  _buildDetailRow(
+                    'Category',
+                    transaction.category.replaceAll('_', ' ').toUpperCase(),
+                    isDark,
+                    smallFontSize,
+                  ),
                   const Divider(height: 24),
                   _buildDetailRow('Status', 'Completed', isDark, smallFontSize),
+                  // Show fee breakdown if there's a fee
+                  if (transaction.effectiveFee > 0) ...[
+                    const Divider(height: 24),
+                    _buildDetailRow(
+                      'Transaction Fee',
+                      _formatCurrency(
+                        transaction.effectiveFee,
+                        transaction.currency,
+                      ),
+                      isDark,
+                      smallFontSize,
+                    ),
+                    if (transaction.psbFee > 0)
+                      _buildDetailRow(
+                        '  • 9PSB Fee',
+                        _formatCurrency(
+                          transaction.psbFee,
+                          transaction.currency,
+                        ),
+                        isDark,
+                        smallFontSize * 0.9,
+                      ),
+                    if (transaction.stampDuty > 0)
+                      _buildDetailRow(
+                        '  • Stamp Duty',
+                        _formatCurrency(
+                          transaction.stampDuty,
+                          transaction.currency,
+                        ),
+                        isDark,
+                        smallFontSize * 0.9,
+                      ),
+                    if (transaction.vatAmount > 0)
+                      _buildDetailRow(
+                        '  • VAT',
+                        _formatCurrency(
+                          transaction.vatAmount,
+                          transaction.currency,
+                        ),
+                        isDark,
+                        smallFontSize * 0.9,
+                      ),
+                  ],
                 ],
               ),
             ),
@@ -511,7 +651,10 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w600)),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -521,14 +664,21 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, bool isDark, double fontSize) {
+  Widget _buildDetailRow(
+    String label,
+    String value,
+    bool isDark,
+    double fontSize,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
           style: TextStyle(
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
             fontSize: fontSize,
           ),
         ),
