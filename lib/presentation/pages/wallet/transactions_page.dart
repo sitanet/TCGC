@@ -646,6 +646,16 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                         isDark,
                         smallFontSize * 0.9,
                       ),
+                    if (transaction.partnerFee > 0)
+                      _buildDetailRow(
+                        '  • Service Fee',
+                        _formatCurrency(
+                          transaction.partnerFee,
+                          transaction.currency,
+                        ),
+                        isDark,
+                        smallFontSize * 0.9,
+                      ),
                   ],
                 ],
               ),
