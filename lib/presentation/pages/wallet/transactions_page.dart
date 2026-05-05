@@ -616,11 +616,11 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                       isDark,
                       smallFontSize,
                     ),
-                    if (transaction.psbFee > 0)
+                    if (transaction.psbFee > 0 || transaction.partnerFee > 0)
                       _buildDetailRow(
                         '  • 9PSB Fee',
                         _formatCurrency(
-                          transaction.psbFee,
+                          transaction.psbFee + transaction.partnerFee,
                           transaction.currency,
                         ),
                         isDark,
@@ -641,16 +641,6 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                         '  • VAT',
                         _formatCurrency(
                           transaction.vatAmount,
-                          transaction.currency,
-                        ),
-                        isDark,
-                        smallFontSize * 0.9,
-                      ),
-                    if (transaction.partnerFee > 0)
-                      _buildDetailRow(
-                        '  • Service Fee',
-                        _formatCurrency(
-                          transaction.partnerFee,
                           transaction.currency,
                         ),
                         isDark,
