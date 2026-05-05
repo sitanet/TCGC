@@ -337,13 +337,21 @@ class _TithePageState extends ConsumerState<TithePage> {
                     children: [
                       _feeRow('Giving amount', '₦${_fmt(amountValue)}', isDark),
                       const SizedBox(height: 6),
-                      // Transaction fee = 9PSB fee + stamp duty + VAT + partner fee (all combined)
+                      // Transaction fee = 9PSB fee + stamp duty + partner/service fee
                       _feeRow(
                         'Transaction fee',
-                        '~₦${_fmt(fees['psbFee']! + fees['stampDuty']! + fees['vat']! + fees['partnerFee']!)}',
+                        '~₦${_fmt(fees['psbFee']! + fees['stampDuty']! + fees['partnerFee']!)}',
                         isDark,
                         isSubtle: true,
                       ),
+                      const SizedBox(height: 4),
+                      if (fees['vat']! > 0)
+                        _feeRow(
+                          'VAT',
+                          '~₦${_fmt(fees['vat']!)}',
+                          isDark,
+                          isSubtle: true,
+                        ),
                       Divider(
                         height: 16,
                         color: AppColors.primaryGold.withOpacity(0.3),
