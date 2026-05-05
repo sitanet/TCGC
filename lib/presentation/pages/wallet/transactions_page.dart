@@ -374,7 +374,8 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
         final displayAmount = isFeeTab
             ? transaction.effectiveFee
             : transaction.amount;
-        final displayPrefix = isMoneyIn ? '+' : '-';
+        // Fees tab: no sign prefix. Money In: +. Money Out: -
+        final displayPrefix = isFeeTab ? '' : (isMoneyIn ? '+' : '-');
 
         return Container(
           margin: EdgeInsets.only(bottom: spacing * 0.75),
@@ -392,8 +393,12 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () =>
-                  _showTransactionDetails(context, isDark, transaction),
+              onTap: () => _showTransactionDetails(
+                context,
+                isDark,
+                transaction,
+                isFeeTab,
+              ),
               borderRadius: BorderRadius.circular(borderRadius),
               child: Padding(
                 padding: EdgeInsets.all(spacing),
@@ -491,7 +496,8 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   void _showTransactionDetails(
     BuildContext context,
     bool isDark,
-    dynamic transaction,
+    TransactionModel transaction,
+    bool isFeeTab,
   ) {
     final bodyFontSize = Responsive.bodyFontSize(context);
     final smallFontSize = Responsive.smallFontSize(context);
@@ -499,14 +505,18 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     final isFee = transaction.isFee;
     final detailColor = isMoneyIn
         ? Colors.green
-        : isFee
+        : (isFeeTab || isFee)
         ? Colors.orange
         : Colors.red;
     final detailIcon = isMoneyIn
         ? Icons.south_west_rounded
-        : isFee
+        : (isFeeTab || isFee)
         ? Icons.receipt_outlined
         : Icons.north_east_rounded;
+
+    // Amount shown at top of detail sheet
+    final topAmount = isFeeTab ? transaction.effectiveFee : transaction.amount;
+    final topPrefix = isFeeTab ? '' : (isMoneyIn ? '+' : '-');
 
     showModalBottomSheet(
       context: context,
@@ -552,11 +562,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              '${isFee
-                  ? ''
-                  : isMoneyIn
-                  ? '+'
-                  : '-'}${_formatCurrency(transaction.amount, transaction.currency)}',
+              '$topPrefix${_formatCurrency(topAmount, transaction.currency)}',
               style: TextStyle(
                 fontSize: bodyFontSize * 1.5,
                 fontWeight: FontWeight.w700,
