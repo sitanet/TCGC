@@ -269,12 +269,23 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     bool isDark,
     WalletProvider walletProvider,
   ) {
-    // Fees tab shows fee transactions AND giving transactions that have fees charged
-    var transactions = selectedFilter == 'Fees'
-        ? walletProvider.transactions
-              .where((t) => t.isFee || (t.effectiveFee > 0 && !t.isMoneyIn))
-              .toList()
-        : walletProvider.transactions.where((t) => !t.isFee).toList();
+    final allTxns = walletProvider.transactions;
+
+    List<TransactionModel> transactions;
+    if (selectedFilter == 'Money In') {
+      transactions = allTxns.where((t) => t.isMoneyIn && !t.isFee).toList();
+    } else if (selectedFilter == 'Money Out') {
+      transactions = allTxns.where((t) => !t.isMoneyIn && !t.isFee).toList();
+    } else if (selectedFilter == 'Fees') {
+      // Show only giving/money-out transactions that had a fee charged
+      transactions = allTxns
+          .where((t) => !t.isMoneyIn && !t.isFee && t.effectiveFee > 0)
+          .toList();
+    } else {
+      // All — exclude internal fee-category transactions
+      transactions = allTxns.where((t) => !t.isFee).toList();
+    }
+
     final spacing = Responsive.verticalSpacing(context);
     final borderRadius = Responsive.borderRadius(context);
     final iconSize = Responsive.iconSize(context);
@@ -286,12 +297,6 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
       tablet: 54.0,
       desktop: 62.0,
     );
-
-    if (selectedFilter == 'Money In') {
-      transactions = transactions.where((t) => t.isMoneyIn).toList();
-    } else if (selectedFilter == 'Money Out') {
-      transactions = transactions.where((t) => !t.isMoneyIn).toList();
-    }
 
     if (transactions.isEmpty) {
       return Container(
@@ -349,22 +354,27 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
       itemBuilder: (context, index) {
         final transaction = transactions[index];
         final isMoneyIn = transaction.isMoneyIn;
-        final isFee = transaction.isFee;
+        final isFeeTab = selectedFilter == 'Fees';
         final itemColor = isMoneyIn
             ? Colors.green
-            : isFee
+            : isFeeTab
             ? Colors.orange
             : Colors.red;
         final itemIcon = isMoneyIn
             ? Icons.south_west_rounded
-            : isFee
+            : isFeeTab
             ? Icons.receipt_outlined
             : Icons.north_east_rounded;
         final itemLabel = isMoneyIn
             ? 'Credit'
-            : isFee
+            : isFeeTab
             ? 'Fee'
             : 'Debit';
+        // On Fees tab show the fee amount; otherwise show the transaction amount
+        final displayAmount = isFeeTab
+            ? transaction.effectiveFee
+            : transaction.amount;
+        final displayPrefix = isMoneyIn ? '+' : '-';
 
         return Container(
           margin: EdgeInsets.only(bottom: spacing * 0.75),
@@ -440,11 +450,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '${isFee
-                              ? ''
-                              : isMoneyIn
-                              ? '+'
-                              : '-'}${_formatCurrency(transaction.amount, transaction.currency)}',
+                          '$displayPrefix${_formatCurrency(displayAmount, transaction.currency)}',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: itemColor.shade600,
