@@ -618,7 +618,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                     ),
                     if (transaction.psbFee > 0 || transaction.partnerFee > 0)
                       _buildDetailRow(
-                        '  • 9PSB Fee',
+                        '  • Transaction Fee',
                         _formatCurrency(
                           transaction.psbFee + transaction.partnerFee,
                           transaction.currency,
