@@ -21,21 +21,19 @@ class TithePage extends ConsumerStatefulWidget {
 }
 
 class _TithePageState extends ConsumerState<TithePage> {
-  String amount = '1,000';
+  String amount = '0';
 
-  /// Estimated 9PSB transaction fee (CBN NIP schedule)
-  /// 9PSB deducts this silently — not reported in API response
-  double _calculatePlatformFee(double amount) {
-    if (amount <= 0) return 0;
-    if (amount <= 5000) return 10;
-    if (amount <= 50000) return 25;
-    return 50;
+  /// Calculate fees using live config from backend via WalletProvider.
+  /// Falls back to standard rates if provider not yet loaded.
+  Map<String, double> _getFees(double amount) {
+    final walletProvider = ref.read(walletChangeNotifierProvider);
+    return walletProvider.calculateFees(amount);
   }
 
   Future<void> _processPayment() async {
     final cleanAmount = amount.replaceAll(',', '');
     final amountValue = double.tryParse(cleanAmount) ?? 0;
-    
+
     if (amountValue <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -45,15 +43,17 @@ class _TithePageState extends ConsumerState<TithePage> {
       );
       return;
     }
-    
+
     final walletProvider = ref.read(walletChangeNotifierProvider);
     final biometricProvider = ref.read(biometricChangeNotifierProvider);
-    
+
     if (walletProvider.balance < amountValue) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Insufficient balance. Please add money to your wallet.'),
+            content: Text(
+              'Insufficient balance. Please add money to your wallet.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -62,7 +62,8 @@ class _TithePageState extends ConsumerState<TithePage> {
     }
 
     // Enforce single transaction limit
-    if (walletProvider.singleLimit > 0 && amountValue > walletProvider.singleLimit) {
+    if (walletProvider.singleLimit > 0 &&
+        amountValue > walletProvider.singleLimit) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -77,10 +78,11 @@ class _TithePageState extends ConsumerState<TithePage> {
       }
       return;
     }
-    
+
     // Check if biometric is enabled for transactions
     if (biometricProvider.biometricTransactionEnabled) {
-      final authenticated = await biometricProvider.authenticateForTransaction();
+      final authenticated = await biometricProvider
+          .authenticateForTransaction();
       if (authenticated && mounted) {
         await _executePaymentWithBiometric(amountValue);
       } else if (mounted) {
@@ -89,20 +91,20 @@ class _TithePageState extends ConsumerState<TithePage> {
       }
       return;
     }
-    
+
     // Check if user has PIN set
     final hasPin = await walletProvider.checkHasPin();
     if (!hasPin && mounted) {
       _showSetPinDialog();
       return;
     }
-    
+
     // Show PIN input dialog
     if (mounted) {
       _showPinDialog(amountValue);
     }
   }
-  
+
   Future<void> _executePaymentWithBiometric(double amountValue) async {
     final walletProvider = ref.read(walletChangeNotifierProvider);
     final authProvider = ref.read(authChangeNotifierProvider);
@@ -115,7 +117,10 @@ class _TithePageState extends ConsumerState<TithePage> {
           title: widget.title,
           amount: currentAmount,
           processTransaction: () async {
-            return await walletProvider.giveWithBiometric(widget.giveOptionId, amountValue);
+            return await walletProvider.giveWithBiometric(
+              widget.giveOptionId,
+              amountValue,
+            );
           },
           getErrorMessage: () => walletProvider.error,
           successPage: SuccessPage(
@@ -131,7 +136,7 @@ class _TithePageState extends ConsumerState<TithePage> {
         ),
       ),
     );
-    
+
     // If returned false, show error
     if (result == false && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -142,12 +147,12 @@ class _TithePageState extends ConsumerState<TithePage> {
       );
     }
   }
-  
+
   void _showSetPinDialog() {
     final pinController = TextEditingController();
     final confirmPinController = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -157,7 +162,9 @@ class _TithePageState extends ConsumerState<TithePage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('You need to set a transaction PIN before making payments.'),
+            const Text(
+              'You need to set a transaction PIN before making payments.',
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: pinController,
@@ -191,7 +198,9 @@ class _TithePageState extends ConsumerState<TithePage> {
             onPressed: () async {
               if (pinController.text.length < 4) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('PIN must be at least 4 digits')),
+                  const SnackBar(
+                    content: Text('PIN must be at least 4 digits'),
+                  ),
                 );
                 return;
               }
@@ -201,13 +210,13 @@ class _TithePageState extends ConsumerState<TithePage> {
                 );
                 return;
               }
-              
+
               final walletProvider = ref.read(walletChangeNotifierProvider);
               final success = await walletProvider.setTransactionPin(
                 pinController.text,
                 confirmPinController.text,
               );
-              
+
               if (success && mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -215,24 +224,29 @@ class _TithePageState extends ConsumerState<TithePage> {
                 );
               } else if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(walletProvider.error ?? 'Failed to set PIN')),
+                  SnackBar(
+                    content: Text(walletProvider.error ?? 'Failed to set PIN'),
+                  ),
                 );
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGold,
+            ),
             child: const Text('Set PIN', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
-  
+
   void _showPinDialog(double amountValue) {
     final pinController = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final walletProvider = ref.read(walletChangeNotifierProvider);
     bool isProcessing = false;
-    final fee = _calculatePlatformFee(amountValue);
+    final fees = _getFees(amountValue);
+    final fee = fees['totalFee']!;
     final total = amountValue + fee;
 
     showDialog(
@@ -241,7 +255,9 @@ class _TithePageState extends ConsumerState<TithePage> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
               Icon(Icons.lock_outline, color: AppColors.primaryGold, size: 24),
@@ -266,21 +282,40 @@ class _TithePageState extends ConsumerState<TithePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Transaction Details',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                            color: AppColors.primaryGold,
-                          )),
+                      Text(
+                        'Transaction Details',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                          color: AppColors.primaryGold,
+                        ),
+                      ),
                       const SizedBox(height: 12),
-                      _detailRow('From', walletProvider.accountName ?? 'Your Wallet', isDark),
+                      _detailRow(
+                        'From',
+                        walletProvider.accountName ?? 'Your Wallet',
+                        isDark,
+                      ),
                       const SizedBox(height: 8),
-                      _detailRow('Account No.', walletProvider.accountNumber ?? 'N/A', isDark),
+                      _detailRow(
+                        'Account No.',
+                        walletProvider.accountNumber ?? 'N/A',
+                        isDark,
+                      ),
                       const SizedBox(height: 8),
                       _detailRow('Bank', '9 Payment Service Bank', isDark),
-                      Divider(height: 20, color: isDark ? AppColors.dividerDark : AppColors.dividerLight),
-                      _detailRow('To', 'The CityGate Apostolic Kingdom Ministry', isDark),
+                      Divider(
+                        height: 20,
+                        color: isDark
+                            ? AppColors.dividerDark
+                            : AppColors.dividerLight,
+                      ),
+                      _detailRow(
+                        'To',
+                        'The CityGate Apostolic Kingdom Ministry',
+                        isDark,
+                      ),
                       const SizedBox(height: 8),
                       _detailRow('Purpose', widget.title, isDark),
                     ],
@@ -295,16 +330,47 @@ class _TithePageState extends ConsumerState<TithePage> {
                     color: AppColors.primaryGold.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                        color: AppColors.primaryGold.withOpacity(0.25)),
+                      color: AppColors.primaryGold.withOpacity(0.25),
+                    ),
                   ),
                   child: Column(
                     children: [
                       _feeRow('Giving amount', '₦${_fmt(amountValue)}', isDark),
                       const SizedBox(height: 6),
-                      _feeRow('Est. transaction fee (9PSB)', '~₦${_fmt(fee)}', isDark,
-                          isSubtle: true),
-                      Divider(height: 16, color: AppColors.primaryGold.withOpacity(0.3)),
-                      _feeRow('Est. total deducted', '~₦${_fmt(total)}', isDark, isBold: true),
+                      // Transaction fee = 9PSB fee + stamp duty (combined for user)
+                      _feeRow(
+                        'Transaction fee',
+                        '~₦${_fmt(fees['psbFee']! + fees['stampDuty']!)}',
+                        isDark,
+                        isSubtle: true,
+                      ),
+                      const SizedBox(height: 4),
+                      if (fees['vat']! > 0)
+                        _feeRow(
+                          'VAT',
+                          '~₦${_fmt(fees['vat']!)}',
+                          isDark,
+                          isSubtle: true,
+                        ),
+                      if (fees['partnerFee']! > 0) ...[
+                        const SizedBox(height: 4),
+                        _feeRow(
+                          'Service fee',
+                          '~₦${_fmt(fees['partnerFee']!)}',
+                          isDark,
+                          isSubtle: true,
+                        ),
+                      ],
+                      Divider(
+                        height: 16,
+                        color: AppColors.primaryGold.withOpacity(0.3),
+                      ),
+                      _feeRow(
+                        'Est. total deducted',
+                        '~₦${_fmt(total)}',
+                        isDark,
+                        isBold: true,
+                      ),
                     ],
                   ),
                 ),
@@ -324,7 +390,10 @@ class _TithePageState extends ConsumerState<TithePage> {
                   ),
                   decoration: InputDecoration(
                     hintText: '••••',
-                    hintStyle: TextStyle(color: Colors.grey[400], letterSpacing: 8),
+                    hintStyle: TextStyle(
+                      color: Colors.grey[400],
+                      letterSpacing: 8,
+                    ),
                     counterText: '',
                     labelText: 'Enter Transaction PIN',
                     border: OutlineInputBorder(
@@ -333,15 +402,23 @@ class _TithePageState extends ConsumerState<TithePage> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.primaryGold, width: 2),
+                      borderSide: const BorderSide(
+                        color: AppColors.primaryGold,
+                        width: 2,
+                      ),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 16,
+                    ),
                   ),
                   onSubmitted: (_) async {
                     if (pinController.text.isEmpty || isProcessing) return;
                     if (pinController.text.length < 4) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('PIN must be at least 4 digits')),
+                        const SnackBar(
+                          content: Text('PIN must be at least 4 digits'),
+                        ),
                       );
                       return;
                     }
@@ -355,9 +432,15 @@ class _TithePageState extends ConsumerState<TithePage> {
           ),
           actions: [
             TextButton(
-              onPressed: isProcessing ? null : () => Navigator.pop(dialogContext),
-              child: Text('Cancel',
-                  style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600])),
+              onPressed: isProcessing
+                  ? null
+                  : () => Navigator.pop(dialogContext),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
+              ),
             ),
             ElevatedButton(
               onPressed: isProcessing
@@ -365,13 +448,17 @@ class _TithePageState extends ConsumerState<TithePage> {
                   : () async {
                       if (pinController.text.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please enter your PIN')),
+                          const SnackBar(
+                            content: Text('Please enter your PIN'),
+                          ),
                         );
                         return;
                       }
                       if (pinController.text.length < 4) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('PIN must be at least 4 digits')),
+                          const SnackBar(
+                            content: Text('PIN must be at least 4 digits'),
+                          ),
                         );
                         return;
                       }
@@ -381,18 +468,27 @@ class _TithePageState extends ConsumerState<TithePage> {
                     },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGold,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
               child: isProcessing
                   ? const SizedBox(
-                      width: 20, height: 20,
+                      width: 20,
+                      height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
-                  : const Text('Pay Now', style: TextStyle(color: Colors.white)),
+                  : const Text(
+                      'Pay Now',
+                      style: TextStyle(color: Colors.white),
+                    ),
             ),
           ],
         ),
@@ -406,58 +502,76 @@ class _TithePageState extends ConsumerState<TithePage> {
       children: [
         SizedBox(
           width: 90,
-          child: Text(label,
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              )),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
+          ),
         ),
         Expanded(
-          child: Text(value,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : Colors.black87,
-              )),
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _feeRow(String label, String value, bool isDark,
-      {bool isSubtle = false, bool isBold = false}) {
+  Widget _feeRow(
+    String label,
+    String value,
+    bool isDark, {
+    bool isSubtle = false,
+    bool isBold = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label,
-            style: TextStyle(
-              fontSize: isSubtle ? 12 : 13,
-              color: isSubtle
-                  ? (isDark
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: isSubtle ? 12 : 13,
+            color: isSubtle
+                ? (isDark
                       ? AppColors.textSecondaryDark
                       : AppColors.textSecondaryLight)
-                  : (isDark ? Colors.white : Colors.black87),
-            )),
-        Text(value,
-            style: TextStyle(
-              fontSize: isBold ? 15 : 13,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
-              color: isBold
-                  ? AppColors.primaryGold
-                  : (isDark ? Colors.white : Colors.black87),
-            )),
+                : (isDark ? Colors.white : Colors.black87),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: isBold ? 15 : 13,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+            color: isBold
+                ? AppColors.primaryGold
+                : (isDark ? Colors.white : Colors.black87),
+          ),
+        ),
       ],
     );
   }
 
-  String _fmt(double v) =>
-      v.toStringAsFixed(0).replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+  String _fmt(double v) => v
+      .toStringAsFixed(2)
+      .replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]},',
+      );
 
-  String _fmtLimit(double v) =>
-      v <= 0 ? 'Unlimited' : '${v.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
+  String _fmtLimit(double v) => v <= 0
+      ? 'Unlimited'
+      : '${v.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
 
-  
   Future<void> _executePayment(double amountValue, String pin) async {
     final walletProvider = ref.read(walletChangeNotifierProvider);
     final authProvider = ref.read(authChangeNotifierProvider);
@@ -470,7 +584,11 @@ class _TithePageState extends ConsumerState<TithePage> {
           title: widget.title,
           amount: currentAmount,
           processTransaction: () async {
-            return await walletProvider.give(widget.giveOptionId, amountValue, pin);
+            return await walletProvider.give(
+              widget.giveOptionId,
+              amountValue,
+              pin,
+            );
           },
           getErrorMessage: () => walletProvider.error,
           successPage: SuccessPage(
@@ -486,7 +604,7 @@ class _TithePageState extends ConsumerState<TithePage> {
         ),
       ),
     );
-    
+
     // If returned false, show error
     if (result == false && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -507,7 +625,12 @@ class _TithePageState extends ConsumerState<TithePage> {
     final maxWidth = Responsive.maxContentWidth(context);
     final bodyFontSize = Responsive.bodyFontSize(context);
     final smallFontSize = Responsive.smallFontSize(context);
-    final amountFontSize = Responsive.value(context, mobile: 40.0, tablet: 48.0, desktop: 56.0);
+    final amountFontSize = Responsive.value(
+      context,
+      mobile: 40.0,
+      tablet: 48.0,
+      desktop: 56.0,
+    );
     final borderRadius = Responsive.borderRadius(context);
     final buttonHeight = Responsive.buttonHeight(context);
 
@@ -524,7 +647,10 @@ class _TithePageState extends ConsumerState<TithePage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primaryGold.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
@@ -555,8 +681,9 @@ class _TithePageState extends ConsumerState<TithePage> {
                             ),
                           ),
                           Text(
-                            amount,
-                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                            amount == '0' ? '0.00' : amount,
+                            style: Theme.of(context).textTheme.headlineLarge
+                                ?.copyWith(
                                   fontWeight: FontWeight.w700,
                                   fontSize: amountFontSize,
                                   letterSpacing: -1,
@@ -566,10 +693,13 @@ class _TithePageState extends ConsumerState<TithePage> {
                       ),
                       SizedBox(height: spacing),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
                         decoration: BoxDecoration(
-                          color: isDark 
-                              ? AppColors.cardDark 
+                          color: isDark
+                              ? AppColors.cardDark
                               : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -578,7 +708,9 @@ class _TithePageState extends ConsumerState<TithePage> {
                             Text(
                               'To',
                               style: TextStyle(
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
                                 fontSize: smallFontSize * 0.9,
                               ),
                             ),
@@ -586,61 +718,11 @@ class _TithePageState extends ConsumerState<TithePage> {
                             Text(
                               'The CityGate Apostolic Kingdom Ministry',
                               textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     fontSize: bodyFontSize * 0.95,
                                   ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: spacing),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.account_balance_wallet_outlined,
-                            color: AppColors.primaryGold,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Balance: ₦${walletProvider.balance.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              color: AppColors.primaryGold,
-                              fontSize: bodyFontSize * 0.9,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      // Tier limits info
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? AppColors.cardDark
-                              : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.info_outline,
-                                size: 13,
-                                color: isDark
-                                    ? AppColors.textSecondaryDark
-                                    : AppColors.textSecondaryLight),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Tier ${walletProvider.tier} limit: ₦${_fmtLimit(walletProvider.singleLimit)} per transaction',
-                              style: TextStyle(
-                                fontSize: smallFontSize * 0.85,
-                                color: isDark
-                                    ? AppColors.textSecondaryDark
-                                    : AppColors.textSecondaryLight,
-                              ),
                             ),
                           ],
                         ),
@@ -649,6 +731,35 @@ class _TithePageState extends ConsumerState<TithePage> {
                   ),
                 ),
                 _buildNumpad(isDark),
+                // Tier limit info — between numpad and Pay button
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 13,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Tier ${walletProvider.tier} limit: ₦${_fmtLimit(walletProvider.singleLimit)} per transaction',
+                        style: TextStyle(
+                          fontSize: smallFontSize * 0.85,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 SizedBox(height: spacing * 1.25),
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
@@ -682,10 +793,14 @@ class _TithePageState extends ConsumerState<TithePage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.check_circle_outline, color: Colors.white, size: 22),
+                          const Icon(
+                            Icons.check_circle_outline,
+                            color: Colors.white,
+                            size: 22,
+                          ),
                           const SizedBox(width: 10),
                           Text(
-                            'Pay ₦$amount',
+                            'Pay ₦${amount == '0' ? '0.00' : amount}',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: bodyFontSize,
@@ -708,8 +823,13 @@ class _TithePageState extends ConsumerState<TithePage> {
 
   Widget _buildNumpad(bool isDark) {
     final spacing = Responsive.verticalSpacing(context) * 0.6;
-    final keySize = Responsive.value(context, mobile: 72.0, tablet: 82.0, desktop: 92.0);
-    
+    final keySize = Responsive.value(
+      context,
+      mobile: 72.0,
+      tablet: 82.0,
+      desktop: 92.0,
+    );
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: Responsive.wp(context, 6),
@@ -717,8 +837,8 @@ class _TithePageState extends ConsumerState<TithePage> {
       ),
       margin: EdgeInsets.symmetric(horizontal: Responsive.wp(context, 4)),
       decoration: BoxDecoration(
-        color: isDark 
-            ? AppColors.cardDark.withOpacity(0.5) 
+        color: isDark
+            ? AppColors.cardDark.withOpacity(0.5)
             : Colors.grey.withOpacity(0.05),
         borderRadius: BorderRadius.circular(24),
       ),
@@ -765,8 +885,13 @@ class _TithePageState extends ConsumerState<TithePage> {
   }
 
   Widget _buildNumKey(String num, bool isDark, double keySize) {
-    final fontSize = Responsive.value(context, mobile: 26.0, tablet: 30.0, desktop: 34.0);
-    
+    final fontSize = Responsive.value(
+      context,
+      mobile: 26.0,
+      tablet: 30.0,
+      desktop: 34.0,
+    );
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -784,9 +909,7 @@ class _TithePageState extends ConsumerState<TithePage> {
           width: keySize,
           height: keySize,
           decoration: BoxDecoration(
-            color: isDark 
-                ? AppColors.surfaceDark 
-                : Colors.white,
+            color: isDark ? AppColors.surfaceDark : Colors.white,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
@@ -802,7 +925,9 @@ class _TithePageState extends ConsumerState<TithePage> {
               style: TextStyle(
                 fontSize: fontSize,
                 fontWeight: FontWeight.w600,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimaryLight,
               ),
             ),
           ),
@@ -812,8 +937,13 @@ class _TithePageState extends ConsumerState<TithePage> {
   }
 
   Widget _buildClearKey(bool isDark, double keySize) {
-    final fontSize = Responsive.value(context, mobile: 14.0, tablet: 16.0, desktop: 18.0);
-    
+    final fontSize = Responsive.value(
+      context,
+      mobile: 14.0,
+      tablet: 16.0,
+      desktop: 18.0,
+    );
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -848,7 +978,7 @@ class _TithePageState extends ConsumerState<TithePage> {
 
   Widget _buildBackspaceKey(bool isDark, double keySize) {
     final iconSize = Responsive.iconSize(context);
-    
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -856,7 +986,10 @@ class _TithePageState extends ConsumerState<TithePage> {
           setState(() {
             final cleanAmount = amount.replaceAll(',', '');
             if (cleanAmount.isNotEmpty) {
-              final newAmount = cleanAmount.substring(0, cleanAmount.length - 1);
+              final newAmount = cleanAmount.substring(
+                0,
+                cleanAmount.length - 1,
+              );
               amount = newAmount.isEmpty ? '0' : _formatAmount(newAmount);
             }
           });
@@ -878,7 +1011,9 @@ class _TithePageState extends ConsumerState<TithePage> {
           child: Center(
             child: Icon(
               Icons.backspace_outlined,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
               size: iconSize,
             ),
           ),
@@ -891,8 +1026,8 @@ class _TithePageState extends ConsumerState<TithePage> {
     if (amount.isEmpty) return '0';
     final number = int.tryParse(amount) ?? 0;
     return number.toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]},',
-        );
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
   }
 }
