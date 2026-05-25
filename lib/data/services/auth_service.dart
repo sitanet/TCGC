@@ -330,6 +330,10 @@ class AuthService {
       if (dateOfBirth != null) 'date_of_birth': dateOfBirth,
     });
 
+    debugPrint('[AUTH] verifyNin response status: ${response.statusCode}');
+    debugPrint('[AUTH] verifyNin response isSuccess: ${response.isSuccess}');
+    debugPrint('[AUTH] verifyNin response data: ${response.data}');
+
     if (response.isSuccess) {
       return KycResult(
         success: true,

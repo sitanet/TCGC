@@ -396,6 +396,11 @@ class _NinVerificationPageState extends ConsumerState<NinVerificationPage> {
       if (!mounted) return;
 
       if (result.success) {
+        debugPrint('[NIN_VERIFICATION] NIN verification success');
+        debugPrint(
+          '[NIN_VERIFICATION] Confirmation token: ${result.confirmationToken}',
+        );
+        debugPrint('[NIN_VERIFICATION] Status: ${result.status}');
         // NIN verification successful - now confirm identity to create wallet
         final authProvider = ref.read(authChangeNotifierProvider);
         final confirmationToken = result.confirmationToken;
