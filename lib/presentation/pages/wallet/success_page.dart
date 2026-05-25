@@ -956,22 +956,6 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                 pw.SizedBox(height: 12),
                 _buildPdfDetailRow('Donor Name', widget.donorName!, goldColor),
               ],
-              if (widget.accountNumber != null) ...[
-                pw.SizedBox(height: 12),
-                _buildPdfDetailRow(
-                  'Wallet Number',
-                  widget.accountNumber!,
-                  goldColor,
-                ),
-              ],
-              if (widget.accountName != null) ...[
-                pw.SizedBox(height: 12),
-                _buildPdfDetailRow(
-                  'Account Name',
-                  widget.accountName!,
-                  goldColor,
-                ),
-              ],
               if (widget.reference != null) ...[
                 pw.SizedBox(height: 12),
                 _buildPdfDetailRow(
@@ -1215,14 +1199,6 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                 if (widget.donorName != null) ...[
                   const SizedBox(height: 10),
                   _buildReceiptDetailRow('Donor', widget.donorName!),
-                ],
-                if (widget.accountNumber != null) ...[
-                  const SizedBox(height: 10),
-                  _buildReceiptDetailRow('Wallet No.', widget.accountNumber!),
-                ],
-                if (widget.accountName != null) ...[
-                  const SizedBox(height: 10),
-                  _buildReceiptDetailRow('Account', widget.accountName!),
                 ],
                 if (widget.reference != null) ...[
                   const SizedBox(height: 10),
