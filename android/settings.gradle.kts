@@ -13,7 +13,22 @@ pluginManagement {
         google()
         mavenCentral()
         gradlePluginPortal()
-        maven { url = uri("https://maven.aliyun.com/repository/public") } // mirror
+        maven {
+            url = uri("https://maven.aliyun.com/repository/google")
+            content {
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
+        maven {
+            url = uri("https://maven.aliyun.com/repository/central")
+            content {
+                includeGroupByRegex("org\\.jetbrains.*")
+                includeGroupByRegex("org\\.jetbrains\\.kotlin.*")
+                includeGroupByRegex("org\\.jetbrains\\.kotlinx.*")
+            }
+        }
     }
 
 

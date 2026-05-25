@@ -1,10 +1,7 @@
 import 'dart:math' as math;
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
-import '../../../data/services/data_service.dart';
-import '../../../domain/entities/event.dart';
 import 'failure_page.dart';
 
 class TransactionProcessingPage extends StatefulWidget {
@@ -32,38 +29,27 @@ class TransactionProcessingPage extends StatefulWidget {
 
 class _TransactionProcessingPageState extends State<TransactionProcessingPage>
     with TickerProviderStateMixin {
-  // ── Animation controllers ──────────────────────────────────────────────────
   late AnimationController _pulseController;
   late AnimationController _rotationController;
   late AnimationController _shimmerController;
   late AnimationController _floatController;
   late AnimationController _ringController;
-  late AnimationController _slideController;
+  late AnimationController _dotsController;
 
   late Animation<double> _pulseAnimation;
   late Animation<double> _shimmerAnimation;
   late Animation<double> _floatAnimation;
-  late Animation<Offset> _slideAnimation;
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  String _statusText = 'Processing your payment...';
+  String _statusText = 'Initiating transaction...';
   bool _isProcessing = true;
   int _currentStep = 0;
-  final List<String> _steps = [
-    'Initiating transaction...',
-    'Processing your payment...',
-    'Verifying transaction...',
-    'Almost done...',
-  ];
 
-  // ── Events ─────────────────────────────────────────────────────────────────
-  List<Event> _events = [];
-  final PageController _eventPageController = PageController(
-    viewportFraction: 0.80,
-  );
-  int _currentEventIndex = 0;
-  double _currentEventPage = 0;
-  final DataService _dataService = DataService();
+  final List<Map<String, dynamic>> _steps = [
+    {'text': 'Initiating transaction...', 'icon': Icons.lock_outline_rounded},
+    {'text': 'Processing your payment...', 'icon': Icons.payment_rounded},
+    {'text': 'Verifying transaction...', 'icon': Icons.verified_outlined},
+    {'text': 'Almost done...', 'icon': Icons.check_circle_outline_rounded},
+  ];
 
   @override
   void initState() {
@@ -71,7 +57,6 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
     _initAnimations();
     _startStepAnimation();
     _processPayment();
-    _loadEvents();
   }
 
   void _initAnimations() {
@@ -100,10 +85,10 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
       vsync: this,
     )..repeat();
 
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 700),
+    _dotsController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
-    );
+    )..repeat();
 
     _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
@@ -116,58 +101,15 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
     _floatAnimation = Tween<double>(begin: -8.0, end: 8.0).animate(
       CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
     );
-
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-        .animate(
-          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
-        );
-
-    _eventPageController.addListener(() {
-      if (mounted) {
-        setState(() => _currentEventPage = _eventPageController.page ?? 0);
-      }
-    });
-  }
-
-  Future<void> _loadEvents() async {
-    try {
-      final events = await _dataService.getEvents();
-      if (mounted && events.isNotEmpty) {
-        setState(() => _events = events);
-        // Slide in the events section after a short delay
-        Future.delayed(const Duration(milliseconds: 600), () {
-          if (mounted) _slideController.forward();
-        });
-        _startEventAutoSlide();
-      }
-    } catch (e) {
-      debugPrint('TransactionProcessingPage: events load error: $e');
-    }
-  }
-
-  void _startEventAutoSlide() {
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 5));
-      if (!mounted || !_isProcessing || _events.isEmpty) return false;
-      if (!_eventPageController.hasClients) return true;
-      final next = (_currentEventIndex + 1) % _events.length;
-      _eventPageController.animateToPage(
-        next,
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeInOut,
-      );
-      if (mounted) setState(() => _currentEventIndex = next);
-      return _isProcessing;
-    });
   }
 
   void _startStepAnimation() {
     Future.doWhile(() async {
-      await Future.delayed(const Duration(milliseconds: 1200));
+      await Future.delayed(const Duration(milliseconds: 1400));
       if (!mounted || !_isProcessing) return false;
       setState(() {
         _currentStep = (_currentStep + 1) % _steps.length;
-        _statusText = _steps[_currentStep];
+        _statusText = _steps[_currentStep]['text'] as String;
       });
       return _isProcessing;
     });
@@ -177,7 +119,6 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
     try {
       await Future.delayed(const Duration(milliseconds: 1500));
       if (!mounted) return;
-      setState(() => _statusText = 'Verifying transaction...');
 
       final success = await widget.processTransaction();
       if (!mounted) return;
@@ -187,7 +128,7 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
           _statusText = 'Payment successful!';
           _isProcessing = false;
         });
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future.delayed(const Duration(milliseconds: 600));
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
@@ -243,24 +184,22 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
     _shimmerController.dispose();
     _floatController.dispose();
     _ringController.dispose();
-    _slideController.dispose();
-    _eventPageController.dispose();
+    _dotsController.dispose();
     super.dispose();
   }
 
-  // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final size = MediaQuery.of(context).size;
     final maxWidth = Responsive.maxContentWidth(context);
-    final bodyFontSize = Responsive.bodyFontSize(context);
     final titleFontSize = Responsive.titleFontSize(context);
+    final bodyFontSize = Responsive.bodyFontSize(context);
     final iconSize = Responsive.value(
       context,
-      mobile: 120.0,
-      tablet: 140.0,
-      desktop: 160.0,
+      mobile: 110.0,
+      tablet: 130.0,
+      desktop: 150.0,
     );
 
     return PopScope(
@@ -268,412 +207,302 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
       child: Scaffold(
         backgroundColor: isDark
             ? AppColors.backgroundDark
-            : const Color(0xFFFAFAFA),
+            : const Color(0xFFF8F6F0),
         body: SafeArea(
           child: Stack(
             children: [
-              // ── Floating background particles ──────────────────────────────
+              // Background particles
               if (_isProcessing) ..._buildParticles(size),
 
-              // ── Main content ───────────────────────────────────────────────
+              // Main content
               Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: maxWidth),
-                  child: Column(
-                    children: [
-                      // Top section — processing animation
-                      Expanded(
-                        flex: 5,
-                        child: _buildProcessingSection(
-                          isDark,
-                          iconSize,
-                          titleFontSize,
-                          bodyFontSize,
-                        ),
-                      ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Spacer(flex: 2),
 
-                      // Bottom section — events slider (slides up when loaded)
-                      if (_events.isNotEmpty)
-                        SlideTransition(
-                          position: _slideAnimation,
-                          child: _buildEventsSection(isDark),
-                        ),
-
-                      const SizedBox(height: 16),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Processing section ─────────────────────────────────────────────────────
-  Widget _buildProcessingSection(
-    bool isDark,
-    double iconSize,
-    double titleFontSize,
-    double bodyFontSize,
-  ) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Animated icon
-        AnimatedBuilder(
-          animation: _floatAnimation,
-          builder: (context, child) => Transform.translate(
-            offset: Offset(0, _isProcessing ? _floatAnimation.value : 0),
-            child: child,
-          ),
-          child: AnimatedBuilder(
-            animation: _pulseAnimation,
-            builder: (context, child) => Transform.scale(
-              scale: _isProcessing ? _pulseAnimation.value : 1.0,
-              child: child,
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                ..._buildRings(iconSize),
-                // Glow
-                Container(
-                  width: iconSize * 1.4,
-                  height: iconSize * 1.4,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        AppColors.primaryGold.withValues(alpha: 0.35),
-                        AppColors.primaryGold.withValues(alpha: 0.08),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-                // Main circle
-                Container(
-                  width: iconSize,
-                  height: iconSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFFFFD700),
-                        AppColors.primaryGold,
-                        Color(0xFFB8860B),
-                      ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryGold.withValues(alpha: 0.5),
-                        blurRadius: 30,
-                        spreadRadius: 5,
-                        offset: const Offset(0, 10),
-                      ),
-                      BoxShadow(
-                        color: AppColors.primaryGold.withValues(alpha: 0.25),
-                        blurRadius: 60,
-                        spreadRadius: 10,
-                      ),
-                    ],
-                  ),
-                  child: _isProcessing
-                      ? RotationTransition(
-                          turns: _rotationController,
-                          child: const Icon(
-                            Icons.sync_rounded,
-                            color: Colors.white,
-                            size: 52,
+                        // ── Animated icon ──────────────────────────────────
+                        AnimatedBuilder(
+                          animation: _floatAnimation,
+                          builder: (_, child) => Transform.translate(
+                            offset: Offset(
+                              0,
+                              _isProcessing ? _floatAnimation.value : 0,
+                            ),
+                            child: child,
                           ),
-                        )
-                      : TweenAnimationBuilder<double>(
-                          tween: Tween(begin: 0.0, end: 1.0),
-                          duration: const Duration(milliseconds: 500),
-                          builder: (_, v, __) => Transform.scale(
-                            scale: v,
-                            child: const Icon(
-                              Icons.check_rounded,
-                              color: Colors.white,
-                              size: 60,
+                          child: AnimatedBuilder(
+                            animation: _pulseAnimation,
+                            builder: (_, child) => Transform.scale(
+                              scale: _isProcessing
+                                  ? _pulseAnimation.value
+                                  : 1.0,
+                              child: child,
+                            ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // Expanding rings
+                                ..._buildRings(iconSize),
+                                // Outer glow
+                                Container(
+                                  width: iconSize * 1.5,
+                                  height: iconSize * 1.5,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: RadialGradient(
+                                      colors: [
+                                        AppColors.primaryGold.withValues(
+                                          alpha: 0.3,
+                                        ),
+                                        AppColors.primaryGold.withValues(
+                                          alpha: 0.06,
+                                        ),
+                                        Colors.transparent,
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                // Main circle
+                                Container(
+                                  width: iconSize,
+                                  height: iconSize,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: const LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Color(0xFFFFE066),
+                                        AppColors.primaryGold,
+                                        Color(0xFFB8860B),
+                                      ],
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primaryGold.withValues(
+                                          alpha: 0.55,
+                                        ),
+                                        blurRadius: 40,
+                                        spreadRadius: 4,
+                                        offset: const Offset(0, 12),
+                                      ),
+                                      BoxShadow(
+                                        color: AppColors.primaryGold.withValues(
+                                          alpha: 0.2,
+                                        ),
+                                        blurRadius: 80,
+                                        spreadRadius: 12,
+                                      ),
+                                    ],
+                                  ),
+                                  child: _isProcessing
+                                      ? RotationTransition(
+                                          turns: _rotationController,
+                                          child: const Icon(
+                                            Icons.sync_rounded,
+                                            color: Colors.white,
+                                            size: 48,
+                                          ),
+                                        )
+                                      : TweenAnimationBuilder<double>(
+                                          tween: Tween(begin: 0.0, end: 1.0),
+                                          duration: const Duration(
+                                            milliseconds: 500,
+                                          ),
+                                          builder: (_, v, __) =>
+                                              Transform.scale(
+                                                scale: v,
+                                                child: const Icon(
+                                                  Icons.check_rounded,
+                                                  color: Colors.white,
+                                                  size: 56,
+                                                ),
+                                              ),
+                                        ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                ),
-              ],
-            ),
-          ),
-        ),
 
-        const SizedBox(height: 28),
+                        const SizedBox(height: 40),
 
-        // Status text
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          transitionBuilder: (child, anim) => FadeTransition(
-            opacity: anim,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 0.3),
-                end: Offset.zero,
-              ).animate(anim),
-              child: child,
-            ),
-          ),
-          child: Text(
-            _statusText,
-            key: ValueKey(_statusText),
-            style: TextStyle(
-              fontSize: titleFontSize * 0.85,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
+                        // ── Amount ─────────────────────────────────────────
+                        AnimatedBuilder(
+                          animation: _shimmerAnimation,
+                          builder: (_, __) => ShaderMask(
+                            shaderCallback: (bounds) => LinearGradient(
+                              colors: const [
+                                Color(0xFFFFD700),
+                                AppColors.primaryGold,
+                                Color(0xFFFFD700),
+                              ],
+                              stops: [
+                                (_shimmerAnimation.value - 0.3).clamp(0.0, 1.0),
+                                _shimmerAnimation.value.clamp(0.0, 1.0),
+                                (_shimmerAnimation.value + 0.3).clamp(0.0, 1.0),
+                              ],
+                            ).createShader(bounds),
+                            child: Text(
+                              '₦${widget.amount}',
+                              style: TextStyle(
+                                fontSize: titleFontSize * 1.6,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: -1,
+                              ),
+                            ),
+                          ),
+                        ),
 
-        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
 
-        // Amount with shimmer
-        AnimatedBuilder(
-          animation: _shimmerAnimation,
-          builder: (_, __) => ShaderMask(
-            shaderCallback: (bounds) => LinearGradient(
-              colors: const [
-                Color(0xFFFFD700),
-                AppColors.primaryGold,
-                Color(0xFFFFD700),
-              ],
-              stops: [
-                (_shimmerAnimation.value - 0.3).clamp(0.0, 1.0),
-                _shimmerAnimation.value.clamp(0.0, 1.0),
-                (_shimmerAnimation.value + 0.3).clamp(0.0, 1.0),
-              ],
-            ).createShader(bounds),
-            child: Text(
-              '₦${widget.amount}',
-              style: TextStyle(
-                fontSize: titleFontSize * 1.4,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ),
+                        // ── Giving type pill ───────────────────────────────
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGold.withValues(
+                              alpha: 0.12,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppColors.primaryGold.withValues(
+                                alpha: 0.3,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.volunteer_activism_rounded,
+                                size: 14,
+                                color: AppColors.primaryGold,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                widget.title,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primaryGold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
 
-        const SizedBox(height: 6),
+                        const SizedBox(height: 40),
 
-        // Giving type
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.volunteer_activism_rounded,
-              size: 16,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              widget.title,
-              style: TextStyle(
-                fontSize: bodyFontSize,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
-              ),
-            ),
-          ],
-        ),
+                        // ── Status card ────────────────────────────────────
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 400),
+                          transitionBuilder: (child, anim) => FadeTransition(
+                            opacity: anim,
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0, 0.2),
+                                end: Offset.zero,
+                              ).animate(anim),
+                              child: child,
+                            ),
+                          ),
+                          child: Container(
+                            key: ValueKey(_statusText),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 14,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? AppColors.cardDark.withValues(alpha: 0.8)
+                                  : Colors.white.withValues(alpha: 0.8),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: AppColors.primaryGold.withValues(
+                                  alpha: 0.2,
+                                ),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primaryGold.withValues(
+                                    alpha: 0.08,
+                                  ),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _steps[_currentStep]['icon'] as IconData,
+                                  size: 18,
+                                  color: AppColors.primaryGold,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  _statusText,
+                                  style: TextStyle(
+                                    fontSize: bodyFontSize,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? Colors.white
+                                        : Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
 
-        const SizedBox(height: 28),
+                        const SizedBox(height: 32),
 
-        // Progress bar
-        if (_isProcessing) _buildProgressBar(isDark),
-      ],
-    );
-  }
+                        // ── Animated progress dots ─────────────────────────
+                        if (_isProcessing) _buildAnimatedDots(),
 
-  // ── Events section ────────────────────────────────────────────────────────
-  Widget _buildEventsSection(bool isDark) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    // Card takes ~75% of screen width, capped at 280 so it never overflows
-    final cardWidth = (screenWidth * 0.75).clamp(160.0, 280.0);
-    final cardHeight = cardWidth * 0.75; // 4:3 aspect ratio
+                        const Spacer(flex: 3),
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Thin top border line
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          height: 1,
-          color: AppColors.primaryGold.withValues(alpha: 0.18),
-        ),
-        const SizedBox(height: 14),
+                        // ── Security footer ────────────────────────────────
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.lock_rounded,
+                              size: 12,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark.withValues(
+                                      alpha: 0.6,
+                                    )
+                                  : Colors.black38,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Secured by 9PSB · Do not close this screen',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark.withValues(
+                                        alpha: 0.6,
+                                      )
+                                    : Colors.black38,
+                              ),
+                            ),
+                          ],
+                        ),
 
-        // Header
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            children: [
-              Text(
-                'Upcoming Events',
-                style: TextStyle(
-                  color: AppColors.primaryGold,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
-              ),
-              const Spacer(),
-              // Dot indicators
-              Row(
-                children: List.generate(
-                  _events.length.clamp(0, 6),
-                  (i) => AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    margin: const EdgeInsets.only(left: 4),
-                    width: i == _currentEventIndex % _events.length ? 14 : 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: i == _currentEventIndex % _events.length
-                          ? AppColors.primaryGold
-                          : AppColors.primaryGold.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 10),
-
-        // Cards PageView — sized to card dimensions
-        SizedBox(
-          height: cardHeight + 16,
-          child: PageView.builder(
-            controller: _eventPageController,
-            onPageChanged: (index) =>
-                setState(() => _currentEventIndex = index),
-            itemCount: _events.length * 100,
-            itemBuilder: (context, index) {
-              final event = _events[index % _events.length];
-              final double distance = (_currentEventPage - index).abs();
-              final double scale = (1 - (distance * 0.15)).clamp(0.85, 1.0);
-              final double opacity = (1 - (distance * 0.3)).clamp(0.6, 1.0);
-
-              return Center(
-                child: Transform.scale(
-                  scale: scale,
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 200),
-                    opacity: opacity,
-                    child: _buildEventCard(
-                      event,
-                      isDark,
-                      cardWidth,
-                      cardHeight,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-
-        // Bottom tagline
-        Center(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 14),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.lock_outline_rounded,
-                  size: 11,
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Securing your transaction...',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEventCard(
-    Event event,
-    bool isDark,
-    double cardWidth,
-    double cardHeight,
-  ) {
-    return GestureDetector(
-      onTap: () => _showEventImageZoom(event),
-      child: Container(
-        width: cardWidth,
-        height: cardHeight,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _buildEventImage(event.imageUrl),
-              // Gradient overlay at bottom for title
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(10, 20, 10, 10),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.75),
+                        const SizedBox(height: 24),
                       ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
                     ),
-                  ),
-                  child: Text(
-                    event.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
                   ),
                 ),
               ),
@@ -684,90 +513,55 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
     );
   }
 
-  void _showEventImageZoom(Event event) {
-    final screenSize = MediaQuery.of(context).size;
-    showDialog(
-      context: context,
-      barrierColor: Colors.black87,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(16),
-        child: SizedBox(
-          width: screenSize.width - 32,
-          height: (screenSize.width - 32) * 0.75,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: _buildEventImage(event.imageUrl),
-          ),
-        ),
-      ),
+  Widget _buildAnimatedDots() {
+    return AnimatedBuilder(
+      animation: _dotsController,
+      builder: (_, __) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(3, (i) {
+            final delay = i / 3;
+            final t = (_dotsController.value - delay).clamp(0.0, 1.0);
+            final scale = 0.6 + 0.4 * math.sin(t * math.pi);
+            final opacity = 0.3 + 0.7 * math.sin(t * math.pi);
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Transform.scale(
+                scale: scale,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primaryGold.withValues(alpha: opacity),
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 
-  Widget _buildEventImage(String? imageUrl) {
-    final placeholder = Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF1A2744), Color(0xFF0D1522)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Center(
-        child: Icon(
-          Icons.event_rounded,
-          size: 40,
-          color: Colors.white.withValues(alpha: 0.3),
-        ),
-      ),
-    );
-
-    if (imageUrl == null || imageUrl.isEmpty) return placeholder;
-
-    if (imageUrl.startsWith('http')) {
-      return CachedNetworkImage(
-        imageUrl: imageUrl,
-        fit: BoxFit.cover,
-        memCacheWidth: 600,
-        memCacheHeight: 340,
-        fadeInDuration: const Duration(milliseconds: 200),
-        placeholder: (_, __) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF1A2744), Color(0xFF0D1522)],
-            ),
-          ),
-        ),
-        errorWidget: (_, __, ___) => placeholder,
-      );
-    }
-
-    return Image.asset(
-      imageUrl,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => placeholder,
-    );
-  }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
   List<Widget> _buildRings(double size) {
     return List.generate(3, (i) {
       return AnimatedBuilder(
         animation: _ringController,
         builder: (_, __) {
           final progress = (_ringController.value + i * 0.33) % 1.0;
-          final scale = 1.0 + progress * 0.5;
-          final opacity = (1.0 - progress).clamp(0.0, 0.4);
+          final scale = 1.0 + progress * 0.6;
+          final opacity = (1.0 - progress).clamp(0.0, 0.35);
           return Transform.scale(
             scale: scale,
             child: Container(
-              width: size * 1.2,
-              height: size * 1.2,
+              width: size * 1.25,
+              height: size * 1.25,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: AppColors.primaryGold.withValues(alpha: opacity),
-                  width: 2,
+                  width: 1.5,
                 ),
               ),
             ),
@@ -778,16 +572,16 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
   }
 
   List<Widget> _buildParticles(Size screenSize) {
-    return List.generate(12, (i) {
-      final rng = math.Random(i);
+    return List.generate(14, (i) {
+      final rng = math.Random(i * 7);
       final x = rng.nextDouble() * screenSize.width;
       final y = rng.nextDouble() * screenSize.height;
-      final sz = 4.0 + rng.nextDouble() * 8;
+      final sz = 3.0 + rng.nextDouble() * 6;
       return AnimatedBuilder(
         animation: _floatController,
         builder: (_, __) {
-          final dy = math.sin(_floatController.value * math.pi * 2 + i) * 20;
-          final dx = math.cos(_floatController.value * math.pi * 2 + i) * 10;
+          final dy = math.sin(_floatController.value * math.pi * 2 + i) * 18;
+          final dx = math.cos(_floatController.value * math.pi * 2 + i) * 9;
           return Positioned(
             left: x + dx,
             top: y + dy,
@@ -795,10 +589,10 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
               width: sz,
               height: sz,
               decoration: BoxDecoration(
-                shape: i % 2 == 0 ? BoxShape.circle : BoxShape.rectangle,
-                borderRadius: i % 2 == 0 ? null : BorderRadius.circular(2),
+                shape: i % 3 == 0 ? BoxShape.rectangle : BoxShape.circle,
+                borderRadius: i % 3 == 0 ? BorderRadius.circular(2) : null,
                 color: AppColors.primaryGold.withValues(
-                  alpha: 0.15 + rng.nextDouble() * 0.2,
+                  alpha: 0.08 + rng.nextDouble() * 0.15,
                 ),
               ),
             ),
@@ -806,42 +600,5 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
         },
       );
     });
-  }
-
-  Widget _buildProgressBar(bool isDark) {
-    return Column(
-      children: [
-        SizedBox(
-          width: 200,
-          height: 5,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: AnimatedBuilder(
-              animation: _shimmerController,
-              builder: (_, __) => ShaderMask(
-                shaderCallback: (bounds) => LinearGradient(
-                  colors: [
-                    AppColors.primaryGold.withValues(alpha: 0.3),
-                    AppColors.primaryGold,
-                    AppColors.primaryGold.withValues(alpha: 0.3),
-                  ],
-                  stops: [
-                    (_shimmerAnimation.value - 0.3).clamp(0.0, 1.0),
-                    _shimmerAnimation.value.clamp(0.0, 1.0),
-                    (_shimmerAnimation.value + 0.3).clamp(0.0, 1.0),
-                  ],
-                ).createShader(bounds),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(3),
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
   }
 }

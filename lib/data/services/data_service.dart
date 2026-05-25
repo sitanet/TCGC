@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/api_constants.dart';
 import '../../domain/entities/sermon.dart';
 import '../../domain/entities/event.dart';
@@ -17,16 +18,20 @@ class DataService {
   final ContentCacheService _cacheService = ContentCacheService();
 
   // Message Categories - Now uses cache-first strategy
-  Future<List<MessageCategory>> getMessageCategories({bool forceRefresh = false}) async {
+  Future<List<MessageCategory>> getMessageCategories({
+    bool forceRefresh = false,
+  }) async {
     return await _cacheService.getCategories(forceRefresh: forceRefresh);
   }
-  
+
   // Legacy method for backward compatibility (fetches directly from API)
   Future<List<MessageCategory>> getMessageCategoriesFromServer() async {
     final response = await _api.get(ApiConstants.messageCategories);
     if (response.isSuccess) {
       final decoded = response.data;
-      final List<dynamic> data = decoded is List ? decoded : (decoded['results'] ?? decoded);
+      final List<dynamic> data = decoded is List
+          ? decoded
+          : (decoded['results'] ?? decoded);
       return data.map((json) => MessageCategory.fromJson(json)).toList();
     }
     return [];
@@ -42,7 +47,7 @@ class DataService {
   Future<List<Sermon>> clearAndRefreshMessages() async {
     return await _cacheService.clearAndRefreshSermons();
   }
-  
+
   // Legacy method for backward compatibility (fetches ALL pages directly from API)
   Future<List<Sermon>> getMessagesFromServer() async {
     final allResults = await _api.getAllPages(ApiConstants.messages);
@@ -58,7 +63,9 @@ class DataService {
   }
 
   Future<List<Sermon>> getMessagesByCategory(String categoryId) async {
-    final response = await _api.get('${ApiConstants.messagesByCategory}?category_id=$categoryId');
+    final response = await _api.get(
+      '${ApiConstants.messagesByCategory}?category_id=$categoryId',
+    );
     if (response.isSuccess) {
       final List<dynamic> data = response.dataList;
       return data.map((json) => Sermon.fromJson(json)).toList();
@@ -67,7 +74,9 @@ class DataService {
   }
 
   Future<List<Sermon>> getMessagesByCategoryName(String categoryName) async {
-    final response = await _api.get('${ApiConstants.messagesByCategory}?category=$categoryName');
+    final response = await _api.get(
+      '${ApiConstants.messagesByCategory}?category=$categoryName',
+    );
     if (response.isSuccess) {
       final List<dynamic> data = response.dataList;
       return data.map((json) => Sermon.fromJson(json)).toList();
@@ -78,9 +87,15 @@ class DataService {
   // Get messages by speaker
   Future<List<Sermon>> getMessagesBySpeaker(String speaker) async {
     final encodedSpeaker = Uri.encodeComponent(speaker);
-    debugPrint('Fetching messages for speaker: $speaker (encoded: $encodedSpeaker)');
-    final response = await _api.get('${ApiConstants.messages}by_speaker/?speaker=$encodedSpeaker');
-    debugPrint('Response isSuccess: ${response.isSuccess}, data: ${response.data}');
+    debugPrint(
+      'Fetching messages for speaker: $speaker (encoded: $encodedSpeaker)',
+    );
+    final response = await _api.get(
+      '${ApiConstants.messages}by_speaker/?speaker=$encodedSpeaker',
+    );
+    debugPrint(
+      'Response isSuccess: ${response.isSuccess}, data: ${response.data}',
+    );
     if (response.isSuccess) {
       final List<dynamic> data = response.dataList;
       debugPrint('Found ${data.length} messages by speaker');
@@ -105,10 +120,14 @@ class DataService {
   }
 
   // Get recommended messages - Now uses cache-first strategy
-  Future<List<Sermon>> getRecommendedMessages({bool forceRefresh = false}) async {
-    return await _cacheService.getRecommendedSermons(forceRefresh: forceRefresh);
+  Future<List<Sermon>> getRecommendedMessages({
+    bool forceRefresh = false,
+  }) async {
+    return await _cacheService.getRecommendedSermons(
+      forceRefresh: forceRefresh,
+    );
   }
-  
+
   // Get speaker names only (for filtering)
   Future<List<String>> getSpeakerNames() async {
     final speakers = await getSpeakers();
@@ -122,33 +141,107 @@ class DataService {
     required bool added,
   }) async {
     try {
-      final response = await _api.post(
-        ApiConstants.messageStats,
-        {
-          'message_id': messageId,
-          'action': action,
-          'added': added,
-        },
-      );
+      final response = await _api.post(ApiConstants.messageStats, {
+        'message_id': messageId,
+        'action': action,
+        'added': added,
+      });
       return response.isSuccess;
     } catch (e) {
       return false;
     }
   }
 
-  // Transcripts (standalone)
-  Future<List<Transcript>> getTranscripts() async {
-    final response = await _api.get(ApiConstants.transcripts);
-    if (response.isSuccess) {
-      final data = response.data;
-      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
-      return results.map((json) => Transcript.fromJson(json)).toList();
+  // Transcripts (standalone) — cache-first strategy
+  static const String _transcriptsCacheKey = 'cached_transcripts';
+  static const Duration _transcriptsCacheTtl = Duration(hours: 6);
+  static const String _transcriptsCacheTimeKey = 'cached_transcripts_time';
+
+  Future<List<Transcript>> getTranscripts({bool forceRefresh = false}) async {
+    // 1. Try cache first (unless force refresh)
+    if (!forceRefresh) {
+      final cached = await _getCachedTranscripts();
+      if (cached != null && cached.isNotEmpty) {
+        // Refresh in background without blocking UI
+        _refreshTranscriptsInBackground();
+        return cached;
+      }
     }
-    return [];
+
+    // 2. Fetch from server
+    return await _fetchTranscriptsFromServer() ?? [];
+  }
+
+  Future<List<Transcript>?> _getCachedTranscripts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedJson = prefs.getString(_transcriptsCacheKey);
+      final cachedTime = prefs.getInt(_transcriptsCacheTimeKey) ?? 0;
+
+      if (cachedJson == null) return null;
+
+      // Check TTL
+      final age = DateTime.now().millisecondsSinceEpoch - cachedTime;
+      if (age > _transcriptsCacheTtl.inMilliseconds) {
+        debugPrint('Transcripts cache expired, will refresh');
+        return null;
+      }
+
+      final List<dynamic> jsonList = jsonDecode(cachedJson);
+      return jsonList.map((j) => Transcript.fromJson(j)).toList();
+    } catch (e) {
+      debugPrint('Error reading transcripts cache: $e');
+      return null;
+    }
+  }
+
+  Future<List<Transcript>?> _fetchTranscriptsFromServer() async {
+    try {
+      final response = await _api.get(ApiConstants.transcripts);
+      if (response.isSuccess) {
+        final data = response.data;
+        final List<dynamic> results = data is List
+            ? data
+            : (data['results'] ?? data);
+        final transcripts = results
+            .map((json) => Transcript.fromJson(json))
+            .toList();
+        // Save to cache
+        await _saveTranscriptsCache(transcripts);
+        return transcripts;
+      }
+    } catch (e) {
+      debugPrint('Error fetching transcripts from server: $e');
+    }
+    return null;
+  }
+
+  Future<void> _saveTranscriptsCache(List<Transcript> transcripts) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = transcripts.map((t) => t.toJson()).toList();
+      await prefs.setString(_transcriptsCacheKey, jsonEncode(jsonList));
+      await prefs.setInt(
+        _transcriptsCacheTimeKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
+      debugPrint('Cached ${transcripts.length} transcripts');
+    } catch (e) {
+      debugPrint('Error saving transcripts cache: $e');
+    }
+  }
+
+  void _refreshTranscriptsInBackground() {
+    Future.microtask(() async {
+      await _fetchTranscriptsFromServer();
+      debugPrint('Transcripts cache refreshed in background');
+    });
   }
 
   Future<Transcript?> getTranscriptById(String transcriptId) async {
-    final response = await _api.get('${ApiConstants.transcripts}$transcriptId/');
+    final response = await _api.get(
+      '${ApiConstants.transcripts}$transcriptId/',
+    );
     if (response.isSuccess) {
       return Transcript.fromJson(response.data);
     }
@@ -156,7 +249,9 @@ class DataService {
   }
 
   Future<List<Transcript>> getTranscriptsByCategory(String categoryId) async {
-    final response = await _api.get('${ApiConstants.transcriptsByCategory}?category_id=$categoryId');
+    final response = await _api.get(
+      '${ApiConstants.transcriptsByCategory}?category_id=$categoryId',
+    );
     if (response.isSuccess) {
       final List<dynamic> data = response.dataList;
       return data.map((json) => Transcript.fromJson(json)).toList();
@@ -177,7 +272,7 @@ class DataService {
   Future<List<Event>> getEvents({bool forceRefresh = false}) async {
     return await _cacheService.getEvents(forceRefresh: forceRefresh);
   }
-  
+
   // Legacy method for backward compatibility
   Future<List<Event>> getEventsFromServer() async {
     final response = await _api.get(ApiConstants.events);
@@ -189,11 +284,35 @@ class DataService {
     return [];
   }
 
-  Future<List<Event>> getTeensEvents() async {
+  Future<List<Event>> getTeensEvents({bool forceRefresh = false}) async {
+    const cacheKey = 'cached_teens_events';
+    const cacheTimeKey = 'cached_teens_events_time';
+    const ttl = Duration(hours: 6);
+
+    if (!forceRefresh) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cached = prefs.getString(cacheKey);
+        final cachedTime = prefs.getInt(cacheTimeKey) ?? 0;
+        final age = DateTime.now().millisecondsSinceEpoch - cachedTime;
+        if (cached != null && age < ttl.inMilliseconds) {
+          final list = jsonDecode(cached) as List;
+          _refreshInBackground(() => getTeensEvents(forceRefresh: true));
+          return list.map((j) => Event.fromJson(j)).toList();
+        }
+      } catch (_) {}
+    }
+
     final response = await _api.get(ApiConstants.teensEvents);
     if (response.isSuccess) {
-      final List<dynamic> data = response.dataList;
-      return data.map((json) => Event.fromJson(json)).toList();
+      final data = response.dataList;
+      final events = data.map((j) => Event.fromJson(j)).toList();
+      _saveCache(
+        'cached_teens_events',
+        'cached_teens_events_time',
+        events.map((e) => e.toJson()).toList(),
+      );
+      return events;
     }
     return [];
   }
@@ -208,44 +327,212 @@ class DataService {
   }
 
   // Teens Categories - Now uses cache-first strategy
-  Future<List<TeensCategory>> getTeensCategories({bool forceRefresh = false}) async {
+  Future<List<TeensCategory>> getTeensCategories({
+    bool forceRefresh = false,
+  }) async {
     return await _cacheService.getTeensCategories(forceRefresh: forceRefresh);
   }
-  
+
   // Legacy method for backward compatibility
   Future<List<TeensCategory>> getTeensCategoriesFromServer() async {
     final response = await _api.get(ApiConstants.teensCategories);
     if (response.isSuccess) {
       final data = response.data;
-      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
+      final List<dynamic> results = data is List
+          ? data
+          : (data['results'] ?? data);
       return results.map((json) => TeensCategory.fromJson(json)).toList();
     }
     return [];
   }
 
-  // Teens Banner
-  Future<String?> getTeensBannerUrl() async {
+  // Teens Banner — cache-first
+  Future<String?> getTeensBannerUrl({bool forceRefresh = false}) async {
+    const cacheKey = 'cached_teens_banner_url';
+    const cacheTimeKey = 'cached_teens_banner_url_time';
+    const ttl = Duration(hours: 12);
+
+    if (!forceRefresh) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cached = prefs.getString(cacheKey);
+        final cachedTime = prefs.getInt(cacheTimeKey) ?? 0;
+        final age = DateTime.now().millisecondsSinceEpoch - cachedTime;
+        if (cached != null && age < ttl.inMilliseconds) {
+          _refreshInBackground(() => getTeensBannerUrl(forceRefresh: true));
+          return cached;
+        }
+      } catch (_) {}
+    }
+
     final response = await _api.get(ApiConstants.teensBanner);
     if (response.isSuccess) {
-      final data = response.data;
-      return data['image_url'];
+      final url = response.data['image_url'] as String?;
+      if (url != null) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(cacheKey, url);
+          await prefs.setInt(
+            cacheTimeKey,
+            DateTime.now().millisecondsSinceEpoch,
+          );
+        } catch (_) {}
+      }
+      return url;
     }
     return null;
   }
 
+  // Devotionals — cache-first
+  Future<List<TeensContent>> getDevotionals({bool forceRefresh = false}) async {
+    return await _getTeensContentCached(
+      cacheKey: 'cached_teens_devotionals',
+      apiUrl: ApiConstants.devotionals,
+      forceRefresh: forceRefresh,
+      label: 'Devotionals',
+    );
+  }
+
+  // Retreats — cache-first
+  Future<List<TeensContent>> getRetreats({bool forceRefresh = false}) async {
+    return await _getTeensContentCached(
+      cacheKey: 'cached_teens_retreats',
+      apiUrl: ApiConstants.retreats,
+      forceRefresh: forceRefresh,
+      label: 'Retreats',
+    );
+  }
+
+  // Forge Camp — cache-first
+  Future<List<TeensContent>> getForgeCamp({bool forceRefresh = false}) async {
+    return await _getTeensContentCached(
+      cacheKey: 'cached_teens_forgecamp',
+      apiUrl: ApiConstants.forgeCamp,
+      forceRefresh: forceRefresh,
+      label: 'ForgeCamp',
+    );
+  }
+
+  // ── Shared helpers ─────────────────────────────────────────────────────────
+
+  /// Generic cache-first loader for TeensContent lists
+  Future<List<TeensContent>> _getTeensContentCached({
+    required String cacheKey,
+    required String apiUrl,
+    required bool forceRefresh,
+    required String label,
+  }) async {
+    final cacheTimeKey = '${cacheKey}_time';
+    const ttl = Duration(hours: 6);
+
+    if (!forceRefresh) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cached = prefs.getString(cacheKey);
+        final cachedTime = prefs.getInt(cacheTimeKey) ?? 0;
+        final age = DateTime.now().millisecondsSinceEpoch - cachedTime;
+        if (cached != null && age < ttl.inMilliseconds) {
+          final list = jsonDecode(cached) as List;
+          // Refresh in background
+          _refreshInBackground(
+            () => _getTeensContentCached(
+              cacheKey: cacheKey,
+              apiUrl: apiUrl,
+              forceRefresh: true,
+              label: label,
+            ),
+          );
+          return list
+              .map((j) => TeensContent.fromJson(j as Map<String, dynamic>))
+              .toList();
+        }
+      } catch (e) {
+        debugPrint('$label cache read error: $e');
+      }
+    }
+
+    // Fetch from server
+    final response = await _api.get(apiUrl);
+    if (response.isSuccess) {
+      try {
+        final decoded = jsonDecode(response.body);
+        List<dynamic> results;
+        if (decoded is List) {
+          results = decoded;
+        } else if (decoded is Map) {
+          results = decoded['results'] ?? decoded['data'] ?? [];
+        } else {
+          results = [];
+        }
+        final items = results
+            .map((j) => TeensContent.fromJson(j as Map<String, dynamic>))
+            .toList();
+        // Save to cache
+        await _saveCache(
+          cacheKey,
+          cacheTimeKey,
+          items.map((i) => i.toJson()).toList(),
+        );
+        debugPrint('$label: fetched ${items.length} items from server');
+        return items;
+      } catch (e) {
+        debugPrint('$label parse error: $e');
+      }
+    }
+    debugPrint('$label API failed: ${response.errorMessage}');
+    return [];
+  }
+
+  /// Save a JSON list to SharedPreferences cache
+  Future<void> _saveCache(
+    String key,
+    String timeKey,
+    List<dynamic> data,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, jsonEncode(data));
+      await prefs.setInt(timeKey, DateTime.now().millisecondsSinceEpoch);
+    } catch (e) {
+      debugPrint('Cache save error ($key): $e');
+    }
+  }
+
+  /// Run a refresh in the background without blocking the caller
+  void _refreshInBackground(Future<dynamic> Function() fn) {
+    Future.microtask(() async {
+      try {
+        await fn();
+      } catch (e) {
+        debugPrint('Background refresh error: $e');
+      }
+    });
+  }
+
   // Teens Content - Now uses cache-first strategy
-  Future<List<TeensContent>> getTeensContent({bool forceRefresh = false}) async {
+  Future<List<TeensContent>> getTeensContent({
+    bool forceRefresh = false,
+  }) async {
     return await _cacheService.getTeensContent(forceRefresh: forceRefresh);
   }
 
-  Future<List<TeensContent>> getTeensContentByCategory(int categoryId, {bool forceRefresh = false}) async {
-    return await _cacheService.getTeensContentByCategory(categoryId, forceRefresh: forceRefresh);
+  Future<List<TeensContent>> getTeensContentByCategory(
+    int categoryId, {
+    bool forceRefresh = false,
+  }) async {
+    return await _cacheService.getTeensContentByCategory(
+      categoryId,
+      forceRefresh: forceRefresh,
+    );
   }
-  
+
   // Legacy method for backward compatibility
   Future<List<TeensContent>> getTeensContentFromServer(int categoryId) async {
-    final url = '${ApiConstants.teensContentByCategory}?category_id=$categoryId';
-    debugPrint('Fetching teens content by category: ${ApiConstants.baseUrl}$url');
+    final url =
+        '${ApiConstants.teensContentByCategory}?category_id=$categoryId';
+    debugPrint(
+      'Fetching teens content by category: ${ApiConstants.baseUrl}$url',
+    );
     final response = await _api.get(url);
     debugPrint('Response status: ${response.statusCode}');
     debugPrint('Response body: ${response.body}');
@@ -262,7 +549,9 @@ class DataService {
           results = [];
         }
         debugPrint('Teens content results count: ${results.length}');
-        return results.map((json) => TeensContent.fromJson(json as Map<String, dynamic>)).toList();
+        return results
+            .map((json) => TeensContent.fromJson(json as Map<String, dynamic>))
+            .toList();
       } catch (e, stackTrace) {
         debugPrint('Error parsing teens content: $e');
         debugPrint('Stack trace: $stackTrace');
@@ -272,94 +561,19 @@ class DataService {
     return [];
   }
 
-  Future<List<TeensContent>> getTeensContentByCategoryName(String categoryName) async {
-    final response = await _api.get('${ApiConstants.teensContentByCategory}?category=$categoryName');
+  Future<List<TeensContent>> getTeensContentByCategoryName(
+    String categoryName,
+  ) async {
+    final response = await _api.get(
+      '${ApiConstants.teensContentByCategory}?category=$categoryName',
+    );
     if (response.isSuccess) {
       final data = response.data;
-      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
+      final List<dynamic> results = data is List
+          ? data
+          : (data['results'] ?? data);
       return results.map((json) => TeensContent.fromJson(json)).toList();
     }
-    return [];
-  }
-
-  Future<List<TeensContent>> getDevotionals() async {
-    final response = await _api.get(ApiConstants.devotionals);
-    debugPrint('Devotionals API URL: ${ApiConstants.baseUrl}${ApiConstants.devotionals}');
-    debugPrint('Devotionals API response: ${response.statusCode}');
-    debugPrint('Devotionals body: ${response.body}');
-    if (response.isSuccess) {
-      try {
-        final decoded = jsonDecode(response.body);
-        debugPrint('Devotionals decoded type: ${decoded.runtimeType}');
-        List<dynamic> results;
-        if (decoded is List) {
-          results = decoded;
-        } else if (decoded is Map) {
-          results = decoded['results'] ?? decoded['data'] ?? [];
-        } else {
-          results = [];
-        }
-        debugPrint('Devotionals results count: ${results.length}');
-        return results.map((json) => TeensContent.fromJson(json)).toList();
-      } catch (e) {
-        debugPrint('Devotionals parse error: $e');
-      }
-    }
-    debugPrint('Devotionals API failed: ${response.errorMessage}');
-    return [];
-  }
-
-  Future<List<TeensContent>> getRetreats() async {
-    final response = await _api.get(ApiConstants.retreats);
-    debugPrint('Retreats API URL: ${ApiConstants.baseUrl}${ApiConstants.retreats}');
-    debugPrint('Retreats API response: ${response.statusCode}');
-    debugPrint('Retreats body: ${response.body}');
-    if (response.isSuccess) {
-      try {
-        final decoded = jsonDecode(response.body);
-        debugPrint('Retreats decoded type: ${decoded.runtimeType}');
-        List<dynamic> results;
-        if (decoded is List) {
-          results = decoded;
-        } else if (decoded is Map) {
-          results = decoded['results'] ?? decoded['data'] ?? [];
-        } else {
-          results = [];
-        }
-        debugPrint('Retreats results count: ${results.length}');
-        return results.map((json) => TeensContent.fromJson(json)).toList();
-      } catch (e) {
-        debugPrint('Retreats parse error: $e');
-      }
-    }
-    debugPrint('Retreats API failed: ${response.errorMessage}');
-    return [];
-  }
-
-  Future<List<TeensContent>> getForgeCamp() async {
-    final response = await _api.get(ApiConstants.forgeCamp);
-    debugPrint('ForgeCamp API URL: ${ApiConstants.baseUrl}${ApiConstants.forgeCamp}');
-    debugPrint('ForgeCamp API response: ${response.statusCode}');
-    debugPrint('ForgeCamp body: ${response.body}');
-    if (response.isSuccess) {
-      try {
-        final decoded = jsonDecode(response.body);
-        debugPrint('ForgeCamp decoded type: ${decoded.runtimeType}');
-        List<dynamic> results;
-        if (decoded is List) {
-          results = decoded;
-        } else if (decoded is Map) {
-          results = decoded['results'] ?? decoded['data'] ?? [];
-        } else {
-          results = [];
-        }
-        debugPrint('ForgeCamp results count: ${results.length}');
-        return results.map((json) => TeensContent.fromJson(json)).toList();
-      } catch (e) {
-        debugPrint('ForgeCamp parse error: $e');
-      }
-    }
-    debugPrint('ForgeCamp API failed: ${response.errorMessage}');
     return [];
   }
 
@@ -396,7 +610,11 @@ class DataService {
     );
   }
 
-  Future<WalletResult> sendMoney(String recipientEmail, double amount, String pin) async {
+  Future<WalletResult> sendMoney(
+    String recipientEmail,
+    double amount,
+    String pin,
+  ) async {
     final response = await _api.post(ApiConstants.sendMoney, {
       'recipient_email': recipientEmail,
       'amount': amount,
@@ -451,10 +669,13 @@ class DataService {
     }
     return [];
   }
-  
-  Future<AppUpdateInfo?> checkForAppUpdate(String currentVersion, String platform) async {
+
+  Future<AppUpdateInfo?> checkForAppUpdate(
+    String currentVersion,
+    String platform,
+  ) async {
     final response = await _api.get(
-      '${ApiConstants.checkAppUpdate}?version=$currentVersion&platform=$platform'
+      '${ApiConstants.checkAppUpdate}?version=$currentVersion&platform=$platform',
     );
     if (response.isSuccess) {
       try {
@@ -556,9 +777,16 @@ class SpeakerModel {
   });
 
   factory SpeakerModel.fromJson(Map<String, dynamic> json) {
-    String? rawPhotoUrl = json['photo_url'] ?? json['image_url'] ?? json['picture'] ?? json['avatar'] ?? json['photo'];
+    String? rawPhotoUrl =
+        json['photo_url'] ??
+        json['image_url'] ??
+        json['picture'] ??
+        json['avatar'] ??
+        json['photo'];
     // If it's a relative URL, prepend the base URL
-    if (rawPhotoUrl != null && rawPhotoUrl.isNotEmpty && !rawPhotoUrl.startsWith('http')) {
+    if (rawPhotoUrl != null &&
+        rawPhotoUrl.isNotEmpty &&
+        !rawPhotoUrl.startsWith('http')) {
       rawPhotoUrl = 'https://tcgc.thecitygatechurch.org$rawPhotoUrl';
     }
     return SpeakerModel(

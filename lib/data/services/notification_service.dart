@@ -43,9 +43,10 @@ class NotificationService {
   NotificationService._internal();
 
   FirebaseMessaging? _firebaseMessaging;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
   final ApiService _apiService = ApiService();
-  
+
   FirebaseMessaging? get _messaging {
     if (!_isFirebaseMessagingSupported) return null;
     _firebaseMessaging ??= FirebaseMessaging.instance;
@@ -61,16 +62,17 @@ class NotificationService {
   static const String _prefsKeyMessages = 'notification_messages_enabled';
   static const String _prefsKeyWallet = 'notification_wallet_enabled';
   static const String _prefsKeyTeens = 'notification_teens_enabled';
-  static const String _prefsKeyAnnouncements = 'notification_announcements_enabled';
+  static const String _prefsKeyAnnouncements =
+      'notification_announcements_enabled';
   static const String _prefsKeyPromotions = 'notification_promotions_enabled';
 
   bool _fcmInitialized = false;
-  
+
   Future<void> initialize() async {
     try {
       // Local notifications work on all platforms - initialize first
       await _initLocalNotifications();
-      
+
       // Defer FCM initialization to avoid creating background engine at startup
       // This will be done when actually needed or after a delay
       Future.delayed(const Duration(seconds: 5), () => _initializeFCM());
@@ -78,18 +80,20 @@ class NotificationService {
       debugPrint('Notification service initialization error: $e');
     }
   }
-  
+
   Future<void> _initializeFCM() async {
     if (_fcmInitialized || !_isFirebaseMessagingSupported) return;
     _fcmInitialized = true;
-    
+
     try {
       // Ensure Firebase is initialized
       try {
         await Firebase.initializeApp();
       } catch (_) {}
-      
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
       await _requestPermission();
       await _configureFCM();
       await _getToken();
@@ -102,7 +106,7 @@ class NotificationService {
   Future<void> _requestPermission() async {
     final messaging = _messaging;
     if (messaging == null) return;
-    
+
     final settings = await messaging.requestPermission(
       alert: true,
       announcement: false,
@@ -113,11 +117,15 @@ class NotificationService {
       sound: true,
     );
 
-    debugPrint('Notification permission status: ${settings.authorizationStatus}');
+    debugPrint(
+      'Notification permission status: ${settings.authorizationStatus}',
+    );
   }
 
   Future<void> _initLocalNotifications() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -132,13 +140,16 @@ class NotificationService {
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
-      onDidReceiveBackgroundNotificationResponse: _onBackgroundNotificationTapped,
+      onDidReceiveBackgroundNotificationResponse:
+          _onBackgroundNotificationTapped,
     );
 
     if (Platform.isAndroid) {
-      final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
-      
+      final androidPlugin = _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+
       // Create multiple channels for different notification types
       await androidPlugin?.createNotificationChannel(
         const AndroidNotificationChannel(
@@ -150,7 +161,7 @@ class NotificationService {
           playSound: true,
         ),
       );
-      
+
       await androidPlugin?.createNotificationChannel(
         const AndroidNotificationChannel(
           'messages_channel',
@@ -160,7 +171,7 @@ class NotificationService {
           enableVibration: true,
         ),
       );
-      
+
       await androidPlugin?.createNotificationChannel(
         const AndroidNotificationChannel(
           'events_channel',
@@ -168,6 +179,19 @@ class NotificationService {
           description: 'Notifications for upcoming events.',
           importance: Importance.high,
           enableVibration: true,
+        ),
+      );
+
+      // Dedicated wallet channel with gold LED color
+      await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'wallet_channel',
+          'Wallet',
+          description: 'Wallet credit and transaction notifications.',
+          importance: Importance.high,
+          enableVibration: true,
+          playSound: true,
+          ledColor: Color(0xFFD4AF37),
         ),
       );
     }
@@ -182,11 +206,11 @@ class NotificationService {
 
   void _handleNotificationAction(NotificationResponse response) {
     if (response.payload == null) return;
-    
+
     try {
       final data = jsonDecode(response.payload!) as Map<String, dynamic>;
       debugPrint('Notification action: ${response.actionId}, data: $data');
-      
+
       if (onNotificationTapped != null) {
         onNotificationTapped!(data);
       }
@@ -194,7 +218,7 @@ class NotificationService {
       debugPrint('Error parsing notification payload: $e');
     }
   }
-  
+
   @pragma('vm:entry-point')
   static void _onBackgroundNotificationTapped(NotificationResponse response) {
     debugPrint('Background notification tapped: ${response.payload}');
@@ -203,7 +227,7 @@ class NotificationService {
   Future<void> _configureFCM() async {
     final messaging = _messaging;
     if (messaging == null) return;
-    
+
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
 
@@ -219,12 +243,22 @@ class NotificationService {
     final notification = message.notification;
     final data = message.data;
     final notificationType = data['type'] ?? 'announcement';
-    final imageUrl = data['image_url'] ?? notification?.android?.imageUrl ?? notification?.apple?.imageUrl;
+
+    // ── Wallet credit — custom OPay-style layout ───────────────────────────
+    if (notificationType == 'wallet_credit') {
+      _showWalletCreditNotification(data);
+      return;
+    }
+
+    final imageUrl =
+        data['image_url'] ??
+        notification?.android?.imageUrl ??
+        notification?.apple?.imageUrl;
 
     if (notification != null) {
       // Get channel and color based on notification type
       final channelConfig = _getChannelConfig(notificationType);
-      
+
       // Try to download image for large icon
       String? largeIconPath;
       String? bigPicturePath;
@@ -236,13 +270,15 @@ class NotificationService {
           debugPrint('Error downloading notification image: $e');
         }
       }
-      
+
       // Build style information based on whether we have an image
       StyleInformation styleInfo;
       if (bigPicturePath != null) {
         styleInfo = BigPictureStyleInformation(
           FilePathAndroidBitmap(bigPicturePath),
-          largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+          largeIcon: largeIconPath != null
+              ? FilePathAndroidBitmap(largeIconPath)
+              : null,
           contentTitle: '<b>${notification.title}</b>',
           htmlFormatContentTitle: true,
           summaryText: notification.body,
@@ -258,7 +294,7 @@ class NotificationService {
           htmlFormatSummaryText: true,
         );
       }
-      
+
       // Add action buttons for message notifications
       List<AndroidNotificationAction>? actions;
       if (notificationType == 'new_message' || notificationType == 'message') {
@@ -283,7 +319,9 @@ class NotificationService {
             importance: Importance.high,
             priority: Priority.high,
             icon: '@mipmap/ic_launcher',
-            largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+            largeIcon: largeIconPath != null
+                ? FilePathAndroidBitmap(largeIconPath)
+                : null,
             color: channelConfig.color,
             colorized: true,
             styleInformation: styleInfo,
@@ -296,32 +334,109 @@ class NotificationService {
             presentAlert: true,
             presentBadge: true,
             presentSound: true,
-            attachments: imageUrl != null ? [DarwinNotificationAttachment(imageUrl)] : null,
+            attachments: imageUrl != null
+                ? [DarwinNotificationAttachment(imageUrl)]
+                : null,
           ),
         ),
         payload: jsonEncode(message.data),
       );
     }
   }
-  
+
+  // ── OPay-style wallet credit notification ──────────────────────────────────
+  // Layout (expanded):
+  //   ┌─────────────────────────────────────────────────────┐
+  //   │  Wallet Balance (NGN)          [sender name bold]   │
+  //   │  ₦12,500.00                    Amount  ₦5,000.00    │
+  //   └─────────────────────────────────────────────────────┘
+  void _showWalletCreditNotification(Map<String, dynamic> data) {
+    const goldHex = '#D4AF37';
+    const gold = Color(0xFFD4AF37);
+
+    final currency = data['currency'] ?? 'NGN';
+    final symbol = currency == 'NGN' ? '₦' : currency;
+
+    final rawAmount = double.tryParse(data['amount'] ?? '0') ?? 0;
+    final amountStr = _formatMoney(rawAmount);
+
+    final senderName = (data['sender_name'] ?? '').toString().trim();
+    final senderDisplay = senderName.isNotEmpty
+        ? senderName
+        : 'Transfer Received';
+
+    // InboxStyle — sender name + amount
+    final styleInfo = InboxStyleInformation(
+      [
+        '<b>$senderDisplay</b>',
+        'Amount'
+            '                    '
+            '<font color="$goldHex"><b>$symbol$amountStr</b></font>',
+      ],
+      htmlFormatLines: true,
+      contentTitle: '<font color="$goldHex"><b>Money Received 💰</b></font>',
+      htmlFormatContentTitle: true,
+      summaryText: '$senderDisplay · $symbol$amountStr',
+      htmlFormatSummaryText: false,
+    );
+
+    _localNotifications.show(
+      DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      'Money Received 💰',
+      '$senderDisplay sent you $symbol$amountStr',
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          'wallet_channel',
+          'Wallet',
+          channelDescription: 'Wallet credit and transaction notifications.',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+          color: gold,
+          colorized: true,
+          styleInformation: styleInfo,
+          enableVibration: true,
+          playSound: true,
+          ticker: 'Money Received',
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: jsonEncode(data),
+    );
+  }
+
+  /// Format a number as money string e.g. 5000.0 → "5,000.00"
+  String _formatMoney(double value) {
+    final parts = value.toStringAsFixed(2).split('.');
+    final intPart = parts[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]},',
+    );
+    return '$intPart.${parts[1]}';
+  }
+
   Future<String?> _downloadAndSaveImage(String url, String fileName) async {
     try {
       final response = await HttpClient().getUrl(Uri.parse(url));
       final httpResponse = await response.close();
       final bytes = await consolidateHttpClientResponseBytes(httpResponse);
-      
+
       final tempDir = await getTemporaryDirectory();
       final filePath = '${tempDir.path}/$fileName.png';
       final file = File(filePath);
       await file.writeAsBytes(bytes);
-      
+
       return filePath;
     } catch (e) {
       debugPrint('Error downloading image: $e');
       return null;
     }
   }
-  
+
   _NotificationChannelConfig _getChannelConfig(String type) {
     switch (type) {
       case 'new_message':
@@ -353,11 +468,11 @@ class NotificationService {
         );
       case 'wallet':
         return _NotificationChannelConfig(
-          channelId: 'high_importance_channel',
+          channelId: 'wallet_channel',
           channelName: 'Wallet',
           description: 'Wallet notification',
-          color: const Color(0xFF26A69A), // Teal
-          summaryText: '<font color="#26A69A">Wallet</font>',
+          color: const Color(0xFFD4AF37), // Gold
+          summaryText: '<font color="#D4AF37">Wallet</font>',
         );
       default:
         return _NotificationChannelConfig(
@@ -377,7 +492,7 @@ class NotificationService {
   Future<void> _getToken() async {
     final messaging = _messaging;
     if (messaging == null) return;
-    
+
     try {
       _fcmToken = await messaging.getToken();
       debugPrint('FCM Token: $_fcmToken');
@@ -434,12 +549,14 @@ class NotificationService {
   Future<List<AppNotification>> getNotifications() async {
     try {
       final response = await _apiService.get(ApiConstants.notifications);
-      debugPrint('Notifications response: ${response.statusCode} - ${response.body}');
-      
+      debugPrint(
+        'Notifications response: ${response.statusCode} - ${response.body}',
+      );
+
       if (response.isSuccess) {
         // Handle both paginated and non-paginated responses
         List<dynamic> data;
-        
+
         try {
           // Try to parse as list first
           data = response.dataList;
@@ -452,7 +569,7 @@ class NotificationService {
             data = [];
           }
         }
-        
+
         return data.map((json) => AppNotification.fromJson(json)).toList();
       }
     } catch (e) {
@@ -476,7 +593,10 @@ class NotificationService {
 
   Future<bool> markAllAsRead() async {
     try {
-      final response = await _apiService.post(ApiConstants.notificationReadAll, {});
+      final response = await _apiService.post(
+        ApiConstants.notificationReadAll,
+        {},
+      );
       return response.isSuccess;
     } catch (e) {
       debugPrint('Error marking all notifications as read: $e');
@@ -487,11 +607,13 @@ class NotificationService {
   Future<NotificationPreferences> getPreferences() async {
     // Ensure tokens are loaded before checking authentication
     await _apiService.loadTokens();
-    
+
     // Try to fetch from backend first if authenticated
     if (_apiService.isAuthenticated) {
       try {
-        final response = await _apiService.get(ApiConstants.notificationPreferences);
+        final response = await _apiService.get(
+          ApiConstants.notificationPreferences,
+        );
         if (response.isSuccess) {
           final prefs = NotificationPreferences.fromJson(response.data);
           // Save to local storage
@@ -502,7 +624,7 @@ class NotificationService {
         debugPrint('Error fetching preferences from backend: $e');
       }
     }
-    
+
     // Fall back to local storage
     final prefs = await SharedPreferences.getInstance();
     return NotificationPreferences(
@@ -516,8 +638,10 @@ class NotificationService {
       promotionsEnabled: prefs.getBool(_prefsKeyPromotions) ?? true,
     );
   }
-  
-  Future<void> _savePreferencesLocally(NotificationPreferences preferences) async {
+
+  Future<void> _savePreferencesLocally(
+    NotificationPreferences preferences,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_prefsKeyPush, preferences.pushEnabled);
     await prefs.setBool(_prefsKeyEmail, preferences.emailEnabled);
@@ -525,7 +649,10 @@ class NotificationService {
     await prefs.setBool(_prefsKeyMessages, preferences.messagesEnabled);
     await prefs.setBool(_prefsKeyWallet, preferences.walletEnabled);
     await prefs.setBool(_prefsKeyTeens, preferences.teensEnabled);
-    await prefs.setBool(_prefsKeyAnnouncements, preferences.announcementsEnabled);
+    await prefs.setBool(
+      _prefsKeyAnnouncements,
+      preferences.announcementsEnabled,
+    );
     await prefs.setBool(_prefsKeyPromotions, preferences.promotionsEnabled);
   }
 
@@ -536,7 +663,7 @@ class NotificationService {
 
     // Ensure tokens are loaded before checking authentication
     await _apiService.loadTokens();
-    
+
     // Sync to backend if authenticated
     if (_apiService.isAuthenticated) {
       try {
@@ -560,7 +687,7 @@ class NotificationService {
     } else {
       debugPrint('User not authenticated - preferences saved locally only');
     }
-    
+
     // Not authenticated - local save is enough
     return true;
   }
@@ -578,7 +705,8 @@ class NotificationService {
         android: AndroidNotificationDetails(
           'high_importance_channel',
           'High Importance Notifications',
-          channelDescription: 'This channel is used for important notifications.',
+          channelDescription:
+              'This channel is used for important notifications.',
           importance: Importance.high,
           priority: Priority.high,
         ),

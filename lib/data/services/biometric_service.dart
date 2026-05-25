@@ -11,7 +11,8 @@ class BiometricService {
   final LocalAuthentication _localAuth = LocalAuthentication();
 
   static const String _keyBiometricLoginEnabled = 'biometric_login_enabled';
-  static const String _keyBiometricTransactionEnabled = 'biometric_transaction_enabled';
+  static const String _keyBiometricTransactionEnabled =
+      'biometric_transaction_enabled';
   static const String _keySavedEmail = 'biometric_saved_email';
   static const String _keySavedPassword = 'biometric_saved_password';
 
@@ -20,13 +21,15 @@ class BiometricService {
       final canCheckBiometrics = await _localAuth.canCheckBiometrics;
       final isDeviceSupported = await _localAuth.isDeviceSupported();
       final availableBiometrics = await _localAuth.getAvailableBiometrics();
-      
-      debugPrint('Biometric check: canCheckBiometrics=$canCheckBiometrics, isDeviceSupported=$isDeviceSupported');
+
+      debugPrint(
+        'Biometric check: canCheckBiometrics=$canCheckBiometrics, isDeviceSupported=$isDeviceSupported',
+      );
       debugPrint('Available biometrics: $availableBiometrics');
-      
+
       final canAuthenticate = canCheckBiometrics || isDeviceSupported;
       debugPrint('Final canAuthenticate: $canAuthenticate');
-      
+
       return canAuthenticate;
     } on PlatformException catch (e) {
       debugPrint('Biometric availability check failed: $e');
@@ -46,7 +49,9 @@ class BiometricService {
     }
   }
 
-  Future<bool> authenticate({String reason = 'Please authenticate to continue'}) async {
+  Future<bool> authenticate({
+    String reason = 'Please authenticate to continue',
+  }) async {
     try {
       final isAvailable = await isBiometricAvailable();
       if (!isAvailable) {
@@ -109,7 +114,7 @@ class BiometricService {
     final prefs = await SharedPreferences.getInstance();
     final email = prefs.getString(_keySavedEmail);
     final password = prefs.getString(_keySavedPassword);
-    
+
     if (email != null && password != null) {
       return {'email': email, 'password': password};
     }
@@ -127,14 +132,99 @@ class BiometricService {
     await prefs.remove(_keySavedPassword);
   }
 
+  /// Returns true if the device has fingerprint sensor enrolled
+  bool hasFingerprint(List<BiometricType> types) =>
+      types.contains(BiometricType.fingerprint) ||
+      types.contains(BiometricType.strong);
+
+  /// Returns true if the device has face recognition enrolled
+  bool hasFaceRecognition(List<BiometricType> types) =>
+      types.contains(BiometricType.face);
+
+  /// Returns true if the device has iris recognition enrolled
+  bool hasIris(List<BiometricType> types) => types.contains(BiometricType.iris);
+
+  /// Human-readable name for the primary biometric type available
   String getBiometricTypeName(List<BiometricType> types) {
-    if (types.contains(BiometricType.face)) {
-      return 'Face ID';
-    } else if (types.contains(BiometricType.fingerprint)) {
-      return 'Fingerprint';
-    } else if (types.contains(BiometricType.iris)) {
-      return 'Iris';
-    }
+    final hasface = hasFaceRecognition(types);
+    final hasfinger = hasFingerprint(types);
+
+    if (hasface && hasfinger) return 'Face ID / Fingerprint';
+    if (hasface) return 'Face ID';
+    if (hasfinger) return 'Fingerprint';
+    if (types.contains(BiometricType.iris)) return 'Iris';
     return 'Biometric';
+  }
+
+  /// Authenticate using only fingerprint (biometricOnly = true, no face)
+  Future<bool> authenticateFingerprint({
+    String reason = 'Place your finger to authenticate',
+  }) async {
+    try {
+      final isAvailable = await isBiometricAvailable();
+      if (!isAvailable) return false;
+
+      return await _localAuth.authenticate(
+        localizedReason: reason,
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: true,
+        ),
+      );
+    } on PlatformException catch (e) {
+      debugPrint('Fingerprint authentication failed: $e');
+      return false;
+    }
+  }
+
+  /// Authenticate using only face recognition
+  Future<bool> authenticateFace({
+    String reason = 'Look at your camera to authenticate',
+  }) async {
+    try {
+      final isAvailable = await isBiometricAvailable();
+      if (!isAvailable) return false;
+
+      // local_auth uses the OS biometric prompt — on Android it will use face
+      // if that's what's enrolled; on iOS it uses Face ID automatically.
+      return await _localAuth.authenticate(
+        localizedReason: reason,
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: true,
+        ),
+      );
+    } on PlatformException catch (e) {
+      debugPrint('Face authentication failed: $e');
+      return false;
+    }
+  }
+
+  // ── Preference keys for face recognition ──────────────────────────────────
+  static const String _keyFaceLoginEnabled = 'face_login_enabled';
+  static const String _keyFaceTransactionEnabled = 'face_transaction_enabled';
+
+  Future<bool> isFaceLoginEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyFaceLoginEnabled) ?? false;
+  }
+
+  Future<void> setFaceLoginEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyFaceLoginEnabled, enabled);
+    if (!enabled) {
+      await prefs.remove(_keySavedEmail);
+      await prefs.remove(_keySavedPassword);
+    }
+  }
+
+  Future<bool> isFaceTransactionEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyFaceTransactionEnabled) ?? false;
+  }
+
+  Future<void> setFaceTransactionEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyFaceTransactionEnabled, enabled);
   }
 }

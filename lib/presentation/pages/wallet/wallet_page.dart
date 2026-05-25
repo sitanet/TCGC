@@ -16,7 +16,8 @@ class WalletPage extends ConsumerStatefulWidget {
   ConsumerState<WalletPage> createState() => _WalletPageState();
 }
 
-class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObserver {
+class _WalletPageState extends ConsumerState<WalletPage>
+    with WidgetsBindingObserver {
   bool _needsPinSetup = false;
   bool _acceptedDataPolicy = false;
   bool _isAuthenticated = false;
@@ -53,7 +54,9 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Re-authenticate when app comes back to foreground only if not already authenticated
-    if (state == AppLifecycleState.resumed && _hasInitialized && !_isAuthenticated) {
+    if (state == AppLifecycleState.resumed &&
+        _hasInitialized &&
+        !_isAuthenticated) {
       _startAuthentication();
     }
     // Always refresh upgrade status on resume so tier updates are picked up
@@ -82,19 +85,19 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
     // Prevent multiple simultaneous authentication attempts
     if (_authenticationInProgress) return;
     _authenticationInProgress = true;
-    
+
     final walletProvider = ref.read(walletChangeNotifierProvider);
-    
+
     // Always fetch wallet from backend to ensure we have latest state
     await walletProvider.fetchWallet();
-    
+
     // If no wallet yet, no authentication needed
     if (!walletProvider.hasWallet) {
       _authenticationInProgress = false;
       setState(() => _isAuthenticated = true);
       return;
     }
-    
+
     // Check if PIN is set
     final hasPin = await walletProvider.checkHasPin();
     if (!hasPin) {
@@ -109,9 +112,11 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
     // Try biometric first
     final biometricProvider = ref.read(biometricChangeNotifierProvider);
     await biometricProvider.initialize();
-    
-    if (biometricProvider.biometricTransactionEnabled && biometricProvider.isAvailable) {
-      final authenticated = await biometricProvider.authenticateForTransaction();
+
+    if (biometricProvider.biometricTransactionEnabled &&
+        biometricProvider.isAvailable) {
+      final authenticated = await biometricProvider
+          .authenticateForTransaction();
       if (authenticated && mounted) {
         _authenticationInProgress = false;
         setState(() => _isAuthenticated = true);
@@ -133,160 +138,269 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
     final isDark = Theme.of(context).brightness == Brightness.dark;
     bool isVerifying = false;
 
-    showDialog<bool>(
+    showModalBottomSheet<bool>(
       context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) => PopScope(
+      isScrollControlled: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => PopScope(
         canPop: true,
         onPopInvokedWithResult: (didPop, result) {
           if (didPop && result != true) {
-            // Only go to home if user cancelled (result is null or false), not if PIN was verified (result is true)
             _authenticationInProgress = false;
             ref.read(mainTabIndexProvider.notifier).state = 0;
           }
         },
         child: StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
-              children: [
-                Icon(Icons.lock_outline, color: AppColors.primaryGold, size: 24),
-                const SizedBox(width: 8),
-                const Text('Enter Transaction PIN'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Enter your PIN to access wallet',
-                  style: TextStyle(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: pinController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 4,
-                  obscureText: true,
-                  autofocus: true,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    letterSpacing: 8,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: '••••',
-                    hintStyle: TextStyle(
-                      color: Colors.grey[400],
-                      letterSpacing: 8,
-                    ),
-                    counterText: '',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.primaryGold, width: 2),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                  ),
-                  onSubmitted: (_) async {
-                    if (pinController.text.isEmpty || isVerifying) return;
-                    setDialogState(() => isVerifying = true);
-                    
-                    final walletProvider = ref.read(walletChangeNotifierProvider);
-                    final isValid = await walletProvider.verifyPin(pinController.text);
+          builder: (context, setSheetState) {
+            final sheetBg = isDark ? AppColors.cardDark : Colors.white;
+            final labelColor = isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight;
+            final valueColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
 
-                    if (isValid && mounted) {
-                      _authenticationInProgress = false;
-                      Navigator.pop(dialogContext, true);
-                      setState(() => _isAuthenticated = true);
-                      _checkWalletStatus();
-                    } else if (mounted) {
-                      setDialogState(() => isVerifying = false);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(walletProvider.error ?? 'Invalid PIN'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  },
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: isVerifying ? null : () {
-                  _authenticationInProgress = false;
-                  Navigator.pop(dialogContext);
-                  ref.read(mainTabIndexProvider.notifier).state = 0;
-                },
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
-                ),
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-              ElevatedButton(
-                onPressed: isVerifying ? null : () async {
-                  if (pinController.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please enter your PIN')),
-                    );
-                    return;
-                  }
-                  
-                  if (pinController.text.length < 4) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('PIN must be at least 4 digits')),
-                    );
-                    return;
-                  }
-                  
-                  setDialogState(() => isVerifying = true);
-
-                  final walletProvider = ref.read(walletChangeNotifierProvider);
-                  final isValid = await walletProvider.verifyPin(pinController.text);
-
-                  if (isValid && mounted) {
-                    _authenticationInProgress = false;
-                    Navigator.pop(dialogContext, true);
-                    setState(() => _isAuthenticated = true);
-                    _checkWalletStatus();
-                  } else if (mounted) {
-                    setDialogState(() => isVerifying = false);
-                    pinController.clear();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(walletProvider.error ?? 'Invalid PIN'),
-                        backgroundColor: Colors.red,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: sheetBg,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // ── drag handle ──────────────────────────────────────
+                    const SizedBox(height: 12),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryGold,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                child: isVerifying
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                    const SizedBox(height: 4),
+
+                    // ── close button ─────────────────────────────────────
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.close,
+                          color: isDark ? Colors.white70 : Colors.black54,
                         ),
-                      )
-                    : const Text('Confirm', style: TextStyle(color: Colors.white)),
+                        onPressed: isVerifying
+                            ? null
+                            : () {
+                                _authenticationInProgress = false;
+                                Navigator.pop(sheetContext);
+                                ref.read(mainTabIndexProvider.notifier).state =
+                                    0;
+                              },
+                      ),
+                    ),
+
+                    // ── lock icon + title ─────────────────────────────────
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGold.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.lock_outline,
+                        color: AppColors.primaryGold,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Enter Transaction PIN',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: valueColor,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Enter your PIN to access wallet',
+                      style: TextStyle(fontSize: 14, color: labelColor),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // ── PIN field ─────────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: TextField(
+                        controller: pinController,
+                        keyboardType: TextInputType.number,
+                        maxLength: 4,
+                        obscureText: true,
+                        autofocus: true,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          letterSpacing: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '••••',
+                          hintStyle: TextStyle(
+                            color: Colors.grey[400],
+                            letterSpacing: 8,
+                          ),
+                          counterText: '',
+                          labelText: 'PIN',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.primaryGold,
+                              width: 2,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 16,
+                          ),
+                        ),
+                        onSubmitted: (_) async {
+                          if (pinController.text.isEmpty || isVerifying) return;
+                          if (pinController.text.length < 4) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('PIN must be at least 4 digits'),
+                              ),
+                            );
+                            return;
+                          }
+                          setSheetState(() => isVerifying = true);
+                          final walletProvider = ref.read(
+                            walletChangeNotifierProvider,
+                          );
+                          final isValid = await walletProvider.verifyPin(
+                            pinController.text,
+                          );
+                          if (isValid && mounted) {
+                            _authenticationInProgress = false;
+                            Navigator.pop(sheetContext, true);
+                            setState(() => _isAuthenticated = true);
+                            _checkWalletStatus();
+                          } else if (mounted) {
+                            setSheetState(() => isVerifying = false);
+                            pinController.clear();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  walletProvider.error ?? 'Invalid PIN',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Confirm button ────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 54,
+                        child: ElevatedButton(
+                          onPressed: isVerifying
+                              ? null
+                              : () async {
+                                  if (pinController.text.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Please enter your PIN'),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  if (pinController.text.length < 4) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'PIN must be at least 4 digits',
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  setSheetState(() => isVerifying = true);
+                                  final walletProvider = ref.read(
+                                    walletChangeNotifierProvider,
+                                  );
+                                  final isValid = await walletProvider
+                                      .verifyPin(pinController.text);
+                                  if (isValid && mounted) {
+                                    _authenticationInProgress = false;
+                                    Navigator.pop(sheetContext, true);
+                                    setState(() => _isAuthenticated = true);
+                                    _checkWalletStatus();
+                                  } else if (mounted) {
+                                    setSheetState(() => isVerifying = false);
+                                    pinController.clear();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          walletProvider.error ?? 'Invalid PIN',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryGold,
+                            disabledBackgroundColor: AppColors.primaryGold
+                                .withValues(alpha: 0.5),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: isVerifying
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : const Text(
+                                  'Confirm',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -294,7 +408,7 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
 
   Future<void> _checkWalletStatus() async {
     final walletProvider = ref.read(walletChangeNotifierProvider);
-    
+
     // If already initialized, just check PIN status without waiting
     if (walletProvider.isInitialized && walletProvider.hasWallet) {
       final hasPin = await walletProvider.checkHasPin();
@@ -305,10 +419,10 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
       walletProvider.fetchWallet();
       return;
     }
-    
+
     // First time - fetch wallet
     await walletProvider.fetchWallet();
-    
+
     // If wallet exists, check if PIN is set
     if (walletProvider.hasWallet) {
       final hasPin = await walletProvider.checkHasPin();
@@ -321,9 +435,7 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
   void _navigateToCreateWallet() {
     // Navigate to PIN setup first, then NIN verification
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const SetTransactionPinPage(),
-      ),
+      MaterialPageRoute(builder: (context) => const SetTransactionPinPage()),
     );
   }
 
@@ -342,11 +454,17 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: AppColors.primaryGold.withOpacity(0.1),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.privacy_tip_outlined, color: AppColors.primaryGold, size: 28),
+                    Icon(
+                      Icons.privacy_tip_outlined,
+                      color: AppColors.primaryGold,
+                      size: 28,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -456,7 +574,13 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text('Close', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -487,7 +611,9 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
             style: TextStyle(
               fontSize: 14,
               height: 1.5,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
         ],
@@ -498,20 +624,25 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
   @override
   Widget build(BuildContext context) {
     final walletProvider = ref.watch(walletChangeNotifierProvider);
-    
+
     // Watch tab index to detect when user navigates to wallet tab
     final currentTabIndex = ref.watch(mainTabIndexProvider);
-    
+
     // Check if tab changed and trigger re-authentication if needed (only if not already authenticated)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (currentTabIndex == 3 && _previousTabIndex != null && _previousTabIndex != 3 && _hasInitialized && !_isAuthenticated) {
+      if (currentTabIndex == 3 &&
+          _previousTabIndex != null &&
+          _previousTabIndex != 3 &&
+          _hasInitialized &&
+          !_isAuthenticated) {
         _startAuthentication();
       }
       _previousTabIndex = currentTabIndex;
     });
-    
+
     // Show loading while authenticating or loading wallet
-    if (!_isAuthenticated || (walletProvider.isLoading && !walletProvider.isInitialized)) {
+    if (!_isAuthenticated ||
+        (walletProvider.isLoading && !walletProvider.isInitialized)) {
       return Scaffold(
         appBar: CustomAppBar(
           title: '',
@@ -520,23 +651,21 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
           onBackPressed: _handleBackNavigation,
         ),
         body: const Center(
-          child: CircularProgressIndicator(
-            color: AppColors.primaryGold,
-          ),
+          child: CircularProgressIndicator(color: AppColors.primaryGold),
         ),
       );
     }
-    
+
     // If wallet exists but PIN not set, go to PIN setup
     if (walletProvider.hasWallet && _needsPinSetup) {
       return const SetTransactionPinPage();
     }
-    
+
     // If user has wallet with PIN, go to GivePage (wallet details)
     if (walletProvider.hasWallet) {
       return const GivePage();
     }
-    
+
     // If user doesn't have wallet, show welcome page
     return _buildWalletWelcomePage(context);
   }
@@ -544,7 +673,7 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
   Widget _buildDisabledPage(BuildContext context, String message) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final horizontalPadding = Responsive.horizontalPadding(context);
-    
+
     return Scaffold(
       appBar: CustomAppBar(
         title: 'Wallet',
@@ -584,7 +713,9 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
                 message,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                   height: 1.5,
                 ),
               ),
@@ -621,7 +752,7 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   SizedBox(height: spacing * 3),
-                  
+
                   // Wallet Icon
                   Container(
                     width: 120,
@@ -770,7 +901,9 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
                         child: Checkbox(
                           value: _acceptedDataPolicy,
                           onChanged: (value) {
-                            setState(() => _acceptedDataPolicy = value ?? false);
+                            setState(
+                              () => _acceptedDataPolicy = value ?? false,
+                            );
                           },
                           activeColor: AppColors.primaryGold,
                           shape: RoundedRectangleBorder(
@@ -785,7 +918,9 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
                             text: 'I agree to the ',
                             style: TextStyle(
                               fontSize: 13,
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
                             ),
                             children: [
                               TextSpan(
@@ -796,10 +931,14 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
                                   decoration: TextDecoration.underline,
                                 ),
                                 recognizer: TapGestureRecognizer()
-                                  ..onTap = () => _showDataProtectionPolicy(context, isDark),
+                                  ..onTap = () => _showDataProtectionPolicy(
+                                    context,
+                                    isDark,
+                                  ),
                               ),
                               const TextSpan(
-                                text: ' and consent to the processing of my personal data for wallet creation and identity verification.',
+                                text:
+                                    ' and consent to the processing of my personal data for wallet creation and identity verification.',
                               ),
                             ],
                           ),
@@ -814,7 +953,9 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: _acceptedDataPolicy ? _navigateToCreateWallet : null,
+                      onPressed: _acceptedDataPolicy
+                          ? _navigateToCreateWallet
+                          : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryGold,
                         foregroundColor: Colors.white,
@@ -865,11 +1006,7 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
               color: AppColors.primaryGold.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              icon,
-              color: AppColors.primaryGold,
-              size: 24,
-            ),
+            child: Icon(icon, color: AppColors.primaryGold, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -878,9 +1015,9 @@ class _WalletPageState extends ConsumerState<WalletPage> with WidgetsBindingObse
               children: [
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 4),
                 Text(

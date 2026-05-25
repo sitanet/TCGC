@@ -7,7 +7,7 @@ export '../../data/services/auth_service.dart' show KycResult;
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
-  
+
   AppUser? _user;
   bool _isLoading = false;
   String? _error;
@@ -25,16 +25,16 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> initialize() async {
     if (_isInitialized) return;
-    
+
     _isLoading = true;
     notifyListeners();
-    
+
     await _authService.loadSession();
-    
+
     if (_authService.isAuthenticated) {
       _user = await _authService.getProfile();
     }
-    
+
     _isLoading = false;
     _isInitialized = true;
     notifyListeners();
@@ -46,26 +46,28 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     final result = await _authService.login(email, password);
-    
-    print('[AUTH] Login result: success=${result.success}, error=${result.error}');
-    
+
+    print(
+      '[AUTH] Login result: success=${result.success}, error=${result.error}',
+    );
+
     if (result.success) {
       print('[AUTH] Login successful, fetching profile...');
       _user = await _authService.getProfile();
       _isLoading = false;
-      
+
       if (_user == null) {
         print('[AUTH] Failed to fetch profile');
         _error = 'Failed to load profile. Please try again.';
         notifyListeners();
         return false;
       }
-      
+
       print('[AUTH] Profile fetched: ${_user?.email}');
       notifyListeners();
       return true;
     }
-    
+
     print('[AUTH] Login failed: ${result.error}');
     _error = result.error;
     _isLoading = false;
@@ -90,7 +92,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     print('AuthProvider: Starting registration...');
-    
+
     final result = await _authService.register(
       email: email,
       username: username,
@@ -101,18 +103,22 @@ class AuthProvider extends ChangeNotifier {
       phoneNumber: phoneNumber,
       countryCode: countryCode,
     );
-    
-    print('AuthProvider: Registration result - success: ${result.success}, requiresEmailConfirmation: ${result.requiresEmailConfirmation}');
-    
+
+    print(
+      'AuthProvider: Registration result - success: ${result.success}, requiresEmailConfirmation: ${result.requiresEmailConfirmation}',
+    );
+
     if (result.success) {
       _requiresEmailConfirmation = result.requiresEmailConfirmation;
       _message = result.message;
       _isLoading = false;
-      print('AuthProvider: Setting _requiresEmailConfirmation=$_requiresEmailConfirmation, returning true');
+      print(
+        'AuthProvider: Setting _requiresEmailConfirmation=$_requiresEmailConfirmation, returning true',
+      );
       notifyListeners();
       return true;
     }
-    
+
     _error = result.error;
     _isLoading = false;
     print('AuthProvider: Registration failed with error: $_error');
@@ -126,7 +132,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     final result = await _authService.resendConfirmationEmail(email);
-    
+
     _isLoading = false;
     if (result.success) {
       _message = result.message;
@@ -143,20 +149,28 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Clear all user-related data on logout
+  void clearAllUserData() {
+    _user = null;
+    _error = null;
+    _message = null;
+    notifyListeners();
+  }
+
   Future<bool> deleteAccount() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     final result = await _authService.deleteAccount();
-    
+
     if (result.success) {
       _user = null;
       _isLoading = false;
       notifyListeners();
       return true;
     }
-    
+
     _error = result.error;
     _isLoading = false;
     notifyListeners();
@@ -169,14 +183,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     final result = await _authService.updateProfile(data);
-    
+
     if (result.success) {
       _user = await _authService.getProfile();
       _isLoading = false;
       notifyListeners();
       return true;
     }
-    
+
     _error = result.error;
     _isLoading = false;
     notifyListeners();
@@ -189,14 +203,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     final result = await _authService.uploadProfilePhoto(imageFile);
-    
+
     if (result.success) {
       _user = await _authService.getProfile();
       _isLoading = false;
       notifyListeners();
       return true;
     }
-    
+
     _error = result.error;
     _isLoading = false;
     notifyListeners();
@@ -209,7 +223,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     final result = await _authService.changePassword(oldPassword, newPassword);
-    
+
     _isLoading = false;
     if (!result.success) {
       _error = result.error;
@@ -220,9 +234,9 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> verifyPassword(String password) async {
     _error = null;
-    
+
     final result = await _authService.verifyPassword(password);
-    
+
     if (!result.success) {
       _error = result.error;
     }
@@ -236,7 +250,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     final result = await _authService.forgotPassword(email);
-    
+
     _isLoading = false;
     if (result.success) {
       _message = result.message;
@@ -266,7 +280,7 @@ class AuthProvider extends ChangeNotifier {
       name: name,
       category: category,
     );
-    
+
     _isLoading = false;
     if (result.success) {
       _message = result.message;
@@ -288,7 +302,8 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // KYC Verification Methods
-  Future<KycResult> verifyNin(String nin, {
+  Future<KycResult> verifyNin(
+    String nin, {
     String? phoneNumber,
     String? address,
     String? dateOfBirth,
@@ -305,7 +320,7 @@ class AuthProvider extends ChangeNotifier {
       dateOfBirth: dateOfBirth,
       updateProfile: updateProfile,
     );
-    
+
     _isLoading = false;
     if (result.success && updateProfile) {
       // Refresh user profile to get updated data
@@ -323,8 +338,11 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
-    final result = await _authService.verifyBvn(bvn, updateProfile: updateProfile);
-    
+    final result = await _authService.verifyBvn(
+      bvn,
+      updateProfile: updateProfile,
+    );
+
     _isLoading = false;
     if (result.success && updateProfile) {
       // Refresh user profile to get updated data
@@ -343,8 +361,29 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     final result = await _authService.validateIdentity(nin: nin, bvn: bvn);
-    
+
     _isLoading = false;
+    if (!result.success) {
+      _error = result.error;
+    }
+    notifyListeners();
+    return result;
+  }
+
+  Future<KycResult> confirmIdentity({required String confirmationToken}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    final result = await _authService.confirmIdentity(
+      confirmationToken: confirmationToken,
+    );
+
+    _isLoading = false;
+    if (result.success) {
+      // Refresh user profile to get updated data
+      _user = await _authService.getProfile();
+    }
     if (!result.success) {
       _error = result.error;
     }

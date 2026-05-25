@@ -47,7 +47,7 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
-  
+
   bool _isGeneratingReceipt = false;
 
   @override
@@ -88,11 +88,17 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
     );
 
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _scaleController, curve: const Interval(0.3, 1.0, curve: Curves.easeOut)),
+      CurvedAnimation(
+        parent: _scaleController,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
+      ),
     );
 
     _slideAnimation = Tween<double>(begin: 50, end: 0).animate(
-      CurvedAnimation(parent: _scaleController, curve: const Interval(0.3, 1.0, curve: Curves.easeOut)),
+      CurvedAnimation(
+        parent: _scaleController,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
+      ),
     );
 
     _startAnimations();
@@ -127,8 +133,18 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
     final smallFontSize = Responsive.smallFontSize(context);
     final borderRadius = Responsive.borderRadius(context);
     final buttonHeight = Responsive.buttonHeight(context);
-    final iconContainerSize = Responsive.value(context, mobile: 120.0, tablet: 140.0, desktop: 160.0);
-    final iconSize = Responsive.value(context, mobile: 60.0, tablet: 70.0, desktop: 80.0);
+    final iconContainerSize = Responsive.value(
+      context,
+      mobile: 120.0,
+      tablet: 140.0,
+      desktop: 160.0,
+    );
+    final iconSize = Responsive.value(
+      context,
+      mobile: 60.0,
+      tablet: 70.0,
+      desktop: 80.0,
+    );
 
     return PopScope(
       canPop: false,
@@ -182,7 +198,8 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                               AnimatedBuilder(
                                 animation: _pulseController,
                                 builder: (context, child) {
-                                  final pulse = 1.0 + (_pulseController.value * 0.1);
+                                  final pulse =
+                                      1.0 + (_pulseController.value * 0.1);
                                   return Transform.scale(
                                     scale: pulse,
                                     child: Container(
@@ -192,8 +209,12 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                                         shape: BoxShape.circle,
                                         gradient: RadialGradient(
                                           colors: [
-                                            AppColors.primaryGold.withOpacity(0.3),
-                                            AppColors.primaryGold.withOpacity(0.1),
+                                            AppColors.primaryGold.withOpacity(
+                                              0.3,
+                                            ),
+                                            AppColors.primaryGold.withOpacity(
+                                              0.1,
+                                            ),
                                             Colors.transparent,
                                           ],
                                           stops: const [0.0, 0.5, 1.0],
@@ -225,7 +246,9 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                                       offset: const Offset(0, 10),
                                     ),
                                     BoxShadow(
-                                      color: AppColors.primaryGold.withOpacity(0.2),
+                                      color: AppColors.primaryGold.withOpacity(
+                                        0.2,
+                                      ),
                                       blurRadius: 40,
                                       spreadRadius: 10,
                                     ),
@@ -237,7 +260,8 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                                     return Transform.scale(
                                       scale: _checkAnimation.value,
                                       child: Transform.rotate(
-                                        angle: (1 - _checkAnimation.value) * 0.5,
+                                        angle:
+                                            (1 - _checkAnimation.value) * 0.5,
                                         child: child,
                                       ),
                                     );
@@ -307,8 +331,12 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                             width: double.infinity,
                             padding: EdgeInsets.all(spacing * 1.5),
                             decoration: BoxDecoration(
-                              color: isDark ? AppColors.cardDark : Colors.grey[50],
-                              borderRadius: BorderRadius.circular(borderRadius * 1.5),
+                              color: isDark
+                                  ? AppColors.cardDark
+                                  : Colors.grey[50],
+                              borderRadius: BorderRadius.circular(
+                                borderRadius * 1.5,
+                              ),
                               border: Border.all(
                                 color: isDark
                                     ? AppColors.dividerDark
@@ -418,14 +446,20 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                             width: double.infinity,
                             height: buttonHeight,
                             child: ElevatedButton(
-                              onPressed: _isGeneratingReceipt ? null : () => _showReceiptOptions(context, isDark),
+                              onPressed: _isGeneratingReceipt
+                                  ? null
+                                  : () => _showReceiptOptions(context, isDark),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primaryGold,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(borderRadius),
+                                  borderRadius: BorderRadius.circular(
+                                    borderRadius,
+                                  ),
                                 ),
                                 elevation: 4,
-                                shadowColor: AppColors.primaryGold.withValues(alpha: 0.4),
+                                shadowColor: AppColors.primaryGold.withValues(
+                                  alpha: 0.4,
+                                ),
                               ),
                               child: _isGeneratingReceipt
                                   ? const SizedBox(
@@ -433,13 +467,20 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                                       height: 24,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
                                       ),
                                     )
                                   : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
-                                        const Icon(Icons.receipt_long_outlined, color: Colors.white),
+                                        const Icon(
+                                          Icons.receipt_long_outlined,
+                                          color: Colors.white,
+                                        ),
                                         const SizedBox(width: 8),
                                         Text(
                                           'Generate Receipt',
@@ -463,20 +504,32 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                             height: buttonHeight,
                             child: OutlinedButton(
                               onPressed: () {
-                                // Go back to wallet page (GivePage)
-                                Navigator.popUntil(context, (route) => route.isFirst);
-                                ref.read(mainTabIndexProvider.notifier).state = 3; // Wallet tab
+                                // Set wallet tab first, then pop all routes
+                                ref.read(mainTabIndexProvider.notifier).state =
+                                    3;
+                                Navigator.popUntil(
+                                  context,
+                                  (route) => route.isFirst,
+                                );
                               },
                               style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: AppColors.primaryGold, width: 1.5),
+                                side: BorderSide(
+                                  color: AppColors.primaryGold,
+                                  width: 1.5,
+                                ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(borderRadius),
+                                  borderRadius: BorderRadius.circular(
+                                    borderRadius,
+                                  ),
                                 ),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.account_balance_wallet_outlined, color: AppColors.primaryGold),
+                                  Icon(
+                                    Icons.account_balance_wallet_outlined,
+                                    color: AppColors.primaryGold,
+                                  ),
                                   const SizedBox(width: 8),
                                   Text(
                                     'Back to Wallet',
@@ -521,7 +574,9 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
           label,
           style: TextStyle(
             fontSize: smallFontSize,
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
           ),
         ),
         Text(
@@ -540,10 +595,22 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
 
   String _formatDate(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
-    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+    final hour = date.hour > 12
+        ? date.hour - 12
+        : (date.hour == 0 ? 12 : date.hour);
     final amPm = date.hour >= 12 ? 'PM' : 'AM';
     return '${date.day} ${months[date.month - 1]}, ${date.year} at $hour:${date.minute.toString().padLeft(2, '0')} $amPm';
   }
@@ -551,7 +618,7 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
   void _showReceiptOptions(BuildContext context, bool isDark) {
     final spacing = Responsive.verticalSpacing(context);
     final bodyFontSize = Responsive.bodyFontSize(context);
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -586,7 +653,9 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
               'Choose format to generate and share',
               style: TextStyle(
                 fontSize: bodyFontSize * 0.9,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
             SizedBox(height: spacing * 2),
@@ -602,7 +671,10 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                   color: AppColors.primaryGold.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.image_outlined, color: AppColors.primaryGold),
+                child: const Icon(
+                  Icons.image_outlined,
+                  color: AppColors.primaryGold,
+                ),
               ),
               title: Text(
                 'Image (PNG)',
@@ -615,10 +687,15 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                 'Best for sharing on social media',
                 style: TextStyle(
                   fontSize: bodyFontSize * 0.8,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
               ),
-              trailing: const Icon(Icons.chevron_right, color: AppColors.primaryGold),
+              trailing: const Icon(
+                Icons.chevron_right,
+                color: AppColors.primaryGold,
+              ),
             ),
             const SizedBox(height: 8),
             // PDF Option
@@ -633,7 +710,10 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                   color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.picture_as_pdf_outlined, color: Colors.red),
+                child: const Icon(
+                  Icons.picture_as_pdf_outlined,
+                  color: Colors.red,
+                ),
               ),
               title: Text(
                 'PDF Document',
@@ -646,7 +726,9 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                 'Best for printing or email',
                 style: TextStyle(
                   fontSize: bodyFontSize * 0.8,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
               ),
               trailing: const Icon(Icons.chevron_right, color: Colors.red),
@@ -658,9 +740,12 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
     );
   }
 
-  Future<void> _generateAndShareReceipt(BuildContext context, String format) async {
+  Future<void> _generateAndShareReceipt(
+    BuildContext context,
+    String format,
+  ) async {
     setState(() => _isGeneratingReceipt = true);
-    
+
     try {
       if (format == 'image') {
         await _generateImageReceipt(context);
@@ -685,10 +770,10 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
 
   Future<void> _generateImageReceipt(BuildContext context) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     // Create a receipt widget to capture
     final receiptWidget = _buildReceiptWidget(isDark);
-    
+
     // Show the receipt in a dialog and capture it
     final Uint8List? imageBytes = await showDialog<Uint8List>(
       context: context,
@@ -698,14 +783,15 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
         onCaptured: (bytes) => Navigator.pop(dialogContext, bytes),
       ),
     );
-    
+
     if (imageBytes != null && mounted) {
       // Save to temp file and share
       final tempDir = await getTemporaryDirectory();
-      final fileName = 'TCGC_Receipt_${DateTime.now().millisecondsSinceEpoch}.png';
+      final fileName =
+          'TCGC_Receipt_${DateTime.now().millisecondsSinceEpoch}.png';
       final file = File('${tempDir.path}/$fileName');
       await file.writeAsBytes(imageBytes);
-      
+
       await Share.shareXFiles(
         [XFile(file.path)],
         text: 'My ${widget.title} receipt from The CityGate Church',
@@ -719,7 +805,8 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
     final goldColor = PdfColor.fromHex('#D4AF37');
     final successColor = PdfColor.fromHex('#4CAF50');
     final lightGold = PdfColor.fromHex('#FFF8E1');
-    final receiptNumber = widget.reference ??
+    final receiptNumber =
+        widget.reference ??
         'TCGC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
 
     pdf.addPage(
@@ -733,40 +820,74 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
               // Header
               pw.Container(
                 width: double.infinity,
-                padding: const pw.EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                padding: const pw.EdgeInsets.symmetric(
+                  vertical: 24,
+                  horizontal: 20,
+                ),
                 decoration: pw.BoxDecoration(
                   color: goldColor,
                   borderRadius: pw.BorderRadius.circular(8),
                 ),
                 child: pw.Column(
                   children: [
-                    pw.Text('THE CITYGATE CHURCH',
-                        style: pw.TextStyle(
-                            fontSize: 22, fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.white, letterSpacing: 2)),
+                    pw.Text(
+                      'THE CITYGATE CHURCH',
+                      style: pw.TextStyle(
+                        fontSize: 22,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                        letterSpacing: 2,
+                      ),
+                    ),
                     pw.SizedBox(height: 6),
-                    pw.Text('Apostolic Kingdom Ministry',
-                        style: const pw.TextStyle(fontSize: 12, color: PdfColors.white)),
+                    pw.Text(
+                      'Apostolic Kingdom Ministry',
+                      style: const pw.TextStyle(
+                        fontSize: 12,
+                        color: PdfColors.white,
+                      ),
+                    ),
                     pw.SizedBox(height: 4),
-                    pw.Text('www.thecitygatechurch.org',
-                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.white)),
+                    pw.Text(
+                      'www.thecitygatechurch.org',
+                      style: const pw.TextStyle(
+                        fontSize: 10,
+                        color: PdfColors.white,
+                      ),
+                    ),
                   ],
                 ),
               ),
               pw.SizedBox(height: 24),
 
               // Title + badge
-              pw.Text('OFFICIAL DONATION RECEIPT',
-                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.grey800, letterSpacing: 2)),
+              pw.Text(
+                'OFFICIAL DONATION RECEIPT',
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.grey800,
+                  letterSpacing: 2,
+                ),
+              ),
               pw.SizedBox(height: 12),
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
                 decoration: pw.BoxDecoration(
-                    color: successColor, borderRadius: pw.BorderRadius.circular(20)),
-                child: pw.Text('PAYMENT SUCCESSFUL',
-                    style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.white)),
+                  color: successColor,
+                  borderRadius: pw.BorderRadius.circular(20),
+                ),
+                child: pw.Text(
+                  'PAYMENT SUCCESSFUL',
+                  style: pw.TextStyle(
+                    fontSize: 11,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.white,
+                  ),
+                ),
               ),
               pw.SizedBox(height: 24),
 
@@ -781,29 +902,52 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                 ),
                 child: pw.Column(
                   children: [
-                    pw.Text('AMOUNT DONATED',
-                        style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey600)),
+                    pw.Text(
+                      'AMOUNT DONATED',
+                      style: const pw.TextStyle(
+                        fontSize: 11,
+                        color: PdfColors.grey600,
+                      ),
+                    ),
                     pw.SizedBox(height: 6),
-                    pw.Text('NGN ${widget.amount}',
-                        style: pw.TextStyle(fontSize: 36, fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.grey900)),
+                    pw.Text(
+                      'NGN ${widget.amount}',
+                      style: pw.TextStyle(
+                        fontSize: 36,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.grey900,
+                      ),
+                    ),
                     pw.SizedBox(height: 4),
-                    pw.Text(widget.title,
-                        style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold,
-                            color: goldColor)),
+                    pw.Text(
+                      widget.title,
+                      style: pw.TextStyle(
+                        fontSize: 14,
+                        fontWeight: pw.FontWeight.bold,
+                        color: goldColor,
+                      ),
+                    ),
                   ],
                 ),
               ),
               pw.SizedBox(height: 28),
 
               // Divider
-              pw.Container(width: double.infinity, height: 1, color: PdfColors.grey300),
+              pw.Container(
+                width: double.infinity,
+                height: 1,
+                color: PdfColors.grey300,
+              ),
               pw.SizedBox(height: 20),
 
               // Details table
               _buildPdfDetailRow('Receipt No.', receiptNumber, goldColor),
               pw.SizedBox(height: 12),
-              _buildPdfDetailRow('Date & Time', _formatDate(DateTime.now()), goldColor),
+              _buildPdfDetailRow(
+                'Date & Time',
+                _formatDate(DateTime.now()),
+                goldColor,
+              ),
               pw.SizedBox(height: 12),
               _buildPdfDetailRow('Giving Type', widget.title, goldColor),
               pw.SizedBox(height: 12),
@@ -814,20 +958,36 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
               ],
               if (widget.accountNumber != null) ...[
                 pw.SizedBox(height: 12),
-                _buildPdfDetailRow('Wallet Number', widget.accountNumber!, goldColor),
+                _buildPdfDetailRow(
+                  'Wallet Number',
+                  widget.accountNumber!,
+                  goldColor,
+                ),
               ],
               if (widget.accountName != null) ...[
                 pw.SizedBox(height: 12),
-                _buildPdfDetailRow('Account Name', widget.accountName!, goldColor),
+                _buildPdfDetailRow(
+                  'Account Name',
+                  widget.accountName!,
+                  goldColor,
+                ),
               ],
               if (widget.reference != null) ...[
                 pw.SizedBox(height: 12),
-                _buildPdfDetailRow('Transaction Ref', widget.reference!, goldColor),
+                _buildPdfDetailRow(
+                  'Transaction Ref',
+                  widget.reference!,
+                  goldColor,
+                ),
               ],
               pw.SizedBox(height: 20),
 
               // Divider
-              pw.Container(width: double.infinity, height: 1, color: PdfColors.grey300),
+              pw.Container(
+                width: double.infinity,
+                height: 1,
+                color: PdfColors.grey300,
+              ),
               pw.SizedBox(height: 20),
 
               // Scripture
@@ -842,32 +1002,52 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                   children: [
                     pw.Text(
                       '"Give, and it will be given to you. A good measure, pressed down, shaken together and running over, will be poured into your lap."',
-                      style: pw.TextStyle(fontSize: 11, fontStyle: pw.FontStyle.italic,
-                          color: PdfColors.grey700),
+                      style: pw.TextStyle(
+                        fontSize: 11,
+                        fontStyle: pw.FontStyle.italic,
+                        color: PdfColors.grey700,
+                      ),
                       textAlign: pw.TextAlign.center,
                     ),
                     pw.SizedBox(height: 6),
-                    pw.Text('- Luke 6:38',
-                        style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold,
-                            color: goldColor)),
+                    pw.Text(
+                      '- Luke 6:38',
+                      style: pw.TextStyle(
+                        fontSize: 11,
+                        fontWeight: pw.FontWeight.bold,
+                        color: goldColor,
+                      ),
+                    ),
                   ],
                 ),
               ),
               pw.SizedBox(height: 20),
 
-              pw.Text('Thank you for your generosity! God bless you abundantly.',
-                  style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.grey700)),
+              pw.Text(
+                'Thank you for your generosity! God bless you abundantly.',
+                style: pw.TextStyle(
+                  fontSize: 13,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.grey700,
+                ),
+              ),
               pw.Spacer(),
 
               // Footer
-              pw.Container(width: double.infinity, height: 1, color: PdfColors.grey300),
+              pw.Container(
+                width: double.infinity,
+                height: 1,
+                color: PdfColors.grey300,
+              ),
               pw.SizedBox(height: 8),
               pw.Text(
                 'This is an official receipt from The CityGate Church. '
                 'Wallet services powered by 9 Payment Service Bank (9PSB). '
                 'Generated: ${DateTime.now().toString().substring(0, 19)}',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey500),
+                style: const pw.TextStyle(
+                  fontSize: 8,
+                  color: PdfColors.grey500,
+                ),
                 textAlign: pw.TextAlign.center,
               ),
             ],
@@ -877,7 +1057,8 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
     );
 
     final tempDir = await getTemporaryDirectory();
-    final fileName = 'TCGC_Receipt_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final fileName =
+        'TCGC_Receipt_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File('${tempDir.path}/$fileName');
     await file.writeAsBytes(await pdf.save());
 
@@ -892,20 +1073,29 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
-        pw.Text(label,
-            style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey600)),
+        pw.Text(
+          label,
+          style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey600),
+        ),
         pw.Flexible(
-          child: pw.Text(value,
-              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.grey800),
-              textAlign: pw.TextAlign.right),
+          child: pw.Text(
+            value,
+            style: pw.TextStyle(
+              fontSize: 12,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.grey800,
+            ),
+            textAlign: pw.TextAlign.right,
+          ),
         ),
       ],
     );
   }
 
   Widget _buildReceiptWidget(bool isDark) {
-    final receiptNumber = widget.reference ?? 'TCGC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+    final receiptNumber =
+        widget.reference ??
+        'TCGC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
     return Container(
       width: 350,
       padding: const EdgeInsets.all(0),
@@ -961,22 +1151,30 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
               children: [
                 // Success badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
+                    border: Border.all(
+                      color: Colors.green.withValues(alpha: 0.4),
+                    ),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.check_circle, color: Colors.green, size: 16),
                       SizedBox(width: 6),
-                      Text('PAYMENT SUCCESSFUL',
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green)),
+                      Text(
+                        'PAYMENT SUCCESSFUL',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1047,19 +1245,23 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
-                Text('- Luke 6:38',
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[500])),
+                Text(
+                  '- Luke 6:38',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[500],
+                  ),
+                ),
                 const SizedBox(height: 16),
 
                 Text(
                   'Thank you for your generosity! God bless you.',
                   style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[700]),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[700],
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
@@ -1080,13 +1282,7 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey[500],
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: 13, color: Colors.grey[500])),
         Flexible(
           child: Text(
             value,
@@ -1109,7 +1305,8 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
         animation: _confettiController,
         builder: (context, child) {
           final delay = index * 0.15;
-          final progress = ((_confettiController.value - delay) / (1 - delay)).clamp(0.0, 1.0);
+          final progress = ((_confettiController.value - delay) / (1 - delay))
+              .clamp(0.0, 1.0);
           final scale = 1.0 + progress * 0.6;
           final opacity = (0.6 - progress * 0.6).clamp(0.0, 0.6);
           return Transform.scale(
@@ -1163,7 +1360,9 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
         final y = startY + math.sin(angle) * speed * progress * 0.5 + gravity;
 
         final fadeStart = 0.6;
-        final opacity = progress < fadeStart ? 1.0 : (1 - (progress - fadeStart) / (1 - fadeStart)).clamp(0.0, 1.0);
+        final opacity = progress < fadeStart
+            ? 1.0
+            : (1 - (progress - fadeStart) / (1 - fadeStart)).clamp(0.0, 1.0);
         final rotation = progress * rotationSpeed;
 
         if (y > screenHeight || x < -50 || x > screenWidth + 50) {
@@ -1182,7 +1381,9 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
                 height: size * (index % 3 == 0 ? 1.5 : 1),
                 decoration: BoxDecoration(
                   color: colors[index % colors.length],
-                  borderRadius: BorderRadius.circular(index % 3 == 0 ? 1 : size / 2),
+                  borderRadius: BorderRadius.circular(
+                    index % 3 == 0 ? 1 : size / 2,
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: colors[index % colors.length].withOpacity(0.5),
@@ -1198,7 +1399,6 @@ class _SuccessPageState extends ConsumerState<SuccessPage>
     );
   }
 }
-
 
 class _ReceiptCaptureDialog extends StatefulWidget {
   final Widget receiptWidget;
@@ -1224,9 +1424,11 @@ class _ReceiptCaptureDialogState extends State<_ReceiptCaptureDialog> {
 
   Future<void> _captureReceipt() async {
     await Future.delayed(const Duration(milliseconds: 100));
-    
+
     try {
-      final boundary = _captureKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      final boundary =
+          _captureKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
       if (boundary != null) {
         final image = await boundary.toImage(pixelRatio: 3.0);
         final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -1238,7 +1440,7 @@ class _ReceiptCaptureDialogState extends State<_ReceiptCaptureDialog> {
     } catch (e) {
       debugPrint('Error capturing receipt: $e');
     }
-    
+
     if (mounted) {
       Navigator.pop(context);
     }
@@ -1251,10 +1453,7 @@ class _ReceiptCaptureDialogState extends State<_ReceiptCaptureDialog> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          RepaintBoundary(
-            key: _captureKey,
-            child: widget.receiptWidget,
-          ),
+          RepaintBoundary(key: _captureKey, child: widget.receiptWidget),
           const SizedBox(height: 16),
           const CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),

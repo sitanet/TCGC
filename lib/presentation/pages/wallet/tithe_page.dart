@@ -152,403 +152,826 @@ class _TithePageState extends ConsumerState<TithePage> {
     final pinController = TextEditingController();
     final confirmPinController = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    bool isSetting = false;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-        title: const Text('Set Transaction PIN'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'You need to set a transaction PIN before making payments.',
+      isScrollControlled: true,
+      isDismissible: false,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final sheetBg = isDark ? AppColors.cardDark : Colors.white;
+          final labelColor = isDark
+              ? AppColors.textSecondaryDark
+              : AppColors.textSecondaryLight;
+          final valueColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: pinController,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Enter PIN (4-6 digits)',
-                counterText: '',
+            child: Container(
+              decoration: BoxDecoration(
+                color: sheetBg,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── drag handle ────────────────────────────────────────
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+
+                  // ── close button ───────────────────────────────────────
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.close,
+                        color: isDark ? Colors.white70 : Colors.black54,
+                      ),
+                      onPressed: isSetting
+                          ? null
+                          : () => Navigator.pop(sheetContext),
+                    ),
+                  ),
+
+                  // ── icon + title ───────────────────────────────────────
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGold.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.lock_outline,
+                      color: AppColors.primaryGold,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Set Transaction PIN',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: valueColor,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'You need a PIN before making payments.',
+                    style: TextStyle(fontSize: 14, color: labelColor),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── PIN fields ─────────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: TextField(
+                      controller: pinController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      obscureText: true,
+                      autofocus: true,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        letterSpacing: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '••••',
+                        hintStyle: TextStyle(
+                          color: Colors.grey[400],
+                          letterSpacing: 8,
+                        ),
+                        counterText: '',
+                        labelText: 'Enter PIN (4-6 digits)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.primaryGold,
+                            width: 2,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: TextField(
+                      controller: confirmPinController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      obscureText: true,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        letterSpacing: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '••••',
+                        hintStyle: TextStyle(
+                          color: Colors.grey[400],
+                          letterSpacing: 8,
+                        ),
+                        counterText: '',
+                        labelText: 'Confirm PIN',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.primaryGold,
+                            width: 2,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Set PIN button ─────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: isSetting
+                            ? null
+                            : () async {
+                                if (pinController.text.length < 4) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'PIN must be at least 4 digits',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                if (pinController.text !=
+                                    confirmPinController.text) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('PINs do not match'),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                setSheetState(() => isSetting = true);
+                                final walletProvider = ref.read(
+                                  walletChangeNotifierProvider,
+                                );
+                                final success = await walletProvider
+                                    .setTransactionPin(
+                                      pinController.text,
+                                      confirmPinController.text,
+                                    );
+                                if (success && mounted) {
+                                  Navigator.pop(sheetContext);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('PIN set successfully'),
+                                    ),
+                                  );
+                                } else if (mounted) {
+                                  setSheetState(() => isSetting = false);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        walletProvider.error ??
+                                            'Failed to set PIN',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryGold,
+                          disabledBackgroundColor: AppColors.primaryGold
+                              .withValues(alpha: 0.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: isSetting
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Text(
+                                'Set PIN',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: confirmPinController,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Confirm PIN',
-                counterText: '',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (pinController.text.length < 4) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('PIN must be at least 4 digits'),
-                  ),
-                );
-                return;
-              }
-              if (pinController.text != confirmPinController.text) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('PINs do not match')),
-                );
-                return;
-              }
-
-              final walletProvider = ref.read(walletChangeNotifierProvider);
-              final success = await walletProvider.setTransactionPin(
-                pinController.text,
-                confirmPinController.text,
-              );
-
-              if (success && mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('PIN set successfully')),
-                );
-              } else if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(walletProvider.error ?? 'Failed to set PIN'),
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryGold,
-            ),
-            child: const Text('Set PIN', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
+  // ── Sheet 1: Confirmation (no PIN) ─────────────────────────────────────────
   void _showPinDialog(double amountValue) {
-    final pinController = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final walletProvider = ref.read(walletChangeNotifierProvider);
-    bool isProcessing = false;
     final fees = _getFees(amountValue);
     final fee = fees['totalFee']!;
     final total = amountValue + fee;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.lock_outline, color: AppColors.primaryGold, size: 24),
-              const SizedBox(width: 8),
-              const Expanded(child: Text('Confirm Payment')),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+      isScrollControlled: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final sheetBg = isDark ? AppColors.cardDark : Colors.white;
+        final labelColor = isDark
+            ? AppColors.textSecondaryDark
+            : AppColors.textSecondaryLight;
+        final valueColor = isDark ? Colors.white : AppColors.textPrimaryLight;
+        final cardBg = isDark
+            ? AppColors.backgroundDark
+            : const Color(0xFFF7F7F7);
+        final dividerColor = isDark
+            ? AppColors.dividerDark
+            : AppColors.dividerLight;
+
+        Widget infoRow(String label, Widget valueWidget) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Transaction details
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.backgroundDark
-                        : const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Transaction Details',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
-                          color: AppColors.primaryGold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _detailRow(
-                        'From',
-                        walletProvider.accountName ?? 'Your Wallet',
-                        isDark,
-                      ),
-                      const SizedBox(height: 8),
-                      _detailRow(
-                        'Account No.',
-                        walletProvider.accountNumber ?? 'N/A',
-                        isDark,
-                      ),
-                      const SizedBox(height: 8),
-                      _detailRow('Bank', '9 Payment Service Bank', isDark),
-                      Divider(
-                        height: 20,
-                        color: isDark
-                            ? AppColors.dividerDark
-                            : AppColors.dividerLight,
-                      ),
-                      _detailRow(
-                        'To',
-                        'The CityGate Apostolic Kingdom Ministry',
-                        isDark,
-                      ),
-                      const SizedBox(height: 8),
-                      _detailRow('Purpose', widget.title, isDark),
-                    ],
+                SizedBox(
+                  width: 100,
+                  child: Text(
+                    label,
+                    style: TextStyle(fontSize: 14, color: labelColor),
                   ),
                 ),
-                const SizedBox(height: 12),
-                // Amount breakdown
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryGold.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.primaryGold.withOpacity(0.25),
-                    ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: valueWidget,
                   ),
-                  child: Column(
-                    children: [
-                      _feeRow('Giving amount', '₦${_fmt(amountValue)}', isDark),
-                      const SizedBox(height: 6),
-                      // Transaction fee = 9PSB fee + stamp duty + partner/service fee
-                      _feeRow(
-                        'Transaction fee',
-                        '~₦${_fmt(fees['psbFee']! + fees['stampDuty']! + fees['partnerFee']!)}',
-                        isDark,
-                        isSubtle: true,
-                      ),
-                      const SizedBox(height: 4),
-                      if (fees['vat']! > 0)
-                        _feeRow(
-                          'VAT',
-                          '~₦${_fmt(fees['vat']!)}',
-                          isDark,
-                          isSubtle: true,
-                        ),
-                      Divider(
-                        height: 16,
-                        color: AppColors.primaryGold.withOpacity(0.3),
-                      ),
-                      _feeRow(
-                        'Est. total deducted',
-                        '~₦${_fmt(total)}',
-                        isDark,
-                        isBold: true,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // PIN field
-                TextField(
-                  controller: pinController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  obscureText: true,
-                  autofocus: true,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    letterSpacing: 8,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: '••••',
-                    hintStyle: TextStyle(
-                      color: Colors.grey[400],
-                      letterSpacing: 8,
-                    ),
-                    counterText: '',
-                    labelText: 'Enter Transaction PIN',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: AppColors.primaryGold,
-                        width: 2,
-                      ),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 16,
-                    ),
-                  ),
-                  onSubmitted: (_) async {
-                    if (pinController.text.isEmpty || isProcessing) return;
-                    if (pinController.text.length < 4) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('PIN must be at least 4 digits'),
-                        ),
-                      );
-                      return;
-                    }
-                    setDialogState(() => isProcessing = true);
-                    Navigator.pop(dialogContext);
-                    await _executePayment(amountValue, pinController.text);
-                  },
                 ),
               ],
             ),
+          );
+        }
+
+        Widget divider() => Divider(height: 1, color: dividerColor);
+
+        return Container(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          actions: [
-            TextButton(
-              onPressed: isProcessing
-                  ? null
-                  : () => Navigator.pop(dialogContext),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── drag handle ────────────────────────────────────────────
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.dividerDark
+                      : AppColors.dividerLight,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ),
-            ElevatedButton(
-              onPressed: isProcessing
-                  ? null
-                  : () async {
-                      if (pinController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please enter your PIN'),
-                          ),
-                        );
-                        return;
-                      }
-                      if (pinController.text.length < 4) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('PIN must be at least 4 digits'),
-                          ),
-                        );
-                        return;
-                      }
-                      setDialogState(() => isProcessing = true);
-                      Navigator.pop(dialogContext);
-                      await _executePayment(amountValue, pinController.text);
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGold,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-              ),
-              child: isProcessing
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              const SizedBox(height: 4),
+
+              // ── header row: close + title ──────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.close,
+                        color: isDark
+                            ? Colors.white70
+                            : AppColors.textSecondaryLight,
                       ),
-                    )
-                  : const Text(
-                      'Pay Now',
-                      style: TextStyle(color: Colors.white),
+                      onPressed: () => Navigator.pop(sheetContext),
                     ),
+                    const Spacer(),
+                  ],
+                ),
+              ),
+
+              // ── total amount ───────────────────────────────────────────
+              Text(
+                '₦${_fmt(amountValue)}',
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w800,
+                  color: valueColor,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  widget.title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryGold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── details card ───────────────────────────────────────────
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    infoRow(
+                      'To',
+                      Row(
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: const BoxDecoration(
+                              color: AppColors.primaryGold,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.church,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              walletProvider.churchName ?? 'CityGate Church',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: valueColor,
+                              ),
+                              softWrap: true,
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    divider(),
+                    infoRow(
+                      'Purpose',
+                      Text(
+                        widget.title,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: valueColor,
+                        ),
+                      ),
+                    ),
+                    if (walletProvider.churchAccountNumber != null) ...[
+                      divider(),
+                      infoRow(
+                        'Account No.',
+                        Text(
+                          walletProvider.churchAccountNumber!,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: valueColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (walletProvider.churchAccountName != null) ...[
+                      divider(),
+                      infoRow(
+                        'Account Name',
+                        Text(
+                          walletProvider.churchAccountName!,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: valueColor,
+                          ),
+                          softWrap: true,
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                    ],
+                    divider(),
+                    infoRow(
+                      'Amount',
+                      Text(
+                        '₦${_fmt(amountValue)}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: valueColor,
+                        ),
+                      ),
+                    ),
+                    divider(),
+                    infoRow(
+                      'Fee',
+                      Text(
+                        '₦${_fmt(fee)}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: valueColor,
+                        ),
+                      ),
+                    ),
+                    if (fees['vat']! > 0) ...[
+                      divider(),
+                      infoRow(
+                        'VAT',
+                        Text(
+                          '₦${_fmt(fees['vat']!)}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: valueColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                    divider(),
+                    infoRow(
+                      'Total',
+                      Text(
+                        '₦${_fmt(total)}',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryGold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── payment method / balance row ───────────────────────────
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.success.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Wallet Balance',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: valueColor,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '₦${_fmt(walletProvider.balance)}  →  ₦${_fmt(walletProvider.balance - total)} after',
+                            style: TextStyle(fontSize: 12, color: labelColor),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.check_circle,
+                      color: AppColors.success,
+                      size: 22,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Pay button ─────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      _showPinEntrySheet(amountValue);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGold,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Pay',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Sheet 2: PIN entry ───────────────────────────────────────────────────────
+  void _showPinEntrySheet(double amountValue) {
+    final pinController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    bool isProcessing = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final sheetBg = isDark ? AppColors.cardDark : Colors.white;
+          final labelColor = isDark
+              ? AppColors.textSecondaryDark
+              : AppColors.textSecondaryLight;
+          final valueColor = isDark ? Colors.white : AppColors.textPrimaryLight;
+
+          Future<void> submit() async {
+            if (pinController.text.isEmpty || isProcessing) return;
+            if (pinController.text.length < 4) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('PIN must be at least 4 digits')),
+              );
+              return;
+            }
+            setSheetState(() => isProcessing = true);
+            Navigator.pop(sheetContext);
+            await _executePayment(amountValue, pinController.text);
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
             ),
-          ],
-        ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: sheetBg,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── drag handle ──────────────────────────────────────────
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppColors.dividerDark
+                          : AppColors.dividerLight,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+
+                  // ── close button ─────────────────────────────────────────
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.close,
+                        color: isDark
+                            ? Colors.white70
+                            : AppColors.textSecondaryLight,
+                      ),
+                      onPressed: isProcessing
+                          ? null
+                          : () => Navigator.pop(sheetContext),
+                    ),
+                  ),
+
+                  // ── lock icon ────────────────────────────────────────────
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGold.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.lock_outline,
+                      color: AppColors.primaryGold,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Enter Transaction PIN',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: valueColor,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Confirm your payment with your PIN',
+                    style: TextStyle(fontSize: 14, color: labelColor),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // ── PIN field ────────────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: TextField(
+                      controller: pinController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      obscureText: true,
+                      autofocus: true,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 28,
+                        letterSpacing: 12,
+                        fontWeight: FontWeight.bold,
+                        color: valueColor,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '\u2022\u2022\u2022\u2022',
+                        hintStyle: TextStyle(
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                          letterSpacing: 10,
+                          fontSize: 22,
+                        ),
+                        counterText: '',
+                        filled: true,
+                        fillColor: isDark
+                            ? AppColors.backgroundDark
+                            : const Color(0xFFF7F7F7),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: AppColors.primaryGold,
+                            width: 2,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 18,
+                          horizontal: 16,
+                        ),
+                      ),
+                      onSubmitted: (_) => submit(),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Confirm button ───────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: isProcessing ? null : submit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryGold,
+                          disabledBackgroundColor: AppColors.primaryGold
+                              .withValues(alpha: 0.5),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: isProcessing
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Text(
+                                'Confirm Payment',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          );
+        },
       ),
-    );
-  }
-
-  Widget _detailRow(String label, String value, bool isDark) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 90,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _feeRow(
-    String label,
-    String value,
-    bool isDark, {
-    bool isSubtle = false,
-    bool isBold = false,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isSubtle ? 12 : 13,
-            color: isSubtle
-                ? (isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight)
-                : (isDark ? Colors.white : Colors.black87),
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: isBold ? 15 : 13,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
-            color: isBold
-                ? AppColors.primaryGold
-                : (isDark ? Colors.white : Colors.black87),
-          ),
-        ),
-      ],
     );
   }
 

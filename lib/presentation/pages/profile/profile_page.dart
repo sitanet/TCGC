@@ -19,12 +19,16 @@ class ProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
-  Future<void> _authenticateAndNavigateToEditProfile(BuildContext context, bool isDark) async {
+  Future<void> _authenticateAndNavigateToEditProfile(
+    BuildContext context,
+    bool isDark,
+  ) async {
     final biometricProvider = ref.read(biometricChangeNotifierProvider);
     await biometricProvider.initialize();
 
     // Try biometric first if enabled
-    if (biometricProvider.biometricLoginEnabled && biometricProvider.isAvailable) {
+    if (biometricProvider.biometricLoginEnabled &&
+        biometricProvider.isAvailable) {
       final authenticated = await biometricProvider.authenticate(
         reason: 'Authenticate to edit your profile',
       );
@@ -82,7 +86,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   : () async {
                       if (passwordController.text.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please enter your password')),
+                          const SnackBar(
+                            content: Text('Please enter your password'),
+                          ),
                         );
                         return;
                       }
@@ -90,7 +96,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       setDialogState(() => isLoading = true);
 
                       final authProvider = ref.read(authChangeNotifierProvider);
-                      final isValid = await authProvider.verifyPassword(passwordController.text);
+                      final isValid = await authProvider.verifyPassword(
+                        passwordController.text,
+                      );
 
                       setDialogState(() => isLoading = false);
 
@@ -98,23 +106,32 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         Navigator.pop(dialogContext);
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const EditProfilePage()),
+                          MaterialPageRoute(
+                            builder: (_) => const EditProfilePage(),
+                          ),
                         );
                       } else if (dialogContext.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(authProvider.error ?? 'Invalid password'),
+                            content: Text(
+                              authProvider.error ?? 'Invalid password',
+                            ),
                             backgroundColor: Colors.red,
                           ),
                         );
                       }
                     },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGold),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGold,
+              ),
               child: isLoading
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text('Verify', style: TextStyle(color: Colors.white)),
             ),
@@ -201,22 +218,20 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             ),
             const SizedBox(height: 20),
             GestureDetector(
-              onTap: () => _authenticateAndNavigateToEditProfile(context, isDark),
+              onTap: () =>
+                  _authenticateAndNavigateToEditProfile(context, isDark),
               child: Stack(
                 alignment: Alignment.bottomRight,
                 children: [
                   CircleAvatar(
                     radius: 50,
                     backgroundColor: Colors.grey[300],
-                    backgroundImage: user?.photoUrl != null && user!.photoUrl!.isNotEmpty
+                    backgroundImage:
+                        user?.photoUrl != null && user!.photoUrl!.isNotEmpty
                         ? NetworkImage(user.photoUrl!)
                         : null,
                     child: user?.photoUrl == null || user!.photoUrl!.isEmpty
-                        ? const Icon(
-                            Icons.person,
-                            size: 50,
-                            color: Colors.grey,
-                          )
+                        ? const Icon(Icons.person, size: 50, color: Colors.grey)
                         : null,
                   ),
                   Container(
@@ -335,9 +350,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const WalletPage(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const WalletPage()),
                 );
               },
             ),
@@ -350,9 +363,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const SettingsPage(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
                 );
               },
             ),
@@ -365,9 +376,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const ComplaintPage(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const ComplaintPage()),
                 );
               },
             ),
@@ -398,16 +407,18 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           children: [
             Icon(
               icon,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimaryLight,
               size: iconSize,
             ),
             SizedBox(width: spacing),
             Expanded(
               child: Text(
                 title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontSize: bodyFontSize,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontSize: bodyFontSize),
               ),
             ),
           ],
@@ -439,7 +450,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         height: buttonHeight,
         child: OutlinedButton.icon(
           onPressed: () => _showDeleteAccountDialog(context, isDark),
-          icon: Icon(Icons.delete_forever, color: AppColors.error, size: iconSize),
+          icon: Icon(
+            Icons.delete_forever,
+            color: AppColors.error,
+            size: iconSize,
+          ),
           label: Text(
             'Delete Account',
             style: TextStyle(
@@ -493,7 +508,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
           ),
@@ -509,7 +526,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text('Delete'),
           ),
@@ -534,7 +553,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         child: ElevatedButton.icon(
           onPressed: () async {
             final authProvider = ref.read(authChangeNotifierProvider);
+            final walletProvider = ref.read(walletChangeNotifierProvider);
+            final biometricProvider = ref.read(biometricChangeNotifierProvider);
+
+            // Clear all user data
             await authProvider.logout();
+            walletProvider.reset();
+            await biometricProvider.clearOnLogout();
+
             if (context.mounted) {
               Navigator.of(context).popUntil((route) => route.isFirst);
             }
@@ -573,9 +599,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => const PrivacyPolicyPage(),
-            ),
+            MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
           );
         },
         child: Container(
@@ -595,21 +619,25 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             children: [
               Icon(
                 Icons.privacy_tip_outlined,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimaryLight,
                 size: iconSize,
               ),
               SizedBox(width: spacing),
               Expanded(
                 child: Text(
                   'Privacy & Data Policy',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontSize: bodyFontSize,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(fontSize: bodyFontSize),
                 ),
               ),
               Icon(
                 Icons.arrow_forward_ios,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
                 size: iconSize * 0.67,
               ),
             ],

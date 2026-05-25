@@ -43,7 +43,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
   late TabController _tabController;
   final DataService _dataService = DataService();
   final AudioCacheService _audioCacheService = AudioCacheService();
-  
+
   List<MessageCategory> _categories = [];
   List<Sermon> _sermons = [];
   List<Transcript> _transcripts = [];
@@ -58,7 +58,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
     _audioCacheService.initialize();
     _loadCachedDataFirst();
   }
-  
+
   /// Load cached data first for instant display, then refresh from server
   Future<void> _loadCachedDataFirst() async {
     try {
@@ -68,33 +68,36 @@ class _AudioPageState extends ConsumerState<AudioPage>
       final isServiceTeamMember = user?.isServiceTeamMember ?? false;
       final isGeneralMarried = user?.isGeneralMarried ?? false;
       final isInHouseMarried = user?.isInHouseMarried ?? false;
-      
+
       // Load categories and sermons from cache FIRST (instant)
       // Don't wait for transcripts - load them in background
       final results = await Future.wait([
         _dataService.getMessageCategories(), // Uses cache-first
-        _dataService.getMessages(),          // Uses cache-first
+        _dataService.getMessages(), // Uses cache-first
       ]);
-      
+
       final categories = results[0] as List<MessageCategory>;
       final allSermons = results[1] as List<Sermon>;
-      
+
       // Filter based on permissions
       final filteredCategories = categories.where((category) {
         if (category.isServiceTeamOnly && !isServiceTeamMember) return false;
         return true;
       }).toList();
-      
+
       final sermons = allSermons.where((sermon) {
         if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
         if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
         if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
         return true;
       }).toList();
-      
+
       // Process and sort categories
-      final processedCategories = _processCategories(filteredCategories, sermons);
-      
+      final processedCategories = _processCategories(
+        filteredCategories,
+        sermons,
+      );
+
       if (mounted) {
         setState(() {
           _categories = processedCategories;
@@ -102,11 +105,11 @@ class _AudioPageState extends ConsumerState<AudioPage>
           _isLoading = false;
           _initialLoadDone = true;
         });
-        
+
         // Pre-buffer in background
         _audioCacheService.preBufferCategory(sermons, count: 3);
       }
-      
+
       // Load transcripts in background (non-blocking)
       _loadTranscriptsInBackground();
     } catch (e) {
@@ -116,7 +119,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
       }
     }
   }
-  
+
   /// Load transcripts in background without blocking UI
   Future<void> _loadTranscriptsInBackground() async {
     try {
@@ -132,36 +135,43 @@ class _AudioPageState extends ConsumerState<AudioPage>
   }
 
   /// Process categories with latest message dates and sorting
-  List<MessageCategory> _processCategories(List<MessageCategory> categories, List<Sermon> sermons) {
+  List<MessageCategory> _processCategories(
+    List<MessageCategory> categories,
+    List<Sermon> sermons,
+  ) {
     final now = DateTime.now();
     final threeDaysAgo = now.subtract(const Duration(days: 3));
     final playedAudioService = PlayedAudioService();
-    
+
     final updatedCategories = categories.map((category) {
       final categorySermons = sermons.where((s) {
-        final matchById = s.category == category.id || s.category.toString() == category.id.toString();
-        final matchByName = s.categoryName.toLowerCase() == category.name.toLowerCase();
+        final matchById =
+            s.category == category.id ||
+            s.category.toString() == category.id.toString();
+        final matchByName =
+            s.categoryName.toLowerCase() == category.name.toLowerCase();
         return matchById || matchByName;
       }).toList();
-      
+
       DateTime? latestDate;
       for (var sermon in categorySermons) {
         if (latestDate == null || sermon.date.isAfter(latestDate)) {
           latestDate = sermon.date;
         }
       }
-      
+
       // Only show NEW if there are recent messages AND category hasn't been viewed
-      final hasRecentMessages = latestDate != null && latestDate.isAfter(threeDaysAgo);
+      final hasRecentMessages =
+          latestDate != null && latestDate.isAfter(threeDaysAgo);
       final isCategoryViewed = playedAudioService.isCategoryViewed(category.id);
       final hasNew = hasRecentMessages && !isCategoryViewed;
-      
+
       return category.copyWith(
         latestMessageDate: latestDate,
         hasNewMessage: hasNew,
       );
     }).toList();
-    
+
     updatedCategories.sort((a, b) {
       if (a.hasNewMessage && !b.hasNewMessage) return -1;
       if (!a.hasNewMessage && b.hasNewMessage) return 1;
@@ -172,7 +182,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
       if (b.latestMessageDate != null) return 1;
       return a.name.compareTo(b.name);
     });
-    
+
     return updatedCategories;
   }
 
@@ -185,35 +195,41 @@ class _AudioPageState extends ConsumerState<AudioPage>
       final isServiceTeamMember = user?.isServiceTeamMember ?? false;
       final isGeneralMarried = user?.isGeneralMarried ?? false;
       final isInHouseMarried = user?.isInHouseMarried ?? false;
-      
+
       final results = await Future.wait([
         _dataService.getMessageCategories(forceRefresh: true),
         _dataService.getMessages(forceRefresh: true),
-        _dataService.getTranscripts(),
+        _dataService.getTranscripts(forceRefresh: true),
       ]);
-      
+
       final categories = results[0] as List<MessageCategory>;
       final allSermons = results[1] as List<Sermon>;
       final transcripts = results[2] as List<Transcript>;
-      
+
       final filteredCategories = categories.where((category) {
         if (category.isServiceTeamOnly && !isServiceTeamMember) return false;
         return true;
       }).toList();
-      
+
       final sermons = allSermons.where((sermon) {
         if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
         if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
         if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
         return true;
       }).toList();
-      
+
       Future.microtask(() {
-        _audioCacheService.cacheMetadata(categories: filteredCategories, sermons: sermons);
+        _audioCacheService.cacheMetadata(
+          categories: filteredCategories,
+          sermons: sermons,
+        );
       });
-      
-      final processedCategories = _processCategories(filteredCategories, sermons);
-      
+
+      final processedCategories = _processCategories(
+        filteredCategories,
+        sermons,
+      );
+
       if (mounted) {
         setState(() {
           _categories = processedCategories;
@@ -248,7 +264,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
           title: '',
           showBackButton: true,
           lightBackground: true,
-          onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+          onBackPressed: () =>
+              ref.read(mainTabIndexProvider.notifier).state = 0,
           actions: [
             IconButton(
               icon: const Icon(Icons.favorite_border),
@@ -278,18 +295,18 @@ class _AudioPageState extends ConsumerState<AudioPage>
         ),
         body: Column(
           children: [
-          _buildTabBar(isDark),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildCategoryList(context, isDark),
-                const EbookListPage(),
-                _buildTranscriptList(context, isDark),
-              ],
+            _buildTabBar(isDark),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildCategoryList(context, isDark),
+                  _buildTranscriptList(context, isDark),
+                  const EbookListPage(),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -297,7 +314,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
 
   Widget _buildTabBar(bool isDark) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(30),
@@ -314,13 +331,21 @@ class _AudioPageState extends ConsumerState<AudioPage>
         indicatorSize: TabBarIndicatorSize.tab,
         dividerColor: Colors.transparent,
         labelColor: AppColors.primaryGold,
-        unselectedLabelColor:
-            isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+        unselectedLabelColor: isDark
+            ? AppColors.textSecondaryDark
+            : AppColors.textSecondaryLight,
+        labelStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 12.5,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: 12.5,
+        ),
         tabs: const [
           Tab(text: 'Audio'),
+          Tab(text: 'Transcripts'),
           Tab(text: 'Library'),
-          Tab(text: 'Transcript'),
         ],
       ),
     );
@@ -357,10 +382,10 @@ class _AudioPageState extends ConsumerState<AudioPage>
                     Text(
                       'No audio categories available',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                          ),
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
                     ),
                   ],
                 ),
@@ -378,13 +403,19 @@ class _AudioPageState extends ConsumerState<AudioPage>
         child: GridView.builder(
           padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: Responsive.gridCrossAxisCount(context, mobile: 1, tablet: 2, desktop: 3),
+            crossAxisCount: Responsive.gridCrossAxisCount(
+              context,
+              mobile: 1,
+              tablet: 2,
+              desktop: 3,
+            ),
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
             childAspectRatio: 2.5,
           ),
           itemCount: _categories.length,
-          itemBuilder: (context, index) => _buildCategoryCard(context, isDark, _categories[index]),
+          itemBuilder: (context, index) =>
+              _buildCategoryCard(context, isDark, _categories[index]),
         ),
       );
     }
@@ -395,17 +426,20 @@ class _AudioPageState extends ConsumerState<AudioPage>
       child: ListView.builder(
         padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
         itemCount: _categories.length,
-        itemBuilder: (context, index) => _buildCategoryCard(context, isDark, _categories[index]),
+        itemBuilder: (context, index) =>
+            _buildCategoryCard(context, isDark, _categories[index]),
       ),
     );
   }
 
-  Widget _buildCategoryCard(BuildContext context, bool isDark, MessageCategory category) {
+  Widget _buildCategoryCard(
+    BuildContext context,
+    bool isDark,
+    MessageCategory category,
+  ) {
     return GestureDetector(
       onTap: () async {
-        final categoryNameToId = {
-          for (var c in _categories) c.name: c.id
-        };
+        final categoryNameToId = {for (var c in _categories) c.name: c.id};
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -426,7 +460,9 @@ class _AudioPageState extends ConsumerState<AudioPage>
         }
       },
       child: Container(
-        margin: Responsive.isMobile(context) ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
+        margin: Responsive.isMobile(context)
+            ? const EdgeInsets.only(bottom: 16)
+            : EdgeInsets.zero,
         child: Row(
           children: [
             Stack(
@@ -440,7 +476,10 @@ class _AudioPageState extends ConsumerState<AudioPage>
                     top: 4,
                     right: 4,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.red,
                         borderRadius: BorderRadius.circular(8),
@@ -466,19 +505,22 @@ class _AudioPageState extends ConsumerState<AudioPage>
                   Text(
                     _stripHtmlTags(category.name),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _stripHtmlTags(category.description ?? 'It is a time for to come together to worship, hear God\'s word, and fellowship.'),
+                    _stripHtmlTags(
+                      category.description ??
+                          'It is a time for to come together to worship, hear God\'s word, and fellowship.',
+                    ),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontFamily: 'ClashDisplay',
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
-                        ),
+                      fontFamily: 'ClashDisplay',
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -543,8 +585,11 @@ class _AudioPageState extends ConsumerState<AudioPage>
 
     // Filter categories that have standalone transcripts
     final categoriesWithTranscripts = _categories.where((category) {
-      return _transcripts.any((transcript) =>
-          transcript.category == category.id || transcript.categoryName == category.name);
+      return _transcripts.any(
+        (transcript) =>
+            transcript.category == category.id ||
+            transcript.categoryName == category.name,
+      );
     }).toList();
 
     final padding = Responsive.horizontalPadding(context);
@@ -580,20 +625,20 @@ class _AudioPageState extends ConsumerState<AudioPage>
                       Text(
                         'No Transcripts Yet',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         'Message transcripts will be available here soon.\nStay tuned for written versions of our messages.',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
-                              height: 1.5,
-                            ),
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                          height: 1.5,
+                        ),
                       ),
                     ],
                   ),
@@ -612,13 +657,22 @@ class _AudioPageState extends ConsumerState<AudioPage>
         child: GridView.builder(
           padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: Responsive.gridCrossAxisCount(context, mobile: 1, tablet: 2, desktop: 3),
+            crossAxisCount: Responsive.gridCrossAxisCount(
+              context,
+              mobile: 1,
+              tablet: 2,
+              desktop: 3,
+            ),
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
             childAspectRatio: 2.5,
           ),
           itemCount: categoriesWithTranscripts.length,
-          itemBuilder: (context, index) => _buildTranscriptCategoryCard(context, isDark, categoriesWithTranscripts[index]),
+          itemBuilder: (context, index) => _buildTranscriptCategoryCard(
+            context,
+            isDark,
+            categoriesWithTranscripts[index],
+          ),
         ),
       );
     }
@@ -629,24 +683,40 @@ class _AudioPageState extends ConsumerState<AudioPage>
       child: ListView.builder(
         padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
         itemCount: categoriesWithTranscripts.length,
-        itemBuilder: (context, index) => _buildTranscriptCategoryCard(context, isDark, categoriesWithTranscripts[index]),
+        itemBuilder: (context, index) => _buildTranscriptCategoryCard(
+          context,
+          isDark,
+          categoriesWithTranscripts[index],
+        ),
       ),
     );
   }
 
-  Widget _buildTranscriptCategoryCard(BuildContext context, bool isDark, MessageCategory category) {
+  Widget _buildTranscriptCategoryCard(
+    BuildContext context,
+    bool isDark,
+    MessageCategory category,
+  ) {
     // Count standalone transcripts in this category
-    final transcriptCount = _transcripts.where((transcript) =>
-        transcript.category == category.id || transcript.categoryName == category.name).length;
+    final transcriptCount = _transcripts
+        .where(
+          (transcript) =>
+              transcript.category == category.id ||
+              transcript.categoryName == category.name,
+        )
+        .length;
 
     // Get categories that have transcripts for filter list
     final categoriesWithTranscripts = _categories.where((cat) {
-      return _transcripts.any((transcript) =>
-          transcript.category == cat.id || transcript.categoryName == cat.name);
+      return _transcripts.any(
+        (transcript) =>
+            transcript.category == cat.id ||
+            transcript.categoryName == cat.name,
+      );
     }).toList();
-    
+
     final categoryNameToId = {
-      for (var c in categoriesWithTranscripts) c.name: c.id
+      for (var c in categoriesWithTranscripts) c.name: c.id,
     };
 
     return GestureDetector(
@@ -664,7 +734,9 @@ class _AudioPageState extends ConsumerState<AudioPage>
         );
       },
       child: Container(
-        margin: Responsive.isMobile(context) ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
+        margin: Responsive.isMobile(context)
+            ? const EdgeInsets.only(bottom: 16)
+            : EdgeInsets.zero,
         child: Row(
           children: [
             ClipRRect(
@@ -680,18 +752,18 @@ class _AudioPageState extends ConsumerState<AudioPage>
                   Text(
                     _stripHtmlTags(category.name),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '$transcriptCount transcript${transcriptCount != 1 ? 's' : ''} available',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
-                        ),
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),

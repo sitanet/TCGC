@@ -18,7 +18,7 @@ class TeensPage extends ConsumerStatefulWidget {
 
 class _TeensPageState extends ConsumerState<TeensPage> {
   final DataService _dataService = DataService();
-  
+
   List<TeensCategory> _categories = [];
   String? _bannerUrl;
   bool _isLoading = true;
@@ -54,9 +54,9 @@ class _TeensPageState extends ConsumerState<TeensPage> {
     try {
       final results = await Future.wait([
         _dataService.getTeensCategories(forceRefresh: forceRefresh),
-        _dataService.getTeensBannerUrl(),
+        _dataService.getTeensBannerUrl(forceRefresh: forceRefresh),
       ]);
-      
+
       if (mounted) {
         setState(() {
           _categories = results[0] as List<TeensCategory>;
@@ -78,10 +78,13 @@ class _TeensPageState extends ConsumerState<TeensPage> {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     final spacing = Responsive.verticalSpacing(context);
     final appConfig = ref.watch(appConfigChangeNotifierProvider);
-    
+
     // Check if teens page is disabled
     if (appConfig.config.teensPageDisabled) {
-      return _buildDisabledPage(context, appConfig.config.teensPageDisabledMessage);
+      return _buildDisabledPage(
+        context,
+        appConfig.config.teensPageDisabledMessage,
+      );
     }
 
     return Scaffold(
@@ -117,7 +120,7 @@ class _TeensPageState extends ConsumerState<TeensPage> {
   Widget _buildDisabledPage(BuildContext context, String message) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final horizontalPadding = Responsive.horizontalPadding(context);
-    
+
     return Scaffold(
       appBar: CustomAppBar(
         title: 'Teens',
@@ -157,7 +160,9 @@ class _TeensPageState extends ConsumerState<TeensPage> {
                 message,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                   height: 1.5,
                 ),
               ),
@@ -178,10 +183,7 @@ class _TeensPageState extends ConsumerState<TeensPage> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFFFF9800),
-            Color(0xFFFFB74D),
-          ],
+          colors: [Color(0xFFFF9800), Color(0xFFFFB74D)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -217,7 +219,9 @@ class _TeensPageState extends ConsumerState<TeensPage> {
                 placeholder: (context, url) => Container(
                   color: isDark ? AppColors.cardDark : Colors.grey[200],
                   child: const Center(
-                    child: CircularProgressIndicator(color: AppColors.primaryGold),
+                    child: CircularProgressIndicator(
+                      color: AppColors.primaryGold,
+                    ),
                   ),
                 ),
                 errorWidget: (context, url, error) => fallbackBanner,
@@ -243,8 +247,10 @@ class _TeensPageState extends ConsumerState<TeensPage> {
           child: Text(
             'No categories available',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
           ),
         ),
       );
@@ -270,7 +276,7 @@ class _TeensPageState extends ConsumerState<TeensPage> {
             final category = entry.value;
             final color = _categoryColors[index % _categoryColors.length];
             final icon = _categoryIcons[index % _categoryIcons.length];
-            
+
             return Column(
               children: [
                 _buildCategoryTile(context, isDark, category, color, icon),
@@ -278,7 +284,9 @@ class _TeensPageState extends ConsumerState<TeensPage> {
                   Divider(
                     height: 1,
                     indent: 72,
-                    color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                    color: isDark
+                        ? AppColors.dividerDark
+                        : AppColors.dividerLight,
                   ),
               ],
             );
@@ -288,16 +296,30 @@ class _TeensPageState extends ConsumerState<TeensPage> {
     );
   }
 
-  Widget _buildCategoryTile(BuildContext context, bool isDark, TeensCategory category, Color color, IconData icon) {
+  Widget _buildCategoryTile(
+    BuildContext context,
+    bool isDark,
+    TeensCategory category,
+    Color color,
+    IconData icon,
+  ) {
     final spacing = Responsive.verticalSpacing(context);
     final iconSize = Responsive.iconSize(context);
-    final iconContainerSize = Responsive.value(context, mobile: 48.0, tablet: 56.0, desktop: 64.0);
+    final iconContainerSize = Responsive.value(
+      context,
+      mobile: 48.0,
+      tablet: 56.0,
+      desktop: 64.0,
+    );
     final bodyFontSize = Responsive.bodyFontSize(context);
     final smallFontSize = Responsive.smallFontSize(context);
     final borderRadius = Responsive.borderRadius(context);
 
     return ListTile(
-      contentPadding: EdgeInsets.symmetric(horizontal: spacing, vertical: spacing * 0.5),
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: spacing,
+        vertical: spacing * 0.5,
+      ),
       leading: Container(
         width: iconContainerSize,
         height: iconContainerSize,
@@ -313,8 +335,10 @@ class _TeensPageState extends ConsumerState<TeensPage> {
                   fit: BoxFit.cover,
                   memCacheWidth: 128,
                   memCacheHeight: 128,
-                  placeholder: (context, url) => Icon(icon, color: color, size: iconSize),
-                  errorWidget: (context, url, error) => Icon(icon, color: color, size: iconSize),
+                  placeholder: (context, url) =>
+                      Icon(icon, color: color, size: iconSize),
+                  errorWidget: (context, url, error) =>
+                      Icon(icon, color: color, size: iconSize),
                 ),
               )
             : Icon(icon, color: color, size: iconSize),
@@ -322,27 +346,35 @@ class _TeensPageState extends ConsumerState<TeensPage> {
       title: Text(
         category.name,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              fontSize: bodyFontSize,
-            ),
+          fontWeight: FontWeight.w600,
+          fontSize: bodyFontSize,
+        ),
       ),
       subtitle: Text(
         '${category.contentCount} ${category.contentCount == 1 ? 'item' : 'items'}',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              fontSize: smallFontSize,
-            ),
+          color: isDark
+              ? AppColors.textSecondaryDark
+              : AppColors.textSecondaryLight,
+          fontSize: smallFontSize,
+        ),
       ),
       trailing: Icon(
         Icons.chevron_right,
-        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+        color: isDark
+            ? AppColors.textSecondaryDark
+            : AppColors.textSecondaryLight,
         size: iconSize,
       ),
       onTap: () => _navigateToContentList(context, category, color),
     );
   }
 
-  void _navigateToContentList(BuildContext context, TeensCategory category, Color color) {
+  void _navigateToContentList(
+    BuildContext context,
+    TeensCategory category,
+    Color color,
+  ) {
     Navigator.push(
       context,
       MaterialPageRoute(

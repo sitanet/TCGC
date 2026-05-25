@@ -130,6 +130,10 @@ class WalletProvider extends ChangeNotifier {
   // 9PSB Wallet Details
   String? _accountNumber;
   String? _accountName;
+  // Church (receiver) account details
+  String? _churchName;
+  String? _churchAccountNumber;
+  String? _churchAccountName;
   int _tier = 0;
   String _status = 'pending';
   double _singleLimit = 0;
@@ -169,6 +173,10 @@ class WalletProvider extends ChangeNotifier {
   // 9PSB Getters
   String? get accountNumber => _accountNumber;
   String? get accountName => _accountName;
+  // Church (receiver) getters
+  String? get churchName => _churchName;
+  String? get churchAccountNumber => _churchAccountNumber;
+  String? get churchAccountName => _churchAccountName;
   int get tier => _tier;
   String get status => _status;
   double get singleLimit => _singleLimit;
@@ -268,6 +276,9 @@ class WalletProvider extends ChangeNotifier {
           _currency = wallet['currency'] ?? 'NGN';
           _accountNumber = wallet['psb_account_number'];
           _accountName = wallet['psb_account_name'];
+          _churchName = wallet['church_name'];
+          _churchAccountNumber = wallet['church_account_number'];
+          _churchAccountName = wallet['church_account_name'];
           _tier = wallet['tier'] ?? 0;
           _status = wallet['status'] ?? 'pending';
           _singleLimit =
@@ -338,6 +349,9 @@ class WalletProvider extends ChangeNotifier {
         _currency = wallet['currency'] ?? 'NGN';
         _accountNumber = wallet['psb_account_number'];
         _accountName = wallet['psb_account_name'];
+        _churchName = wallet['church_name'];
+        _churchAccountNumber = wallet['church_account_number'];
+        _churchAccountName = wallet['church_account_name'];
         _tier = wallet['tier'] ?? 1;
         _status = wallet['status'] ?? 'active';
         _singleLimit =
@@ -1091,6 +1105,9 @@ class WalletProvider extends ChangeNotifier {
     _givingReport = null;
     _accountNumber = null;
     _accountName = null;
+    _churchName = null;
+    _churchAccountNumber = null;
+    _churchAccountName = null;
     _tier = 0;
     _status = 'pending';
     _singleLimit = 0;

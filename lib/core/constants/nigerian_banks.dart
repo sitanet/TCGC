@@ -18,13 +18,16 @@ class NigerianBank {
 
 class NigerianBanks {
   static const List<NigerianBank> banks = [
+    // ── Tier 1 Banks ──────────────────────────────────────────────────────────
     NigerianBank(
       name: 'Access Bank',
       code: '044',
       logo: 'assets/images/banks/access.png',
-      androidPackage: 'com.accessbank.accessbankapp',
-      iosScheme: 'accessbank://',
-      iosAppStoreId: '1aborandle',
+      // Access More (Nigeria) — com.accessbank.nextgen
+      // Previously com.accessbank.accessbankapp was Ghana
+      androidPackage: 'com.accessbank.nextgen',
+      iosScheme: 'accessmore://',
+      iosAppStoreId: '1574773672',
     ),
     NigerianBank(
       name: 'First Bank of Nigeria',
@@ -35,36 +38,41 @@ class NigerianBanks {
       iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
-      name: 'GTBank',
+      name: 'GTBank (GTWorld)',
       code: '058',
       logo: 'assets/images/banks/gtbank.png',
-      androidPackage: 'com.gtbank.gtworldapp',
+      // GTWorld Nigeria — com.gtbank.gtworldv1
+      androidPackage: 'com.gtbank.gtworldv1',
       iosScheme: 'gtworld://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'UBA',
       code: '033',
       logo: 'assets/images/banks/uba.png',
-      androidPackage: 'com.aboraned.aborane',
+      // UBA Mobile App Nigeria — com.ubanquity.redd.uba
+      androidPackage: 'com.ubanquity.redd.uba',
       iosScheme: 'ubamobile://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Zenith Bank',
       code: '057',
       logo: 'assets/images/banks/zenith.png',
-      androidPackage: 'com.zenithbank.eazymoney',
+      // Zenith Bank Nigeria — com.zenithBank.eazymoney
+      androidPackage: 'com.zenithBank.eazymoney',
       iosScheme: 'zenithmobile://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
+
+    // ── Fintechs / Neobanks ───────────────────────────────────────────────────
     NigerianBank(
       name: 'Kuda Bank',
       code: '090267',
       logo: 'assets/images/banks/kuda.png',
       androidPackage: 'com.kudabank.app',
       iosScheme: 'kuda://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'OPay',
@@ -72,7 +80,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/opay.png',
       androidPackage: 'team.opay.pay',
       iosScheme: 'opay://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'PalmPay',
@@ -80,23 +88,26 @@ class NigerianBanks {
       logo: 'assets/images/banks/palmpay.png',
       androidPackage: 'com.transsnet.palmpay',
       iosScheme: 'palmpay://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Moniepoint',
       code: '090405',
       logo: 'assets/images/banks/moniepoint.png',
-      androidPackage: 'com.teamapt.customers.monnify',
+      // Moniepoint Personal Banking Nigeria
+      androidPackage: 'com.moniepoint.personal',
       iosScheme: 'moniepoint://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
+
+    // ── Tier 2 / Commercial Banks ─────────────────────────────────────────────
     NigerianBank(
       name: 'Fidelity Bank',
       code: '070',
       logo: 'assets/images/banks/fidelity.png',
       androidPackage: 'com.fidelity.fidelitymobile',
       iosScheme: 'fidelity://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Union Bank',
@@ -104,7 +115,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/union.png',
       androidPackage: 'com.unionbankng.unionmobile',
       iosScheme: 'unionmobile://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Stanbic IBTC',
@@ -112,7 +123,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/stanbic.png',
       androidPackage: 'com.stanbic.stanbicmobile',
       iosScheme: 'stanbicibtc://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Sterling Bank',
@@ -120,7 +131,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/sterling.png',
       androidPackage: 'com.sterling.onepay',
       iosScheme: 'sterlingmobile://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Polaris Bank',
@@ -128,7 +139,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/polaris.png',
       androidPackage: 'com.polaris.vurba',
       iosScheme: 'polarisbank://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Wema Bank (ALAT)',
@@ -136,7 +147,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/wema.png',
       androidPackage: 'com.alat.app',
       iosScheme: 'alat://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'FCMB',
@@ -144,23 +155,16 @@ class NigerianBanks {
       logo: 'assets/images/banks/fcmb.png',
       androidPackage: 'com.fcmb.mobile.mobilebanking',
       iosScheme: 'fcmbmobile://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
-      name: 'Ecobank',
+      name: 'Ecobank Nigeria',
       code: '050',
       logo: 'assets/images/banks/ecobank.png',
-      androidPackage: 'com.ecobank.mobile',
+      // Ecobank Nigeria specific package
+      androidPackage: 'com.ecobank.mobile.ng',
       iosScheme: 'ecobankmobile://',
-      iosAppStoreId: '1laborandle',
-    ),
-    NigerianBank(
-      name: 'Heritage Bank',
-      code: '030',
-      logo: 'assets/images/banks/heritage.png',
-      androidPackage: 'com.hb.hbmobile',
-      iosScheme: 'heritagebank://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Keystone Bank',
@@ -168,7 +172,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/keystone.png',
       androidPackage: 'com.keystone.mobile',
       iosScheme: 'keystonebank://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Unity Bank',
@@ -176,7 +180,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/unity.png',
       androidPackage: 'com.unitybank.mobile',
       iosScheme: 'unitybank://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Providus Bank',
@@ -184,7 +188,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/providus.png',
       androidPackage: 'com.providusbank.mobile',
       iosScheme: 'providusbank://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Jaiz Bank',
@@ -192,7 +196,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/jaiz.png',
       androidPackage: 'com.jaiz.mobile',
       iosScheme: 'jaizbank://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Titan Trust Bank',
@@ -200,7 +204,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/titan.png',
       androidPackage: 'com.titantrustbank.mobile',
       iosScheme: 'titantrust://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Globus Bank',
@@ -208,15 +212,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/globus.png',
       androidPackage: 'com.globusbank.mobile',
       iosScheme: 'globusbank://',
-      iosAppStoreId: '1laborandle',
-    ),
-    NigerianBank(
-      name: 'SunTrust Bank',
-      code: '100',
-      logo: 'assets/images/banks/suntrust.png',
-      androidPackage: 'com.suntrustbank.mobile',
-      iosScheme: 'suntrustbank://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'TAJ Bank',
@@ -224,7 +220,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/taj.png',
       androidPackage: 'com.tajbank.mobile',
       iosScheme: 'tajbank://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'VFD Microfinance Bank',
@@ -232,7 +228,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/vfd.png',
       androidPackage: 'com.vbank.vfd',
       iosScheme: 'vbank://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Carbon',
@@ -240,7 +236,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/carbon.png',
       androidPackage: 'ng.getcarbon.app',
       iosScheme: 'carbon://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
     NigerianBank(
       name: 'Rubies Bank',
@@ -248,23 +244,7 @@ class NigerianBanks {
       logo: 'assets/images/banks/rubies.png',
       androidPackage: 'com.rubiesbank.mobile',
       iosScheme: 'rubiesbank://',
-      iosAppStoreId: '1laborandle',
-    ),
-    NigerianBank(
-      name: 'Standard Chartered',
-      code: '068',
-      logo: 'assets/images/banks/standardchartered.png',
-      androidPackage: 'com.sc.mobile',
-      iosScheme: 'scmobile://',
-      iosAppStoreId: '1laborandle',
-    ),
-    NigerianBank(
-      name: 'Citibank',
-      code: '023',
-      logo: 'assets/images/banks/citibank.png',
-      androidPackage: 'com.citi.mobile',
-      iosScheme: 'citimobile://',
-      iosAppStoreId: '1laborandle',
+      iosAppStoreId: '1aborandle',
     ),
   ];
 }

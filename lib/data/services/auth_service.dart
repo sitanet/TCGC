@@ -23,16 +23,17 @@ class AuthService {
       await _api.saveTokens(data['access'], data['refresh']);
       return AuthResult(success: true);
     }
-    
+
     String errorMessage = _parseErrorMessage(response);
-    
+
     // Provide user-friendly messages for common status codes
     if (response.statusCode == 401) {
       errorMessage = 'Invalid email or password. Please try again.';
     } else if (response.statusCode == 0) {
-      errorMessage = 'Unable to connect to server. Please check your internet connection.';
+      errorMessage =
+          'Unable to connect to server. Please check your internet connection.';
     }
-    
+
     return AuthResult(success: false, error: errorMessage);
   }
 
@@ -48,7 +49,7 @@ class AuthService {
   }) async {
     final normalizedEmail = email.toLowerCase();
     print('Register API: Starting registration for $normalizedEmail');
-    
+
     // Use postPublic for registration (public endpoint)
     final response = await _api.postPublic(ApiConstants.register, {
       'email': normalizedEmail,
@@ -65,14 +66,18 @@ class AuthService {
     print('Register API response: ${response.statusCode} - ${response.body}');
 
     if (response.isSuccess) {
-      print('Register API: Success, returning with requiresEmailConfirmation=true');
+      print(
+        'Register API: Success, returning with requiresEmailConfirmation=true',
+      );
       return AuthResult(
-        success: true, 
+        success: true,
         requiresEmailConfirmation: true,
-        message: response.data['message'] ?? 'Please check your email to confirm your account.',
+        message:
+            response.data['message'] ??
+            'Please check your email to confirm your account.',
       );
     }
-    
+
     String errorMessage = _parseErrorMessage(response);
     print('Register API: Failed with error: $errorMessage');
     return AuthResult(success: false, error: errorMessage);
@@ -86,9 +91,12 @@ class AuthService {
     });
 
     if (response.isSuccess) {
-      return AuthResult(success: true, message: 'Confirmation email sent successfully');
+      return AuthResult(
+        success: true,
+        message: 'Confirmation email sent successfully',
+      );
     }
-    
+
     String errorMessage = _parseErrorMessage(response);
     return AuthResult(success: false, error: errorMessage);
   }
@@ -98,12 +106,12 @@ class AuthService {
       // Debug: temporarily enabled to diagnose login issue
       print('Error response: ${response.statusCode} - ${response.body}');
       final data = response.data;
-      
+
       // Handle detail message (common in DRF)
       if (data.containsKey('detail')) {
         return data['detail'].toString();
       }
-      
+
       // Handle field-specific errors
       List<String> errors = [];
       data.forEach((key, value) {
@@ -118,7 +126,7 @@ class AuthService {
       if (errors.isNotEmpty) {
         return errors.join('\n');
       }
-      
+
       // Handle non_field_errors
       if (data.containsKey('non_field_errors')) {
         final nonFieldErrors = data['non_field_errors'];
@@ -126,7 +134,7 @@ class AuthService {
           return nonFieldErrors.first.toString();
         }
       }
-      
+
       return response.errorMessage ?? 'An error occurred. Please try again.';
     } catch (e) {
       return response.errorMessage ?? 'An error occurred. Please try again.';
@@ -137,9 +145,11 @@ class AuthService {
     return field
         .replaceAll('_', ' ')
         .split(' ')
-        .map((word) => word.isNotEmpty 
-            ? '${word[0].toUpperCase()}${word.substring(1)}' 
-            : '')
+        .map(
+          (word) => word.isNotEmpty
+              ? '${word[0].toUpperCase()}${word.substring(1)}'
+              : '',
+        )
         .join(' ');
   }
 
@@ -149,19 +159,19 @@ class AuthService {
 
   Future<AuthResult> deleteAccount() async {
     final response = await _api.delete(ApiConstants.deleteAccount);
-    
+
     if (response.isSuccess) {
       await _api.clearTokens();
       return AuthResult(success: true, message: 'Account deleted successfully');
     }
-    
+
     String errorMessage = _parseErrorMessage(response);
     return AuthResult(success: false, error: errorMessage);
   }
 
   Future<AppUser?> getProfile() async {
     final response = await _api.get(ApiConstants.userProfile);
-    
+
     if (response.isSuccess) {
       try {
         final user = AppUser.fromJson(response.data);
@@ -175,14 +185,11 @@ class AuthService {
 
   Future<AuthResult> updateProfile(Map<String, dynamic> data) async {
     final response = await _api.patch(ApiConstants.userProfile, data);
-    
+
     if (response.isSuccess) {
       return AuthResult(success: true);
     }
-    return AuthResult(
-      success: false,
-      error: _parseErrorMessage(response),
-    );
+    return AuthResult(success: false, error: _parseErrorMessage(response));
   }
 
   Future<AuthResult> uploadProfilePhoto(File imageFile) async {
@@ -191,7 +198,7 @@ class AuthService {
       imageFile,
       fieldName: 'photo',
     );
-    
+
     if (response.isSuccess) {
       return AuthResult(success: true);
     }
@@ -201,7 +208,10 @@ class AuthService {
     );
   }
 
-  Future<AuthResult> changePassword(String oldPassword, String newPassword) async {
+  Future<AuthResult> changePassword(
+    String oldPassword,
+    String newPassword,
+  ) async {
     final response = await _api.put(ApiConstants.changePassword, {
       'old_password': oldPassword,
       'new_password': newPassword,
@@ -240,10 +250,7 @@ class AuthService {
     if (response.isSuccess) {
       return AuthResult(success: true, message: response.data['message']);
     }
-    return AuthResult(
-      success: false,
-      error: _parseErrorMessage(response),
-    );
+    return AuthResult(success: false, error: _parseErrorMessage(response));
   }
 
   Future<AuthResult> sendContactMessage({
@@ -264,27 +271,28 @@ class AuthService {
     if (response.isSuccess) {
       return AuthResult(success: true, message: response.data['message']);
     }
-    return AuthResult(
-      success: false,
-      error: _parseErrorMessage(response),
-    );
+    return AuthResult(success: false, error: _parseErrorMessage(response));
   }
 
   Future<List<ContactMessage>> getMyContactMessages() async {
     final response = await _api.get(ApiConstants.myContactMessages);
-    
+
     if (response.isSuccess) {
       final data = response.data;
       // Handle both paginated and non-paginated responses
-      final List<dynamic> results = data is List ? data : (data['results'] ?? data);
+      final List<dynamic> results = data is List
+          ? data
+          : (data['results'] ?? data);
       return results.map((json) => ContactMessage.fromJson(json)).toList();
     }
     return [];
   }
 
   Future<ContactMessage?> getContactMessageDetail(int id) async {
-    final response = await _api.get('${ApiConstants.myContactMessageDetail}$id/');
-    
+    final response = await _api.get(
+      '${ApiConstants.myContactMessageDetail}$id/',
+    );
+
     if (response.isSuccess) {
       return ContactMessage.fromJson(response.data);
     }
@@ -292,10 +300,11 @@ class AuthService {
   }
 
   Future<bool> replyToContactMessage(int id, String message) async {
-    final response = await _api.post('${ApiConstants.myContactMessageDetail}$id/reply/', {
-      'message': message,
-    });
-    
+    final response = await _api.post(
+      '${ApiConstants.myContactMessageDetail}$id/reply/',
+      {'message': message},
+    );
+
     return response.isSuccess;
   }
 
@@ -306,40 +315,59 @@ class AuthService {
   }
 
   // KYC Verification Methods
-  Future<KycResult> verifyNin(String nin, {
+  Future<KycResult> verifyNin(
+    String nin, {
     String? phoneNumber,
     String? address,
     String? dateOfBirth,
     bool updateProfile = false,
   }) async {
-    final response = await _api.post(ApiConstants.verifyNin, {
+    // Use secure endpoint for new two-step flow
+    final response = await _api.post(ApiConstants.secureVerifyNin, {
       'nin': nin,
-      'update_profile': updateProfile,
       if (phoneNumber != null) 'phone_number': phoneNumber,
       if (address != null) 'address': address,
       if (dateOfBirth != null) 'date_of_birth': dateOfBirth,
     });
 
     if (response.isSuccess) {
-      // Check if wallet creation failed even though NIN verification succeeded
-      final walletError = response.data['wallet_error'];
-      if (walletError != null) {
-        return KycResult(
-          success: false,
-          error: 'NIN verified but wallet creation failed: $walletError',
-          verifiedData: response.data['data'],
-        );
-      }
       return KycResult(
         success: true,
         message: response.data['message'],
-        verifiedData: response.data['data'],
+        confirmationToken: response.data['confirmation_token'],
+        maskedIdentity: response.data['masked_identity'],
+        status: response.data['status'],
+      );
+    }
+    return KycResult(
+      success: false,
+      error: response.data?['error'] ?? _parseErrorMessage(response),
+      errorCode: response.data?['error_code'],
+      mismatches: List<String>.from(response.data?['mismatches'] ?? []),
+      verifiedData: response.data?['data'],
+    );
+  }
+
+  Future<KycResult> confirmIdentity({
+    required String confirmationToken,
+    bool confirmed = true,
+  }) async {
+    final response = await _api.post(ApiConstants.confirmIdentity, {
+      'confirmation_token': confirmationToken,
+      'confirmed': confirmed,
+    });
+
+    if (response.isSuccess) {
+      return KycResult(
+        success: true,
+        message: response.data['message'],
         walletData: response.data['wallet'],
       );
     }
     return KycResult(
       success: false,
       error: response.data?['error'] ?? _parseErrorMessage(response),
+      errorCode: response.data?['error_code'],
     );
   }
 
@@ -393,8 +421,8 @@ class AuthResult {
   final bool requiresEmailConfirmation;
 
   AuthResult({
-    required this.success, 
-    this.error, 
+    required this.success,
+    this.error,
     this.message,
     this.requiresEmailConfirmation = false,
   });
@@ -403,6 +431,7 @@ class AuthResult {
 class KycResult {
   final bool success;
   final String? error;
+  final String? errorCode;
   final String? message;
   final Map<String, dynamic>? verifiedData;
   final Map<String, dynamic>? walletData;
@@ -411,10 +440,15 @@ class KycResult {
   final List<String> mismatches;
   final String? ninError;
   final String? bvnError;
+  // New fields for secure two-step flow
+  final String? confirmationToken;
+  final Map<String, dynamic>? maskedIdentity;
+  final String? status;
 
   KycResult({
     required this.success,
     this.error,
+    this.errorCode,
     this.message,
     this.verifiedData,
     this.walletData,
@@ -423,5 +457,8 @@ class KycResult {
     this.mismatches = const [],
     this.ninError,
     this.bvnError,
+    this.confirmationToken,
+    this.maskedIdentity,
+    this.status,
   });
 }

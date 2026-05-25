@@ -87,7 +87,7 @@ class _GivePageState extends ConsumerState<GivePage> with WidgetsBindingObserver
 
   String _formatCurrency(double amount, String currency) {
     final symbols = {'NGN': 'N', 'USD': '\$', 'EUR': '€', 'GBP': '£'};
-    final formatted = amount.toStringAsFixed(0).replaceAllMapped(
+    final formatted = amount.toStringAsFixed(2).replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]},',
     );

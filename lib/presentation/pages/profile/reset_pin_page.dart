@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,32 +37,55 @@ class _ResetPinPageState extends ConsumerState<ResetPinPage> {
 
     setState(() => _isLoading = true);
 
-    final walletProvider = ref.read(walletChangeNotifierProvider);
-    final success = await walletProvider.resetTransactionPin(
-      _passwordController.text,
-      _newPinController.text,
-      _confirmPinController.text,
-    );
-
-    if (!mounted) return;
-
-    setState(() => _isLoading = false);
-
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Transaction PIN reset successfully'),
-          backgroundColor: Colors.green,
-        ),
+    try {
+      final walletProvider = ref.read(walletChangeNotifierProvider);
+      final success = await walletProvider.resetTransactionPin(
+        _passwordController.text,
+        _newPinController.text,
+        _confirmPinController.text,
       );
-      Navigator.pop(context, true);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(walletProvider.error ?? 'Failed to reset PIN'),
-          backgroundColor: Colors.red,
-        ),
-      );
+
+      if (!mounted) return;
+
+      setState(() => _isLoading = false);
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Transaction PIN reset successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(walletProvider.error ?? 'Failed to reset PIN'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        String errorMessage = 'Failed to reset PIN. Please try again.';
+
+        if (e is SocketException) {
+          errorMessage =
+              'Network error. Please check your internet connection.';
+        } else if (e is TimeoutException) {
+          errorMessage = 'Request timed out. Please try again.';
+        } else if (e.toString().contains('Connection refused')) {
+          errorMessage = 'Unable to connect to server. Please try again later.';
+        } else if (e.toString().contains('Failed host lookup')) {
+          errorMessage =
+              'Network error. Please check your internet connection.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -69,7 +94,10 @@ class _ResetPinPageState extends ConsumerState<ResetPinPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: const CustomAppBar(title: 'Reset Transaction PIN', showBackButton: true),
+      appBar: const CustomAppBar(
+        title: 'Reset Transaction PIN',
+        showBackButton: true,
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -89,11 +117,7 @@ class _ResetPinPageState extends ConsumerState<ResetPinPage> {
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.lock_reset,
-                        color: Colors.blue[700],
-                        size: 28,
-                      ),
+                      Icon(Icons.lock_reset, color: Colors.blue[700], size: 28),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -101,7 +125,8 @@ class _ResetPinPageState extends ConsumerState<ResetPinPage> {
                           children: [
                             Text(
                               'Forgot Your PIN?',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: Colors.blue[700],
                                   ),
@@ -109,7 +134,8 @@ class _ResetPinPageState extends ConsumerState<ResetPinPage> {
                             const SizedBox(height: 4),
                             Text(
                               'Enter your account password to reset your transaction PIN.',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
                                     color: isDark
                                         ? AppColors.textSecondaryDark
                                         : AppColors.textSecondaryLight,
@@ -125,17 +151,17 @@ class _ResetPinPageState extends ConsumerState<ResetPinPage> {
                 Text(
                   'Reset your transaction PIN',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Enter your account password and create a new PIN.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
                 ),
                 const SizedBox(height: 32),
                 _buildPasswordField(context, isDark),
@@ -164,7 +190,8 @@ class _ResetPinPageState extends ConsumerState<ResetPinPage> {
                   'Confirm New PIN',
                   _confirmPinController,
                   _obscureConfirmPin,
-                  () => setState(() => _obscureConfirmPin = !_obscureConfirmPin),
+                  () =>
+                      setState(() => _obscureConfirmPin = !_obscureConfirmPin),
                   (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please confirm your new PIN';
@@ -194,7 +221,9 @@ class _ResetPinPageState extends ConsumerState<ResetPinPage> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : const Text(
@@ -248,9 +277,9 @@ class _ResetPinPageState extends ConsumerState<ResetPinPage> {
       children: [
         Text(
           'Account Password',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 8),
         TextFormField(
@@ -280,16 +309,17 @@ class _ResetPinPageState extends ConsumerState<ResetPinPage> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.primaryGold,
-              ),
+              borderSide: const BorderSide(color: AppColors.primaryGold),
             ),
             suffixIcon: IconButton(
               icon: Icon(
                 _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
-              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
             ),
           ),
         ),
@@ -311,9 +341,9 @@ class _ResetPinPageState extends ConsumerState<ResetPinPage> {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 8),
         TextFormField(
@@ -345,14 +375,14 @@ class _ResetPinPageState extends ConsumerState<ResetPinPage> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.primaryGold,
-              ),
+              borderSide: const BorderSide(color: AppColors.primaryGold),
             ),
             suffixIcon: IconButton(
               icon: Icon(
                 obscureText ? Icons.visibility_off : Icons.visibility,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
               onPressed: onToggleVisibility,
             ),

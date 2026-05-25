@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -123,10 +125,7 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
             children: [
               const Text(
                 'Wallet Balance',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 14),
               ),
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
@@ -163,10 +162,7 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                 children: [
                   const Text(
                     'Account Name',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -184,10 +180,7 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                 children: [
                   const Text(
                     'Account Number',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -257,18 +250,18 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
               children: [
                 Text(
                   '9 Payment Service Bank (9PSB)',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Your wallet is powered by 9PSB',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
                 ),
               ],
             ),
@@ -285,18 +278,26 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
         Text(
           'Account Details',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppColors.primaryGold,
-                fontWeight: FontWeight.w600,
-              ),
+            color: AppColors.primaryGold,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 16),
         _buildDetailRow(context, isDark, 'Bank Name', '9 Payment Service Bank'),
         const Divider(),
         _buildDetailRow(
-            context, isDark, 'Account Number', _walletAccountNumber ?? 'N/A'),
+          context,
+          isDark,
+          'Account Number',
+          _walletAccountNumber ?? 'N/A',
+        ),
         const Divider(),
         _buildDetailRow(
-            context, isDark, 'Account Name', _walletAccountName ?? 'N/A'),
+          context,
+          isDark,
+          'Account Name',
+          _walletAccountName ?? 'N/A',
+        ),
         const Divider(),
         _buildDetailRow(context, isDark, 'Account Type', 'Savings'),
       ],
@@ -304,7 +305,11 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
   }
 
   Widget _buildDetailRow(
-      BuildContext context, bool isDark, String label, String value) {
+    BuildContext context,
+    bool isDark,
+    String label,
+    String value,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
@@ -313,16 +318,16 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
           Text(
             label,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
           ),
           Text(
             value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -347,10 +352,10 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                 Text(
                   'Enter your NIN to verify your identity',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 _buildVerifiableTextField(
@@ -382,7 +387,12 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                 ),
                 if (_ninVerified && _ninVerifiedData != null) ...[
                   const SizedBox(height: 8),
-                  _buildVerifiedDataCard(context, isDark, 'NIN', _ninVerifiedData!),
+                  _buildVerifiedDataCard(
+                    context,
+                    isDark,
+                    'NIN',
+                    _ninVerifiedData!,
+                  ),
                 ],
                 const SizedBox(height: 32),
                 _buildNextButton(context),
@@ -393,10 +403,10 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                 Text(
                   'Create a 4-digit PIN for securing your transactions',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 _buildSecureTextField(
@@ -535,17 +545,17 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                 Text(
                   'Create Your 9PSB Wallet',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Powered by 9 Payment Service Bank',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
                 ),
               ],
             ),
@@ -559,9 +569,9 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
     return Text(
       title,
       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: AppColors.primaryGold,
-            fontWeight: FontWeight.w600,
-          ),
+        color: AppColors.primaryGold,
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 
@@ -612,8 +622,10 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppColors.primaryGold, width: 1.5),
+              borderSide: const BorderSide(
+                color: AppColors.primaryGold,
+                width: 1.5,
+              ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -628,8 +640,10 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
               ),
               onPressed: onToggle,
             ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
           ),
         ),
       ],
@@ -700,13 +714,16 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: isVerified 
+                    borderSide: isVerified
                         ? const BorderSide(color: AppColors.success, width: 1.5)
                         : BorderSide.none,
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
+                    borderSide: const BorderSide(
+                      color: AppColors.primaryGold,
+                      width: 1.5,
+                    ),
                   ),
                   errorBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -718,18 +735,27 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                       if (isVerified)
                         const Padding(
                           padding: EdgeInsets.only(right: 8),
-                          child: Icon(Icons.check_circle, color: AppColors.success, size: 20),
+                          child: Icon(
+                            Icons.check_circle,
+                            color: AppColors.success,
+                            size: 20,
+                          ),
                         ),
                       IconButton(
                         icon: Icon(
-                          obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                          obscure
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
                           color: Colors.grey[600],
                         ),
                         onPressed: onToggle,
                       ),
                     ],
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                 ),
               ),
             ),
@@ -737,11 +763,14 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
             SizedBox(
               height: 48,
               child: ElevatedButton(
-                onPressed: isVerifying || isVerified || controller.text.length != 11
+                onPressed:
+                    isVerifying || isVerified || controller.text.length != 11
                     ? null
                     : onVerify,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isVerified ? AppColors.success : AppColors.primaryGold,
+                  backgroundColor: isVerified
+                      ? AppColors.success
+                      : AppColors.primaryGold,
                   disabledBackgroundColor: Colors.grey[300],
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   shape: RoundedRectangleBorder(
@@ -754,7 +783,9 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
                     : Text(
@@ -772,7 +803,12 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
     );
   }
 
-  Widget _buildVerifiedDataCard(BuildContext context, bool isDark, String type, Map<String, dynamic> data) {
+  Widget _buildVerifiedDataCard(
+    BuildContext context,
+    bool isDark,
+    String type,
+    Map<String, dynamic> data,
+  ) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -790,19 +826,25 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
               Text(
                 '$type Verified Successfully',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: AppColors.success,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  color: AppColors.success,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 8),
           if (data['first_name'] != null || data['last_name'] != null)
-            _buildVerifiedRow('Name', '${data['first_name'] ?? ''} ${data['last_name'] ?? ''}'.trim()),
+            _buildVerifiedRow(
+              'Name',
+              '${data['first_name'] ?? ''} ${data['last_name'] ?? ''}'.trim(),
+            ),
           if (data['phone'] != null && data['phone'].toString().isNotEmpty)
             _buildVerifiedRow('Phone', data['phone']),
           if (data['gender'] != null && data['gender'].toString().isNotEmpty)
-            _buildVerifiedRow('Gender', data['gender'].toString().toUpperCase()),
+            _buildVerifiedRow(
+              'Gender',
+              data['gender'].toString().toUpperCase(),
+            ),
         ],
       ),
     );
@@ -815,17 +857,11 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
         children: [
           Text(
             '$label: ',
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-            ),
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -837,27 +873,56 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
 
     setState(() => _isVerifyingNin = true);
 
-    final authProvider = context.read<AuthProvider>();
-    final result = await authProvider.verifyNin(_ninController.text, updateProfile: true);
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final result = await authProvider.verifyNin(
+        _ninController.text,
+        updateProfile: true,
+      );
 
-    setState(() {
-      _isVerifyingNin = false;
-      _ninVerified = result.success;
-      _ninVerifiedData = result.verifiedData;
-    });
+      setState(() {
+        _isVerifyingNin = false;
+        _ninVerified = result.success;
+        _ninVerifiedData = result.verifiedData;
+      });
 
-    if (mounted) {
-      if (result.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('NIN verified successfully!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      } else {
+      if (mounted) {
+        if (result.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('NIN verified successfully!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.error ?? 'NIN verification failed'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => _isVerifyingNin = false);
+      if (mounted) {
+        String errorMessage = 'NIN verification failed. Please try again.';
+
+        if (e is SocketException) {
+          errorMessage =
+              'Network error. Please check your internet connection.';
+        } else if (e is TimeoutException) {
+          errorMessage = 'Request timed out. Please try again.';
+        } else if (e.toString().contains('Connection refused')) {
+          errorMessage = 'Unable to connect to server. Please try again later.';
+        } else if (e.toString().contains('Failed host lookup')) {
+          errorMessage =
+              'Network error. Please check your internet connection.';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.error ?? 'NIN verification failed'),
+            content: Text(errorMessage),
             backgroundColor: AppColors.error,
           ),
         );
@@ -870,27 +935,56 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
 
     setState(() => _isVerifyingBvn = true);
 
-    final authProvider = context.read<AuthProvider>();
-    final result = await authProvider.verifyBvn(_bvnController.text, updateProfile: true);
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final result = await authProvider.verifyBvn(
+        _bvnController.text,
+        updateProfile: true,
+      );
 
-    setState(() {
-      _isVerifyingBvn = false;
-      _bvnVerified = result.success;
-      _bvnVerifiedData = result.verifiedData;
-    });
+      setState(() {
+        _isVerifyingBvn = false;
+        _bvnVerified = result.success;
+        _bvnVerifiedData = result.verifiedData;
+      });
 
-    if (mounted) {
-      if (result.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('BVN verified successfully!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      } else {
+      if (mounted) {
+        if (result.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('BVN verified successfully!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.error ?? 'BVN verification failed'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => _isVerifyingBvn = false);
+      if (mounted) {
+        String errorMessage = 'BVN verification failed. Please try again.';
+
+        if (e is SocketException) {
+          errorMessage =
+              'Network error. Please check your internet connection.';
+        } else if (e is TimeoutException) {
+          errorMessage = 'Request timed out. Please try again.';
+        } else if (e.toString().contains('Connection refused')) {
+          errorMessage = 'Unable to connect to server. Please try again later.';
+        } else if (e.toString().contains('Failed host lookup')) {
+          errorMessage =
+              'Network error. Please check your internet connection.';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.error ?? 'BVN verification failed'),
+            content: Text(errorMessage),
             backgroundColor: AppColors.error,
           ),
         );
@@ -955,7 +1049,7 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
 
     final user = context.read<AuthProvider>().user;
     final walletProvider = context.read<WalletProvider>();
-    
+
     setState(() {
       _isLoading = true;
     });
@@ -983,13 +1077,13 @@ class _WalletManagementPageState extends State<WalletManagementPage> {
           _walletAccountName = walletProvider.accountName;
           _walletBalance = walletProvider.balance;
         });
-        
+
         // Set transaction PIN after wallet creation
         await walletProvider.setTransactionPin(
           _transactionPinController.text,
           _confirmPinController.text,
         );
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Wallet created successfully!'),

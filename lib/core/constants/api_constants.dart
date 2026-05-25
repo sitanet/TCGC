@@ -5,11 +5,13 @@ class ApiConstants {
   // Agora App ID — get from https://console.agora.io
   static const String agoraAppId = 'f348f64924b048ef9f9fcb44bd0409e8';
   // static const String webBaseUrl = 'http://192.168.43.57:8000'; // Local development
-  
+
   // Web pages (for WebView)
-  static String transcriptUrl(int messageId) => '$webBaseUrl/transcript/$messageId/';
-  static String standaloneTranscriptUrl(String transcriptId) => '$webBaseUrl/standalone-transcript/$transcriptId/';
-  
+  static String transcriptUrl(int messageId) =>
+      '$webBaseUrl/transcript/$messageId/';
+  static String standaloneTranscriptUrl(String transcriptId) =>
+      '$webBaseUrl/standalone-transcript/$transcriptId/';
+
   // Auth
   static const String register = '/auth/register/';
   static const String login = '/auth/login/';
@@ -19,7 +21,7 @@ class ApiConstants {
   static const String resendConfirmation = '/auth/resend-confirmation/';
   static const String forgotPassword = '/auth/forgot-password/';
   static const String resetPassword = '/auth/reset-password/';
-  
+
   // User
   static const String userProfile = '/user/profile/';
   static const String changePassword = '/user/change-password/';
@@ -28,35 +30,38 @@ class ApiConstants {
   static const String changeTransactionPin = '/user/transaction-pin/change/';
   static const String resetTransactionPin = '/user/transaction-pin/reset/';
   static const String deleteAccount = '/user/delete-account/';
-  
+
   // Messages
   static const String messageCategories = '/message-categories/';
   static const String messages = '/messages/';
   static const String messagesByCategory = '/messages/by_category/';
-  static const String messageStats = '/messages/stats/'; // Track favorite/share stats
-  static const String topFavorites = '/messages/top_favorites/'; // Get most favorited messages
-  static const String topShares = '/messages/top_shares/'; // Get most shared messages
-  
+  static const String messageStats =
+      '/messages/stats/'; // Track favorite/share stats
+  static const String topFavorites =
+      '/messages/top_favorites/'; // Get most favorited messages
+  static const String topShares =
+      '/messages/top_shares/'; // Get most shared messages
+
   // Transcripts (standalone)
   static const String transcripts = '/transcripts/';
   static const String transcriptsByCategory = '/transcripts/by_category/';
   static const String featuredTranscripts = '/transcripts/featured/';
   static const String ebooks = '/ebooks/';
   static const String featuredEbooks = '/ebooks/featured/';
-  
+
   // Favorites (synced to backend)
   static const String favorites = '/favorites/';
   static const String favoritesSync = '/favorites/sync/';
-  
+
   // Playlists (synced to backend)
   static const String playlists = '/playlists/';
   static const String playlistsSync = '/playlists/sync/';
-  
+
   // Events
   static const String events = '/events/';
   static const String teensEvents = '/events/teens/';
   static const String liveEvents = '/events/live/';
-  
+
   // Teens Content
   static const String teensCategories = '/teens-categories/';
   static const String teensBanner = '/teens/banner/';
@@ -65,7 +70,7 @@ class ApiConstants {
   static const String devotionals = '/teens-content/devotionals/';
   static const String retreats = '/teens-content/retreats/';
   static const String forgeCamp = '/teens-content/forge_camp/';
-  
+
   // Wallet - 9PSB Integration
   static const String wallet = '/wallet/';
   static const String walletOpen = '/wallet/open/';
@@ -82,16 +87,17 @@ class ApiConstants {
   static const String addMoney = '/wallet/add-money/';
   static const String sendMoney = '/wallet/send-money/';
   static const String walletPsbHistory = '/wallet/psb-history/';
-  
+
   // Giving
   static const String giveOptions = '/give-options/';
   static const String givings = '/givings/';
-  
+
   // Contact
   static const String contact = '/contact/';
   static const String myContactMessages = '/contact/my-messages/';
-  static const String myContactMessageDetail = '/contact/my-messages/'; // append {id}/
-  
+  static const String myContactMessageDetail =
+      '/contact/my-messages/'; // append {id}/
+
   // Notifications
   static const String notifications = '/notifications/';
   static const String notificationPreferences = '/notifications/preferences/';
@@ -99,26 +105,42 @@ class ApiConstants {
   static const String notificationReadAll = '/notifications/read-all/';
   static const String deviceRegister = '/devices/register/';
   static const String deviceUnregister = '/devices/unregister/';
-  
+
   // Promotions
   static const String activePromotion = '/promotions/active/';
-  
+
   // App Version & Config
   static const String checkAppUpdate = '/app/check-update/';
   static const String appConfig = '/app/config/';
-  
+
   // Community
   static const String communityOnline = '/community/online/';
   static const String communityMembers = '/community/members/';
   static const String communityRooms = '/community/rooms/';
-  static String communityMessages(int roomId) => '/community/rooms/$roomId/messages/';
-  static String communityDeleteMessage(int messageId) => '/community/messages/$messageId/delete/';
+  static String communityMessages(int roomId) =>
+      '/community/rooms/$roomId/messages/';
+  static String communityDeleteMessage(int messageId) =>
+      '/community/messages/$messageId/delete/';
   static String communityDm(int userId) => '/community/dm/$userId/';
-  static String communityMessageUpload(int roomId) => '/community/rooms/$roomId/messages/upload/';
-  static String communityListenSession(int roomId) => '/community/rooms/$roomId/listen-session/';
+  static String communityMessageUpload(int roomId) =>
+      '/community/rooms/$roomId/messages/upload/';
+  static String communityListenSession(int roomId) =>
+      '/community/rooms/$roomId/listen-session/';
 
-  // KYC Verification
+  // KYC Verification (Legacy)
   static const String verifyNin = '/kyc/verify-nin/';
   static const String verifyBvn = '/kyc/verify-bvn/';
   static const String validateIdentity = '/kyc/validate-identity/';
+
+  // Secure KYC Verification (Two-Step Identity Confirmation)
+  static const String secureVerifyNin = '/kyc/secure/verify-nin/';
+  static const String confirmIdentity = '/kyc/secure/confirm-identity/';
+
+  // Data Protection & Privacy (NDPR)
+  static const String privacyPolicy = '/privacy-policy/';
+  static const String recordConsent = '/consent/';
+  static const String withdrawConsent = '/consent/withdraw/';
+  static const String consentStatus = '/consent/status/';
+  static const String dataExport = '/data/export/';
+  static const String dataErase = '/data/erase/';
 }

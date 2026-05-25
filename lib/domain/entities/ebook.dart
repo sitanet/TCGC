@@ -52,4 +52,22 @@ class Ebook {
       date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'description': description,
+    'author': author,
+    'cover_image_url': coverImageUrl,
+    'file_download_url': fileUrl,
+    'category': category,
+    'category_name': categoryName,
+    'pages': pages,
+    'is_featured': isFeatured,
+    'is_free': isFree,
+    'is_service_team_only': isServiceTeamOnly,
+    'is_general_married_only': isGeneralMarriedOnly,
+    'is_in_house_married_only': isInHouseMarriedOnly,
+    'date': date.toIso8601String(),
+  };
 }

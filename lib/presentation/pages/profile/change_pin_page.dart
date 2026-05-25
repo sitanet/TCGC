@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,17 +37,17 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
 
   Future<void> _initializeWallet() async {
     final walletProvider = ref.read(walletChangeNotifierProvider);
-    
+
     // Fetch wallet data if not initialized
     if (!walletProvider.isInitialized) {
       await walletProvider.fetchWallet();
     }
-    
+
     // Check if PIN is already set
     if (walletProvider.hasWallet) {
       _hasPin = await walletProvider.checkHasPin();
     }
-    
+
     if (mounted) {
       setState(() {
         _isInitializing = false;
@@ -67,34 +69,60 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
         _isLoading = true;
       });
 
-      final walletProvider = ref.read(walletChangeNotifierProvider);
-      final success = await walletProvider.changeTransactionPin(
-        _currentPinController.text,
-        _newPinController.text,
-        _confirmPinController.text,
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Transaction PIN changed successfully'),
-            backgroundColor: Colors.green,
-          ),
+      try {
+        final walletProvider = ref.read(walletChangeNotifierProvider);
+        final success = await walletProvider.changeTransactionPin(
+          _currentPinController.text,
+          _newPinController.text,
+          _confirmPinController.text,
         );
-        Navigator.pop(context);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(walletProvider.error ?? 'Failed to change PIN'),
-            backgroundColor: Colors.red,
-          ),
-        );
+
+        if (!mounted) return;
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Transaction PIN changed successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(walletProvider.error ?? 'Failed to change PIN'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+        });
+        if (mounted) {
+          String errorMessage = 'Failed to change PIN. Please try again.';
+
+          if (e is SocketException) {
+            errorMessage =
+                'Network error. Please check your internet connection.';
+          } else if (e is TimeoutException) {
+            errorMessage = 'Request timed out. Please try again.';
+          } else if (e.toString().contains('Connection refused')) {
+            errorMessage =
+                'Unable to connect to server. Please try again later.';
+          } else if (e.toString().contains('Failed host lookup')) {
+            errorMessage =
+                'Network error. Please check your internet connection.';
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+          );
+        }
       }
     }
   }
@@ -105,43 +133,72 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
         _isLoading = true;
       });
 
-      final walletProvider = ref.read(walletChangeNotifierProvider);
-      final success = await walletProvider.setTransactionPin(
-        _newPinController.text,
-        _confirmPinController.text,
-      );
+      try {
+        final walletProvider = ref.read(walletChangeNotifierProvider);
+        final success = await walletProvider.setTransactionPin(
+          _newPinController.text,
+          _confirmPinController.text,
+        );
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (success) {
         setState(() {
-          _hasPin = true;
+          _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Transaction PIN set successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pop(context);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(walletProvider.error ?? 'Failed to set PIN'),
-            backgroundColor: Colors.red,
-          ),
-        );
+
+        if (success) {
+          setState(() {
+            _hasPin = true;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Transaction PIN set successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(walletProvider.error ?? 'Failed to set PIN'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+        });
+        if (mounted) {
+          String errorMessage = 'Failed to set PIN. Please try again.';
+
+          if (e is SocketException) {
+            errorMessage =
+                'Network error. Please check your internet connection.';
+          } else if (e is TimeoutException) {
+            errorMessage = 'Request timed out. Please try again.';
+          } else if (e.toString().contains('Connection refused')) {
+            errorMessage =
+                'Unable to connect to server. Please try again later.';
+          } else if (e.toString().contains('Failed host lookup')) {
+            errorMessage =
+                'Network error. Please check your internet connection.';
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+          );
+        }
       }
     }
   }
 
   Widget _buildSetPinForm(BuildContext context, bool isDark) {
     return Scaffold(
-      appBar: const CustomAppBar(title: 'Set Transaction PIN', showBackButton: true),
+      appBar: const CustomAppBar(
+        title: 'Set Transaction PIN',
+        showBackButton: true,
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -173,7 +230,8 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                           children: [
                             Text(
                               'Set Up Your PIN',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: AppColors.primaryGold,
                                   ),
@@ -181,7 +239,8 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                             const SizedBox(height: 4),
                             Text(
                               'Your wallet is ready. Set a PIN to start making transactions.',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
                                     color: isDark
                                         ? AppColors.textSecondaryDark
                                         : AppColors.textSecondaryLight,
@@ -197,17 +256,17 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                 Text(
                   'Create your transaction PIN',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Enter a 4-digit PIN to secure your wallet transactions.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
                 ),
                 const SizedBox(height: 32),
                 _buildPinField(
@@ -235,7 +294,8 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                   'Confirm PIN',
                   _confirmPinController,
                   _obscureConfirmPin,
-                  () => setState(() => _obscureConfirmPin = !_obscureConfirmPin),
+                  () =>
+                      setState(() => _obscureConfirmPin = !_obscureConfirmPin),
                   (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please confirm your PIN';
@@ -266,7 +326,9 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : const Text(
@@ -322,7 +384,10 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
     // Show loading while initializing
     if (_isInitializing || walletProvider.isLoading) {
       return Scaffold(
-        appBar: const CustomAppBar(title: 'Transaction PIN', showBackButton: true),
+        appBar: const CustomAppBar(
+          title: 'Transaction PIN',
+          showBackButton: true,
+        ),
         body: const Center(
           child: CircularProgressIndicator(color: AppColors.primaryGold),
         ),
@@ -332,7 +397,10 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
     // Check if user has a wallet
     if (!walletProvider.hasWallet) {
       return Scaffold(
-        appBar: const CustomAppBar(title: 'Transaction PIN', showBackButton: true),
+        appBar: const CustomAppBar(
+          title: 'Transaction PIN',
+          showBackButton: true,
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -347,19 +415,19 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                 const SizedBox(height: 24),
                 Text(
                   'No Wallet Found',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'You need to create a wallet first before you can set up a transaction PIN.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
                 ),
               ],
             ),
@@ -406,7 +474,8 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                           children: [
                             Text(
                               'Transaction PIN',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: AppColors.primaryGold,
                                   ),
@@ -414,7 +483,8 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                             const SizedBox(height: 4),
                             Text(
                               'Your PIN is used to authorize wallet transactions',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
                                     color: isDark
                                         ? AppColors.textSecondaryDark
                                         : AppColors.textSecondaryLight,
@@ -430,17 +500,17 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                 Text(
                   'Change your transaction PIN',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Enter your current PIN and create a new 4-digit PIN.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
                 ),
                 const SizedBox(height: 32),
                 _buildPinField(
@@ -449,7 +519,8 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                   'Current PIN',
                   _currentPinController,
                   _obscureCurrentPin,
-                  () => setState(() => _obscureCurrentPin = !_obscureCurrentPin),
+                  () =>
+                      setState(() => _obscureCurrentPin = !_obscureCurrentPin),
                   (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your current PIN';
@@ -490,7 +561,8 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                   'Confirm New PIN',
                   _confirmPinController,
                   _obscureConfirmPin,
-                  () => setState(() => _obscureConfirmPin = !_obscureConfirmPin),
+                  () =>
+                      setState(() => _obscureConfirmPin = !_obscureConfirmPin),
                   (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please confirm your new PIN';
@@ -521,7 +593,9 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : const Text(
@@ -539,7 +613,9 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const ResetPinPage()),
+                        MaterialPageRoute(
+                          builder: (context) => const ResetPinPage(),
+                        ),
                       );
                     },
                     child: Text(
@@ -602,9 +678,9 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 8),
         TextFormField(
@@ -636,14 +712,14 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.primaryGold,
-              ),
+              borderSide: const BorderSide(color: AppColors.primaryGold),
             ),
             suffixIcon: IconButton(
               icon: Icon(
                 obscureText ? Icons.visibility_off : Icons.visibility,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
               onPressed: onToggleVisibility,
             ),

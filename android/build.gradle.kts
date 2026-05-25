@@ -2,6 +2,9 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://maven.aliyun.com/repository/central") }
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
+        maven { url = uri("https://maven.aliyun.com/repository/google") }
     }
     // Force a resolvable protobuf version — iris_method_channel pins AGP 7.1.2
     // which requests protobuf-java:3.10.0, a version no longer on Maven Central.

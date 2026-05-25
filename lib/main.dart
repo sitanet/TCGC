@@ -1,4 +1,5 @@
-import 'dart:async' show Future, StreamSubscription, TimeoutException, runZonedGuarded;
+import 'dart:async'
+    show Future, StreamSubscription, TimeoutException, runZonedGuarded;
 import 'dart:io';
 import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -41,18 +42,31 @@ import 'data/services/biometric_service.dart';
 import 'core/providers/community_provider.dart';
 import 'core/services/image_cache_service.dart';
 
-final communityChangeNotifierProvider = ChangeNotifierProvider<CommunityProvider>((ref) => CommunityProvider());
+final communityChangeNotifierProvider =
+    ChangeNotifierProvider<CommunityProvider>((ref) => CommunityProvider());
 
 const String appVersion = '1.0.0';
 
 // Riverpod providers wrapping ChangeNotifier classes
-final themeChangeNotifierProvider = ChangeNotifierProvider<ThemeProvider>((ref) => ThemeProvider());
-final authChangeNotifierProvider = ChangeNotifierProvider<AuthProvider>((ref) => AuthProvider());
-final notificationChangeNotifierProvider = ChangeNotifierProvider<NotificationProvider>((ref) => NotificationProvider());
-final walletChangeNotifierProvider = ChangeNotifierProvider<WalletProvider>((ref) => WalletProvider());
-final audioPlayerChangeNotifierProvider = ChangeNotifierProvider<AudioPlayerProvider>((ref) => AudioPlayerProvider());
-final biometricChangeNotifierProvider = ChangeNotifierProvider<BiometricProvider>((ref) => BiometricProvider());
-final appConfigChangeNotifierProvider = ChangeNotifierProvider<AppConfigProvider>((ref) => AppConfigProvider());
+final themeChangeNotifierProvider = ChangeNotifierProvider<ThemeProvider>(
+  (ref) => ThemeProvider(),
+);
+final authChangeNotifierProvider = ChangeNotifierProvider<AuthProvider>(
+  (ref) => AuthProvider(),
+);
+final notificationChangeNotifierProvider =
+    ChangeNotifierProvider<NotificationProvider>(
+      (ref) => NotificationProvider(),
+    );
+final walletChangeNotifierProvider = ChangeNotifierProvider<WalletProvider>(
+  (ref) => WalletProvider(),
+);
+final audioPlayerChangeNotifierProvider =
+    ChangeNotifierProvider<AudioPlayerProvider>((ref) => AudioPlayerProvider());
+final biometricChangeNotifierProvider =
+    ChangeNotifierProvider<BiometricProvider>((ref) => BiometricProvider());
+final appConfigChangeNotifierProvider =
+    ChangeNotifierProvider<AppConfigProvider>((ref) => AppConfigProvider());
 
 // Navigation provider to allow tab pages to navigate to home
 final mainTabIndexProvider = StateProvider<int>((ref) => 0);
@@ -63,67 +77,66 @@ void main() async {
     debugPrint('Flutter error: ${details.exception}');
     debugPrint('Stack trace: ${details.stack}');
   };
-  
+
   // Run the app with error zone for async errors
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    
-    // Initialize image cache with conservative memory limits first
-    ImageCacheService.initialize();
-    
-    // Start the app IMMEDIATELY - don't block on any initialization
-    // This prevents ANR on low-end devices
-    runApp(
-      const ProviderScope(
-        child: MyApp(),
-      ),
-    );
-    
-    // Initialize Firebase in background (non-blocking)
-    Future.microtask(() async {
-      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+
+      // Initialize image cache with conservative memory limits first
+      ImageCacheService.initialize();
+
+      // Start the app IMMEDIATELY - don't block on any initialization
+      // This prevents ANR on low-end devices
+      runApp(const ProviderScope(child: MyApp()));
+
+      // Initialize Firebase in background (non-blocking)
+      Future.microtask(() async {
+        if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+          try {
+            await Firebase.initializeApp().timeout(
+              const Duration(seconds: 10),
+              onTimeout: () {
+                debugPrint('Firebase initialization timed out');
+                throw TimeoutException('Firebase init timeout');
+              },
+            );
+            debugPrint('Firebase initialized');
+          } catch (e) {
+            debugPrint('Firebase initialization error: $e');
+          }
+        }
+      });
+
+      // Initialize AudioService in background with delay to let UI render first
+      Future.delayed(const Duration(milliseconds: 500), () async {
         try {
-          await Firebase.initializeApp().timeout(
-            const Duration(seconds: 10),
+          await initAudioService().timeout(
+            const Duration(seconds: 15),
             onTimeout: () {
-              debugPrint('Firebase initialization timed out');
-              throw TimeoutException('Firebase init timeout');
+              debugPrint('Audio service initialization timed out');
+              throw TimeoutException('Audio service init timeout');
             },
           );
-          debugPrint('Firebase initialized');
         } catch (e) {
-          debugPrint('Firebase initialization error: $e');
+          debugPrint('Audio service initialization error: $e');
         }
-      }
-    });
-    
-    // Initialize AudioService in background with delay to let UI render first
-    Future.delayed(const Duration(milliseconds: 500), () async {
-      try {
-        await initAudioService().timeout(
-          const Duration(seconds: 15),
-          onTimeout: () {
-            debugPrint('Audio service initialization timed out');
-            throw TimeoutException('Audio service init timeout');
-          },
-        );
-      } catch (e) {
-        debugPrint('Audio service initialization error: $e');
-      }
-    });
-    
-    // Initialize non-critical services in background with longer delay
-    Future.delayed(const Duration(seconds: 3), () async {
-      try {
-        await ConnectivityService().initialize();
-      } catch (e) {
-        debugPrint('Connectivity service initialization error: $e');
-      }
-    });
-  }, (error, stackTrace) {
-    debugPrint('Uncaught async error: $error');
-    debugPrint('Stack trace: $stackTrace');
-  });
+      });
+
+      // Initialize non-critical services in background with longer delay
+      Future.delayed(const Duration(seconds: 3), () async {
+        try {
+          await ConnectivityService().initialize();
+        } catch (e) {
+          debugPrint('Connectivity service initialization error: $e');
+        }
+      });
+    },
+    (error, stackTrace) {
+      debugPrint('Uncaught async error: $error');
+      debugPrint('Stack trace: $stackTrace');
+    },
+  );
 }
 
 class MyApp extends ConsumerStatefulWidget {
@@ -166,7 +179,7 @@ class _MyAppState extends ConsumerState<MyApp> {
       debugPrint('Connectivity check error: $e - assuming offline');
       isConnected = false;
     }
-    
+
     // If no internet, show offline page immediately
     if (!isConnected) {
       if (mounted) {
@@ -183,7 +196,7 @@ class _MyAppState extends ConsumerState<MyApp> {
       });
       return;
     }
-    
+
     // Show UI now that we confirmed we have internet
     if (mounted) {
       setState(() {
@@ -191,26 +204,26 @@ class _MyAppState extends ConsumerState<MyApp> {
         _isOffline = false;
       });
     }
-    
+
     // Initialize auth in background
     Future.microtask(() async {
       try {
         final authProvider = ref.read(authChangeNotifierProvider);
-        
+
         await authProvider.initialize().timeout(
           const Duration(seconds: 5),
           onTimeout: () {
             debugPrint('Auth initialization timed out');
           },
         );
-        
+
         await _interestsService.initialize().timeout(
           const Duration(seconds: 3),
           onTimeout: () {
             debugPrint('Interests initialization timed out');
           },
         );
-        
+
         if (mounted && authProvider.isAuthenticated) {
           setState(() {
             _showGetStarted = false;
@@ -220,14 +233,14 @@ class _MyAppState extends ConsumerState<MyApp> {
           });
           _startBackgroundPreBuffering();
         }
-        
+
         _initializeNotifications();
       } catch (e) {
         debugPrint('Initialization error: $e');
       }
     });
   }
-  
+
   void _onConnectionRestored() {
     if (mounted) {
       setState(() {
@@ -237,7 +250,7 @@ class _MyAppState extends ConsumerState<MyApp> {
       _initializeApp();
     }
   }
-  
+
   Future<void> _initializeNotifications() async {
     // Delay notification init to let UI render first
     Future.delayed(const Duration(seconds: 1), () async {
@@ -260,13 +273,13 @@ class _MyAppState extends ConsumerState<MyApp> {
     // Start pre-buffering all messages in background after login
     _startBackgroundPreBuffering();
   }
-  
+
   Future<void> _startBackgroundPreBuffering() async {
     // Disabled heavy background caching to prevent ANR issues
     // Data will be fetched on demand from screens
     debugPrint('Background pre-buffering disabled to prevent ANR');
   }
-  
+
   void _onInterestsComplete() {
     setState(() {
       _showInterests = false;
@@ -284,19 +297,15 @@ class _MyAppState extends ConsumerState<MyApp> {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: themeProvider.themeMode,
-        home: const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        ),
+        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
       );
     }
 
     Widget homeWidget;
-    
+
     // Check if offline - show downloads page directly
     if (_isOffline) {
-      homeWidget = OfflineDownloadsPage(
-        onConnected: _onConnectionRestored,
-      );
+      homeWidget = OfflineDownloadsPage(onConnected: _onConnectionRestored);
     } else if (authProvider.isAuthenticated) {
       if (_showInterests) {
         homeWidget = InterestsPage(onComplete: _onInterestsComplete);
@@ -366,7 +375,8 @@ class MainScreen extends ConsumerStatefulWidget {
   ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObserver {
+class _MainScreenState extends ConsumerState<MainScreen>
+    with WidgetsBindingObserver {
   bool _showPromotion = false;
   bool _showUpdateDialog = false;
   bool _showReadyToPlayPopup = false;
@@ -426,7 +436,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       if (mounted) _checkForReadyToPlayPopup();
     });
   }
-  
+
   Future<void> _checkForReadyToPlayPopup() async {
     final shouldShow = await ReadyToPlayPopup.shouldShow();
     if (shouldShow && mounted) {
@@ -435,7 +445,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       });
     }
   }
-  
+
   void _closeReadyToPlayPopup() async {
     await ReadyToPlayPopup.markAsShown();
     if (mounted) {
@@ -444,7 +454,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       });
     }
   }
-  
+
   void _setupNotificationHandler() {
     NotificationService.onNotificationTapped = (data) {
       _handleNotificationNavigation(data);
@@ -489,10 +499,10 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       ref.read(mainTabIndexProvider.notifier).state = 0;
     }
   }
-  
+
   Future<void> _handleNotificationNavigation(Map<String, dynamic> data) async {
     final type = data['type'];
-    
+
     if (type == 'new_message' || type == 'message') {
       final messageId = data['message_id'];
       if (messageId != null) {
@@ -507,7 +517,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       }
     }
   }
-  
+
   @override
   void dispose() {
     _deepLinkSub?.cancel();
@@ -515,24 +525,24 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
-  
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || 
+    if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       _saveCurrentTab();
       // Clear memory cache when app goes to background to prevent OOM
       ImageCacheService.clearMemoryCache();
     }
   }
-  
+
   @override
   void didHaveMemoryPressure() {
     // System is low on memory - clear image caches
     ImageCacheService.clearMemoryCache();
     debugPrint('Memory pressure detected - cleared image cache');
   }
-  
+
   Future<void> _restoreLastTab() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -544,7 +554,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       debugPrint('Error restoring last tab: $e');
     }
   }
-  
+
   Future<void> _saveCurrentTab() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -569,22 +579,22 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       debugPrint('App config fetch error: $e');
     }
   }
-  
+
   Future<void> _handleWalletTap() async {
     final walletProvider = ref.read(walletChangeNotifierProvider);
-    
+
     // If user doesn't have wallet, go directly to wallet page (no auth needed for creation)
     if (!walletProvider.hasWallet) {
       _setCurrentIndex(3);
       return;
     }
-    
+
     // If already authenticated in this session, go directly
     if (_walletAuthenticated) {
       _setCurrentIndex(3);
       return;
     }
-    
+
     // Show authentication dialog
     final authenticated = await _showWalletAuthDialog();
     if (authenticated) {
@@ -592,12 +602,13 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       _setCurrentIndex(3);
     }
   }
-  
+
   Future<bool> _showWalletAuthDialog() async {
     final biometricService = BiometricService();
-    final biometricEnabled = await biometricService.isBiometricTransactionEnabled();
+    final biometricEnabled = await biometricService
+        .isBiometricTransactionEnabled();
     final biometricAvailable = await biometricService.isBiometricAvailable();
-    
+
     // Try biometric first if enabled and available
     if (biometricEnabled && biometricAvailable) {
       final authenticated = await biometricService.authenticate(
@@ -605,21 +616,22 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       );
       if (authenticated) return true;
     }
-    
+
     // Fall back to PIN dialog
     if (!mounted) return false;
-    
+
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => _WalletPinDialog(
-        walletProvider: ref.read(walletChangeNotifierProvider),
-        biometricService: biometricService,
-        biometricAvailable: biometricAvailable,
-      ),
-    ) ?? false;
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => _WalletPinDialog(
+            walletProvider: ref.read(walletChangeNotifierProvider),
+            biometricService: biometricService,
+            biometricAvailable: biometricAvailable,
+          ),
+        ) ??
+        false;
   }
-  
+
   Future<void> _checkForAppUpdate() async {
     try {
       String platform = 'all';
@@ -630,8 +642,11 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
           platform = 'ios';
         }
       }
-      
-      final updateInfo = await _dataService.checkForAppUpdate(appVersion, platform);
+
+      final updateInfo = await _dataService.checkForAppUpdate(
+        appVersion,
+        platform,
+      );
       if (updateInfo != null && updateInfo.updateAvailable && mounted) {
         setState(() {
           _updateInfo = updateInfo;
@@ -667,7 +682,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       _showPromotion = false;
     });
   }
-  
+
   void _closeUpdateDialog() {
     if (_updateInfo?.forceUpdate == true) {
       return;
@@ -676,7 +691,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       _showUpdateDialog = false;
     });
   }
-  
+
   Future<void> _openUpdateUrl() async {
     final url = _updateInfo?.updateUrl;
     if (url != null && url.isNotEmpty) {
@@ -690,13 +705,34 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     if (_showUpdateDialog && _updateInfo != null) {
       return Scaffold(
-        backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF8F9FA),
+        backgroundColor: isDark
+            ? AppColors.backgroundDark
+            : const Color(0xFFF8F9FA),
         body: SafeArea(
           child: Column(
             children: [
+              // Close button row — only shown when update is NOT forced
+              if (!_updateInfo!.forceUpdate)
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8, right: 8),
+                    child: IconButton(
+                      onPressed: _closeUpdateDialog,
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                        size: 28,
+                      ),
+                      tooltip: 'Close',
+                    ),
+                  ),
+                ),
               // Scrollable content area
               Expanded(
                 child: SingleChildScrollView(
@@ -704,7 +740,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
                     children: [
-                      const SizedBox(height: 60),
+                      SizedBox(height: _updateInfo!.forceUpdate ? 60 : 16),
                       // Animated icon container
                       Container(
                         width: 140,
@@ -736,7 +772,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primaryGold.withValues(alpha: 0.4),
+                                  color: AppColors.primaryGold.withValues(
+                                    alpha: 0.4,
+                                  ),
                                   blurRadius: 20,
                                   offset: const Offset(0, 10),
                                 ),
@@ -753,16 +791,22 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                       const SizedBox(height: 32),
                       // Title
                       Text(
-                        _updateInfo!.forceUpdate ? 'Update Required' : 'New Update Available',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.5,
-                        ),
+                        _updateInfo!.forceUpdate
+                            ? 'Update Required'
+                            : 'New Update Available',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.5,
+                            ),
                       ),
                       const SizedBox(height: 8),
                       // Version badge
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primaryGold.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
@@ -789,7 +833,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06),
+                              color: Colors.black.withValues(
+                                alpha: isDark ? 0.2 : 0.06,
+                              ),
                               blurRadius: 20,
                               offset: const Offset(0, 4),
                             ),
@@ -803,7 +849,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: AppColors.primaryGold.withValues(alpha: 0.1),
+                                    color: AppColors.primaryGold.withValues(
+                                      alpha: 0.1,
+                                    ),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Icon(
@@ -818,7 +866,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
-                                    color: isDark ? Colors.white : Colors.black87,
+                                    color: isDark
+                                        ? Colors.white
+                                        : Colors.black87,
                                   ),
                                 ),
                               ],
@@ -830,7 +880,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                               style: TextStyle(
                                 fontSize: 15,
                                 height: 1.6,
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
                               ),
                             ),
                           ],
@@ -878,7 +930,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
               Container(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                 decoration: BoxDecoration(
-                  color: isDark ? AppColors.backgroundDark : const Color(0xFFF8F9FA),
+                  color: isDark
+                      ? AppColors.backgroundDark
+                      : const Color(0xFFF8F9FA),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -889,7 +943,10 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                       height: 56,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [AppColors.primaryGold, AppColors.primaryGold.withValues(alpha: 0.85)],
+                          colors: [
+                            AppColors.primaryGold,
+                            AppColors.primaryGold.withValues(alpha: 0.85),
+                          ],
                           begin: Alignment.centerLeft,
                           end: Alignment.centerRight,
                         ),
@@ -949,7 +1006,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
                             ),
                           ),
                         ),
@@ -963,14 +1022,14 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
         ),
       );
     }
-    
+
     if (_showPromotion && _activePromotions.isNotEmpty) {
       return PromotionPopup(
         promotions: _activePromotions,
         onClose: _closePromotion,
       );
     }
-    
+
     if (_showReadyToPlayPopup) {
       return Stack(
         children: [
@@ -1114,10 +1173,15 @@ class _WalletPinDialogState extends State<_WalletPinDialog> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.primaryGold, width: 2),
+                borderSide: const BorderSide(
+                  color: AppColors.primaryGold,
+                  width: 2,
+                ),
               ),
               suffixIcon: IconButton(
-                icon: Icon(_obscurePin ? Icons.visibility_off : Icons.visibility),
+                icon: Icon(
+                  _obscurePin ? Icons.visibility_off : Icons.visibility,
+                ),
                 onPressed: () => setState(() => _obscurePin = !_obscurePin),
               ),
             ),
@@ -1142,7 +1206,9 @@ class _WalletPinDialogState extends State<_WalletPinDialog> {
           child: Text(
             'Cancel',
             style: TextStyle(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
         ),
@@ -1151,13 +1217,18 @@ class _WalletPinDialogState extends State<_WalletPinDialog> {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primaryGold,
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: _isLoading
               ? const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
               : const Text('Verify'),
         ),

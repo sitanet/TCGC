@@ -6,20 +6,40 @@ class BiometricProvider extends ChangeNotifier {
   final BiometricService _biometricService = BiometricService();
 
   bool _isAvailable = false;
-  bool _biometricLoginEnabled = false;
-  bool _biometricTransactionEnabled = false;
+  bool _hasFace = false;
+  bool _hasFingerprint = false;
+
+  // Login toggles
+  bool _biometricLoginEnabled = false; // fingerprint login
+  bool _faceLoginEnabled = false; // face login
+
+  // Transaction toggles
+  bool _biometricTransactionEnabled = false; // fingerprint transactions
+  bool _faceTransactionEnabled = false; // face transactions
+
   bool _hasSavedCredentials = false;
   List<BiometricType> _availableBiometrics = [];
   bool _isLoading = false;
 
+  // ── Getters ────────────────────────────────────────────────────────────────
   bool get isAvailable => _isAvailable;
+  bool get hasFace => _hasFace;
+  bool get hasFingerprint => _hasFingerprint;
+
   bool get biometricLoginEnabled => _biometricLoginEnabled;
+  bool get faceLoginEnabled => _faceLoginEnabled;
+
   bool get biometricTransactionEnabled => _biometricTransactionEnabled;
+  bool get faceTransactionEnabled => _faceTransactionEnabled;
+
   bool get hasSavedCredentials => _hasSavedCredentials;
   List<BiometricType> get availableBiometrics => _availableBiometrics;
   bool get isLoading => _isLoading;
-  String get biometricTypeName => _biometricService.getBiometricTypeName(_availableBiometrics);
 
+  String get biometricTypeName =>
+      _biometricService.getBiometricTypeName(_availableBiometrics);
+
+  // ── Initialize ─────────────────────────────────────────────────────────────
   Future<void> initialize() async {
     _isLoading = true;
     notifyListeners();
@@ -27,82 +47,177 @@ class BiometricProvider extends ChangeNotifier {
     _isAvailable = await _biometricService.isBiometricAvailable();
     if (_isAvailable) {
       _availableBiometrics = await _biometricService.getAvailableBiometrics();
+      _hasFace = _biometricService.hasFaceRecognition(_availableBiometrics);
+      _hasFingerprint = _biometricService.hasFingerprint(_availableBiometrics);
     }
-    
+
     _biometricLoginEnabled = await _biometricService.isBiometricLoginEnabled();
-    _biometricTransactionEnabled = await _biometricService.isBiometricTransactionEnabled();
+    _faceLoginEnabled = await _biometricService.isFaceLoginEnabled();
+    _biometricTransactionEnabled = await _biometricService
+        .isBiometricTransactionEnabled();
+    _faceTransactionEnabled = await _biometricService
+        .isFaceTransactionEnabled();
     _hasSavedCredentials = await _biometricService.hasSavedCredentials();
 
     _isLoading = false;
     notifyListeners();
   }
 
+  // ── Generic authenticate (used by wallet page) ─────────────────────────────
   Future<bool> authenticate({String? reason}) async {
     if (!_isAvailable) return false;
-    return await _biometricService.authenticate(reason: reason ?? 'Please authenticate');
+    return await _biometricService.authenticate(
+      reason: reason ?? 'Please authenticate',
+    );
   }
 
+  // ── Transaction auth — tries face first if enabled, then fingerprint ───────
   Future<bool> authenticateForTransaction() async {
-    if (!_isAvailable || !_biometricTransactionEnabled) return false;
-    return await _biometricService.authenticateForTransaction();
-  }
+    if (!_isAvailable) return false;
 
-  Future<bool> authenticateForLogin() async {
-    if (!_isAvailable || !_biometricLoginEnabled || !_hasSavedCredentials) return false;
-    return await _biometricService.authenticateForLogin();
-  }
-
-  Future<void> setBiometricLoginEnabled(bool enabled, {String? email, String? password}) async {
-    debugPrint('setBiometricLoginEnabled called: enabled=$enabled, isAvailable=$_isAvailable');
-    
-    if (enabled && !_isAvailable) {
-      debugPrint('Biometric not available, returning');
-      return;
-    }
-    
-    if (enabled) {
-      debugPrint('Attempting biometric authentication...');
-      final authenticated = await _biometricService.authenticate(
-        reason: 'Authenticate to enable biometric login',
+    if (_faceTransactionEnabled && _hasFace) {
+      final ok = await _biometricService.authenticateFace(
+        reason: 'Look at your camera to confirm transaction',
       );
-      debugPrint('Authentication result: $authenticated');
-      
-      if (!authenticated) {
-        debugPrint('Authentication failed, returning without enabling');
-        return;
-      }
-      
+      if (ok) return true;
+    }
+
+    if (_biometricTransactionEnabled && _hasFingerprint) {
+      return await _biometricService.authenticateFingerprint(
+        reason: 'Place your finger to confirm transaction',
+      );
+    }
+
+    // Fallback: any available biometric
+    if (_faceTransactionEnabled || _biometricTransactionEnabled) {
+      return await _biometricService.authenticateForTransaction();
+    }
+
+    return false;
+  }
+
+  // ── Login auth ─────────────────────────────────────────────────────────────
+  Future<bool> authenticateForLogin() async {
+    if (!_isAvailable) return false;
+
+    if (_faceLoginEnabled && _hasFace) {
+      final ok = await _biometricService.authenticateFace(
+        reason: 'Look at your camera to sign in',
+      );
+      if (ok) return true;
+    }
+
+    if (_biometricLoginEnabled && _hasFingerprint) {
+      return await _biometricService.authenticateFingerprint(
+        reason: 'Place your finger to sign in',
+      );
+    }
+
+    if (_faceLoginEnabled || _biometricLoginEnabled) {
+      return await _biometricService.authenticateForLogin();
+    }
+
+    return false;
+  }
+
+  // ── Fingerprint login toggle ───────────────────────────────────────────────
+  Future<void> setBiometricLoginEnabled(
+    bool enabled, {
+    String? email,
+    String? password,
+  }) async {
+    debugPrint(
+      'setBiometricLoginEnabled: enabled=$enabled, isAvailable=$_isAvailable',
+    );
+
+    if (enabled && !_isAvailable) return;
+
+    if (enabled) {
+      final authenticated = await _biometricService.authenticateFingerprint(
+        reason: 'Authenticate to enable fingerprint login',
+      );
+      if (!authenticated) return;
+
       if (email != null && password != null) {
-        debugPrint('Saving credentials for email: $email');
         await _biometricService.saveCredentials(email, password);
         _hasSavedCredentials = true;
       }
     } else {
-      await _biometricService.clearCredentials();
-      _hasSavedCredentials = false;
+      // Only clear credentials if face login is also disabled
+      if (!_faceLoginEnabled) {
+        await _biometricService.clearCredentials();
+        _hasSavedCredentials = false;
+      }
     }
-    
+
     await _biometricService.setBiometricLoginEnabled(enabled);
     _biometricLoginEnabled = enabled;
-    debugPrint('Biometric login enabled set to: $_biometricLoginEnabled');
     notifyListeners();
   }
 
+  // ── Face login toggle ──────────────────────────────────────────────────────
+  Future<void> setFaceLoginEnabled(
+    bool enabled, {
+    String? email,
+    String? password,
+  }) async {
+    if (enabled && (!_isAvailable || !_hasFace)) return;
+
+    if (enabled) {
+      final authenticated = await _biometricService.authenticateFace(
+        reason: 'Look at your camera to enable Face ID login',
+      );
+      if (!authenticated) return;
+
+      if (email != null && password != null) {
+        await _biometricService.saveCredentials(email, password);
+        _hasSavedCredentials = true;
+      }
+    } else {
+      if (!_biometricLoginEnabled) {
+        await _biometricService.clearCredentials();
+        _hasSavedCredentials = false;
+      }
+    }
+
+    await _biometricService.setFaceLoginEnabled(enabled);
+    _faceLoginEnabled = enabled;
+    notifyListeners();
+  }
+
+  // ── Fingerprint transaction toggle ─────────────────────────────────────────
   Future<void> setBiometricTransactionEnabled(bool enabled) async {
     if (enabled && !_isAvailable) return;
-    
+
     if (enabled) {
-      final authenticated = await _biometricService.authenticate(
-        reason: 'Authenticate to enable biometric for transactions',
+      final authenticated = await _biometricService.authenticateFingerprint(
+        reason: 'Authenticate to enable fingerprint for transactions',
       );
       if (!authenticated) return;
     }
-    
+
     await _biometricService.setBiometricTransactionEnabled(enabled);
     _biometricTransactionEnabled = enabled;
     notifyListeners();
   }
 
+  // ── Face transaction toggle ────────────────────────────────────────────────
+  Future<void> setFaceTransactionEnabled(bool enabled) async {
+    if (enabled && (!_isAvailable || !_hasFace)) return;
+
+    if (enabled) {
+      final authenticated = await _biometricService.authenticateFace(
+        reason: 'Look at your camera to enable Face ID for transactions',
+      );
+      if (!authenticated) return;
+    }
+
+    await _biometricService.setFaceTransactionEnabled(enabled);
+    _faceTransactionEnabled = enabled;
+    notifyListeners();
+  }
+
+  // ── Credentials helpers ────────────────────────────────────────────────────
   Future<Map<String, String>?> getSavedCredentials() async {
     return await _biometricService.getSavedCredentials();
   }
