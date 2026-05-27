@@ -9,6 +9,7 @@ class FailurePage extends ConsumerStatefulWidget {
   final String amount;
   final String? errorMessage;
   final VoidCallback? onRetry;
+  final bool isTimeout;
 
   const FailurePage({
     super.key,
@@ -16,6 +17,7 @@ class FailurePage extends ConsumerStatefulWidget {
     required this.amount,
     this.errorMessage,
     this.onRetry,
+    this.isTimeout = false,
   });
 
   @override
@@ -52,9 +54,10 @@ class _FailurePageState extends ConsumerState<FailurePage>
       CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _scaleController, curve: Curves.easeIn),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _scaleController, curve: Curves.easeIn));
 
     _startAnimations();
   }
@@ -84,8 +87,18 @@ class _FailurePageState extends ConsumerState<FailurePage>
     final smallFontSize = Responsive.smallFontSize(context);
     final borderRadius = Responsive.borderRadius(context);
     final buttonHeight = Responsive.buttonHeight(context);
-    final iconContainerSize = Responsive.value(context, mobile: 120.0, tablet: 140.0, desktop: 160.0);
-    final iconSize = Responsive.value(context, mobile: 60.0, tablet: 70.0, desktop: 80.0);
+    final iconContainerSize = Responsive.value(
+      context,
+      mobile: 120.0,
+      tablet: 140.0,
+      desktop: 160.0,
+    );
+    final iconSize = Responsive.value(
+      context,
+      mobile: 60.0,
+      tablet: 70.0,
+      desktop: 80.0,
+    );
 
     return PopScope(
       canPop: false,
@@ -174,16 +187,23 @@ class _FailurePageState extends ConsumerState<FailurePage>
                       child: Column(
                         children: [
                           Text(
-                            'Transaction Failed',
+                            widget.isTimeout
+                                ? 'Transaction Timeout'
+                                : 'Transaction Failed',
                             style: TextStyle(
                               fontSize: titleFontSize,
                               fontWeight: FontWeight.bold,
-                              color: Colors.red,
+                              color: widget.isTimeout
+                                  ? Colors.orange
+                                  : Colors.red,
                             ),
                           ),
                           SizedBox(height: spacing),
                           Text(
-                            widget.errorMessage ?? 'Your ${widget.title.toLowerCase()} could not be processed',
+                            widget.isTimeout
+                                ? 'Your transaction may have been processed. Please check your balance in a moment. If the amount was deducted, the transaction will be completed automatically. Contact support if you need assistance.'
+                                : (widget.errorMessage ??
+                                      'Your ${widget.title.toLowerCase()} could not be processed'),
                             style: TextStyle(
                               fontSize: bodyFontSize,
                               color: isDark
@@ -204,7 +224,9 @@ class _FailurePageState extends ConsumerState<FailurePage>
                         padding: EdgeInsets.all(spacing * 1.5),
                         decoration: BoxDecoration(
                           color: isDark ? AppColors.cardDark : Colors.grey[50],
-                          borderRadius: BorderRadius.circular(borderRadius * 1.5),
+                          borderRadius: BorderRadius.circular(
+                            borderRadius * 1.5,
+                          ),
                           border: Border.all(
                             color: isDark
                                 ? AppColors.dividerDark
@@ -305,10 +327,14 @@ class _FailurePageState extends ConsumerState<FailurePage>
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primaryGold,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(borderRadius),
+                                borderRadius: BorderRadius.circular(
+                                  borderRadius,
+                                ),
                               ),
                               elevation: 4,
-                              shadowColor: AppColors.primaryGold.withValues(alpha: 0.4),
+                              shadowColor: AppColors.primaryGold.withValues(
+                                alpha: 0.4,
+                              ),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -337,11 +363,17 @@ class _FailurePageState extends ConsumerState<FailurePage>
                         height: buttonHeight,
                         child: OutlinedButton(
                           onPressed: () {
-                            Navigator.popUntil(context, (route) => route.isFirst);
+                            Navigator.popUntil(
+                              context,
+                              (route) => route.isFirst,
+                            );
                             ref.read(mainTabIndexProvider.notifier).state = 2;
                           },
                           style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: AppColors.primaryGold, width: 1.5),
+                            side: BorderSide(
+                              color: AppColors.primaryGold,
+                              width: 1.5,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(borderRadius),
                             ),
@@ -349,7 +381,10 @@ class _FailurePageState extends ConsumerState<FailurePage>
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.account_balance_wallet_outlined, color: AppColors.primaryGold),
+                              Icon(
+                                Icons.account_balance_wallet_outlined,
+                                color: AppColors.primaryGold,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'Back to Wallet',
@@ -393,19 +428,23 @@ class _FailurePageState extends ConsumerState<FailurePage>
           label,
           style: TextStyle(
             fontSize: smallFontSize,
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
           ),
         ),
         Text(
           value,
           style: TextStyle(
             fontSize: isAmount ? bodyFontSize * 1.1 : bodyFontSize,
-            fontWeight: isAmount || isStatus ? FontWeight.bold : FontWeight.w500,
+            fontWeight: isAmount || isStatus
+                ? FontWeight.bold
+                : FontWeight.w500,
             color: isStatus
                 ? Colors.red
                 : isAmount
-                    ? AppColors.primaryGold
-                    : (isDark ? Colors.white : Colors.black87),
+                ? AppColors.primaryGold
+                : (isDark ? Colors.white : Colors.black87),
           ),
         ),
       ],
@@ -414,10 +453,22 @@ class _FailurePageState extends ConsumerState<FailurePage>
 
   String _formatDate(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
-    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+    final hour = date.hour > 12
+        ? date.hour - 12
+        : (date.hour == 0 ? 12 : date.hour);
     final amPm = date.hour >= 12 ? 'PM' : 'AM';
     return '${date.day} ${months[date.month - 1]}, ${date.year} at $hour:${date.minute.toString().padLeft(2, '0')} $amPm';
   }

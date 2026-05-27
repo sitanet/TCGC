@@ -142,6 +142,12 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
         await Future.delayed(const Duration(milliseconds: 500));
         if (!mounted) return;
         final errorMsg = widget.getErrorMessage?.call() ?? widget.errorMessage;
+
+        // Check if this is a timeout error
+        final isTimeout =
+            errorMsg?.contains('timeout') == true ||
+            errorMsg?.contains('TIMEOUT') == true;
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -149,6 +155,7 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
               title: widget.title,
               amount: widget.amount,
               errorMessage: errorMsg,
+              isTimeout: isTimeout,
               onRetry: () => Navigator.pop(context),
             ),
           ),
@@ -163,6 +170,11 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
       await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
       final errorMsg = widget.getErrorMessage?.call() ?? e.toString();
+
+      // Check if this is a timeout error
+      final isTimeout =
+          errorMsg.contains('timeout') || errorMsg.contains('TIMEOUT');
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -170,6 +182,7 @@ class _TransactionProcessingPageState extends State<TransactionProcessingPage>
             title: widget.title,
             amount: widget.amount,
             errorMessage: errorMsg,
+            isTimeout: isTimeout,
             onRetry: () => Navigator.pop(context),
           ),
         ),
