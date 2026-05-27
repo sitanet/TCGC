@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
+import '../../widgets/password_input_field.dart';
 import '../legal/privacy_policy_page.dart';
 import '../support/complaint_page.dart';
 import 'edit_profile_page.dart';
@@ -64,14 +65,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             children: [
               const Text('Enter your password to edit your profile'),
               const SizedBox(height: 16),
-              TextField(
+              PasswordInputField(
                 controller: passwordController,
-                obscureText: true,
+                labelText: 'Password',
                 autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Password',
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(border: OutlineInputBorder()),
               ),
             ],
           ),

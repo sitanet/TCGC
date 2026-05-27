@@ -13,6 +13,7 @@ import '../../../data/services/data_service.dart';
 import '../../../data/services/playback_position_service.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../../widgets/password_input_field.dart';
 import '../../widgets/animated_play_button.dart';
 import '../wallet/give_page.dart';
 import '../wallet/wallet_page.dart';
@@ -44,10 +45,10 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   final PlaylistService _playlistService = PlaylistService();
   final DownloadService _downloadService = DownloadService();
   final DataService _dataService = DataService();
-  
+
   SpeakerModel? _speaker;
   List<Sermon> _otherMessages = [];
-  
+
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
   }
@@ -61,7 +62,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
       _loadSpeakerInfo();
     });
   }
-  
+
   Future<void> _loadSpeakerInfo() async {
     debugPrint('=== LOADING SPEAKER INFO ===');
     debugPrint('Sermon speaker: "${widget.sermon.speaker}"');
@@ -69,7 +70,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
       debugPrint('Speaker is null or empty, skipping');
       return;
     }
-    
+
     try {
       List<SpeakerModel> speakers = [];
       try {
@@ -79,44 +80,57 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
         debugPrint('Failed to fetch speakers: $e');
         // Continue without speaker profile - will try to get messages directly
       }
-      
+
       final sermonSpeaker = widget.sermon.speaker!.toLowerCase().trim();
-      
+
       // More flexible speaker matching - check for partial matches and contains
       SpeakerModel? speaker;
       for (final s in speakers) {
         final fullNameLower = s.fullName.toLowerCase().trim();
         final nameLower = s.name.toLowerCase().trim();
-        
+
         // Exact match
         if (fullNameLower == sermonSpeaker || nameLower == sermonSpeaker) {
           speaker = s;
           break;
         }
         // Contains match (e.g., "Pastor John Doe" contains "John Doe")
-        if (fullNameLower.contains(sermonSpeaker) || sermonSpeaker.contains(fullNameLower)) {
+        if (fullNameLower.contains(sermonSpeaker) ||
+            sermonSpeaker.contains(fullNameLower)) {
           speaker = s;
           break;
         }
-        if (nameLower.contains(sermonSpeaker) || sermonSpeaker.contains(nameLower)) {
+        if (nameLower.contains(sermonSpeaker) ||
+            sermonSpeaker.contains(nameLower)) {
           speaker = s;
           break;
         }
       }
-      
-      debugPrint('Match result: ${speaker != null ? "id=${speaker.id}, name=${speaker.fullName}" : "no match"}');
-      
+
+      debugPrint(
+        'Match result: ${speaker != null ? "id=${speaker.id}, name=${speaker.fullName}" : "no match"}',
+      );
+
       // Show explore section for all matched speakers
       if (speaker != null) {
         debugPrint('Speaker matched! Loading other messages...');
-        
+
         // Try to load messages by speaker name
-        final messages = await _dataService.getMessagesBySpeaker(widget.sermon.speaker!);
-        debugPrint('Got ${messages.length} total messages from speaker "${widget.sermon.speaker}"');
-        
-        final otherMessages = messages.where((m) => m.id != widget.sermon.id).take(5).toList();
-        debugPrint('Found ${otherMessages.length} other messages (excluding current)');
-        
+        final messages = await _dataService.getMessagesBySpeaker(
+          widget.sermon.speaker!,
+        );
+        debugPrint(
+          'Got ${messages.length} total messages from speaker "${widget.sermon.speaker}"',
+        );
+
+        final otherMessages = messages
+            .where((m) => m.id != widget.sermon.id)
+            .take(5)
+            .toList();
+        debugPrint(
+          'Found ${otherMessages.length} other messages (excluding current)',
+        );
+
         if (mounted) {
           setState(() {
             _speaker = speaker;
@@ -126,10 +140,17 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
       } else {
         debugPrint('Speaker not found in speakers list');
         // Still try to get messages by speaker name even without a speaker profile match
-        final messages = await _dataService.getMessagesBySpeaker(widget.sermon.speaker!);
+        final messages = await _dataService.getMessagesBySpeaker(
+          widget.sermon.speaker!,
+        );
         if (messages.isNotEmpty) {
-          debugPrint('Found ${messages.length} messages by speaker name (no profile)');
-          final otherMessages = messages.where((m) => m.id != widget.sermon.id).take(5).toList();
+          debugPrint(
+            'Found ${messages.length} messages by speaker name (no profile)',
+          );
+          final otherMessages = messages
+              .where((m) => m.id != widget.sermon.id)
+              .take(5)
+              .toList();
           if (otherMessages.isNotEmpty && mounted) {
             // Create a minimal speaker model for display
             setState(() {
@@ -148,28 +169,28 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
       debugPrint('Stack: $st');
     }
   }
-  
+
   void _checkAccessAndPlay() {
     final authProvider = ref.read(authChangeNotifierProvider);
     final user = authProvider.user;
     final isServiceTeamMember = user?.isServiceTeamMember ?? false;
     final isGeneralMarried = user?.isGeneralMarried ?? false;
     final isInHouseMarried = user?.isInHouseMarried ?? false;
-    
+
     final canAccess = AudioPlayerPage.canAccess(
       widget.sermon,
       isServiceTeamMember: isServiceTeamMember,
       isGeneralMarried: isGeneralMarried,
       isInHouseMarried: isInHouseMarried,
     );
-    
+
     if (!canAccess) {
       _showAccessDeniedDialog();
     } else {
       _handlePlayback();
     }
   }
-  
+
   String _getAccessDeniedMessage() {
     if (widget.sermon.isServiceTeamOnly) {
       return 'This message is only available for Service Team members.';
@@ -180,10 +201,10 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     }
     return 'You do not have access to this content.';
   }
-  
+
   void _showAccessDeniedDialog() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -203,19 +224,20 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
             Icon(
               Icons.lock_outline,
               size: 64,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
             const SizedBox(height: 16),
-            Text(
-              _getAccessDeniedMessage(),
-              textAlign: TextAlign.center,
-            ),
+            Text(_getAccessDeniedMessage(), textAlign: TextAlign.center),
             const SizedBox(height: 8),
             Text(
               'Please contact an administrator if you believe you should have access.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
                 fontSize: 13,
               ),
             ),
@@ -230,7 +252,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryGold,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text('OK'),
           ),
@@ -238,30 +262,30 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
       ),
     );
   }
-  
+
   Future<void> _handlePlayback() async {
     if (!mounted) return;
-    
+
     final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
-    
+
     // If this sermon is already playing, don't restart
-    if (audioProvider.currentSermon?.id == widget.sermon.id && 
+    if (audioProvider.currentSermon?.id == widget.sermon.id &&
         (audioProvider.isPlaying || audioProvider.isLoading)) {
       return;
     }
-    
+
     final savedPosition = audioProvider.getSavedPosition(widget.sermon.id);
-    
+
     if (savedPosition != null && savedPosition.isSignificant) {
       _showResumeDialog(savedPosition);
     } else {
       await audioProvider.playSermon(widget.sermon);
     }
   }
-  
+
   void _showResumeDialog(PlaybackPosition savedPosition) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -287,7 +311,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               'Would you like to continue where you left off?',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
                 fontSize: 14,
               ),
             ),
@@ -304,7 +330,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
             child: Text(
               'Start Over',
               style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
           ),
@@ -312,12 +340,17 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
             onPressed: () {
               Navigator.pop(dialogContext);
               final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
-              audioProvider.playSermonFromPosition(widget.sermon, savedPosition.position);
+              audioProvider.playSermonFromPosition(
+                widget.sermon,
+                savedPosition.position,
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryGold,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text('Resume'),
           ),
@@ -338,9 +371,12 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
     final errorMessage = audioProvider.errorMessage;
-    
+
     // Show rating dialog after first successful play
-    ref.listen<AudioPlayerProvider>(audioPlayerChangeNotifierProvider, (previous, next) {
+    ref.listen<AudioPlayerProvider>(audioPlayerChangeNotifierProvider, (
+      previous,
+      next,
+    ) {
       if (next.shouldShowRatingPopup && mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -392,10 +428,10 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                   const SizedBox(height: 24),
                   _buildControlsWithSpeed(isDark, audioProvider),
                   const SizedBox(height: 16),
-                  if (errorMessage != null) _buildCompactDownloadNotice(isDark, audioProvider),
+                  if (errorMessage != null)
+                    _buildCompactDownloadNotice(isDark, audioProvider),
                   const SizedBox(height: 24),
-                  if (_speaker != null)
-                    _buildExploreSection(isDark),
+                  if (_speaker != null) _buildExploreSection(isDark),
                 ],
               ),
             );
@@ -411,16 +447,12 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
       children: [
         const Divider(),
         const SizedBox(height: 20),
-        
+
         // Section 1: Related Messages
         if (_otherMessages.isNotEmpty) ...[
           Row(
             children: [
-              Icon(
-                Icons.library_music,
-                size: 20,
-                color: AppColors.primaryGold,
-              ),
+              Icon(Icons.library_music, size: 20, color: AppColors.primaryGold),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -434,7 +466,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                 '${_otherMessages.length} messages',
                 style: TextStyle(
                   fontSize: 12,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
               ),
             ],
@@ -454,153 +488,163 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
           ),
           const SizedBox(height: 24),
         ],
-        
+
         // Section 2: Minister Bio Card (only show if we have a real speaker profile)
         if (_speaker!.id > 0) ...[
-        Row(
-          children: [
-            Icon(
-              Icons.person,
-              size: 20,
-              color: AppColors.primaryGold,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'About the Minister',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        // Minister bio card
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
+          Row(
+            children: [
+              Icon(Icons.person, size: 20, color: AppColors.primaryGold),
+              const SizedBox(width: 8),
+              Text(
+                'About the Minister',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          child: Column(
-            children: [
-              // Minister photo - tappable to show full image with bio
-              GestureDetector(
-                onTap: () => _showFullMinisterPhoto(isDark),
-                child: ClipOval(
-                  child: _speaker!.photoUrl != null && _speaker!.photoUrl!.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: _speaker!.photoUrl!,
-                          width: 100,
-                          height: 100,
-                          fit: BoxFit.cover,
-                          memCacheWidth: 200,
-                          memCacheHeight: 200,
-                          placeholder: (_, __) => Container(
+          const SizedBox(height: 16),
+          // Minister bio card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Minister photo - tappable to show full image with bio
+                GestureDetector(
+                  onTap: () => _showFullMinisterPhoto(isDark),
+                  child: ClipOval(
+                    child:
+                        _speaker!.photoUrl != null &&
+                            _speaker!.photoUrl!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: _speaker!.photoUrl!,
                             width: 100,
                             height: 100,
-                            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                            child: const Icon(Icons.person, size: 50),
-                          ),
-                          errorWidget: (_, __, ___) => Container(
+                            fit: BoxFit.cover,
+                            memCacheWidth: 200,
+                            memCacheHeight: 200,
+                            placeholder: (_, __) => Container(
+                              width: 100,
+                              height: 100,
+                              color: isDark
+                                  ? AppColors.dividerDark
+                                  : AppColors.dividerLight,
+                              child: const Icon(Icons.person, size: 50),
+                            ),
+                            errorWidget: (_, __, ___) => Container(
+                              width: 100,
+                              height: 100,
+                              color: isDark
+                                  ? AppColors.dividerDark
+                                  : AppColors.dividerLight,
+                              child: const Icon(Icons.person, size: 50),
+                            ),
+                          )
+                        : Container(
                             width: 100,
                             height: 100,
-                            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                            child: const Icon(Icons.person, size: 50),
-                          ),
-                        )
-                      : Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              _speaker!.fullName.isNotEmpty ? _speaker!.fullName[0].toUpperCase() : '?',
-                              style: TextStyle(
-                                fontSize: 40,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primaryGold,
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? AppColors.dividerDark
+                                  : AppColors.dividerLight,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                _speaker!.fullName.isNotEmpty
+                                    ? _speaker!.fullName[0].toUpperCase()
+                                    : '?',
+                                style: TextStyle(
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primaryGold,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Name
-              Text(
-                _speaker!.fullName,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              // Title
-              if (_speaker!.title != null && _speaker!.title!.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  _speaker!.title!,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.primaryGold,
-                    fontWeight: FontWeight.w500,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-              ],
-              // Bio preview
-              if (_speaker!.bio != null && _speaker!.bio!.isNotEmpty) ...[
                 const SizedBox(height: 16),
+                // Name
                 Text(
-                  _speaker!.bio!.length > 200 
-                      ? '${_speaker!.bio!.substring(0, 200)}...' 
-                      : _speaker!.bio!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    height: 1.5,
-                  ),
+                  _speaker!.fullName,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
-                if (_speaker!.bio!.length > 200) ...[
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => _showSpeakerBioDialog(isDark),
-                    child: Text(
-                      'Read Full Bio',
-                      style: TextStyle(
-                        color: AppColors.primaryGold,
-                        fontWeight: FontWeight.w600,
-                      ),
+                // Title
+                if (_speaker!.title != null && _speaker!.title!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _speaker!.title!,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.primaryGold,
+                      fontWeight: FontWeight.w500,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
-              ] else ...[
-                const SizedBox(height: 12),
-                Text(
-                  'Minister at The Citygate Church',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                // Bio preview
+                if (_speaker!.bio != null && _speaker!.bio!.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    _speaker!.bio!.length > 200
+                        ? '${_speaker!.bio!.substring(0, 200)}...'
+                        : _speaker!.bio!,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
-                ),
+                  if (_speaker!.bio!.length > 200) ...[
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => _showSpeakerBioDialog(isDark),
+                      child: Text(
+                        'Read Full Bio',
+                        style: TextStyle(
+                          color: AppColors.primaryGold,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ] else ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Minister at The Citygate Church',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
-        const SizedBox(height: 24),
+          const SizedBox(height: 24),
         ], // End of if (_speaker!.id > 0)
       ],
     );
@@ -611,9 +655,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
       onTap: () {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => AudioPlayerPage(sermon: message),
-          ),
+          MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: message)),
         );
       },
       child: Container(
@@ -637,8 +679,11 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-                  child: message.imageUrl != null && message.imageUrl!.isNotEmpty
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(14),
+                  ),
+                  child:
+                      message.imageUrl != null && message.imageUrl!.isNotEmpty
                       ? CachedNetworkImage(
                           imageUrl: message.imageUrl!,
                           width: 150,
@@ -653,7 +698,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                               gradient: LinearGradient(
                                 colors: [
                                   AppColors.primaryGold.withOpacity(0.3),
-                                  isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                  isDark
+                                      ? AppColors.cardDark
+                                      : AppColors.dividerLight,
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
@@ -668,7 +715,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                               gradient: LinearGradient(
                                 colors: [
                                   AppColors.primaryGold.withOpacity(0.3),
-                                  isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                  isDark
+                                      ? AppColors.cardDark
+                                      : AppColors.dividerLight,
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
@@ -684,7 +733,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                             gradient: LinearGradient(
                               colors: [
                                 AppColors.primaryGold.withOpacity(0.3),
-                                isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                isDark
+                                    ? AppColors.cardDark
+                                    : AppColors.dividerLight,
                               ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
@@ -697,7 +748,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(14),
+                      ),
                       gradient: LinearGradient(
                         colors: [
                           Colors.transparent,
@@ -755,15 +808,21 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                       Icon(
                         Icons.folder_outlined,
                         size: 12,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          message.categoryName.isNotEmpty ? message.categoryName : message.category,
+                          message.categoryName.isNotEmpty
+                              ? message.categoryName
+                              : message.category,
                           style: TextStyle(
                             fontSize: 10,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -807,7 +866,8 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               ),
             ),
             ClipOval(
-              child: _speaker!.photoUrl != null && _speaker!.photoUrl!.isNotEmpty
+              child:
+                  _speaker!.photoUrl != null && _speaker!.photoUrl!.isNotEmpty
                   ? CachedNetworkImage(
                       imageUrl: _speaker!.photoUrl!,
                       width: 100,
@@ -816,23 +876,31 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                       placeholder: (_, __) => Container(
                         width: 100,
                         height: 100,
-                        color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                        color: isDark
+                            ? AppColors.dividerDark
+                            : AppColors.dividerLight,
                         child: const Icon(Icons.person, size: 50),
                       ),
                       errorWidget: (_, __, ___) => Container(
                         width: 100,
                         height: 100,
-                        color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                        color: isDark
+                            ? AppColors.dividerDark
+                            : AppColors.dividerLight,
                         child: const Icon(Icons.person, size: 50),
                       ),
                     )
                   : Container(
                       width: 100,
                       height: 100,
-                      color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                      color: isDark
+                          ? AppColors.dividerDark
+                          : AppColors.dividerLight,
                       child: Center(
                         child: Text(
-                          _speaker!.fullName.isNotEmpty ? _speaker!.fullName[0].toUpperCase() : '?',
+                          _speaker!.fullName.isNotEmpty
+                              ? _speaker!.fullName[0].toUpperCase()
+                              : '?',
                           style: TextStyle(
                             fontSize: 40,
                             fontWeight: FontWeight.bold,
@@ -845,19 +913,16 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
             const SizedBox(height: 16),
             Text(
               _speaker!.fullName,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             if (_speaker!.title != null && _speaker!.title!.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
                 _speaker!.title!,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.primaryGold,
-                ),
+                style: TextStyle(fontSize: 14, color: AppColors.primaryGold),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -868,9 +933,11 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                   child: Text(
                     _speaker!.bio!,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                          height: 1.5,
-                        ),
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                      height: 1.5,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -880,7 +947,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               Text(
                 'No bio available',
                 style: TextStyle(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -909,7 +978,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
 
   void _showFullMinisterPhoto(bool isDark) {
     if (_speaker == null) return;
-    
+
     Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,
@@ -926,14 +995,17 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                   fit: StackFit.expand,
                   children: [
                     // Full screen photo
-                    if (_speaker!.photoUrl != null && _speaker!.photoUrl!.isNotEmpty)
+                    if (_speaker!.photoUrl != null &&
+                        _speaker!.photoUrl!.isNotEmpty)
                       CachedNetworkImage(
                         imageUrl: _speaker!.photoUrl!,
                         fit: BoxFit.cover,
                         placeholder: (_, __) => Container(
                           color: Colors.black,
                           child: const Center(
-                            child: CircularProgressIndicator(color: Colors.white),
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                         errorWidget: (_, __, ___) => Container(
@@ -949,10 +1021,14 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                       )
                     else
                       Container(
-                        color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                        color: isDark
+                            ? AppColors.cardDark
+                            : AppColors.dividerLight,
                         child: Center(
                           child: Text(
-                            _speaker!.fullName.isNotEmpty ? _speaker!.fullName[0].toUpperCase() : '?',
+                            _speaker!.fullName.isNotEmpty
+                                ? _speaker!.fullName[0].toUpperCase()
+                                : '?',
                             style: TextStyle(
                               fontSize: 120,
                               fontWeight: FontWeight.bold,
@@ -993,7 +1069,8 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                               ),
                             ),
                             // Title
-                            if (_speaker!.title != null && _speaker!.title!.isNotEmpty) ...[
+                            if (_speaker!.title != null &&
+                                _speaker!.title!.isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
                                 _speaker!.title!,
@@ -1005,11 +1082,13 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                               ),
                             ],
                             // Bio
-                            if (_speaker!.bio != null && _speaker!.bio!.isNotEmpty) ...[
+                            if (_speaker!.bio != null &&
+                                _speaker!.bio!.isNotEmpty) ...[
                               const SizedBox(height: 16),
                               ConstrainedBox(
                                 constraints: BoxConstraints(
-                                  maxHeight: MediaQuery.of(context).size.height * 0.3,
+                                  maxHeight:
+                                      MediaQuery.of(context).size.height * 0.3,
                                 ),
                                 child: SingleChildScrollView(
                                   child: Text(
@@ -1083,37 +1162,41 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Text(
                 'Playback Speed',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
             const Divider(),
-            ...AudioPlayerProvider.availableSpeeds.map((speed) => ListTile(
-              leading: Icon(
-                audioProvider.playbackSpeed == speed
-                    ? Icons.check_circle
-                    : Icons.circle_outlined,
-                color: audioProvider.playbackSpeed == speed
-                    ? AppColors.primaryGold
-                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-              ),
-              title: Text(
-                '${speed}x${speed == 1.0 ? ' (Normal)' : ''}',
-                style: TextStyle(
-                  fontWeight: audioProvider.playbackSpeed == speed
-                      ? FontWeight.w600
-                      : FontWeight.normal,
+            ...AudioPlayerProvider.availableSpeeds.map(
+              (speed) => ListTile(
+                leading: Icon(
+                  audioProvider.playbackSpeed == speed
+                      ? Icons.check_circle
+                      : Icons.circle_outlined,
                   color: audioProvider.playbackSpeed == speed
                       ? AppColors.primaryGold
-                      : null,
+                      : (isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight),
                 ),
+                title: Text(
+                  '${speed}x${speed == 1.0 ? ' (Normal)' : ''}',
+                  style: TextStyle(
+                    fontWeight: audioProvider.playbackSpeed == speed
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                    color: audioProvider.playbackSpeed == speed
+                        ? AppColors.primaryGold
+                        : null,
+                  ),
+                ),
+                onTap: () {
+                  audioProvider.setPlaybackSpeed(speed);
+                  Navigator.pop(context);
+                },
               ),
-              onTap: () {
-                audioProvider.setPlaybackSpeed(speed);
-                Navigator.pop(context);
-              },
-            )),
+            ),
             const SizedBox(height: 8),
           ],
         ),
@@ -1189,22 +1272,24 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final speakerName = widget.sermon.speaker;
     debugPrint('Building song info - speaker: $speakerName');
-    
+
     return Column(
       children: [
         Text(
           widget.sermon.title,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 4),
         Text(
           _formatDate(widget.sermon.date),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
+          ),
           textAlign: TextAlign.center,
         ),
         if (speakerName != null && speakerName.isNotEmpty) ...[
@@ -1212,9 +1297,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
           Text(
             speakerName,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.primaryGold,
-                  fontWeight: FontWeight.w500,
-                ),
+              color: AppColors.primaryGold,
+              fontWeight: FontWeight.w500,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -1224,8 +1309,10 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               ? widget.sermon.categoryName
               : widget.sermon.category,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-              ),
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
+          ),
         ),
       ],
     );
@@ -1236,7 +1323,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     final position = audioProvider.position;
     final durationMs = duration.inMilliseconds.toDouble();
     final positionMs = position.inMilliseconds.toDouble();
-    final sliderValue = durationMs > 0 ? (positionMs / durationMs).clamp(0.0, 1.0) : 0.0;
+    final sliderValue = durationMs > 0
+        ? (positionMs / durationMs).clamp(0.0, 1.0)
+        : 0.0;
 
     return Column(
       children: [
@@ -1246,7 +1335,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
             overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
             activeTrackColor: AppColors.primaryGold,
-            inactiveTrackColor: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+            inactiveTrackColor: isDark
+                ? AppColors.dividerDark
+                : AppColors.dividerLight,
             thumbColor: AppColors.primaryGold,
             overlayColor: AppColors.primaryGold.withOpacity(0.2),
           ),
@@ -1268,14 +1359,18 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               Text(
                 _formatDuration(position),
                 style: TextStyle(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                   fontSize: 12,
                 ),
               ),
               Text(
                 _formatDuration(duration),
                 style: TextStyle(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                   fontSize: 12,
                 ),
               ),
@@ -1286,11 +1381,15 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     );
   }
 
-  Widget _buildControlsWithSpeed(bool isDark, AudioPlayerProvider audioProvider) {
+  Widget _buildControlsWithSpeed(
+    bool isDark,
+    AudioPlayerProvider audioProvider,
+  ) {
     final isPlaying = audioProvider.isPlaying;
     final isLoading = audioProvider.isLoading;
     final hasNext = audioProvider.hasNext;
-    final hasPrevious = audioProvider.hasPrevious || audioProvider.position.inSeconds > 3;
+    final hasPrevious =
+        audioProvider.hasPrevious || audioProvider.position.inSeconds > 3;
 
     return Column(
       children: [
@@ -1303,12 +1402,15 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                   ? null
                   : () async {
                       await audioProvider.skipToPrevious();
-                      if (mounted && audioProvider.currentSermon != null &&
+                      if (mounted &&
+                          audioProvider.currentSermon != null &&
                           audioProvider.currentSermon!.id != widget.sermon.id) {
                         Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => AudioPlayerPage(sermon: audioProvider.currentSermon!),
+                            builder: (_) => AudioPlayerPage(
+                              sermon: audioProvider.currentSermon!,
+                            ),
                           ),
                         );
                       }
@@ -1317,8 +1419,12 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                 Icons.skip_previous,
                 size: 32,
                 color: hasPrevious
-                    ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
-                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                    ? (isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight)
+                    : (isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight),
               ),
             ),
             IconButton(
@@ -1326,7 +1432,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               icon: Icon(
                 Icons.replay_10,
                 size: 28,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimaryLight,
               ),
             ),
             AnimatedPlayButton(
@@ -1346,7 +1454,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               icon: Icon(
                 Icons.forward_10,
                 size: 28,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimaryLight,
               ),
             ),
             // Skip to Next
@@ -1359,7 +1469,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                         Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => AudioPlayerPage(sermon: audioProvider.currentSermon!),
+                            builder: (_) => AudioPlayerPage(
+                              sermon: audioProvider.currentSermon!,
+                            ),
                           ),
                         );
                       }
@@ -1368,8 +1480,12 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                 Icons.skip_next,
                 size: 32,
                 color: hasNext
-                    ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
-                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                    ? (isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight)
+                    : (isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight),
               ),
             ),
           ],
@@ -1409,7 +1525,10 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     );
   }
 
-  Widget _buildCompactDownloadNotice(bool isDark, AudioPlayerProvider audioProvider) {
+  Widget _buildCompactDownloadNotice(
+    bool isDark,
+    AudioPlayerProvider audioProvider,
+  ) {
     final isDownloaded = _downloadService.isDownloaded(widget.sermon.id);
     final isDownloading = _downloadService.isDownloading(widget.sermon.id);
     final downloadProgress = _downloadService.getProgress(widget.sermon.id);
@@ -1431,9 +1550,11 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               Icon(
                 isDownloading ? Icons.downloading : Icons.cloud_off_outlined,
                 size: 18,
-                color: isDownloading 
-                    ? AppColors.primaryGold 
-                    : (isDark ? AppColors.textSecondaryDark : Colors.orange.shade700),
+                color: isDownloading
+                    ? AppColors.primaryGold
+                    : (isDark
+                          ? AppColors.textSecondaryDark
+                          : Colors.orange.shade700),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -1443,7 +1564,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                       : 'Streaming issue',
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDark ? AppColors.textSecondaryDark : Colors.orange.shade900,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : Colors.orange.shade900,
                   ),
                 ),
               ),
@@ -1456,7 +1579,10 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                     _showDownloadProgressDialog(context, isDark);
                   },
                   style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
@@ -1474,7 +1600,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                 icon: const Icon(Icons.close, size: 16),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                color: isDark ? AppColors.textSecondaryDark : Colors.orange.shade700,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : Colors.orange.shade700,
               ),
             ],
           ),
@@ -1486,10 +1614,12 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               child: LinearProgressIndicator(
                 value: downloadProgress,
                 minHeight: 4,
-                backgroundColor: isDark 
-                    ? AppColors.dividerDark 
+                backgroundColor: isDark
+                    ? AppColors.dividerDark
                     : Colors.orange.shade100,
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryGold),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.primaryGold,
+                ),
               ),
             ),
           ],
@@ -1502,7 +1632,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    
+
     if (hours > 0) {
       return '$hours:$minutes:$seconds';
     }
@@ -1517,14 +1647,20 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
         builder: (context, setModalState) {
           final isFavorite = _favoritesService.isFavorite(widget.sermon.id);
           final isDownloaded = _downloadService.isDownloaded(widget.sermon.id);
-          final isDownloading = _downloadService.isDownloading(widget.sermon.id);
-          final downloadProgress = _downloadService.getProgress(widget.sermon.id);
+          final isDownloading = _downloadService.isDownloading(
+            widget.sermon.id,
+          );
+          final downloadProgress = _downloadService.getProgress(
+            widget.sermon.id,
+          );
 
           return Container(
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
               color: isDark ? AppColors.cardDark : Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1534,12 +1670,17 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                    color: isDark
+                        ? AppColors.dividerDark
+                        : AppColors.dividerLight,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Text(
                     '${_formatDate(widget.sermon.date)} - ${widget.sermon.title}',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -1557,7 +1698,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                     isFavorite ? Icons.favorite : Icons.favorite_border,
                     color: isFavorite ? Colors.red : null,
                   ),
-                  title: Text(isFavorite ? 'Remove from Favorites' : 'Add to Favorites'),
+                  title: Text(
+                    isFavorite ? 'Remove from Favorites' : 'Add to Favorites',
+                  ),
                   onTap: () async {
                     await _favoritesService.toggleFavorite(widget.sermon);
                     // Track favorite action to backend
@@ -1568,7 +1711,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            isFavorite ? 'Removed from favorites' : 'Added to favorites',
+                            isFavorite
+                                ? 'Removed from favorites'
+                                : 'Added to favorites',
                           ),
                           duration: const Duration(seconds: 2),
                         ),
@@ -1597,12 +1742,10 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                     isDownloaded
                         ? 'Downloaded'
                         : (isDownloading
-                            ? 'Downloading ${(downloadProgress * 100).toInt()}%'
-                            : 'Download for Offline'),
+                              ? 'Downloading ${(downloadProgress * 100).toInt()}%'
+                              : 'Download for Offline'),
                   ),
-                  subtitle: isDownloaded 
-                      ? const Text('Tap to delete') 
-                      : null,
+                  subtitle: isDownloaded ? const Text('Tap to delete') : null,
                   onTap: isDownloading
                       ? null
                       : () {
@@ -1645,10 +1788,12 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   }
 
   void _shareSermon() {
-    const playStoreLink = 'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
+    const playStoreLink =
+        'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
     final sermon = widget.sermon;
     final formattedTitle = '${_formatDate(sermon.date)} - ${sermon.title}';
-    final shareText = '''
+    final shareText =
+        '''
 Check out this message: "$formattedTitle"
 
 ${sermon.description}
@@ -1666,7 +1811,9 @@ Download Citygate mobile: $playStoreLink''';
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Download?'),
-        content: const Text('This will remove the downloaded file from your device.'),
+        content: const Text(
+          'This will remove the downloaded file from your device.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -1693,7 +1840,7 @@ Download Citygate mobile: $playStoreLink''';
   void _showDownloadProgressDialog(BuildContext context, bool isDark) {
     // Start the download
     _downloadService.downloadSermon(widget.sermon);
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1704,10 +1851,14 @@ Download Citygate mobile: $playStoreLink''';
               listenable: _downloadService,
               builder: (context, child) {
                 final progress = _downloadService.getProgress(widget.sermon.id);
-                final isDownloading = _downloadService.isDownloading(widget.sermon.id);
-                final isDownloaded = _downloadService.isDownloaded(widget.sermon.id);
+                final isDownloading = _downloadService.isDownloading(
+                  widget.sermon.id,
+                );
+                final isDownloaded = _downloadService.isDownloaded(
+                  widget.sermon.id,
+                );
                 final progressPercent = (progress * 100).toInt();
-                
+
                 // Auto close when done
                 if (isDownloaded && !isDownloading) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1732,10 +1883,12 @@ Download Citygate mobile: $playStoreLink''';
                     }
                   });
                 }
-                
+
                 return AlertDialog(
                   backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1753,11 +1906,13 @@ Download Citygate mobile: $playStoreLink''';
                               child: CircularProgressIndicator(
                                 value: progress,
                                 strokeWidth: 8,
-                                backgroundColor: isDark 
-                                    ? AppColors.dividerDark 
+                                backgroundColor: isDark
+                                    ? AppColors.dividerDark
                                     : AppColors.dividerLight,
                                 valueColor: AlwaysStoppedAnimation<Color>(
-                                  isDownloaded ? Colors.green : AppColors.primaryGold,
+                                  isDownloaded
+                                      ? Colors.green
+                                      : AppColors.primaryGold,
                                 ),
                               ),
                             ),
@@ -1765,12 +1920,12 @@ Download Citygate mobile: $playStoreLink''';
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  isDownloaded 
-                                      ? Icons.check_circle 
+                                  isDownloaded
+                                      ? Icons.check_circle
                                       : Icons.downloading,
                                   size: 32,
-                                  color: isDownloaded 
-                                      ? Colors.green 
+                                  color: isDownloaded
+                                      ? Colors.green
                                       : AppColors.primaryGold,
                                 ),
                                 const SizedBox(height: 4),
@@ -1779,8 +1934,8 @@ Download Citygate mobile: $playStoreLink''';
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: isDownloaded 
-                                        ? Colors.green 
+                                    color: isDownloaded
+                                        ? Colors.green
                                         : AppColors.primaryGold,
                                   ),
                                 ),
@@ -1792,20 +1947,17 @@ Download Citygate mobile: $playStoreLink''';
                       const SizedBox(height: 20),
                       // Title
                       Text(
-                        isDownloaded 
-                            ? 'Download Complete!' 
-                            : 'Downloading...',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        isDownloaded ? 'Download Complete!' : 'Downloading...',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       // Sermon title
                       Text(
                         '${_formatDate(widget.sermon.date)} - ${widget.sermon.title}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isDark 
-                              ? AppColors.textSecondaryDark 
+                          color: isDark
+                              ? AppColors.textSecondaryDark
                               : AppColors.textSecondaryLight,
                         ),
                         textAlign: TextAlign.center,
@@ -1819,8 +1971,8 @@ Download Citygate mobile: $playStoreLink''';
                         child: LinearProgressIndicator(
                           value: progress,
                           minHeight: 8,
-                          backgroundColor: isDark 
-                              ? AppColors.dividerDark 
+                          backgroundColor: isDark
+                              ? AppColors.dividerDark
                               : AppColors.dividerLight,
                           valueColor: AlwaysStoppedAnimation<Color>(
                             isDownloaded ? Colors.green : AppColors.primaryGold,
@@ -1830,42 +1982,44 @@ Download Citygate mobile: $playStoreLink''';
                       const SizedBox(height: 16),
                       // Status text
                       Text(
-                        isDownloaded 
-                            ? 'Available for offline playback' 
+                        isDownloaded
+                            ? 'Available for offline playback'
                             : 'Please wait while downloading...',
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark 
-                              ? AppColors.textSecondaryDark 
+                          color: isDark
+                              ? AppColors.textSecondaryDark
                               : AppColors.textSecondaryLight,
                         ),
                       ),
                     ],
                   ),
-                  actions: isDownloading ? null : [
-                    Center(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(dialogContext);
-                          if (mounted) setState(() {});
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isDownloaded 
-                              ? Colors.green 
-                              : AppColors.primaryGold,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                  actions: isDownloading
+                      ? null
+                      : [
+                          Center(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(dialogContext);
+                                if (mounted) setState(() {});
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isDownloaded
+                                    ? Colors.green
+                                    : AppColors.primaryGold,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                  vertical: 12,
+                                ),
+                              ),
+                              child: Text(isDownloaded ? 'Done' : 'Close'),
+                            ),
                           ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32, 
-                            vertical: 12,
-                          ),
-                        ),
-                        child: Text(isDownloaded ? 'Done' : 'Close'),
-                      ),
-                    ),
-                  ],
+                        ],
                 );
               },
             );
@@ -1897,7 +2051,9 @@ Download Citygate mobile: $playStoreLink''';
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 24),
                   decoration: BoxDecoration(
-                    color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                    color: isDark
+                        ? AppColors.dividerDark
+                        : AppColors.dividerLight,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1912,7 +2068,11 @@ Download Citygate mobile: $playStoreLink''';
                     ),
                   ),
                   TextButton.icon(
-                    onPressed: () => _showCreatePlaylistDialog(context, isDark, setModalState),
+                    onPressed: () => _showCreatePlaylistDialog(
+                      context,
+                      isDark,
+                      setModalState,
+                    ),
                     icon: const Icon(Icons.add),
                     label: const Text('New'),
                   ),
@@ -1928,18 +2088,26 @@ Download Citygate mobile: $playStoreLink''';
                         Icon(
                           Icons.playlist_play,
                           size: 48,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
                         ),
                         const SizedBox(height: 12),
                         Text(
                           'No playlists yet',
                           style: TextStyle(
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                         ),
                         const SizedBox(height: 8),
                         TextButton(
-                          onPressed: () => _showCreatePlaylistDialog(context, isDark, setModalState),
+                          onPressed: () => _showCreatePlaylistDialog(
+                            context,
+                            isDark,
+                            setModalState,
+                          ),
                           child: const Text('Create your first playlist'),
                         ),
                       ],
@@ -1957,12 +2125,14 @@ Download Citygate mobile: $playStoreLink''';
                     itemBuilder: (context, index) {
                       final playlist = _playlistService.playlists[index];
                       final isInPlaylist = _playlistService.isInPlaylist(
-                        playlist.id, 
+                        playlist.id,
                         widget.sermon.id,
                       );
                       return ListTile(
                         leading: Icon(
-                          isInPlaylist ? Icons.playlist_add_check : Icons.playlist_play,
+                          isInPlaylist
+                              ? Icons.playlist_add_check
+                              : Icons.playlist_play,
                           color: isInPlaylist ? AppColors.primaryGold : null,
                         ),
                         title: Text(playlist.name),
@@ -1973,12 +2143,12 @@ Download Citygate mobile: $playStoreLink''';
                         onTap: () async {
                           if (isInPlaylist) {
                             await _playlistService.removeFromPlaylist(
-                              playlist.id, 
+                              playlist.id,
                               widget.sermon.id,
                             );
                           } else {
                             await _playlistService.addToPlaylist(
-                              playlist.id, 
+                              playlist.id,
                               widget.sermon,
                             );
                           }
@@ -1987,7 +2157,7 @@ Download Citygate mobile: $playStoreLink''';
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  isInPlaylist 
+                                  isInPlaylist
                                       ? 'Removed from ${playlist.name}'
                                       : 'Added to ${playlist.name}',
                                 ),
@@ -2007,7 +2177,11 @@ Download Citygate mobile: $playStoreLink''';
     );
   }
 
-  void _showCreatePlaylistDialog(BuildContext context, bool isDark, StateSetter setModalState) {
+  void _showCreatePlaylistDialog(
+    BuildContext context,
+    bool isDark,
+    StateSetter setModalState,
+  ) {
     final controller = TextEditingController();
     showDialog(
       context: context,
@@ -2031,13 +2205,16 @@ Download Citygate mobile: $playStoreLink''';
               final name = controller.text.trim();
               if (name.isNotEmpty) {
                 final playlist = await _playlistService.createPlaylist(name);
-                await _playlistService.addToPlaylist(playlist.id, widget.sermon);
+                await _playlistService.addToPlaylist(
+                  playlist.id,
+                  widget.sermon,
+                );
                 if (mounted) {
                   Navigator.pop(dialogContext);
                   setModalState(() {});
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Added to "$name"')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Added to "$name"')));
                 }
               }
             },
@@ -2050,7 +2227,7 @@ Download Citygate mobile: $playStoreLink''';
 
   void _showGivingBottomSheet(BuildContext context, bool isDark) {
     final walletProvider = ref.read(walletChangeNotifierProvider);
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2081,16 +2258,18 @@ Download Citygate mobile: $playStoreLink''';
             const SizedBox(height: 16),
             Text(
               'Are you blessed by this ministration?',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             Text(
               'Give an offering by clicking below',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
               textAlign: TextAlign.center,
             ),
@@ -2100,7 +2279,9 @@ Download Citygate mobile: $playStoreLink''';
               child: ElevatedButton(
                 onPressed: () async {
                   Navigator.pop(context);
-                  await _authenticateAndNavigateToGive(walletProvider.hasWallet);
+                  await _authenticateAndNavigateToGive(
+                    walletProvider.hasWallet,
+                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryGold,
@@ -2133,7 +2314,9 @@ Download Citygate mobile: $playStoreLink''';
               child: Text(
                 'Maybe Later',
                 style: TextStyle(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
               ),
             ),
@@ -2146,9 +2329,9 @@ Download Citygate mobile: $playStoreLink''';
 
   Future<void> _authenticateAndNavigateToGive(bool hasWallet) async {
     if (!mounted) return;
-    
+
     final walletProvider = ref.read(walletChangeNotifierProvider);
-    
+
     // If no wallet, just navigate to wallet page (no auth needed yet)
     if (!hasWallet) {
       Navigator.push(
@@ -2157,7 +2340,7 @@ Download Citygate mobile: $playStoreLink''';
       );
       return;
     }
-    
+
     // Check if PIN is set
     final hasPin = await walletProvider.checkHasPin();
     if (!hasPin) {
@@ -2170,13 +2353,15 @@ Download Citygate mobile: $playStoreLink''';
       }
       return;
     }
-    
+
     // Try biometric authentication first
     final biometricProvider = ref.read(biometricChangeNotifierProvider);
     await biometricProvider.initialize();
-    
-    if (biometricProvider.biometricTransactionEnabled && biometricProvider.isAvailable) {
-      final authenticated = await biometricProvider.authenticateForTransaction();
+
+    if (biometricProvider.biometricTransactionEnabled &&
+        biometricProvider.isAvailable) {
+      final authenticated = await biometricProvider
+          .authenticateForTransaction();
       if (authenticated && mounted) {
         Navigator.push(
           context,
@@ -2185,7 +2370,7 @@ Download Citygate mobile: $playStoreLink''';
         return;
       }
     }
-    
+
     // Fall back to PIN dialog
     if (mounted) {
       _showGivePinDialog();
@@ -2203,7 +2388,9 @@ Download Citygate mobile: $playStoreLink''';
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
               Icon(Icons.lock_outline, color: AppColors.primaryGold, size: 24),
@@ -2217,7 +2404,9 @@ Download Citygate mobile: $playStoreLink''';
               Text(
                 'Enter your PIN to continue',
                 style: TextStyle(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
               ),
               const SizedBox(height: 20),
@@ -2246,19 +2435,27 @@ Download Citygate mobile: $playStoreLink''';
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primaryGold, width: 2),
+                    borderSide: const BorderSide(
+                      color: AppColors.primaryGold,
+                      width: 2,
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 16,
+                    horizontal: 16,
+                  ),
                 ),
                 onSubmitted: (_) async {
                   if (pinController.text.isEmpty || isVerifying) return;
                   setDialogState(() => isVerifying = true);
-                  
+
                   final walletProvider = ref.read(walletChangeNotifierProvider);
-                  final isValid = await walletProvider.verifyPin(pinController.text);
-                  
+                  final isValid = await walletProvider.verifyPin(
+                    pinController.text,
+                  );
+
                   if (!mounted) return;
-                  
+
                   if (isValid) {
                     Navigator.pop(dialogContext, true);
                     Navigator.push(
@@ -2285,7 +2482,9 @@ Download Citygate mobile: $playStoreLink''';
               child: Text(
                 'Cancel',
                 style: TextStyle(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
               ),
             ),
@@ -2295,12 +2494,16 @@ Download Citygate mobile: $playStoreLink''';
                   : () async {
                       if (pinController.text.isEmpty) return;
                       setDialogState(() => isVerifying = true);
-                      
-                      final walletProvider = ref.read(walletChangeNotifierProvider);
-                      final isValid = await walletProvider.verifyPin(pinController.text);
-                      
+
+                      final walletProvider = ref.read(
+                        walletChangeNotifierProvider,
+                      );
+                      final isValid = await walletProvider.verifyPin(
+                        pinController.text,
+                      );
+
                       if (!mounted) return;
-                      
+
                       if (isValid) {
                         Navigator.pop(dialogContext, true);
                         Navigator.push(
@@ -2321,7 +2524,9 @@ Download Citygate mobile: $playStoreLink''';
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGold,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: isVerifying
                   ? const SizedBox(
@@ -2340,4 +2545,3 @@ Download Citygate mobile: $playStoreLink''';
     );
   }
 }
-

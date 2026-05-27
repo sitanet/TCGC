@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../../widgets/password_input_field.dart';
 import 'success_page.dart';
 import 'transaction_processing_page.dart';
 
@@ -240,26 +241,25 @@ class _TithePageState extends ConsumerState<TithePage> {
                   // ── PIN fields ─────────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: TextField(
+                    child: PasswordInputField(
                       controller: pinController,
+                      labelText: 'Enter PIN (4-6 digits)',
+                      hintText: '••••',
                       keyboardType: TextInputType.number,
                       maxLength: 6,
-                      obscureText: true,
-                      autofocus: true,
                       textAlign: TextAlign.center,
+                      autofocus: true,
+                      enabled: !isSetting,
                       style: const TextStyle(
                         fontSize: 24,
                         letterSpacing: 10,
                         fontWeight: FontWeight.bold,
                       ),
                       decoration: InputDecoration(
-                        hintText: '••••',
                         hintStyle: TextStyle(
                           color: Colors.grey[400],
                           letterSpacing: 8,
                         ),
-                        counterText: '',
-                        labelText: 'Enter PIN (4-6 digits)',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(color: Colors.grey[300]!),
@@ -281,25 +281,24 @@ class _TithePageState extends ConsumerState<TithePage> {
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: TextField(
+                    child: PasswordInputField(
                       controller: confirmPinController,
+                      labelText: 'Confirm PIN',
+                      hintText: '••••',
                       keyboardType: TextInputType.number,
                       maxLength: 6,
-                      obscureText: true,
                       textAlign: TextAlign.center,
+                      enabled: !isSetting,
                       style: const TextStyle(
                         fontSize: 24,
                         letterSpacing: 10,
                         fontWeight: FontWeight.bold,
                       ),
                       decoration: InputDecoration(
-                        hintText: '••••',
                         hintStyle: TextStyle(
                           color: Colors.grey[400],
                           letterSpacing: 8,
                         ),
-                        counterText: '',
-                        labelText: 'Confirm PIN',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(color: Colors.grey[300]!),

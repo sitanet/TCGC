@@ -5,6 +5,7 @@ import '../../../core/providers/biometric_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../../widgets/password_input_field.dart';
 import 'change_password_page.dart';
 import 'change_pin_page.dart';
 import '../interests/edit_interests_page.dart';
@@ -532,14 +533,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 'This is NOT your phone unlock pattern or PIN.',
               ),
               const SizedBox(height: 16),
-              TextField(
+              PasswordInputField(
                 controller: passwordController,
-                obscureText: true,
+                labelText: 'Account Password',
                 enabled: !isVerifying,
-                decoration: const InputDecoration(
-                  labelText: 'Account Password',
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(border: OutlineInputBorder()),
               ),
             ],
           ),

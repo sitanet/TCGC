@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../../widgets/password_input_field.dart';
 import 'give_page.dart';
 
 import 'set_transaction_pin_page.dart';
@@ -237,26 +238,25 @@ class _WalletPageState extends ConsumerState<WalletPage>
                     // ── PIN field ─────────────────────────────────────────
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: TextField(
+                      child: PasswordInputField(
                         controller: pinController,
+                        labelText: 'PIN',
+                        hintText: '••••',
                         keyboardType: TextInputType.number,
                         maxLength: 4,
-                        obscureText: true,
-                        autofocus: true,
                         textAlign: TextAlign.center,
+                        autofocus: true,
+                        enabled: !isVerifying,
                         style: const TextStyle(
                           fontSize: 24,
                           letterSpacing: 10,
                           fontWeight: FontWeight.bold,
                         ),
                         decoration: InputDecoration(
-                          hintText: '••••',
                           hintStyle: TextStyle(
                             color: Colors.grey[400],
                             letterSpacing: 8,
                           ),
-                          counterText: '',
-                          labelText: 'PIN',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(color: Colors.grey[300]!),
