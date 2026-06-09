@@ -38,10 +38,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
               onPressed: () => provider.markAllAsRead(),
               child: const Text(
                 'Mark all read',
-                style: TextStyle(
-                  color: AppColors.primaryGold,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: AppColors.primaryGold, fontSize: 14),
               ),
             ),
         ],
@@ -50,7 +47,11 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     );
   }
 
-  Widget _buildBody(BuildContext context, bool isDark, NotificationProvider provider) {
+  Widget _buildBody(
+    BuildContext context,
+    bool isDark,
+    NotificationProvider provider,
+  ) {
     if (provider.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -76,7 +77,9 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
             Text(
               provider.error!,
               style: TextStyle(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
             const SizedBox(height: 16),
@@ -120,17 +123,19 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
             const SizedBox(height: 24),
             Text(
               'No notifications yet',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             Text(
               'You\'ll see your notifications here\nwhen you receive them',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  ),
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
             ),
           ],
         ),
@@ -144,7 +149,10 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
       onRefresh: () => provider.loadNotifications(),
       color: AppColors.primaryGold,
       child: ListView.builder(
-        padding: EdgeInsets.symmetric(vertical: spacing * 0.75, horizontal: horizontalPadding),
+        padding: EdgeInsets.symmetric(
+          vertical: spacing * 0.75,
+          horizontal: horizontalPadding,
+        ),
         itemCount: provider.notifications.length,
         itemBuilder: (context, index) {
           final notification = provider.notifications[index];
@@ -157,7 +165,10 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     );
   }
 
-  void _onNotificationTap(AppNotification notification, NotificationProvider provider) {
+  void _onNotificationTap(
+    AppNotification notification,
+    NotificationProvider provider,
+  ) {
     if (!notification.isRead) {
       provider.markAsRead(notification.id);
     }
@@ -168,10 +179,7 @@ class _NotificationCard extends StatelessWidget {
   final AppNotification notification;
   final VoidCallback onTap;
 
-  const _NotificationCard({
-    required this.notification,
-    required this.onTap,
-  });
+  const _NotificationCard({required this.notification, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -179,7 +187,12 @@ class _NotificationCard extends StatelessWidget {
     final config = _getNotificationConfig();
     final spacing = Responsive.verticalSpacing(context);
     final borderRadius = Responsive.borderRadius(context);
-    final iconContainerSize = Responsive.value(context, mobile: 52.0, tablet: 60.0, desktop: 68.0);
+    final iconContainerSize = Responsive.value(
+      context,
+      mobile: 52.0,
+      tablet: 60.0,
+      desktop: 68.0,
+    );
 
     return Container(
       margin: EdgeInsets.only(bottom: spacing * 0.75),
@@ -230,10 +243,7 @@ class _NotificationCard extends StatelessWidget {
                   height: iconContainerSize,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        config.color,
-                        config.color.withOpacity(0.7),
-                      ],
+                      colors: [config.color, config.color.withOpacity(0.7)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -262,7 +272,10 @@ class _NotificationCard extends StatelessWidget {
                         children: [
                           // Type badge
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: config.color.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(6),
@@ -301,8 +314,10 @@ class _NotificationCard extends StatelessWidget {
                       Text(
                         notification.title,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: notification.isRead ? FontWeight.w500 : FontWeight.w700,
-                            ),
+                          fontWeight: notification.isRead
+                              ? FontWeight.w500
+                              : FontWeight.w700,
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -311,9 +326,11 @@ class _NotificationCard extends StatelessWidget {
                       Text(
                         notification.body,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                              height: 1.4,
-                            ),
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                          height: 1.4,
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -324,13 +341,18 @@ class _NotificationCard extends StatelessWidget {
                           Icon(
                             Icons.access_time_rounded,
                             size: 14,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             _formatTime(notification.createdAt),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
                                   fontSize: 11,
                                 ),
                           ),
@@ -362,6 +384,16 @@ class _NotificationCard extends StatelessWidget {
           label: 'MESSAGE',
         );
       case 'wallet':
+        // Check if it's a money received notification for extra visual appeal
+        if (notification.title.contains('Money Received') ||
+            notification.title.contains('💰') ||
+            notification.body.contains('sent you')) {
+          return _NotificationConfig(
+            icon: Icons.trending_up_rounded,
+            color: const Color(0xFF4CAF50), // Green for money received
+            label: 'MONEY IN',
+          );
+        }
         return _NotificationConfig(
           icon: Icons.account_balance_wallet_rounded,
           color: const Color(0xFF26A69A),
