@@ -6,6 +6,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../domain/entities/app_notification.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
+import 'notification_detail_page.dart';
 
 class NotificationsPage extends ConsumerStatefulWidget {
   const NotificationsPage({super.key});
@@ -169,6 +170,14 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     AppNotification notification,
     NotificationProvider provider,
   ) {
+    // Navigate to detail page
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NotificationDetailPage(notification: notification),
+      ),
+    );
+    // Mark as read if not already read
     if (!notification.isRead) {
       provider.markAsRead(notification.id);
     }

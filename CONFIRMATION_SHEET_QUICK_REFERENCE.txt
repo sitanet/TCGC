@@ -1,0 +1,308 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║         TRANSACTION CONFIRMATION SHEET - QUICK REFERENCE                  ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+WHAT IS IT?
+═══════════
+Bottom sheet modal that appears after user enters amount and clicks "Pay"
+but BEFORE entering PIN. This is where user reviews all transaction details.
+
+
+WHEN DOES IT APPEAR?
+════════════════════
+1. User enters amount on wallet screen
+2. User clicks "Pay" button
+3. THIS SHEET OPENS ← User reviews details here
+4. User clicks "Pay" again
+5. PIN entry sheet opens
+
+
+WHAT'S DISPLAYED?
+═════════════════
+
+1. AMOUNT (Large & Bold)
+   Display: ₦10,000.00
+   Purpose: Shows base amount user entered
+   Font: 36px, weight 800
+
+2. TYPE BADGE (Gold Pill)
+   Display: "TITHE", "GIVING", etc.
+   Purpose: Shows transaction type
+   Color: Gold (15% opacity bg)
+
+3. DETAILS CARD (With Dividers)
+   ├─ To: CityGate Church (with church icon)
+   ├─ Purpose: Transaction type (Tithe, Giving, etc.)
+   ├─ Account No.: 1234567890 (⚠️ if available)
+   ├─ Account Name: Church Account (⚠️ if available)
+   ├─ Amount: ₦10,000.00
+   ├─ Fee: ₦50.00
+   ├─ VAT: ₦10.00 (if > 0)
+   └─ Total: ₦10,060.00 (BOLD, GOLD)
+
+4. WALLET BALANCE CARD (Green Border)
+   Display: ₦50,000 → ₦39,940 after ✓
+   Purpose: Shows current balance and balance after transaction
+   Icon: Green checkmark (balance sufficient)
+
+5. PAY BUTTON (Gold)
+   Action: Closes this sheet, opens PIN entry sheet
+
+6. CLOSE BUTTON (X)
+   Action: Closes this sheet without processing
+
+
+KEY INFORMATION
+═══════════════
+
+AMOUNT:     User entered amount
+FEE:        System calculated (typically 0.5% of amount)
+VAT:        Tax on fee (typically 20% of fee)
+TOTAL:      Amount + Fee + VAT ← This is deducted from wallet
+BALANCE:    Current wallet balance
+AFTER:      Balance - Total (what user has left after transaction)
+
+
+EXAMPLE TRANSACTION
+═══════════════════
+
+User enters:           ₦10,000.00
+System adds:
+  Fee (0.5%):         +₦50.00
+  VAT (20% on fee):   +₦10.00
+                      ─────────
+TOTAL:                ₦10,060.00
+
+User's wallet:        ₦50,000.00
+After transaction:    ₦39,940.00 (₦50,000 - ₦10,060)
+
+
+OPTIONAL FIELDS
+═══════════════
+
+Account No.    ← Only shown if churchAccountNumber exists
+               ← ⚠️ Privacy concern: May need to be hidden
+
+Account Name   ← Only shown if churchAccountName exists
+               ← Redundant with "To" field (church name already shown)
+
+VAT            ← Only shown if VAT > 0
+               ← Not shown if VAT amount is zero
+
+
+FILE LOCATION
+═════════════
+
+File:    lib/presentation/pages/wallet/tithe_page.dart
+Method:  _showPinDialog(double amountValue)
+Lines:   420-770 (approximately)
+
+
+CODE FLOW
+═════════
+
+_showPinDialog() 
+  ├─ Creates bottom sheet container
+  ├─ Displays amount, badge, details
+  ├─ Displays balance card
+  ├─ Pay button → calls _showPinEntrySheet()
+  └─ Close button → closes sheet
+
+
+STYLING
+═══════
+
+Light Mode:
+  ├─ Background: White
+  ├─ Cards: Light gray
+  ├─ Text: Black/Dark gray
+  └─ Total: Gold
+
+Dark Mode:
+  ├─ Background: Card dark
+  ├─ Cards: Background dark
+  ├─ Text: White/Light gray
+  └─ Total: Gold (unchanged)
+
+
+COLORS USED
+═══════════
+
+AppColors.primaryGold     ← Amount, Total, Badges, Icons
+AppColors.success         ← Balance checkmark, Border
+AppColors.textSecondaryX  ← Labels (secondary text)
+AppColors.dividerX        ← Dividers between rows
+
+
+RESPONSIVE DESIGN
+═════════════════
+
+Mobile (320-480px):
+  └─ Sheet height: 70-80% screen
+
+Tablet (768px+):
+  └─ Sheet height: 60-70% screen
+
+Desktop (1080px+):
+  └─ Sheet height: 60-70% screen, centered
+
+
+INTERACTIONS
+════════════
+
+[X] Close Button
+    └─ Closes sheet
+    └─ Returns to amount entry screen
+    └─ No transaction processed
+
+[Pay] Button
+    ├─ Closes this sheet
+    ├─ Opens PIN entry sheet
+    └─ User must enter 4-digit PIN
+
+Balance Card (informational)
+    └─ Just shows information
+    └─ Tapping it does nothing
+
+
+WHAT HAPPENS NEXT?
+══════════════════
+
+User clicks "Pay"
+    ↓
+PIN Entry Sheet opens
+    ↓
+User enters 4-digit PIN
+    ↓
+PIN validated
+    ↓
+Transaction Processing Page (with spinner)
+    ↓
+Success Page OR Failure Page
+
+
+CURRENT ISSUES
+══════════════
+
+⚠️ Account Number Display
+   ├─ Currently shown in confirmation sheet
+   ├─ Privacy risk if user screenshots
+   └─ Recommendation: Hide or mask
+
+
+✅ Clear Layout
+   ├─ All information well-organized
+   ├─ Good separation with dividers
+   └─ Total highlighted in gold
+
+
+✅ Balance Verification
+   ├─ Shows current and after-transaction balance
+   ├─ Green checkmark confirms sufficient funds
+   └─ Clear visual feedback
+
+
+PRIVACY CONSIDERATIONS
+══════════════════════
+
+✅ SAFE to display:
+   ├─ Amount
+   ├─ Fee
+   ├─ Total
+   ├─ User's own balance
+   └─ Church name
+
+❌ RISKY to display:
+   ├─ Bank account number (sensitive)
+   └─ Full account name (less critical)
+
+
+RECOMMENDATIONS
+═══════════════
+
+1. HIGH PRIORITY: Hide account number
+   └─ Remove or show masked (****7890)
+
+2. MEDIUM PRIORITY: Remove account name
+   └─ Church name already shown in "To"
+
+3. LOW PRIORITY: Add confirmation checkbox
+   └─ "I confirm these details are correct"
+
+4. LOW PRIORITY: Show fee breakdown
+   └─ Processing fee: ₦40
+   └─ Platform fee: ₦10
+   └─ VAT: ₦10
+
+
+TESTING POINTS
+══════════════
+
+□ Light mode layout
+□ Dark mode layout
+□ Mobile responsive
+□ Tablet responsive
+□ Desktop responsive
+□ Large amounts (₦100,000+)
+□ Small amounts (₦100)
+□ With VAT
+□ Without VAT
+□ With account number
+□ Without account number
+□ With account name
+□ Without account name
+□ Close button works
+□ Pay button navigates to PIN sheet
+□ Balance calculation correct
+□ Total calculation correct
+
+
+QUICK STATS
+═══════════
+
+Lines of code: ~350
+Layout type: Bottom sheet modal
+Max width: Responsive
+Min height: Content-based
+Animation: None (simple modal)
+Accessibility: Good (clear text hierarchy)
+Performance: Excellent (single provider watch)
+
+
+USER EXPERIENCE
+═══════════════
+
+✅ Clear what amount will be charged
+✅ See fees and VAT breakdown
+✅ Confirm recipient (church name)
+✅ Verify sufficient balance
+✅ Easy to cancel (X button)
+✅ Easy to proceed (Pay button)
+✅ Professional layout
+✅ Dark mode support
+✅ Responsive design
+
+
+NEXT IN FLOW
+════════════
+
+After "Pay" button:
+    ↓
+PIN Entry Sheet (_showPinEntrySheet)
+    ├─ User enters 4-digit PIN
+    ├─ PIN validated
+    └─ Proceeds to transaction processing
+
+OR
+
+Close sheet:
+    ↓
+Returns to amount entry screen
+    └─ User can change amount and try again
+
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                     SUMMARY: CLEAR & PROFESSIONAL                         ║
+║          Great UX with one privacy concern (account number)                ║
+╚════════════════════════════════════════════════════════════════════════════╝

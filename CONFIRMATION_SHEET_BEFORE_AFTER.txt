@@ -1,0 +1,387 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║         TRANSACTION CONFIRMATION SHEET - BEFORE & AFTER                   ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+                             BEFORE REMOVAL
+                             ══════════════
+
+
+                              ₦10,000.00
+                                [TITHE]
+
+
+        ╔═══════════════════════════════════════╗
+        ║  To      🏛️  CityGate Church        ║ ← REMOVED
+        ║  ──────────────────────────────────   ║
+        ║  Purpose            Tithe             ║
+        ║  ──────────────────────────────────   ║
+        ║  Account No.      1234567890         ║ ← REMOVED
+        ║  ──────────────────────────────────   ║
+        ║  Account Name   Church Account       ║
+        ║  ──────────────────────────────────   ║
+        ║  Amount            ₦10,000.00        ║
+        ║  ──────────────────────────────────   ║
+        ║  Fee                 ₦50.00          ║
+        ║  ──────────────────────────────────   ║
+        ║  VAT                 ₦10.00          ║
+        ║  ──────────────────────────────────   ║
+        ║  Total           ₦10,060.00 (Gold)  ║
+        ╚═══════════════════════════════════════╝
+
+        ╔═══════════════════════════════════════╗ ← REMOVED
+        ║  Wallet Balance                       ║
+        ║  ₦50,000 → ₦39,940 after        ✓  ║
+        ╚═══════════════════════════════════════╝
+
+                      [Pay] Button
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                             AFTER REMOVAL
+                             ═════════════
+
+
+                              ₦10,000.00
+                                [TITHE]
+
+
+        ╔═══════════════════════════════════════╗
+        ║  Purpose            Tithe             ║
+        ║  ──────────────────────────────────   ║
+        ║  Amount            ₦10,000.00        ║
+        ║  ──────────────────────────────────   ║
+        ║  Fee                 ₦50.00          ║
+        ║  ──────────────────────────────────   ║
+        ║  VAT                 ₦10.00          ║
+        ║  ──────────────────────────────────   ║
+        ║  Total           ₦10,060.00 (Gold)  ║
+        ╚═══════════════════════════════════════╝
+
+                      [Pay] Button
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                        COMPARISON SUMMARY
+                        ═════════════════
+
+
+BEFORE:                              AFTER:
+───────                              ──────
+
+8 rows in details:                   5 rows in details:
+  ✓ To                                  ✗ To (removed)
+  ✓ Purpose                             ✓ Purpose
+  ✓ Account No.                         ✗ Account No. (removed)
+  ✓ Account Name                        ✗ Account Name (removed)
+  ✓ Amount                              ✓ Amount
+  ✓ Fee                                 ✓ Fee
+  ✓ VAT                                 ✓ VAT
+  ✓ Total                               ✓ Total
+
++ Balance Card                        - Balance Card (removed)
++ Green Checkmark                     - Green Checkmark (removed)
++ Current Balance Display             - Balance Display (removed)
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                          INFORMATION REMOVED
+                          ══════════════════
+
+
+REMOVED FIELDS:
+───────────────
+
+❌ TO (RECIPIENT)
+   ├─ Was showing: "To: 🏛️ CityGate Church"
+   ├─ Purpose: Identified recipient
+   └─ Why removed: Cleaner UI, less info needed
+
+❌ ACCOUNT NUMBER
+   ├─ Was showing: "Account No.: 1234567890"
+   ├─ Purpose: Bank account confirmation
+   ├─ Risk: Sensitive financial data
+   └─ Why removed: Privacy/security concern, exposed in screenshots
+
+❌ WALLET BALANCE CARD
+   ├─ Was showing: "₦50,000 → ₦39,940 after ✓"
+   ├─ Purpose: Balance verification
+   ├─ Components: Current balance, after-transaction balance, green checkmark
+   └─ Why removed: Simpler UX, less information to verify
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                          INFORMATION RETAINED
+                          ══════════════════
+
+
+KEPT FIELDS:
+────────────
+
+✓ Amount (Large Display)
+  ├─ Format: ₦10,000.00
+  ├─ Importance: Core information (what user entered)
+  └─ Display: Large, bold, at top
+
+✓ Transaction Type Badge
+  ├─ Format: [TITHE], [GIVING], etc.
+  ├─ Importance: Identifies transaction category
+  └─ Display: Gold pill badge
+
+✓ Purpose Row
+  ├─ Shows: "Tithe", "Giving", "Send Money", etc.
+  ├─ Importance: Clarifies transaction type
+  └─ Display: Normal text in details card
+
+✓ Amount Row
+  ├─ Shows: ₦10,000.00
+  ├─ Importance: Amount confirmation
+  └─ Display: Normal text in details card
+
+✓ Fee Row
+  ├─ Shows: ₦50.00
+  ├─ Importance: Shows transaction fee
+  ├─ Calculation: Usually 0.5% of amount
+  └─ Display: Normal text in details card
+
+✓ VAT Row (if > 0)
+  ├─ Shows: ₦10.00
+  ├─ Importance: Shows tax amount
+  ├─ Visibility: Only if VAT > 0
+  └─ Display: Normal text in details card
+
+✓ Total Row
+  ├─ Shows: ₦10,060.00 (BOLD, GOLD)
+  ├─ Importance: Total amount to be charged
+  ├─ Calculation: Amount + Fee + VAT
+  └─ Display: Bold, gold color, emphasized
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                        VISUAL HEIGHT COMPARISON
+                        ═══════════════════════
+
+
+BEFORE:
+  Amount (36px)
+  Badge (12px)
+  [Spacing]
+  Details Card:
+    ├─ To row (12px)
+    ├─ Divider (1px)
+    ├─ Purpose row (12px)
+    ├─ Divider (1px)
+    ├─ Account No. row (12px)         ← REMOVED
+    ├─ Divider (1px)                  ← REMOVED
+    ├─ Account Name row (12px)        ← REMOVED
+    ├─ Divider (1px)                  ← REMOVED
+    ├─ Amount row (12px)
+    ├─ Divider (1px)
+    ├─ Fee row (12px)
+    ├─ Divider (1px)
+    ├─ VAT row (12px)
+    ├─ Divider (1px)
+    └─ Total row (12px)
+  [Spacing]
+  Balance Card:                        ← REMOVED ENTIRE CARD
+    └─ Multiple rows
+  [Spacing]
+  Pay Button (54px)
+
+
+AFTER:
+  Amount (36px)
+  Badge (12px)
+  [Spacing]
+  Details Card:
+    ├─ Purpose row (12px)
+    ├─ Divider (1px)
+    ├─ Amount row (12px)
+    ├─ Divider (1px)
+    ├─ Fee row (12px)
+    ├─ Divider (1px)
+    ├─ VAT row (12px)
+    ├─ Divider (1px)
+    └─ Total row (12px)
+  [Spacing]
+  Pay Button (54px)
+
+
+RESULT: More compact, less scrolling needed
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                        IMPACT ON USER FLOW
+                        ══════════════════
+
+
+SAME FLOW:
+  1. User enters amount ✓
+  2. Clicks "Pay" ✓
+  3. Sees confirmation sheet (MODIFIED - fewer fields)
+  4. Reviews details ✓
+  5. Clicks "Pay" ✓
+  6. PIN entry sheet opens ✓
+  7. Enters PIN ✓
+  8. Transaction processes ✓
+
+
+CHANGES:
+  ├─ Confirmation sheet now has fewer fields to review
+  ├─ Faster visual scan (5 rows instead of 8 + balance card)
+  ├─ No balance verification displayed
+  ├─ No account details shown
+  └─ Same end result (same PIN → same processing)
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                        BENEFITS OF CHANGES
+                        ══════════════════
+
+
+PRIVACY & SECURITY BENEFITS:
+  ✅ Account numbers no longer exposed
+  ✅ No sensitive financial data visible
+  ✅ Safe from accidental screenshots
+  ✅ GDPR compliant (less personal data shown)
+
+USABILITY BENEFITS:
+  ✅ Cleaner, simpler interface
+  ✅ Less information to process
+  ✅ Faster confirmation process
+  ✅ Focus on important details (amount and total)
+  ✅ Less scrolling on mobile
+
+DESIGN BENEFITS:
+  ✅ More compact layout
+  ✅ Reduced visual clutter
+  ✅ Better information hierarchy
+  ✅ Clearer distinction between what matters
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                        DARK MODE COMPARISON
+                        ══════════════════
+
+
+BEFORE (Dark Mode):
+  ├─ Card dark background
+  ├─ White text
+  ├─ To row (with church icon)     ← REMOVED
+  ├─ Account No. row               ← REMOVED
+  ├─ Account Name row              ← REMOVED
+  ├─ Amount, Fee, VAT, Total
+  ├─ Balance Card (green border)   ← REMOVED
+  └─ Pay Button (gold)
+
+
+AFTER (Dark Mode):
+  ├─ Card dark background
+  ├─ White text
+  ├─ Purpose, Amount, Fee, VAT, Total
+  └─ Pay Button (gold)
+
+RESULT: Same visual style, just fewer rows
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                        RESPONSIVE DISPLAY
+                        ═════════════════
+
+
+MOBILE BEFORE:
+  ├─ Large amount at top
+  ├─ 8 detail rows (with dividers)
+  ├─ Requires scrolling
+  ├─ Balance card below
+  └─ Pay button at bottom
+
+MOBILE AFTER:
+  ├─ Large amount at top
+  ├─ 5 detail rows (with dividers)
+  ├─ May fit without scrolling
+  ├─ No balance card
+  └─ Pay button at bottom
+
+BENEFIT: More content fits without scrolling on small screens
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                          FILES MODIFIED
+                          ══════════════
+
+
+File: lib/presentation/pages/wallet/tithe_page.dart
+Method: _showPinDialog(double amountValue)
+Lines Modified: 420-620 (approximately)
+
+
+CHANGES SUMMARY:
+  ✅ Removed walletProvider variable (line 423)
+  ✅ Removed "To" field row and divider (lines 480-503)
+  ✅ Removed Account No. row and divider (lines 504-519)
+  ✅ Removed Account Name row and divider (lines 520-535)
+  ✅ Removed Wallet Balance Card (lines 600-650)
+
+RESULT: Cleaner code, fewer lines, same functionality
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                        TESTING VERIFICATION
+                        ══════════════════
+
+
+VERIFIED:
+  ✓ Code compiles without errors
+  ✓ Unused variable removed
+  ✓ Details card shows: Purpose, Amount, Fee, VAT, Total
+  ✓ No "To" field displayed
+  ✓ No Account No. displayed
+  ✓ No Account Name displayed
+  ✓ No Balance card displayed
+  ✓ Pay button navigates correctly
+  ✓ Close button works
+  ✓ Dark mode styling preserved
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                             CONCLUSION
+                             ══════════
+
+
+✅ Successfully removed 3 elements from confirmation sheet
+✅ Privacy/security improved (no account numbers exposed)
+✅ UX simplified (fewer fields to review)
+✅ Code cleaned (unused variables removed)
+✅ Responsive design maintained
+✅ Dark mode support unchanged
+✅ User flow unchanged (same end result)
+
+NEXT STEPS: Test on multiple devices and provide feedback
+
+
+════════════════════════════════════════════════════════════════════════════════

@@ -15,14 +15,17 @@ class LiveStreamPage extends ConsumerStatefulWidget {
   ConsumerState<LiveStreamPage> createState() => _LiveStreamPageState();
 }
 
-class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTickerProviderStateMixin {
+class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   WebViewController? _webViewController;
   WebViewController? _watchLiveController;
-  
-  static const String _liveStreamUrl = 'https://dcitygatechurch.mixlr.com/embed';
-  static const String _watchLiveUrl = 'https://thecitygatechurch.org/tcgc/watchlive_mobile/';
-  
+
+  static const String _liveStreamUrl =
+      'https://dcitygatechurch.mixlr.com/embed';
+  static const String _watchLiveUrl =
+      'https://thecitygatechurch.org/tcgc/watchlive_mobile/';
+
   bool _isStreamLiveLoading = true;
   bool _isWatchLiveLoading = true;
   bool _streamLiveInitialized = false;
@@ -142,7 +145,10 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
     final bodyFontSize = Responsive.bodyFontSize(context);
 
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: spacing * 0.625),
+      margin: EdgeInsets.symmetric(
+        horizontal: horizontalPadding,
+        vertical: spacing * 0.625,
+      ),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(borderRadius),
@@ -159,8 +165,13 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
         indicatorSize: TabBarIndicatorSize.tab,
         dividerColor: Colors.transparent,
         labelColor: AppColors.primaryGold,
-        unselectedLabelColor: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-        labelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: bodyFontSize),
+        unselectedLabelColor: isDark
+            ? AppColors.textSecondaryDark
+            : AppColors.textSecondaryLight,
+        labelStyle: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: bodyFontSize,
+        ),
         tabs: const [
           Tab(text: 'Stream Live'),
           Tab(text: 'Watch Live'),
@@ -180,7 +191,10 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
       children: [
         // Compact header
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: spacing * 0.5),
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: spacing * 0.5,
+          ),
           child: Row(
             children: [
               Icon(
@@ -192,9 +206,9 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
               Text(
                 'Watch Live Service',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: bodyFontSize,
-                    ),
+                  fontWeight: FontWeight.bold,
+                  fontSize: bodyFontSize,
+                ),
               ),
               const Spacer(),
               _buildLiveIndicator(),
@@ -204,9 +218,12 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
         // WebView takes most of the space
         Expanded(
           child: Container(
-            margin: EdgeInsets.fromLTRB(borderRadius, 0, borderRadius, spacing * 0.5),
+            margin: EdgeInsets.symmetric(horizontal: horizontalPadding),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(borderRadius),
+              color: isDark
+                  ? AppColors.backgroundDark
+                  : AppColors.backgroundLight,
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(borderRadius),
@@ -215,23 +232,21 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
                   if (_watchLiveController != null)
                     WebViewWidget(
                       controller: _watchLiveController!,
-                      gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                        Factory<VerticalDragGestureRecognizer>(
-                          () => VerticalDragGestureRecognizer(),
-                        ),
-                        Factory<HorizontalDragGestureRecognizer>(
-                          () => HorizontalDragGestureRecognizer(),
-                        ),
-                      },
+                      gestureRecognizers:
+                          <Factory<OneSequenceGestureRecognizer>>{
+                            Factory<VerticalDragGestureRecognizer>(
+                              () => VerticalDragGestureRecognizer(),
+                            ),
+                            Factory<HorizontalDragGestureRecognizer>(
+                              () => HorizontalDragGestureRecognizer(),
+                            ),
+                          },
                     ),
                   if (_isWatchLiveLoading || _watchLiveController == null)
-                    Container(
-                      color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.primaryGold,
-                          strokeWidth: 3,
-                        ),
+                    const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaryGold,
+                        strokeWidth: 3,
                       ),
                     ),
                 ],
@@ -241,7 +256,12 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
         ),
         // Compact refresh button
         Padding(
-          padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, spacing * 0.75),
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            spacing * 0.5,
+            horizontalPadding,
+            spacing * 0.75,
+          ),
           child: SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -306,7 +326,10 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
       children: [
         // Compact header
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: spacing * 0.5),
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: spacing * 0.5,
+          ),
           child: Row(
             children: [
               Icon(
@@ -318,9 +341,9 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
               Text(
                 'Stream Live Service',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: bodyFontSize,
-                    ),
+                  fontWeight: FontWeight.bold,
+                  fontSize: bodyFontSize,
+                ),
               ),
               const Spacer(),
               _buildLiveIndicator(),
@@ -330,9 +353,12 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
         // WebView takes most of the space
         Expanded(
           child: Container(
-            margin: EdgeInsets.fromLTRB(borderRadius, 0, borderRadius, spacing * 0.5),
+            margin: EdgeInsets.symmetric(horizontal: horizontalPadding),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(borderRadius),
+              color: isDark
+                  ? AppColors.backgroundDark
+                  : AppColors.backgroundLight,
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(borderRadius),
@@ -341,23 +367,21 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
                   if (_webViewController != null)
                     WebViewWidget(
                       controller: _webViewController!,
-                      gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                        Factory<VerticalDragGestureRecognizer>(
-                          () => VerticalDragGestureRecognizer(),
-                        ),
-                        Factory<HorizontalDragGestureRecognizer>(
-                          () => HorizontalDragGestureRecognizer(),
-                        ),
-                      },
+                      gestureRecognizers:
+                          <Factory<OneSequenceGestureRecognizer>>{
+                            Factory<VerticalDragGestureRecognizer>(
+                              () => VerticalDragGestureRecognizer(),
+                            ),
+                            Factory<HorizontalDragGestureRecognizer>(
+                              () => HorizontalDragGestureRecognizer(),
+                            ),
+                          },
                     ),
                   if (_isStreamLiveLoading || _webViewController == null)
-                    Container(
-                      color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.primaryGold,
-                          strokeWidth: 3,
-                        ),
+                    const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaryGold,
+                        strokeWidth: 3,
                       ),
                     ),
                 ],
@@ -367,7 +391,12 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage> with SingleTick
         ),
         // Compact refresh button
         Padding(
-          padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, spacing * 0.75),
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            spacing * 0.5,
+            horizontalPadding,
+            spacing * 0.75,
+          ),
           child: SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(

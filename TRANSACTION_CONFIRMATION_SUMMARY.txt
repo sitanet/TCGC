@@ -1,0 +1,289 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║              TCGC WALLET - TRANSACTION CONFIRMATION PAGE                  ║
+║                          (What Gets Displayed)                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                              SCREEN LAYOUT
+═══════════════════════════════════════════════════════════════════════════════
+
+                                 [Screen Top]
+                              (Confetti falling)
+                                      ↓
+
+                    ╔═════════════════════════╗
+                    ║   🟢 ✓ (Green Check)   ║  ← Animated with pulse rings
+                    ║     (Spinning glow)     ║     and outer halo effect
+                    ╚═════════════════════════╝
+                                ↓
+                     (Large animated icon)
+                                ↓
+
+                   ┌─────────────────────────┐
+                   │ Payment Successful!     │  ← Green-to-gold gradient
+                   │ Your giving has been    │     Animates in with slide
+                   │ been received           │
+                   └─────────────────────────┘
+                                ↓
+        ╔═════════════════════════════════════════════╗
+        ║        TRANSACTION DETAILS                  ║
+        ║                                             ║
+        ║  Amount              ₦10,000.00            ║ ← BOLD & GOLD
+        ║  Type                        Giving         ║
+        ║  To           The CityGate Church          ║
+        ║  Date        10 Jan, 2025 at 2:30 PM       ║
+        ║  Reference         TXN1704928200123         ║ ← (Only if available)
+        ║                                             ║
+        ╚═════════════════════════════════════════════╝
+                                ↓
+        ╭─────────────────────────────────────────┬─╮
+        │ ✨ "Give, and it will be given to      │ │
+        │                  you..." - Luke 6:38    │ │ ← Gold background
+        ╰─────────────────────────────────────────┴─╯
+
+                    ┏━━━━━━━━━━━━━━━━━━━━━━━┓
+                    ┃ 📄 Generate Receipt   ┃ ← Primary
+                    ┗━━━━━━━━━━━━━━━━━━━━━━━┛
+                    
+                    ╔═══════════════════════╗
+                    ║ 💰 Back to Wallet     ║ ← Secondary
+                    ╚═══════════════════════╝
+                    
+                                ↓
+                              [Screen Bottom]
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                           WHAT'S DISPLAYED
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ ALWAYS SHOWN:
+   ├─ Animated green checkmark icon with pulse effect
+   ├─ "Payment Successful!" headline
+   ├─ Confirmation message: "Your [type] has been received"
+   ├─ Amount: Formatted with ₦ symbol, bold, large, gold color
+   ├─ Type: Transaction type (Giving/Tithe/Send Money/etc)
+   ├─ To: Recipient name ("The CityGate Church")
+   ├─ Date: Full date and time (formatted)
+   ├─ Inspirational quote with Bible verse
+   ├─ Generate Receipt button (PNG/PDF options)
+   └─ Back to Wallet button
+
+✅ CONDITIONALLY SHOWN:
+   └─ Reference number (only if transaction has reference)
+
+❌ NEVER SHOWN:
+   ├─ Account numbers (REMOVED - Privacy/Security)
+   ├─ Donor/Sender name (even if available)
+   ├─ Account names
+   ├─ Bank details
+   └─ Internal transaction IDs
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         FIELD BREAKDOWN
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─ AMOUNT
+│  ├─ Format: "₦10,000.00" or "₦50,000"
+│  ├─ Style: Bold, 1.1x normal font size, GOLD color
+│  ├─ Importance: High - User confirms they sent this amount
+│  └─ Example: ₦10,000.00
+
+├─ TYPE
+│  ├─ Values: "Giving", "Tithe", "Send Money", etc.
+│  ├─ Style: Normal weight, standard color
+│  ├─ Purpose: Clarifies transaction category
+│  └─ Example: "Giving"
+
+├─ TO (RECIPIENT)
+│  ├─ Current value: "The CityGate Church" (hardcoded)
+│  ├─ Style: Normal weight, standard color
+│  ├─ Purpose: Shows who received the money
+│  └─ Note: Could be dynamic in future versions
+
+├─ DATE & TIME
+│  ├─ Format: "10 Jan, 2025 at 2:30 PM"
+│  ├─ Style: Normal weight, secondary/gray color
+│  ├─ Purpose: Transaction timestamp
+│  └─ Timezone: Device local time
+
+├─ REFERENCE (OPTIONAL)
+│  ├─ Format: Unique transaction ID
+│  ├─ Style: Normal weight, monospace recommended
+│  ├─ Purpose: Support/tracking reference
+│  ├─ Example: "TXN1704928200123"
+│  └─ Shown: Only if widget.reference is not null
+
+└─ INSPIRATIONAL MESSAGE
+   ├─ Content: Bible verse or inspirational quote
+   ├─ Color: Gold with transparent background
+   ├─ Font: Italic, smaller size
+   └─ Example: "Give, and it will be given to you..." - Luke 6:38
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         VISUAL DETAILS
+═══════════════════════════════════════════════════════════════════════════════
+
+ICON ANIMATION:
+  Stage 1 (0-100ms): Waiting for build
+  Stage 2 (100-200ms): Icon starts scaling (elastic easing)
+  Stage 3 (200-800ms): Checkmark animates in with rotation
+  Stage 4 (0-2500ms): Confetti falls from top
+  Continuous: Pulse glow expands/contracts (1500ms cycle)
+
+TEXT ANIMATIONS:
+  Timeline: 300-1100ms
+  Effect: Slide up + fade in
+  Easing: Ease-out curve
+  Result: Smooth entrance after icon appears
+
+LAYOUT:
+  Max width: Responsive (mobile/tablet/desktop)
+  Padding: Horizontal padding based on device
+  Colors: Adapt to dark/light theme
+  Shadows: Subtle shadows on cards and buttons
+
+COLORS (Light Mode):
+  Background: White
+  Card: Light gray (#f3f3f3)
+  Text: Dark gray/black
+  Accent: Gold (primary brand color)
+  Icon: Green checkmark (success green)
+  Quote: Gold on semi-transparent gold
+
+COLORS (Dark Mode):
+  Background: Dark gray/black
+  Card: Dark card color
+  Text: White/light gray
+  Accent: Gold (unchanged)
+  Icon: Green checkmark (unchanged)
+  Quote: Gold on semi-transparent gold
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                      RECEIPT GENERATION
+═══════════════════════════════════════════════════════════════════════════════
+
+When user taps "Generate Receipt":
+
+┌─ PNG/IMAGE FORMAT
+│  ├─ Captures full transaction details visually
+│  ├─ Best for: Social media sharing, WhatsApp, etc.
+│  ├─ Includes: Amount, type, date, reference, quote
+│  └─ Resolution: High-quality screenshot
+
+└─ PDF FORMAT
+   ├─ Professional document format
+   ├─ Best for: Email, printing, archiving
+   ├─ Includes: Same details as PNG + formatted professionally
+   └─ Features: Embeds all transaction info, logo, quote
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                        RESPONSIVE DISPLAY
+═══════════════════════════════════════════════════════════════════════════════
+
+MOBILE (320-480px):
+  ├─ Icon: 120px diameter
+  ├─ Title font: ~20px
+  ├─ Card: Full width minus padding
+  ├─ Padding: 16px sides
+  └─ Button height: 48px
+
+TABLET (600-900px):
+  ├─ Icon: 140px diameter
+  ├─ Title font: ~22px
+  ├─ Card: Full width minus padding
+  ├─ Padding: 24px sides
+  └─ Button height: 56px
+
+DESKTOP (1000px+):
+  ├─ Icon: 160px diameter
+  ├─ Title font: ~26px
+  ├─ Card: Max 600px width, centered
+  ├─ Padding: 32px sides
+  └─ Button height: 56px
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         NAVIGATION
+═══════════════════════════════════════════════════════════════════════════════
+
+BUTTONS:
+
+1. Generate Receipt
+   ├─ Taps show modal with PNG/PDF options
+   ├─ PNG selected: Generates image, shows share dialog
+   ├─ PDF selected: Generates PDF, shows share dialog
+   └─ Loading state: Spinner shows while generating
+
+2. Back to Wallet
+   ├─ Returns to main wallet page
+   ├─ Sets active tab to wallet (index 3)
+   ├─ Clears navigation stack
+   └─ Resets all transaction pages
+
+3. System Back Button
+   ├─ Cannot go back (PopScope prevents it)
+   ├─ Must use "Back to Wallet" button
+   ├─ Ensures user doesn't accidentally leave without review
+   └─ Design pattern: Prevent accidental back navigation
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                       ACTUAL EXAMPLE
+═══════════════════════════════════════════════════════════════════════════════
+
+TRANSACTION DATA:
+{
+  title: "Giving",
+  amount: "10,000.00",
+  reference: "TXN1704928200123"
+}
+
+DISPLAYED RESULT:
+
+        ✅ Payment Successful!
+    Your giving has been received
+
+
+    ┌──────────────────────────────────┐
+    │ Amount                 ₦10,000.00 │
+    │ Type                       Giving │
+    │ To       The CityGate Church     │
+    │ Date   10 Jan, 2025 at 2:30 PM   │
+    │ Reference   TXN1704928200123     │
+    └──────────────────────────────────┘
+
+    ✨ "Give, and it will be given
+        to you..." - Luke 6:38
+
+    [📄 Generate Receipt]
+    [Back to Wallet]
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                      SECURITY & PRIVACY
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ PROTECTED DATA (Not Displayed):
+   ├─ Account numbers: ❌ NEVER shown
+   ├─ Sensitive banking info: ❌ NOT displayed
+   ├─ Personal identification: ❌ Hidden
+   └─ Backend transaction IDs: ❌ Kept private
+
+✅ USER-SAFE DATA (Displayed):
+   ├─ Amount: ✅ User initiated, needs confirmation
+   ├─ Type: ✅ Clarifies purpose
+   ├─ Recipient: ✅ Shows who received
+   ├─ Date/Time: ✅ Transaction timestamp
+   └─ Reference: ✅ Support/tracking only (no sensitive data)
+
+PRIVACY LEVEL: ⭐⭐⭐⭐⭐
+(Account numbers successfully removed for security)
+
+
+═══════════════════════════════════════════════════════════════════════════════

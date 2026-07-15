@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../TCGC_BACKEND"
+		},
+		{
+			"path": "../FINANCE/finance_app"
+		}
+	],
+	"settings": {
+	}
+}

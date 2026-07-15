@@ -1,0 +1,441 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║         TRANSACTION CONFIRMATION SHEET - VISUAL EXAMPLE                   ║
+║              (What User Sees Before Entering PIN)                         ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+                            LIGHT MODE DISPLAY
+                            ═════════════════
+
+
+                              ━━━━━━━━━━
+                          [drag handle bar]
+                              ━━━━━━━━━━
+                              
+                    [X]                           ← Close button
+
+
+                              ₦10,000.00
+                          (Large bold text)
+
+
+                            ┌────────────┐
+                            │   TITHE    │        ← Gold badge
+                            └────────────┘
+
+
+        ╔═══════════════════════════════════════════════════╗
+        ║                                                   ║
+        ║  To               🏛️  CityGate Church            ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  Purpose                              Tithe      ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  Account No.                      1234567890     ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  Account Name                   Church Account   ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  Amount                            ₦10,000.00    ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  Fee                                   ₦50.00    ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  VAT                                   ₦10.00    ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  Total                  ₦10,060.00  (BOLD GOLD) ║
+        ║                                                   ║
+        ╚═══════════════════════════════════════════════════╝
+
+
+        ╔═══════════════════════════════════════════════════╗ ← Green border
+        ║  Wallet Balance                                   ║
+        ║  ₦50,000  →  ₦39,940 after              ✓       ║
+        ║  (Current balance → Balance after transaction)    ║
+        ╚═══════════════════════════════════════════════════╝
+
+
+                    ┏━━━━━━━━━━━━━━━━━━━━━━━━━┓
+                    ┃         Pay            ┃
+                    ┗━━━━━━━━━━━━━━━━━━━━━━━━━┛
+                    (Gold background, white text)
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                            DARK MODE DISPLAY
+                            ════════════════
+
+
+                              ━━━━━━━━━━
+                          [drag handle bar]
+                              ━━━━━━━━━━
+                              
+                    [X]                           ← Close button
+
+
+                              ₦10,000.00
+                          (Large bold white text)
+
+
+                            ┌────────────┐
+                            │   TITHE    │        ← Gold badge
+                            └────────────┘
+
+
+        ╔═══════════════════════════════════════════════════╗
+        ║  (Dark card background)                          ║
+        ║  To               🏛️  CityGate Church            ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  Purpose                              Tithe      ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  Account No.                      1234567890     ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  Account Name                   Church Account   ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  Amount                            ₦10,000.00    ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  Fee                                   ₦50.00    ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  VAT                                   ₦10.00    ║
+        ║  ─────────────────────────────────────────────   ║
+        ║  Total                  ₦10,060.00  (BOLD GOLD) ║
+        ║                                                   ║
+        ╚═══════════════════════════════════════════════════╝
+
+
+        ╔═══════════════════════════════════════════════════╗ ← Green border
+        ║  Wallet Balance                                   ║
+        ║  ₦50,000  →  ₦39,940 after              ✓       ║
+        ║  (Current balance → Balance after transaction)    ║
+        ╚═══════════════════════════════════════════════════╝
+
+
+                    ┏━━━━━━━━━━━━━━━━━━━━━━━━━┓
+                    ┃         Pay            ┃
+                    ┗━━━━━━━━━━━━━━━━━━━━━━━━━┛
+                    (Gold background, white text)
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                        FIELD DESCRIPTIONS
+                        ═════════════════
+
+
+┌─ TO (RECIPIENT)
+│  ├─ Icon: Gold circle with church icon
+│  ├─ Value: "CityGate Church" (from wallet provider)
+│  ├─ Purpose: Shows who receives the money
+│  └─ Example: "The CityGate Church"
+
+├─ PURPOSE (TRANSACTION TYPE)
+│  ├─ Value: "Tithe", "Giving", "Send Money", etc.
+│  ├─ Purpose: Shows type of transaction
+│  └─ Example: "Tithe"
+
+├─ ACCOUNT NO. (OPTIONAL)
+│  ├─ Value: Church's bank account number
+│  ├─ Purpose: Confirmation of bank account
+│  ├─ Example: "1234567890"
+│  └─ Note: Only shown if available in wallet provider
+│           ⚠️ USER CONCERN: May need to be hidden (privacy)
+
+├─ ACCOUNT NAME (OPTIONAL)
+│  ├─ Value: Church account name
+│  ├─ Purpose: Identifies the account
+│  ├─ Example: "Church Operations Account"
+│  └─ Note: Only shown if available in wallet provider
+
+├─ AMOUNT
+│  ├─ Value: User-entered amount
+│  ├─ Format: ₦10,000.00
+│  ├─ Purpose: Shows base transaction amount
+│  └─ Weight: Medium-bold
+
+├─ FEE
+│  ├─ Value: Service/transaction fee calculated by system
+│  ├─ Format: ₦50.00
+│  ├─ Purpose: Shows processing fee
+│  └─ Note: Calculated based on amount and transaction type
+
+├─ VAT
+│  ├─ Value: Value Added Tax (if applicable)
+│  ├─ Format: ₦10.00
+│  ├─ Purpose: Shows tax component
+│  ├─ Note: Only shown if VAT > 0
+│  └─ Calculation: Often based on fee
+
+└─ TOTAL (IMPORTANT)
+   ├─ Value: Amount + Fee + VAT
+   ├─ Format: ₦10,060.00
+   ├─ Style: BOLD, GOLD COLOR, Larger font
+   ├─ Purpose: Total amount user will pay
+   └─ Note: This is what actually gets deducted from wallet
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                        BALANCE CARD DETAILS
+                        ══════════════════
+
+
+FORMAT:
+    Wallet Balance
+    ₦50,000 → ₦39,940 after  ✓
+
+COMPONENTS:
+    ├─ Label: "Wallet Balance"
+    ├─ Current balance: ₦50,000
+    ├─ Arrow: →
+    ├─ Balance after transaction: ₦39,940
+    └─ Success icon: ✓ (Green checkmark)
+
+CALCULATION:
+    Balance After = Current Balance - Total Amount
+    ₦50,000 - ₦10,060 = ₦39,940
+
+COLORS:
+    ├─ Border: Green (success green)
+    ├─ Text: Default (white in dark, black in light)
+    └─ Icon: Green checkmark
+
+PURPOSE:
+    Shows user their current balance and confirms they have enough funds
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                    TYPICAL TRANSACTION EXAMPLES
+                    ══════════════════════════
+
+
+EXAMPLE 1: TITHE OFFERING
+    Amount:        ₦10,000.00
+    Fee:              ₦50.00
+    VAT:              ₦10.00
+    ─────────────────────────
+    Total:        ₦10,060.00
+    
+    Wallet:     ₦50,000 → ₦39,940
+
+
+EXAMPLE 2: MONTHLY GIVING
+    Amount:        ₦20,000.00
+    Fee:             ₦100.00
+    VAT:              ₦20.00
+    ─────────────────────────
+    Total:        ₦20,120.00
+    
+    Wallet:    ₦100,000 → ₦79,880
+
+
+EXAMPLE 3: SEND MONEY (Peer Transfer)
+    Amount:         ₦5,000.00
+    Fee:              ₦25.00
+    VAT:               ₦5.00
+    ─────────────────────────
+    Total:         ₦5,030.00
+    
+    Wallet:     ₦30,000 → ₦24,970
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                          BUTTON BEHAVIOR
+                          ══════════════
+
+
+CLOSE BUTTON (X):
+    ├─ Location: Top right of sheet
+    ├─ Action: Closes this sheet
+    ├─ Returns to: Amount entry screen
+    └─ Note: No transaction is processed
+
+PAY BUTTON:
+    ├─ Location: Bottom of sheet
+    ├─ Label: "Pay"
+    ├─ Color: Gold background, white text
+    ├─ Action: 
+    │   1. Closes confirmation sheet
+    │   2. Opens PIN entry sheet
+    │   3. User enters 4-digit PIN
+    ├─ Enabled when: Always (if balance sufficient)
+    └─ Next: PIN verification sheet
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                        EDGE CASES
+                        ═════════
+
+
+CASE 1: NO ACCOUNT NUMBER
+    If churchAccountNumber is null:
+    ├─ Account No. row: NOT SHOWN
+    └─ Sheet shows only: To, Purpose, Amount, Fee, VAT, Total
+
+
+CASE 2: NO ACCOUNT NAME
+    If churchAccountName is null:
+    ├─ Account Name row: NOT SHOWN
+    └─ Sheet shows only: To, Purpose, Account No., Amount, Fee, VAT, Total
+
+
+CASE 3: NO VAT
+    If VAT == 0:
+    ├─ VAT row: NOT SHOWN
+    └─ Shows only: Amount and Fee
+
+
+CASE 4: INSUFFICIENT BALANCE
+    If balance < total:
+    ├─ Balance card: Shows red or warning color
+    ├─ Pay button: DISABLED or shows warning
+    └─ Message: "Insufficient balance" (if implemented)
+
+
+CASE 5: HIGH AMOUNT
+    If amount is very large:
+    ├─ Font size: Adjusts responsively
+    ├─ Line breaks: Text wraps properly
+    └─ Layout: Remains readable
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                        RESPONSIVE DESIGN
+                        ════════════════
+
+
+MOBILE (320-480px):
+    ├─ Sheet height: 70-80% of screen
+    ├─ Amount font: 36px
+    ├─ Card padding: 16px
+    ├─ Button height: 54px
+    └─ Scrollable if content exceeds screen
+
+TABLET (768px+):
+    ├─ Sheet height: 60-70% of screen
+    ├─ Amount font: 36px (same)
+    ├─ Card padding: 20px
+    ├─ Button height: 54px
+    └─ More spacious layout
+
+DESKTOP (1080px+):
+    ├─ Sheet width: Limited by maxWidth constraint
+    ├─ Amount font: 36px
+    ├─ Card padding: 24px
+    ├─ Button height: 54px
+    └─ Centered on screen
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                    WHAT HAPPENS WHEN USER TAPS "PAY"
+                    ════════════════════════════════
+
+
+SEQUENCE:
+    1. User reviews all details on confirmation sheet
+    2. User sees adequate balance (green checkmark)
+    3. User taps "Pay" button
+    4. This sheet closes (Navigator.pop)
+    5. PIN Entry Sheet opens
+    6. User enters 4-digit PIN
+    7. PIN is validated
+    8. If PIN correct → Transaction processing begins
+    9. If PIN wrong → Error message, can retry
+    10. After processing → Success or Failure page
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                        CURRENTLY DISPLAYED DATA
+                        ══════════════════════
+
+
+FROM USER INPUT:
+    ✅ Amount (entered by user)
+
+FROM SYSTEM CALCULATION:
+    ✅ Fee (calculated based on amount)
+    ✅ VAT (calculated on fee)
+    ✅ Total (amount + fee + vat)
+
+FROM WALLET PROVIDER:
+    ✅ Church name
+    ✅ Church account number (if available)
+    ✅ Church account name (if available)
+    ✅ Current wallet balance
+    ✅ Balance after transaction
+
+NOT DISPLAYED:
+    ❌ Transaction ID (assigned after processing)
+    ❌ Timestamp (shown after success)
+    ❌ User name/email
+    ❌ Payment method details
+    ❌ Processing fee breakdown (just shows total)
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                        COLORS IN DETAIL
+                        ═══════════════
+
+
+TEXT COLORS:
+    Primary value:    Black (light) / White (dark)
+    Secondary label:  Gray (light) / Light gray (dark)
+    Amount display:   Black (light) / White (dark)
+    Total highlight:  AppColors.primaryGold (ALWAYS GOLD)
+
+BACKGROUND COLORS:
+    Sheet bg:         White (light) / Card dark (dark)
+    Card bg:          Light gray #F7F7F7 (light) / Background dark (dark)
+    Badge bg:         Gold with 15% opacity
+    Balance border:   Green success with 35% opacity
+
+ACCENT COLORS:
+    Gold:             AppColors.primaryGold (primary brand)
+    Green:            AppColors.success (balance confirmation)
+    Icons:            Gold for church, green for checkmark
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+                    PRIVACY & SECURITY NOTES
+                    ════════════════════════
+
+
+CURRENTLY DISPLAYED:
+    ⚠️ Account Number: Visible (123456789)
+    ⚠️ Account Name: Visible (Church Account)
+    ✅ User Balance: Visible (acceptable - user's own info)
+    ✅ Amount: Visible (user entered it)
+
+PRIVACY CONCERNS:
+    ❌ Account numbers should perhaps be hidden
+       → Risk: If user screenshots, account number is visible
+       → Recommendation: Show masked (****7890) or remove entirely
+    
+    ❌ Full account name might be unnecessary
+       → Church name is already shown in "To" field
+       → Full account name adds no value
+
+SECURITY MEASURES:
+    ✅ PIN required before processing
+    ✅ Balance verification before payment
+    ✅ No sensitive personal data shown
+    ✅ No transaction processing on this screen
+
+
+════════════════════════════════════════════════════════════════════════════════

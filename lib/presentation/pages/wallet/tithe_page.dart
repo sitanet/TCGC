@@ -420,7 +420,6 @@ class _TithePageState extends ConsumerState<TithePage> {
   // ── Sheet 1: Confirmation (no PIN) ─────────────────────────────────────────
   void _showPinDialog(double amountValue) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final walletProvider = ref.read(walletChangeNotifierProvider);
     final fees = _getFees(amountValue);
     final fee = fees['totalFee']!;
     final total = amountValue + fee;
@@ -553,41 +552,6 @@ class _TithePageState extends ConsumerState<TithePage> {
                 child: Column(
                   children: [
                     infoRow(
-                      'To',
-                      Row(
-                        mainAxisSize: MainAxisSize.max,
-                        children: [
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: const BoxDecoration(
-                              color: AppColors.primaryGold,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.church,
-                              color: Colors.white,
-                              size: 14,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              walletProvider.churchName ?? 'CityGate Church',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: valueColor,
-                              ),
-                              softWrap: true,
-                              textAlign: TextAlign.right,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    divider(),
-                    infoRow(
                       'Purpose',
                       Text(
                         widget.title,
@@ -598,36 +562,6 @@ class _TithePageState extends ConsumerState<TithePage> {
                         ),
                       ),
                     ),
-                    if (walletProvider.churchAccountNumber != null) ...[
-                      divider(),
-                      infoRow(
-                        'Account No.',
-                        Text(
-                          walletProvider.churchAccountNumber!,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: valueColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                    if (walletProvider.churchAccountName != null) ...[
-                      divider(),
-                      infoRow(
-                        'Account Name',
-                        Text(
-                          walletProvider.churchAccountName!,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: valueColor,
-                          ),
-                          softWrap: true,
-                          textAlign: TextAlign.right,
-                        ),
-                      ),
-                    ],
                     divider(),
                     infoRow(
                       'Amount',
@@ -677,52 +611,6 @@ class _TithePageState extends ConsumerState<TithePage> {
                           color: AppColors.primaryGold,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // ── payment method / balance row ───────────────────────────
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.success.withValues(alpha: 0.35),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Wallet Balance',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: valueColor,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '₦${_fmt(walletProvider.balance)}  →  ₦${_fmt(walletProvider.balance - total)} after',
-                            style: TextStyle(fontSize: 12, color: labelColor),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.check_circle,
-                      color: AppColors.success,
-                      size: 22,
                     ),
                   ],
                 ),
