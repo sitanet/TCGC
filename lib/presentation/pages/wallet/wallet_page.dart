@@ -42,7 +42,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Refresh app config to get latest wallet page status
       ref.read(appConfigChangeNotifierProvider).fetchConfig();
-      _startAuthentication();
+      // NOTE: _startAuthentication() is now called from build() after toggle check
     });
   }
 
@@ -641,6 +641,12 @@ class _WalletPageState extends ConsumerState<WalletPage>
       ),
       error: (error, stackTrace) {
         // On error, continue with wallet - safe default is enabled
+        // Trigger authentication if not yet initialized
+        if (!_hasInitialized) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _startAuthentication();
+          });
+        }
         return _buildWalletUI(context);
       },
       data: (toggleStatus) {
@@ -741,6 +747,12 @@ class _WalletPageState extends ConsumerState<WalletPage>
         }
 
         // Feature is available, show normal wallet UI
+        // Trigger authentication if not yet initialized
+        if (!_hasInitialized) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _startAuthentication();
+          });
+        }
         return _buildWalletUI(context);
       },
     );
