@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/theme/app_theme.dart';
@@ -41,6 +42,9 @@ import 'core/widgets/network_aware_widget.dart';
 import 'data/services/biometric_service.dart';
 import 'core/providers/community_provider.dart';
 import 'core/services/image_cache_service.dart';
+import 'presentation/bloc/ask_wing_ai/ask_wing_ai_cubit.dart';
+import 'data/services/ask_wing_ai_service.dart';
+import 'core/services/token_service.dart';
 
 final communityChangeNotifierProvider =
     ChangeNotifierProvider<CommunityProvider>((ref) => CommunityProvider());
@@ -385,6 +389,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
   final DataService _dataService = DataService();
   AppUpdateInfo? _updateInfo;
   StreamSubscription? _deepLinkSub;
+  late AskWingAICubit _askWingAICubit;
 
   static const String _lastTabKey = 'last_tab_index';
 
@@ -420,6 +425,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
     _setupNotificationHandler();
     _restoreLastTab();
     _initDeepLinks();
+    _initializeAskWingAICubit();
 
     // Delay non-critical operations to let UI render first
     Future.delayed(const Duration(milliseconds: 500), () {
@@ -435,6 +441,33 @@ class _MainScreenState extends ConsumerState<MainScreen>
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted) _checkForReadyToPlayPopup();
     });
+  }
+
+  void _initializeAskWingAICubit() {
+    try {
+      // Initialize AskWingAIService with TokenService
+      final tokenService = TokenService();
+      _askWingAICubit = AskWingAICubit(
+        service: AskWingAIService(
+          tokenService: tokenService,
+        ),
+      );
+      debugPrint('AskWingAICubit initialized successfully');
+    } catch (e) {
+      debugPrint('Error initializing AskWingAICubit: $e');
+      // Create with a fallback service to avoid crashes
+      try {
+        final tokenService = TokenService();
+        _askWingAICubit = AskWingAICubit(
+          service: AskWingAIService(
+            tokenService: tokenService,
+          ),
+        );
+      } catch (fallbackError) {
+        debugPrint('Failed to create fallback AskWingAICubit: $fallbackError');
+        rethrow;
+      }
+    }
   }
 
   Future<void> _checkForReadyToPlayPopup() async {
@@ -523,6 +556,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
     _deepLinkSub?.cancel();
     NotificationService.onNotificationTapped = null;
     WidgetsBinding.instance.removeObserver(this);
+    _askWingAICubit.close();
     super.dispose();
   }
 
@@ -1031,49 +1065,55 @@ class _MainScreenState extends ConsumerState<MainScreen>
     }
 
     if (_showReadyToPlayPopup) {
-      return Stack(
-        children: [
-          Scaffold(
-            body: _buildPage(_currentIndex),
-            bottomNavigationBar: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const MiniPlayer(),
-                BottomNavBar(
-                  currentIndex: _currentIndex,
-                  onTap: (index) {
-                    if (index == 3) {
-                      _handleWalletTap();
-                    } else {
-                      _setCurrentIndex(index);
-                    }
-                  },
-                ),
-              ],
+      return BlocProvider<AskWingAICubit>(
+        create: (context) => _askWingAICubit,
+        child: Stack(
+          children: [
+            Scaffold(
+              body: _buildPage(_currentIndex),
+              bottomNavigationBar: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const MiniPlayer(),
+                  BottomNavBar(
+                    currentIndex: _currentIndex,
+                    onTap: (index) {
+                      if (index == 3) {
+                        _handleWalletTap();
+                      } else {
+                        _setCurrentIndex(index);
+                      }
+                    },
+                  ),
+                ],
+              ),
             ),
-          ),
-          ReadyToPlayPopup(onDismiss: _closeReadyToPlayPopup),
-        ],
+            ReadyToPlayPopup(onDismiss: _closeReadyToPlayPopup),
+          ],
+        ),
       );
     }
 
-    return Scaffold(
-      body: _buildPage(_currentIndex),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const MiniPlayer(),
-          BottomNavBar(
-            currentIndex: _currentIndex,
-            onTap: (index) {
-              if (index == 3) {
-                _handleWalletTap();
-              } else {
-                _setCurrentIndex(index);
-              }
-            },
-          ),
-        ],
+    return BlocProvider<AskWingAICubit>(
+      create: (context) => _askWingAICubit,
+      child: Scaffold(
+        body: _buildPage(_currentIndex),
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const MiniPlayer(),
+            BottomNavBar(
+              currentIndex: _currentIndex,
+              onTap: (index) {
+                if (index == 3) {
+                  _handleWalletTap();
+                } else {
+                  _setCurrentIndex(index);
+                }
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
