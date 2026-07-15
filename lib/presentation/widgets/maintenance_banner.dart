@@ -75,7 +75,7 @@ class MaintenanceBanner extends StatelessWidget {
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.outlined(
+              child: OutlinedButton(
                 onPressed: onRetry,
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: AppColors.primaryGold),

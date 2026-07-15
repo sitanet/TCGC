@@ -802,52 +802,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
     // If user doesn't have wallet, show welcome page
     return _buildWalletWelcomePage(context);
   }
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final horizontalPadding = Responsive.horizontalPadding(context);
-
-    return Scaffold(
-      appBar: CustomAppBar(
-        title: 'Wallet',
-        showBackButton: true,
-        lightBackground: true,
-        onBackPressed: _handleBackNavigation,
-      ),
-      body: Center(
-        child: Padding(
-          padding: EdgeInsets.all(horizontalPadding),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.construction_rounded,
-                  size: 50,
-                  color: Colors.orange,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Under Maintenance',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                  height: 1.5,
                 ),
               ),
             ],
