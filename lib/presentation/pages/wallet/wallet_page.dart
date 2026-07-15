@@ -7,6 +7,8 @@ import '../../../main.dart';
 import '../../../core/constants/feature_flags.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/password_input_field.dart';
+import '../../widgets/maintenance_banner.dart';
+import '../../providers/feature_toggle_provider.dart';
 import 'give_page.dart';
 
 import 'set_transaction_pin_page.dart';
@@ -629,6 +631,131 @@ class _WalletPageState extends ConsumerState<WalletPage>
       return _buildDisabledPage(context, FeatureFlags.walletUnderDevelopmentMessage);
     }
 
+    // Check feature toggle status for wallet
+    final walletToggleAsync = ref.watch(walletFeatureToggleProvider);
+
+    // Handle feature toggle loading
+    return walletToggleAsync.when(
+      loading: () => Scaffold(
+        appBar: CustomAppBar(
+          title: 'Wallet',
+          showBackButton: true,
+          lightBackground: true,
+          onBackPressed: _handleBackNavigation,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primaryGold),
+        ),
+      ),
+      error: (error, stackTrace) {
+        // On error, continue with wallet - safe default is enabled
+        return _buildWalletUI(context);
+      },
+      data: (toggleStatus) {
+        // If wallet feature is disabled/under maintenance, show maintenance screen
+        if (!toggleStatus.isAvailable) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return Scaffold(
+            appBar: CustomAppBar(
+              title: 'Wallet',
+              showBackButton: true,
+              lightBackground: true,
+              onBackPressed: _handleBackNavigation,
+            ),
+            body: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.construction_outlined,
+                        size: 50,
+                        color: Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Under Maintenance',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      toggleStatus.maintenanceMessage ?? 'Wallet service is temporarily unavailable. Please try again later.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                        height: 1.5,
+                      ),
+                    ),
+                    if (toggleStatus.estimatedDowntimeMinutes != null) ...[
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Estimated downtime: ${toggleStatus.estimatedDowntimeMinutes}m',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: 200,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          // Invalidate cache and refresh
+                          ref.read(featureToggleServiceProvider).invalidateCache('wallet');
+                          ref.refresh(walletFeatureToggleProvider);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryGold,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        child: const Text(
+                          'Check Again',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        // Feature is available, show normal wallet UI
+        return _buildWalletUI(context);
+      },
+    );
+  }
+
+  /// Build the actual wallet UI (extracted from original build method)
+  Widget _buildWalletUI(BuildContext context) {
     final walletProvider = ref.watch(walletChangeNotifierProvider);
 
     // Watch tab index to detect when user navigates to wallet tab
@@ -675,8 +802,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
     // If user doesn't have wallet, show welcome page
     return _buildWalletWelcomePage(context);
   }
-
-  Widget _buildDisabledPage(BuildContext context, String message) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final horizontalPadding = Responsive.horizontalPadding(context);
 
