@@ -4,13 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
-import '../../../core/constants/feature_flags.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/password_input_field.dart';
-import '../../widgets/maintenance_banner.dart';
 import '../../providers/feature_toggle_provider.dart';
 import 'give_page.dart';
-
 import 'set_transaction_pin_page.dart';
 
 class WalletPage extends ConsumerStatefulWidget {
@@ -626,11 +623,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
 
   @override
   Widget build(BuildContext context) {
-    // FEATURE FLAG: Check if wallet is under development
-    if (FeatureFlags.isWalletUnderDevelopment) {
-      return _buildDisabledPage(context, FeatureFlags.walletUnderDevelopmentMessage);
-    }
-
     // Check feature toggle status for wallet
     final walletToggleAsync = ref.watch(walletFeatureToggleProvider);
 
@@ -801,14 +793,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
 
     // If user doesn't have wallet, show welcome page
     return _buildWalletWelcomePage(context);
-  }
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _buildWalletWelcomePage(BuildContext context) {
