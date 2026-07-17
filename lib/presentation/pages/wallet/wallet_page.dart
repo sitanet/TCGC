@@ -621,8 +621,96 @@ class _WalletPageState extends ConsumerState<WalletPage>
     );
   }
 
+  Widget _buildDisabledPage(BuildContext context, String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      appBar: CustomAppBar(
+        title: 'Wallet',
+        showBackButton: true,
+        lightBackground: true,
+        onBackPressed: _handleBackNavigation,
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.construction_outlined,
+                  size: 50,
+                  color: Colors.orange,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Under Maintenance',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: 200,
+                child: ElevatedButton(
+                  onPressed: () {
+                    // Refresh both config and feature toggle
+                    ref.read(appConfigChangeNotifierProvider).fetchConfig();
+                    ref.read(featureToggleServiceProvider).invalidateCache('wallet');
+                    ref.refresh(walletFeatureToggleProvider);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGold,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: const Text(
+                    'Check Again',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Check local/dashboard page disable toggle first
+    final appConfig = ref.watch(appConfigChangeNotifierProvider);
+    if (appConfig.config.walletPageDisabled) {
+      return _buildDisabledPage(
+        context,
+        appConfig.config.walletPageDisabledMessage,
+      );
+    }
+
     // Check feature toggle status for wallet
     final walletToggleAsync = ref.watch(walletFeatureToggleProvider);
 
@@ -652,97 +740,9 @@ class _WalletPageState extends ConsumerState<WalletPage>
       data: (toggleStatus) {
         // If wallet feature is disabled/under maintenance, show maintenance screen
         if (!toggleStatus.isAvailable) {
-          final isDark = Theme.of(context).brightness == Brightness.dark;
-          return Scaffold(
-            appBar: CustomAppBar(
-              title: 'Wallet',
-              showBackButton: true,
-              lightBackground: true,
-              onBackPressed: _handleBackNavigation,
-            ),
-            body: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.construction_outlined,
-                        size: 50,
-                        color: Colors.orange,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Under Maintenance',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      toggleStatus.maintenanceMessage ?? 'Wallet service is temporarily unavailable. Please try again later.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                        height: 1.5,
-                      ),
-                    ),
-                    if (toggleStatus.estimatedDowntimeMinutes != null) ...[
-                      const SizedBox(height: 20),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'Estimated downtime: ${toggleStatus.estimatedDowntimeMinutes}m',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isDark ? Colors.white70 : Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 32),
-                    SizedBox(
-                      width: 200,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // Invalidate cache and refresh
-                          ref.read(featureToggleServiceProvider).invalidateCache('wallet');
-                          ref.refresh(walletFeatureToggleProvider);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryGold,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
-                        child: const Text(
-                          'Check Again',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          return _buildDisabledPage(
+            context,
+            toggleStatus.maintenanceMessage ?? 'Wallet service is temporarily unavailable. Please try again later.',
           );
         }
 

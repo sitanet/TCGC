@@ -59,7 +59,7 @@ class CitationCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  citation.speakerName!,
+                  citation.speakerName ?? '',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[700],
@@ -74,7 +74,7 @@ class CitationCard extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                citation.estimatedTimestamp,
+                citation.estimatedTimestamp ?? citation.timestamp ?? '--:--',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -99,7 +99,7 @@ class CitationCard extends StatelessWidget {
           ),
 
           // Excerpt (if available and not too long)
-          if (citation.textChunk.isNotEmpty && citation.textChunk.length < 150) ...[
+          if ((citation.textChunk?.isNotEmpty ?? false) && (citation.textChunk?.length ?? 0) < 150) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(8),
@@ -108,7 +108,7 @@ class CitationCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                '"${citation.textChunk}"',
+                '"${citation.textChunk ?? ''}"',
                 style: TextStyle(
                   fontSize: 11,
                   fontStyle: FontStyle.italic,

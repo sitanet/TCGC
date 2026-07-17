@@ -3,7 +3,7 @@ import '../../../data/models/ask_wing_ai/ask_wing_ai_response_model.dart';
 
 /// Rate limit indicator shown in AppBar
 class RateLimitIndicator extends StatelessWidget {
-  final RateLimitStatus status;
+  final RateLimitModel status;
 
   const RateLimitIndicator({
     Key? key,

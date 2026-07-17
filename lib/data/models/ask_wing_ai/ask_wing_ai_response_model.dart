@@ -1,6 +1,36 @@
 import 'package:equatable/equatable.dart';
 import 'chat_message_model.dart';
 
+/// Represents the status of the Ask Wing AI feature
+class FeatureStatusModel extends Equatable {
+  final bool isEnabled;
+  final String? message;
+
+  const FeatureStatusModel({
+    required this.isEnabled,
+    this.message,
+  });
+
+  /// Create from JSON response
+  factory FeatureStatusModel.fromJson(Map<String, dynamic> json) {
+    return FeatureStatusModel(
+      isEnabled: json['is_enabled'] ?? json['enabled'] ?? true,
+      message: json['message'] as String?,
+    );
+  }
+
+  /// Convert to JSON
+  Map<String, dynamic> toJson() {
+    return {
+      'is_enabled': isEnabled,
+      'message': message,
+    };
+  }
+
+  @override
+  List<Object?> get props => [isEnabled, message];
+}
+
 /// Represents the response from Ask Wing AI backend API
 class AskWingAIResponseModel extends Equatable {
   final String messageId;
@@ -10,6 +40,8 @@ class AskWingAIResponseModel extends Equatable {
   final int processingTimeMs;
   final DateTime timestamp;
   final String? error;
+  final String? sessionId;
+  final RateLimitModel? rateLimit;
 
   const AskWingAIResponseModel({
     required this.messageId,
@@ -19,12 +51,14 @@ class AskWingAIResponseModel extends Equatable {
     required this.processingTimeMs,
     required this.timestamp,
     this.error,
+    this.sessionId,
+    this.rateLimit,
   });
 
   /// Create from JSON response from backend
   factory AskWingAIResponseModel.fromJson(Map<String, dynamic> json) {
     return AskWingAIResponseModel(
-      messageId: json['message_id'] ?? '',
+      messageId: (json['message_id'] ?? '').toString(),
       question: json['question'] ?? '',
       response: json['response'] ?? '',
       citations: (json['citations'] as List<dynamic>?)
@@ -35,6 +69,10 @@ class AskWingAIResponseModel extends Equatable {
       timestamp: DateTime.parse(
           json['timestamp'] ?? DateTime.now().toIso8601String()),
       error: json['error'],
+      sessionId: json['session_id'] as String?,
+      rateLimit: json['rate_limit'] != null 
+          ? RateLimitModel.fromJson(json['rate_limit'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -48,6 +86,8 @@ class AskWingAIResponseModel extends Equatable {
       'processing_time_ms': processingTimeMs,
       'timestamp': timestamp.toIso8601String(),
       'error': error,
+      'session_id': sessionId,
+      'rate_limit': rateLimit?.toJson(),
     };
   }
 
@@ -60,6 +100,8 @@ class AskWingAIResponseModel extends Equatable {
         processingTimeMs,
         timestamp,
         error,
+        sessionId,
+        rateLimit,
       ];
 }
 
@@ -76,6 +118,18 @@ class RateLimitModel extends Equatable {
     required this.dailyRemaining,
     required this.resetTime,
   });
+
+  /// Check if at limit
+  bool get isAtLimit => dailyRemaining <= 0;
+
+  /// Check if near limit (within 5 questions)
+  bool get isNearLimit => dailyRemaining > 0 && dailyRemaining <= 5;
+
+  /// Check if user can ask more questions
+  bool get canAsk => dailyRemaining > 0;
+
+  /// Get usage percentage (0.0 to 1.0)
+  double get usagePercentage => dailyUsed / dailyLimit;
 
   /// Create from JSON response
   factory RateLimitModel.fromJson(Map<String, dynamic> json) {
@@ -106,6 +160,9 @@ class RateLimitModel extends Equatable {
         resetTime,
       ];
 }
+
+/// Alias for backward compatibility
+typedef RateLimitStatus = RateLimitModel;
 
 /// Represents chat history from backend
 class ChatHistoryModel extends Equatable {

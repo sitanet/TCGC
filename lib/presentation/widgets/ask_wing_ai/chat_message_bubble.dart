@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
 import 'citation_card.dart';
 
@@ -72,7 +72,7 @@ class ChatMessageBubble extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'Wing AI • CityGate Family',
+                'Wing AI',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -123,35 +123,6 @@ class ChatMessageBubble extends StatelessWidget {
                       fontSize: 12,
                       color: Theme.of(context).primaryColor.withOpacity(0.7),
                       fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
-
-              // Error message (if any)
-              if (message.hasError)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.error_outline, size: 16, color: Colors.red),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'I\'m having trouble right now, but I\'m still here for you! ${message.errorMessage}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                 ),
