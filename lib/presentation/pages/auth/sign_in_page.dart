@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
+import '../../../data/services/credential_storage_service.dart';
 
 class SignInPage extends ConsumerStatefulWidget {
   final VoidCallback onSignIn;
@@ -18,10 +19,12 @@ class SignInPage extends ConsumerStatefulWidget {
 class _SignInPageState extends ConsumerState<SignInPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _credentialService = CredentialStorageService();
   bool _obscurePassword = true;
   bool _isEmailValid = false;
   bool _isLoading = false;
   bool _biometricAvailable = false;
+  List<EmailSuggestion> _emailSuggestions = [];
 
   @override
   void initState() {
@@ -102,6 +105,70 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     setState(() {
       _isEmailValid = emailRegex.hasMatch(email);
     });
+  }
+
+  Future<void> _loadEmailSuggestions() async {
+    final suggestions = await _credentialService.getEmailSuggestions();
+    setState(() {
+      _emailSuggestions = suggestions;
+    });
+  }
+
+  Future<void> _fillCredentials(String email) async {
+    _emailController.text = email;
+    final password = await _credentialService.getPasswordForEmail(email);
+    if (password != null) {
+      _passwordController.text = password;
+    }
+    _validateEmail();
+    if (mounted) {
+      FocusScope.of(context).unfocus();
+    }
+  }
+
+  void _showSavedCredentials() async {
+    await _loadEmailSuggestions();
+    
+    if (!mounted || _emailSuggestions.isEmpty) return;
+    
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                'Select saved account',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ..._emailSuggestions.map((suggestion) => ListTile(
+              leading: Icon(
+                Icons.account_circle,
+                color: AppColors.primaryGold,
+                size: 32,
+              ),
+              title: Text(suggestion.email),
+              subtitle: suggestion.hasStoredPassword
+                  ? const Text('Password saved')
+                  : const Text('No password saved'),
+              onTap: () {
+                _fillCredentials(suggestion.email);
+                Navigator.pop(context);
+              },
+            )),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -305,6 +372,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                         TextField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
+                          onTap: _showSavedCredentials,
                           decoration: InputDecoration(
                             hintText: 'example@gmail.com',
                             hintStyle: TextStyle(color: Colors.grey[400], fontSize: bodyFontSize),

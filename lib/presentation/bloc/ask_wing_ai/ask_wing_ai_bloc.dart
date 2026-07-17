@@ -109,10 +109,11 @@ class AskWingAIBloc extends Bloc<AskWingAIEvent, AskWingAIState> {
 
     // Add user message to history
     final userMessage = ChatMessageModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: DateTime.now().millisecondsSinceEpoch,
+      sessionId: '',
       content: event.question,
-      type: ChatMessageType.user,
-      timestamp: DateTime.now(),
+      messageType: MessageType.user,
+      createdAt: DateTime.now(),
     );
 
     _sessionMessages.add(userMessage);
@@ -161,10 +162,11 @@ class AskWingAIBloc extends Bloc<AskWingAIEvent, AskWingAIState> {
       (response) {
         // Add AI response to history
         final aiMessage = ChatMessageModel(
-          id: response.messageId,
+          id: int.tryParse(response.messageId) ?? DateTime.now().millisecondsSinceEpoch,
+          sessionId: '',
           content: response.response,
-          type: ChatMessageType.ai,
-          timestamp: response.timestamp,
+          messageType: MessageType.ai,
+          createdAt: response.timestamp,
           citations: response.citations,
           processingTimeMs: response.processingTimeMs,
         );

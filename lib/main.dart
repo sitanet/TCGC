@@ -743,8 +743,8 @@ class _MainScreenState extends ConsumerState<MainScreen>
     if (_showUpdateDialog && _updateInfo != null) {
       return Scaffold(
         backgroundColor: isDark
-            ? AppColors.backgroundDark
-            : const Color(0xFFF8F9FA),
+            ? const Color(0xFF0E0E0D)
+            : const Color(0xFFFAF9F6),
         body: SafeArea(
           child: Column(
             children: [
@@ -753,74 +753,83 @@ class _MainScreenState extends ConsumerState<MainScreen>
                 Align(
                   alignment: Alignment.topRight,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 8, right: 8),
+                    padding: const EdgeInsets.only(top: 12, right: 16),
                     child: IconButton(
                       onPressed: _closeUpdateDialog,
+                      style: IconButton.styleFrom(
+                        backgroundColor: isDark
+                            ? Colors.white.withValues(alpha: 0.05)
+                            : Colors.black.withValues(alpha: 0.04),
+                        shape: const CircleBorder(),
+                        padding: const EdgeInsets.all(8),
+                      ),
                       icon: Icon(
                         Icons.close_rounded,
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                        size: 28,
+                        color: isDark ? Colors.white70 : Colors.black54,
+                        size: 22,
                       ),
                       tooltip: 'Close',
                     ),
                   ),
-                ),
+                )
+              else
+                const SizedBox(height: 24),
               // Scrollable content area
               Expanded(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
                   child: Column(
                     children: [
-                      SizedBox(height: _updateInfo!.forceUpdate ? 60 : 16),
-                      // Animated icon container
-                      Container(
-                        width: 140,
-                        height: 140,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppColors.primaryGold.withValues(alpha: 0.15),
-                              AppColors.primaryGold.withValues(alpha: 0.05),
-                            ],
+                      SizedBox(height: _updateInfo!.forceUpdate ? 40 : 16),
+                      // Animated premium outer glowing ring artwork
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 160,
+                            height: 160,
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryGold.withValues(alpha: 0.03),
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Container(
+                          Container(
+                            width: 130,
+                            height: 130,
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryGold.withValues(alpha: 0.08),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          Container(
                             width: 100,
                             height: 100,
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
+                              gradient: const LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [
-                                  AppColors.primaryGold,
-                                  AppColors.primaryGold.withValues(alpha: 0.8),
+                                  Color(0xFFFFD700),
+                                  Color(0xFFB8860B),
                                 ],
                               ),
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primaryGold.withValues(
-                                    alpha: 0.4,
-                                  ),
-                                  blurRadius: 20,
+                                  color: AppColors.primaryGold.withValues(alpha: 0.35),
+                                  blurRadius: 24,
                                   offset: const Offset(0, 10),
                                 ),
                               ],
                             ),
                             child: const Icon(
                               Icons.rocket_launch_rounded,
-                              size: 50,
+                              size: 42,
                               color: Colors.white,
                             ),
                           ),
-                        ),
+                        ],
                       ),
                       const SizedBox(height: 32),
                       // Title
@@ -828,32 +837,35 @@ class _MainScreenState extends ConsumerState<MainScreen>
                         _updateInfo!.forceUpdate
                             ? 'Update Required'
                             : 'New Update Available',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.5,
-                            ),
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 24,
+                          letterSpacing: -0.5,
+                          color: isDark ? Colors.white : const Color(0xFF1E1E1E),
+                        ),
                       ),
-                      const SizedBox(height: 8),
-                      // Version badge
+                      const SizedBox(height: 12),
+                      // Version capsule
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
+                          horizontal: 14,
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryGold.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
+                          color: AppColors.primaryGold.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(30),
                           border: Border.all(
-                            color: AppColors.primaryGold.withValues(alpha: 0.3),
+                            color: AppColors.primaryGold.withValues(alpha: 0.25),
+                            width: 1,
                           ),
                         ),
                         child: Text(
                           'Version ${_updateInfo!.latestVersion}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
                             color: AppColors.primaryGold,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
@@ -861,17 +873,22 @@ class _MainScreenState extends ConsumerState<MainScreen>
                       // What's new card
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: isDark ? AppColors.cardDark : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
+                          color: isDark ? const Color(0xFF161615) : Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.06)
+                                : Colors.black.withValues(alpha: 0.04),
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(
-                                alpha: isDark ? 0.2 : 0.06,
+                                alpha: isDark ? 0.25 : 0.04,
                               ),
-                              blurRadius: 20,
-                              offset: const Offset(0, 4),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
@@ -883,14 +900,12 @@ class _MainScreenState extends ConsumerState<MainScreen>
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: AppColors.primaryGold.withValues(
-                                      alpha: 0.1,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
+                                    color: AppColors.primaryGold.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: Icon(
-                                    Icons.auto_awesome,
-                                    size: 20,
+                                  child: const Icon(
+                                    Icons.auto_awesome_rounded,
+                                    size: 18,
                                     color: AppColors.primaryGold,
                                   ),
                                 ),
@@ -898,11 +913,10 @@ class _MainScreenState extends ConsumerState<MainScreen>
                                 Text(
                                   "What's New",
                                   style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: isDark
-                                        ? Colors.white
-                                        : Colors.black87,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: isDark ? Colors.white : const Color(0xFF1E1E1E),
+                                    letterSpacing: -0.2,
                                   ),
                                 ),
                               ],
@@ -912,11 +926,11 @@ class _MainScreenState extends ConsumerState<MainScreen>
                             Text(
                               _updateInfo!.updateMessage,
                               style: TextStyle(
-                                fontSize: 15,
+                                fontSize: 14,
                                 height: 1.6,
                                 color: isDark
-                                    ? AppColors.textSecondaryDark
-                                    : AppColors.textSecondaryLight,
+                                    ? const Color(0xFFABABAB)
+                                    : const Color(0xFF555555),
                               ),
                             ),
                           ],
@@ -929,17 +943,17 @@ class _MainScreenState extends ConsumerState<MainScreen>
                           width: double.infinity,
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.orange.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: Colors.orange.withValues(alpha: 0.3),
+                              color: Colors.orange.withValues(alpha: 0.2),
                             ),
                           ),
                           child: Row(
                             children: [
                               Icon(
                                 Icons.info_outline,
-                                size: 22,
+                                size: 20,
                                 color: Colors.orange[700],
                               ),
                               const SizedBox(width: 12),
@@ -949,6 +963,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: Colors.orange[700],
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
@@ -962,11 +977,11 @@ class _MainScreenState extends ConsumerState<MainScreen>
               ),
               // Fixed bottom buttons
               Container(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                padding: const EdgeInsets.fromLTRB(28, 16, 28, 28),
                 decoration: BoxDecoration(
                   color: isDark
-                      ? AppColors.backgroundDark
-                      : const Color(0xFFF8F9FA),
+                      ? const Color(0xFF0E0E0D)
+                      : const Color(0xFFFAF9F6),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -976,20 +991,20 @@ class _MainScreenState extends ConsumerState<MainScreen>
                       width: double.infinity,
                       height: 56,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
+                        gradient: const LinearGradient(
                           colors: [
                             AppColors.primaryGold,
-                            AppColors.primaryGold.withValues(alpha: 0.85),
+                            Color(0xFFE5A93B),
                           ],
                           begin: Alignment.centerLeft,
                           end: Alignment.centerRight,
                         ),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primaryGold.withValues(alpha: 0.4),
-                            blurRadius: 12,
-                            offset: const Offset(0, 6),
+                            color: AppColors.primaryGold.withValues(alpha: 0.35),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
                           ),
                         ],
                       ),
@@ -999,24 +1014,25 @@ class _MainScreenState extends ConsumerState<MainScreen>
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(18),
                           ),
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.download_rounded,
                               color: Colors.white,
-                              size: 22,
+                              size: 20,
                             ),
-                            const SizedBox(width: 10),
-                            const Text(
+                            SizedBox(width: 10),
+                            Text(
                               'Update Now',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.2,
                               ),
                             ),
                           ],
@@ -1032,14 +1048,14 @@ class _MainScreenState extends ConsumerState<MainScreen>
                           onPressed: _closeUpdateDialog,
                           style: TextButton.styleFrom(
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(18),
                             ),
                           ),
                           child: Text(
                             'Remind Me Later',
                             style: TextStyle(
                               fontSize: 15,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                               color: isDark
                                   ? AppColors.textSecondaryDark
                                   : AppColors.textSecondaryLight,

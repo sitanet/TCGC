@@ -112,7 +112,7 @@ class _LoadingIndicatorState extends State<LoadingIndicator>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Wing AI • CityGate Family',
+                      'Wing AI',
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(context).primaryColor,

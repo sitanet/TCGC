@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
@@ -14,6 +15,8 @@ import '../audio/audio_player_page.dart';
 import '../profile/profile_page.dart';
 import '../support/complaint_page.dart';
 import '../notifications/notifications_page.dart';
+import '../ask_wing_ai/ask_wing_ai_chat_page.dart';
+import '../../bloc/ask_wing_ai/ask_wing_ai_cubit.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -195,18 +198,58 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           ),
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
+        floatingActionButton: GestureDetector(
+          onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const ComplaintPage()),
+              MaterialPageRoute(
+                builder: (_) => BlocProvider.value(
+                  value: context.read<AskWingAICubit>(),
+                  child: const AskWingAIChatPage(),
+                ),
+              ),
             );
           },
-          backgroundColor: AppColors.primaryGold,
-          child: Icon(
-            Icons.chat_bubble_outline,
-            color: Colors.white,
-            size: Responsive.iconSize(context),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.primaryGold,
+              borderRadius: BorderRadius.circular(50),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryGold.withValues(alpha: 0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.smart_toy_outlined,
+                    color: AppColors.primaryGold,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Ask Wing AI',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

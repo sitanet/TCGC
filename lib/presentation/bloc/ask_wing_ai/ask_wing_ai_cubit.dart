@@ -13,7 +13,7 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
 
   String? _currentSessionId;
   List<ChatMessageModel> _messages = [];
-  RateLimitStatus? _rateLimitStatus;
+  RateLimitModel? _rateLimitStatus;
 
   /// Initialize - Check if feature is enabled
   Future<void> initialize() async {
@@ -97,7 +97,7 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
 
       // Create AI message from response
       final aiMessage = ChatMessageModel(
-        id: response.messageId,
+        id: int.tryParse(response.messageId) ?? DateTime.now().millisecondsSinceEpoch,
         sessionId: _currentSessionId ?? '',
         messageType: MessageType.ai,
         content: response.response,
@@ -120,11 +120,11 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
       
       emit(AskWingAIRateLimitExceeded(
         message: e.toString(),
-        rateLimitStatus: _rateLimitStatus ?? RateLimitStatus(
+        rateLimitStatus: _rateLimitStatus ?? RateLimitModel(
           dailyLimit: 50,
           dailyUsed: 50,
           dailyRemaining: 0,
-          canAsk: false,
+          resetTime: DateTime.now().add(const Duration(days: 1)),
         ),
       ));
     } on FeatureDisabledException catch (e) {

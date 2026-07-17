@@ -2,42 +2,48 @@ import 'package:equatable/equatable.dart';
 
 /// Represents a message in the Ask Wing AI chat interface
 class ChatMessageModel extends Equatable {
-  final String id;
+  final int id;
+  final String sessionId;
   final String content;
-  final ChatMessageType type; // 'user' or 'ai'
-  final DateTime timestamp;
-  final List<CitationModel> citations; // For AI responses
+  final MessageType messageType; // 'user' or 'ai'
+  final DateTime createdAt;
+  final List<CitationModel>? citations; // For AI responses
   final int? processingTimeMs; // For AI responses
-  final String? errorMessage; // For error cases
 
   const ChatMessageModel({
     required this.id,
+    required this.sessionId,
     required this.content,
-    required this.type,
-    required this.timestamp,
-    this.citations = const [],
+    required this.messageType,
+    required this.createdAt,
+    this.citations,
     this.processingTimeMs,
-    this.errorMessage,
   });
 
+  /// Check if message is from user
+  bool get isUserMessage => messageType == MessageType.user;
+  
+  /// Check if message has an error
+  bool get hasError => false; // TODO: Add error field if needed
+  
   /// Create a copy with modified fields
   ChatMessageModel copyWith({
-    String? id,
+    int? id,
+    String? sessionId,
     String? content,
-    ChatMessageType? type,
-    DateTime? timestamp,
+    MessageType? messageType,
+    DateTime? createdAt,
     List<CitationModel>? citations,
     int? processingTimeMs,
-    String? errorMessage,
   }) {
     return ChatMessageModel(
       id: id ?? this.id,
+      sessionId: sessionId ?? this.sessionId,
       content: content ?? this.content,
-      type: type ?? this.type,
-      timestamp: timestamp ?? this.timestamp,
+      messageType: messageType ?? this.messageType,
+      createdAt: createdAt ?? this.createdAt,
       citations: citations ?? this.citations,
       processingTimeMs: processingTimeMs ?? this.processingTimeMs,
-      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 
@@ -45,55 +51,54 @@ class ChatMessageModel extends Equatable {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'session_id': sessionId,
       'content': content,
-      'type': type.value,
-      'timestamp': timestamp.toIso8601String(),
-      'citations': citations.map((c) => c.toJson()).toList(),
+      'message_type': messageType.value,
+      'created_at': createdAt.toIso8601String(),
+      'citations': citations?.map((c) => c.toJson()).toList(),
       'processing_time_ms': processingTimeMs,
-      'error_message': errorMessage,
     };
   }
 
   /// Create from JSON response
   factory ChatMessageModel.fromJson(Map<String, dynamic> json) {
     return ChatMessageModel(
-      id: json['id'] ?? json['message_id'] ?? '',
+      id: json['id'] ?? json['message_id'] ?? 0,
+      sessionId: json['session_id'] ?? '',
       content: json['content'] ?? json['response'] ?? '',
-      type: ChatMessageType.fromValue(json['type'] ?? 'user'),
-      timestamp: DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()),
+      messageType: MessageType.fromValue(json['message_type'] ?? json['type'] ?? 'user'),
+      createdAt: DateTime.parse(json['created_at'] ?? json['timestamp'] ?? DateTime.now().toIso8601String()),
       citations: (json['citations'] as List<dynamic>?)
               ?.map((c) => CitationModel.fromJson(c as Map<String, dynamic>))
-              .toList() ??
-          [],
+              .toList(),
       processingTimeMs: json['processing_time_ms'],
-      errorMessage: json['error_message'],
     );
   }
 
   @override
   List<Object?> get props => [
         id,
+        sessionId,
         content,
-        type,
-        timestamp,
+        messageType,
+        createdAt,
         citations,
         processingTimeMs,
-        errorMessage,
       ];
 }
 
 /// Enum for message types
-enum ChatMessageType {
+enum MessageType {
   user('user'),
   ai('ai');
 
   final String value;
-  const ChatMessageType(this.value);
+  const MessageType(this.value);
 
-  factory ChatMessageType.fromValue(String value) {
-    return ChatMessageType.values.firstWhere(
+  factory MessageType.fromValue(String value) {
+    return MessageType.values.firstWhere(
       (type) => type.value == value,
-      orElse: () => ChatMessageType.user,
+      orElse: () => MessageType.user,
     );
   }
 }
@@ -102,17 +107,33 @@ enum ChatMessageType {
 class CitationModel extends Equatable {
   final String sermonId;
   final String sermonTitle;
-  final String speakerName;
+  final String? speakerName;
   final String? timestamp; // MM:SS format
   final double similarityScore;
+  final String? textChunk; // For excerpt display
+  final String? estimatedTimestamp; // Alias for timestamp
 
   const CitationModel({
     required this.sermonId,
     required this.sermonTitle,
-    required this.speakerName,
+    this.speakerName,
     this.timestamp,
     this.similarityScore = 1.0,
+    this.textChunk,
+    this.estimatedTimestamp,
   });
+
+  /// Formatted citation text for display/copying
+  String get formattedCitation {
+    final parts = [sermonTitle];
+    if (speakerName != null && speakerName!.isNotEmpty) {
+      parts.add('by $speakerName');
+    }
+    if (timestamp != null && timestamp!.isNotEmpty) {
+      parts.add('at $timestamp');
+    }
+    return parts.join(' ');
+  }
 
   /// Convert to JSON
   Map<String, dynamic> toJson() {
@@ -120,19 +141,24 @@ class CitationModel extends Equatable {
       'sermon_id': sermonId,
       'sermon_title': sermonTitle,
       'speaker_name': speakerName,
-      'timestamp': timestamp,
+      'timestamp': timestamp ?? estimatedTimestamp,
       'similarity_score': similarityScore,
+      'text_chunk': textChunk,
+      'estimated_timestamp': estimatedTimestamp ?? timestamp,
     };
   }
 
   /// Create from JSON
   factory CitationModel.fromJson(Map<String, dynamic> json) {
+    final timestamp = json['timestamp'] ?? json['estimated_timestamp'];
     return CitationModel(
       sermonId: json['sermon_id'] ?? '',
       sermonTitle: json['sermon_title'] ?? '',
-      speakerName: json['speaker_name'] ?? '',
-      timestamp: json['timestamp'],
+      speakerName: json['speaker_name'],
+      timestamp: timestamp,
       similarityScore: (json['similarity_score'] as num?)?.toDouble() ?? 1.0,
+      textChunk: json['text_chunk'] as String?,
+      estimatedTimestamp: timestamp,
     );
   }
 
@@ -143,5 +169,7 @@ class CitationModel extends Equatable {
         speakerName,
         timestamp,
         similarityScore,
+        textChunk,
+        estimatedTimestamp,
       ];
 }
