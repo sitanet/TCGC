@@ -77,40 +77,42 @@ class AppRatingService {
               ),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'We hope you\'re blessed by the messages. Please take a moment to rate us on the Play Store!',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'We hope you\'re blessed by the messages. Please take a moment to rate us on the Play Store!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) {
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        selectedRating = index + 1;
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Icon(
-                        index < selectedRating ? Icons.star_rounded : Icons.star_outline_rounded,
-                        size: 40,
-                        color: index < selectedRating 
-                            ? AppColors.primaryGold 
-                            : (isDark ? Colors.grey[600] : Colors.grey[400]),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          selectedRating = index + 1;
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Icon(
+                          index < selectedRating ? Icons.star_rounded : Icons.star_outline_rounded,
+                          size: 40,
+                          color: index < selectedRating 
+                              ? AppColors.primaryGold 
+                              : (isDark ? Colors.grey[600] : Colors.grey[400]),
+                        ),
                       ),
-                    ),
-                  );
-                }),
-              ),
-            ],
+                    );
+                  }),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(

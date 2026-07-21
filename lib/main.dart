@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/theme_provider.dart';
@@ -158,6 +159,432 @@ class _MyAppState extends ConsumerState<MyApp> {
   bool _isOffline = false;
   final InterestsService _interestsService = InterestsService();
   final ConnectivityService _connectivityService = ConnectivityService();
+  final DataService _dataService = DataService();
+  AppUpdateInfo? _updateInfo;
+  bool _showUpdateDialog = false;
+
+  Future<void> _checkForAppUpdate() async {
+    try {
+      String platform = 'all';
+      if (!kIsWeb) {
+        if (Platform.isAndroid) {
+          platform = 'android';
+        } else if (Platform.isIOS) {
+          platform = 'ios';
+        }
+      }
+
+      // Dynamically load exact version name & build number from app package
+      String currentVersion = appVersion; // fallback
+      try {
+        final packageInfo = await PackageInfo.fromPlatform();
+        currentVersion = '${packageInfo.version}.${packageInfo.buildNumber}';
+        debugPrint('Dynamic app version detected: $currentVersion');
+      } catch (e) {
+        debugPrint('Error getting package info: $e');
+      }
+
+      final updateInfo = await _dataService.checkForAppUpdate(
+        currentVersion,
+        platform,
+      );
+      if (updateInfo != null && updateInfo.updateAvailable && mounted) {
+        setState(() {
+          _updateInfo = updateInfo;
+          _showUpdateDialog = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Update check error: $e');
+    }
+  }
+
+  void _closeUpdateDialog() {
+    if (_updateInfo?.forceUpdate == true) {
+      return;
+    }
+    setState(() {
+      _showUpdateDialog = false;
+    });
+  }
+
+  Future<void> _openUpdateUrl() async {
+    debugPrint('Update Now button clicked');
+
+    String? url = _updateInfo?.updateUrl;
+    if (url == null || url.trim().isEmpty) {
+      if (!kIsWeb) {
+        if (Platform.isAndroid) {
+          url = 'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
+        } else if (Platform.isIOS) {
+          url = 'https://apps.apple.com/app/tcgc'; // Replace with actual App store URL when available
+        }
+      }
+    }
+    
+    if (url != null && url.isNotEmpty) {
+      String formattedUrl = url.trim();
+      
+      // Convert Play Store https links to native market:// scheme on Android
+      // to bypass browser-hijacking apps (like OPay) that throw SecurityExceptions
+      if (!kIsWeb && Platform.isAndroid && formattedUrl.contains('play.google.com/store/apps/details')) {
+        try {
+          final playStoreUri = Uri.parse(formattedUrl);
+          final appId = playStoreUri.queryParameters['id'];
+          if (appId != null && appId.isNotEmpty) {
+            formattedUrl = 'market://details?id=$appId';
+          }
+        } catch (e) {
+          debugPrint('Error parsing Play Store URL: $e');
+        }
+      }
+      
+      // Ensure the URL has a valid scheme for other cases
+      if (!formattedUrl.startsWith('http://') && 
+          !formattedUrl.startsWith('https://') && 
+          !formattedUrl.startsWith('market://')) {
+        formattedUrl = 'https://$formattedUrl';
+      }
+      
+      final uri = Uri.parse(formattedUrl);
+      debugPrint('Attempting to launch: $formattedUrl');
+      try {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        debugPrint('Could not launch update URL: $e');
+        // Secondary fallback - try opening play store directly using native market scheme
+        if (!kIsWeb && Platform.isAndroid) {
+          try {
+            await launchUrl(
+              Uri.parse('market://details?id=com.tcgc.tcgc'),
+              mode: LaunchMode.externalApplication,
+            );
+          } catch (fallbackError) {
+            debugPrint('Fallback launch also failed: $fallbackError');
+          }
+        }
+      }
+    }
+  }
+
+  Widget _buildUpdateDialog(BuildContext context, bool isDark) {
+    return Scaffold(
+      backgroundColor: isDark
+          ? const Color(0xFF0E0E0D)
+          : const Color(0xFFFAF9F6),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Close button row — only shown when update is NOT forced
+            if (!_updateInfo!.forceUpdate)
+              Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 12, right: 16),
+                  child: IconButton(
+                    onPressed: _closeUpdateDialog,
+                    style: IconButton.styleFrom(
+                      backgroundColor: isDark
+                          ? Colors.white.withValues(alpha: 0.05)
+                          : Colors.black.withValues(alpha: 0.04),
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(8),
+                    ),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                      size: 22,
+                    ),
+                    tooltip: 'Close',
+                  ),
+                ),
+              )
+            else
+              const SizedBox(height: 24),
+            // Scrollable content area
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Column(
+                  children: [
+                    SizedBox(height: _updateInfo!.forceUpdate ? 40 : 16),
+                    // Animated premium outer glowing ring artwork
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 160,
+                          height: 160,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGold.withValues(alpha: 0.03),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        Container(
+                          width: 130,
+                          height: 130,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGold.withValues(alpha: 0.08),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFFFFD700),
+                                Color(0xFFB8860B),
+                              ],
+                            ),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primaryGold.withValues(alpha: 0.35),
+                                blurRadius: 24,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.rocket_launch_rounded,
+                            size: 42,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                    // Title
+                    Text(
+                      _updateInfo!.forceUpdate
+                          ? 'Update Required'
+                          : 'New Update Available',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                        letterSpacing: -0.5,
+                        color: isDark ? Colors.white : const Color(0xFF1E1E1E),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Version capsule
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGold.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                          color: AppColors.primaryGold.withValues(alpha: 0.25),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        'Version ${_updateInfo!.latestVersion}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryGold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    // What's new card
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF161615) : Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.06)
+                              : Colors.black.withValues(alpha: 0.04),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(
+                              alpha: isDark ? 0.25 : 0.04,
+                            ),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryGold.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.auto_awesome_rounded,
+                                  size: 18,
+                                  color: AppColors.primaryGold,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                "What's New",
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? Colors.white : const Color(0xFF1E1E1E),
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          // Update message
+                          Text(
+                            _updateInfo!.updateMessage,
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.6,
+                              color: isDark
+                                  ? const Color(0xFFABABAB)
+                                  : const Color(0xFF555555),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Info note for force update
+                    if (_updateInfo!.forceUpdate)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.orange.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline_rounded,
+                              color: Colors.orange,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'This update is required to continue using the application.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark ? Colors.orange[200] : Colors.orange[800],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 32),
+                    // Update Now CTA
+                    Container(
+                      width: double.infinity,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFFFFD700),
+                            Color(0xFFB8860B),
+                          ],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primaryGold.withValues(alpha: 0.35),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: _openUpdateUrl,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.download_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              'Update Now',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (!_updateInfo!.forceUpdate) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: TextButton(
+                          onPressed: _closeUpdateDialog,
+                          style: TextButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                          ),
+                          child: Text(
+                            'Remind Me Later',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -207,6 +634,7 @@ class _MyAppState extends ConsumerState<MyApp> {
         _initialized = true;
         _isOffline = false;
       });
+      _checkForAppUpdate();
     }
 
     // Initialize auth in background
@@ -302,6 +730,18 @@ class _MyAppState extends ConsumerState<MyApp> {
         darkTheme: AppTheme.darkTheme,
         themeMode: themeProvider.themeMode,
         home: const Scaffold(body: Center(child: CircularProgressIndicator())),
+      );
+    }
+
+    if (_showUpdateDialog && _updateInfo != null) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      return MaterialApp(
+        title: 'TCGC',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: themeProvider.themeMode,
+        home: _buildUpdateDialog(context, isDark),
       );
     }
 
@@ -432,9 +872,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
       if (mounted) _initializeWallet();
       if (mounted) _fetchAppConfig();
     });
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) _checkForAppUpdate();
-    });
+    // App update check is now handled at root app initialization stage
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) _checkForPromotion();
     });
@@ -666,31 +1104,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
         false;
   }
 
-  Future<void> _checkForAppUpdate() async {
-    try {
-      String platform = 'all';
-      if (!kIsWeb) {
-        if (Platform.isAndroid) {
-          platform = 'android';
-        } else if (Platform.isIOS) {
-          platform = 'ios';
-        }
-      }
 
-      final updateInfo = await _dataService.checkForAppUpdate(
-        appVersion,
-        platform,
-      );
-      if (updateInfo != null && updateInfo.updateAvailable && mounted) {
-        setState(() {
-          _updateInfo = updateInfo;
-          _showUpdateDialog = true;
-        });
-      }
-    } catch (e) {
-      debugPrint('Update check error: $e');
-    }
-  }
 
   Future<void> _checkForPromotion() async {
     try {
@@ -717,361 +1131,11 @@ class _MainScreenState extends ConsumerState<MainScreen>
     });
   }
 
-  void _closeUpdateDialog() {
-    if (_updateInfo?.forceUpdate == true) {
-      return;
-    }
-    setState(() {
-      _showUpdateDialog = false;
-    });
-  }
 
-  Future<void> _openUpdateUrl() async {
-    final url = _updateInfo?.updateUrl;
-    if (url != null && url.isNotEmpty) {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    if (_showUpdateDialog && _updateInfo != null) {
-      return Scaffold(
-        backgroundColor: isDark
-            ? const Color(0xFF0E0E0D)
-            : const Color(0xFFFAF9F6),
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Close button row — only shown when update is NOT forced
-              if (!_updateInfo!.forceUpdate)
-                Align(
-                  alignment: Alignment.topRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 12, right: 16),
-                    child: IconButton(
-                      onPressed: _closeUpdateDialog,
-                      style: IconButton.styleFrom(
-                        backgroundColor: isDark
-                            ? Colors.white.withValues(alpha: 0.05)
-                            : Colors.black.withValues(alpha: 0.04),
-                        shape: const CircleBorder(),
-                        padding: const EdgeInsets.all(8),
-                      ),
-                      icon: Icon(
-                        Icons.close_rounded,
-                        color: isDark ? Colors.white70 : Colors.black54,
-                        size: 22,
-                      ),
-                      tooltip: 'Close',
-                    ),
-                  ),
-                )
-              else
-                const SizedBox(height: 24),
-              // Scrollable content area
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
-                  child: Column(
-                    children: [
-                      SizedBox(height: _updateInfo!.forceUpdate ? 40 : 16),
-                      // Animated premium outer glowing ring artwork
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            width: 160,
-                            height: 160,
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryGold.withValues(alpha: 0.03),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          Container(
-                            width: 130,
-                            height: 130,
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryGold.withValues(alpha: 0.08),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Color(0xFFFFD700),
-                                  Color(0xFFB8860B),
-                                ],
-                              ),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primaryGold.withValues(alpha: 0.35),
-                                  blurRadius: 24,
-                                  offset: const Offset(0, 10),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.rocket_launch_rounded,
-                              size: 42,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-                      // Title
-                      Text(
-                        _updateInfo!.forceUpdate
-                            ? 'Update Required'
-                            : 'New Update Available',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 24,
-                          letterSpacing: -0.5,
-                          color: isDark ? Colors.white : const Color(0xFF1E1E1E),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // Version capsule
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryGold.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(
-                            color: AppColors.primaryGold.withValues(alpha: 0.25),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          'Version ${_updateInfo!.latestVersion}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primaryGold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      // What's new card
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF161615) : Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.06)
-                                : Colors.black.withValues(alpha: 0.04),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(
-                                alpha: isDark ? 0.25 : 0.04,
-                              ),
-                              blurRadius: 24,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primaryGold.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(
-                                    Icons.auto_awesome_rounded,
-                                    size: 18,
-                                    color: AppColors.primaryGold,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  "What's New",
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    color: isDark ? Colors.white : const Color(0xFF1E1E1E),
-                                    letterSpacing: -0.2,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            // Update message - scrollable content
-                            Text(
-                              _updateInfo!.updateMessage,
-                              style: TextStyle(
-                                fontSize: 14,
-                                height: 1.6,
-                                color: isDark
-                                    ? const Color(0xFFABABAB)
-                                    : const Color(0xFF555555),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // Info note for force update
-                      if (_updateInfo!.forceUpdate)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.orange.withValues(alpha: 0.2),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.info_outline,
-                                size: 20,
-                                color: Colors.orange[700],
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'This update is required to continue using the app.',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.orange[700],
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: 32),
-                    ],
-                  ),
-                ),
-              ),
-              // Fixed bottom buttons
-              Container(
-                padding: const EdgeInsets.fromLTRB(28, 16, 28, 28),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF0E0E0D)
-                      : const Color(0xFFFAF9F6),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Update button with gradient
-                    Container(
-                      width: double.infinity,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            AppColors.primaryGold,
-                            Color(0xFFE5A93B),
-                          ],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primaryGold.withValues(alpha: 0.35),
-                            blurRadius: 15,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton(
-                        onPressed: _openUpdateUrl,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.download_rounded,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                            SizedBox(width: 10),
-                            Text(
-                              'Update Now',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (!_updateInfo!.forceUpdate) ...[
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: TextButton(
-                          onPressed: _closeUpdateDialog,
-                          style: TextButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                          ),
-                          child: Text(
-                            'Remind Me Later',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
 
     if (_showPromotion && _activePromotions.isNotEmpty) {
       return PromotionPopup(

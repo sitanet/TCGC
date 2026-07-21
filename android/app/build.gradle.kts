@@ -32,7 +32,7 @@ android {
 
     defaultConfig {
         applicationId = "com.tcgc.tcgc"
-        minSdk = 24
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -70,19 +70,28 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            // R8 full mode optimizations (required by Google Play)
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             
-            // Additional optimizations for smaller APK
+            // Generate debug symbols for crash reporting (uploaded separately to Play Console)
             ndk {
-                debugSymbolLevel = "NONE"  // Remove debug symbols
+                debugSymbolLevel = "SYMBOL_TABLE"  // Include symbols for crash analysis
             }
         }
     }
     
+    // Enable R8 full mode (not compatibility mode)
+    buildFeatures {
+        buildConfig = true
+    }
+    
     // Packaging options to exclude unnecessary files
     packaging {
+        jniLibs {
+            keepDebugSymbols.add("**/*.so")
+        }
         resources {
             excludes += listOf(
                 "META-INF/DEPENDENCIES",
