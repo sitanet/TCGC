@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
@@ -197,6 +198,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     setState(() => _isLoading = false);
 
     if (success) {
+      TextInput.finishAutofillContext();
       widget.onSignIn();
     } else {
       if (mounted) {
@@ -324,9 +326,10 @@ class _SignInPageState extends ConsumerState<SignInPage> {
             child: SingleChildScrollView(
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                child: AutofillGroup(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                     SizedBox(height: spacing),
                     IconButton(
                       onPressed: widget.onBack,
@@ -372,6 +375,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                         TextField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [AutofillHints.email],
                           onTap: _showSavedCredentials,
                           decoration: InputDecoration(
                             hintText: 'example@gmail.com',
@@ -410,6 +414,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                         TextField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
+                          autofillHints: const [AutofillHints.password],
                           decoration: InputDecoration(
                             hintText: '**********',
                             hintStyle: TextStyle(color: Colors.grey[400], fontSize: bodyFontSize),
@@ -579,6 +584,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                   ],
                 ),
               ),
+            ),
             ),
           ),
         ),

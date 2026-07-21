@@ -110,7 +110,7 @@ class AskWingAIService {
       return AskWingAIResponseModel(
         messageId: DateTime.now().millisecondsSinceEpoch.toString(),
         question: question,
-        response: 'I\'m currently listening to teachings from The CityGate Church and taking some time to learn and reflect. Please check back later—I’ll be happy to answer your questions when I’m ready.',
+        response: 'I\'m currently listening to teachings from The CityGate Church and taking some time to learn and reflect. Please check back later I’ll be happy to answer your questions when I’m ready.',
         citations: [],
         processingTimeMs: 1000,
         timestamp: DateTime.now(),
