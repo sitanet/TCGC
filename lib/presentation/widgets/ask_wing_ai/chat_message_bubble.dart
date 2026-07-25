@@ -19,9 +19,9 @@ class ChatMessageBubble extends StatelessWidget {
           ? Alignment.centerRight
           : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
+          maxWidth: MediaQuery.of(context).size.width * 0.82,
         ),
         child: message.isUserMessage
             ? _buildUserMessage(context)
@@ -31,43 +31,85 @@ class ChatMessageBubble extends StatelessWidget {
   }
 
   Widget _buildUserMessage(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Text(
-        message.content,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
+    final primaryColor = Theme.of(context).primaryColor;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                primaryColor,
+                primaryColor.withBlue(primaryColor.blue + 30).withGreen(primaryColor.green + 10),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+              bottomLeft: Radius.circular(20),
+              bottomRight: Radius.circular(4),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Text(
+            message.content,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              height: 1.3,
+            ),
+          ),
         ),
-      ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4, right: 4),
+          child: Text(
+            _formatTimestamp(message.createdAt),
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey[500],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildAIMessage(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).primaryColor;
+    final bubbleBg = isDark ? Colors.grey[900] : Colors.white;
+    final borderBg = isDark ? Colors.grey[850] : Colors.grey[100];
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Wing AI Header
+        // Wing AI Header Row
         Padding(
-          padding: const EdgeInsets.only(bottom: 8, left: 4),
+          padding: const EdgeInsets.only(bottom: 6, left: 4),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  color: primaryColor.withOpacity(0.12),
+                  shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.flutter_dash,
-                  size: 16,
-                  color: Theme.of(context).primaryColor,
+                  Icons.auto_awesome,
+                  size: 14,
+                  color: primaryColor,
                 ),
               ),
               const SizedBox(width: 8),
@@ -75,23 +117,37 @@ class ChatMessageBubble extends StatelessWidget {
                 'Wing AI',
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).primaryColor,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                  color: primaryColor,
                 ),
               ),
             ],
           ),
         ),
         
+        // AI Main Bubble
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isDark ? Colors.grey[800] : Colors.grey[100],
-            borderRadius: BorderRadius.circular(16),
+            color: bubbleBg,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(4),
+              topRight: Radius.circular(20),
+              bottomLeft: Radius.circular(20),
+              bottomRight: Radius.circular(20),
+            ),
             border: Border.all(
-              color: Theme.of(context).primaryColor.withOpacity(0.2),
+              color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
               width: 1,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,51 +157,78 @@ class ChatMessageBubble extends StatelessWidget {
                 data: message.content,
                 styleSheet: MarkdownStyleSheet(
                   p: TextStyle(
-                    fontSize: 16, 
-                    color: isDark ? Colors.white.withOpacity(0.87) : Colors.black.withOpacity(0.87),
-                    height: 1.4,
+                    fontSize: 15, 
+                    color: isDark ? Colors.white.withOpacity(0.9) : Colors.black.withOpacity(0.8),
+                    height: 1.45,
                   ),
                   strong: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black,
+                    color: isDark ? Colors.white : Colors.black87,
                   ),
                   em: const TextStyle(fontStyle: FontStyle.italic),
+                  listBullet: TextStyle(
+                    color: primaryColor,
+                    fontSize: 15,
+                  ),
                 ),
               ),
 
-              // Processing time (if available)
+              // Processing time footer
               if (message.processingTimeMs != null)
                 Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    '🙏 Responded with love in ${(message.processingTimeMs! / 1000).toStringAsFixed(1)}s',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).primaryColor.withOpacity(0.7),
-                      fontStyle: FontStyle.italic,
-                    ),
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.done_all,
+                        size: 14,
+                        color: primaryColor.withOpacity(0.6),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Responded in ${(message.processingTimeMs! / 1000).toStringAsFixed(1)}s',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[500],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],
           ),
         ),
 
-        // Citations (if any)
+        // Citations (Sources list)
         if (message.citations != null && message.citations!.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: 8, left: 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Sources:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[700],
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.bookmark_outline,
+                        size: 13,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'SOURCES:',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.7,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
                 ...message.citations!.map((citation) => CitationCard(
                   citation: citation,
                 )),
@@ -155,12 +238,13 @@ class ChatMessageBubble extends StatelessWidget {
 
         // Timestamp
         Padding(
-          padding: const EdgeInsets.only(top: 4, left: 4),
+          padding: const EdgeInsets.only(top: 4, left: 6),
           child: Text(
             _formatTimestamp(message.createdAt),
             style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey[600],
+              fontSize: 10,
+              color: Colors.grey[500],
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
@@ -179,7 +263,7 @@ class ChatMessageBubble extends StatelessWidget {
     } else if (difference.inDays < 1) {
       return '${difference.inHours}h ago';
     } else {
-      return '${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+      return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
     }
   }
 }
