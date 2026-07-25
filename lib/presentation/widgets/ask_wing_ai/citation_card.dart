@@ -43,7 +43,7 @@ class CitationCard extends StatelessWidget {
             width: 1,
           ),
         ),
-      child: Column(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header with sermon title
