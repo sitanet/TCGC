@@ -13,13 +13,19 @@ class CitationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).primaryColor;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.blue[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blue[200]!),
+        color: isDark ? Colors.grey[900] : primaryColor.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.grey[800]! : primaryColor.withOpacity(0.12),
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -28,18 +34,18 @@ class CitationCard extends StatelessWidget {
           Row(
             children: [
               Icon(
-                Icons.book,
-                size: 16,
-                color: Colors.blue[700],
+                Icons.menu_book_outlined,
+                size: 15,
+                color: primaryColor.withOpacity(0.8),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   citation.sermonTitle,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue[900],
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white.withOpacity(0.9) : Colors.black87,
                   ),
                 ),
               ),
@@ -53,32 +59,33 @@ class CitationCard extends StatelessWidget {
             children: [
               if (citation.speakerName != null) ...[
                 Icon(
-                  Icons.person_outline,
+                  Icons.person_pin_outlined,
                   size: 14,
-                  color: Colors.grey[600],
+                  color: Colors.grey[500],
                 ),
                 const SizedBox(width: 4),
                 Text(
                   citation.speakerName ?? '',
                   style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[700],
+                    fontSize: 11,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(width: 12),
               ],
               Icon(
-                Icons.access_time,
+                Icons.schedule_outlined,
                 size: 14,
-                color: Colors.grey[600],
+                color: Colors.grey[500],
               ),
               const SizedBox(width: 4),
               Text(
                 citation.estimatedTimestamp ?? citation.timestamp ?? '--:--',
                 style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey[700],
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[600],
                 ),
               ),
               const Spacer(),
@@ -89,9 +96,9 @@ class CitationCard extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(4),
                   child: Icon(
-                    Icons.copy,
+                    Icons.content_copy_outlined,
                     size: 14,
-                    color: Colors.grey[600],
+                    color: primaryColor.withOpacity(0.6),
                   ),
                 ),
               ),
