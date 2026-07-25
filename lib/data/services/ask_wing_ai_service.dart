@@ -27,7 +27,7 @@ class AskWingAIService {
 
       try {
         final response = await http.get(
-          Uri.parse('$_baseUrl/api/ask-wing-ai/feature-status'),
+          Uri.parse('$_baseUrl/ask-wing-ai/feature-status'),
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json',
@@ -72,7 +72,7 @@ class AskWingAIService {
       };
 
       final response = await http.post(
-        Uri.parse('$_baseUrl/api/ask-wing-ai/questions'),
+        Uri.parse('$_baseUrl/ask-wing-ai/questions'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -132,7 +132,7 @@ class AskWingAIService {
         if (sessionId != null) 'session_id': sessionId,
       };
 
-      final uri = Uri.parse('$_baseUrl/api/ask-wing-ai/history')
+      final uri = Uri.parse('$_baseUrl/ask-wing-ai/history')
           .replace(queryParameters: queryParams);
 
       try {
