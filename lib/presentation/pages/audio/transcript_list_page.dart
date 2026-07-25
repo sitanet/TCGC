@@ -88,7 +88,7 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
       }
       
       // Fetch fresh data from API
-      final transcripts = await _dataService.getTranscripts();
+      final transcripts = await _dataService.getTranscripts(forceRefresh: true);
       if (mounted) {
         setState(() {
           _allItems = transcripts;
@@ -794,9 +794,16 @@ class _TranscriptListItem extends StatelessWidget {
 }
 
 class TranscriptViewPage extends StatefulWidget {
-  final Transcript transcript;
+  final Transcript? transcript;
+  final String? overrideUrl;
+  final String? overrideTitle;
 
-  const TranscriptViewPage({super.key, required this.transcript});
+  const TranscriptViewPage({
+    super.key, 
+    this.transcript,
+    this.overrideUrl,
+    this.overrideTitle,
+  });
 
   @override
   State<TranscriptViewPage> createState() => _TranscriptViewPageState();
@@ -835,17 +842,24 @@ class _TranscriptViewPageState extends State<TranscriptViewPage> {
   }
 
   Future<void> _loadContent() async {
-    final cachedHtml = await _cacheService.getCachedHtml(widget.transcript.id);
+    if (widget.overrideUrl != null) {
+      await _webViewController.loadRequest(Uri.parse(widget.overrideUrl!));
+      return;
+    }
+
+    final transcriptId = widget.transcript?.id;
+    if (transcriptId == null) return;
     
+    final cachedHtml = await _cacheService.getCachedHtml(transcriptId);
     if (cachedHtml != null && cachedHtml.isNotEmpty) {
       await _webViewController.loadHtmlString(cachedHtml);
-      _cacheService.fetchAndCacheHtml(widget.transcript.id);
+      _cacheService.fetchAndCacheHtml(transcriptId);
     } else {
-      final html = await _cacheService.fetchAndCacheHtml(widget.transcript.id);
+      final html = await _cacheService.fetchAndCacheHtml(transcriptId);
       if (html != null && mounted) {
         await _webViewController.loadHtmlString(html);
       } else {
-        final transcriptUrl = ApiConstants.standaloneTranscriptUrl(widget.transcript.id);
+        final transcriptUrl = ApiConstants.standaloneTranscriptUrl(transcriptId);
         await _webViewController.loadRequest(Uri.parse(transcriptUrl));
       }
     }
@@ -853,14 +867,15 @@ class _TranscriptViewPageState extends State<TranscriptViewPage> {
 
   void _shareTranscript() {
     const playStoreLink = 'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
+    final title = widget.overrideTitle ?? widget.transcript?.title ?? 'Sermon Transcript';
     
-    final shareText = '''${widget.transcript.title}
+    final shareText = '''$title
 
 Read the full transcript in the Citygate mobile app
 
 Download: $playStoreLink''';
     
-    Share.share(shareText, subject: widget.transcript.title);
+    Share.share(shareText, subject: title);
   }
 
   @override
@@ -875,7 +890,7 @@ Download: $playStoreLink''';
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
       appBar: CustomAppBar(
-        title: 'Transcript',
+        title: widget.overrideTitle ?? widget.transcript?.title ?? 'Transcript',
         showBackButton: true,
         actions: [
           IconButton(
@@ -900,7 +915,7 @@ Download: $playStoreLink''';
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
       appBar: CustomAppBar(
-        title: 'Transcript',
+        title: widget.overrideTitle ?? widget.transcript?.title ?? 'Transcript',
         showBackButton: true,
         actions: [
           IconButton(
@@ -915,7 +930,7 @@ Download: $playStoreLink''';
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.transcript.title,
+              widget.overrideTitle ?? widget.transcript?.title ?? 'Transcript',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -924,7 +939,7 @@ Download: $playStoreLink''';
             ),
             const SizedBox(height: 16),
             SelectableText(
-              widget.transcript.content,
+              widget.transcript?.content ?? '',
               style: TextStyle(
                 fontSize: 16,
                 height: 1.8,
