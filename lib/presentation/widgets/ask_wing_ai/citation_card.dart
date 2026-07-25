@@ -164,10 +164,11 @@ class CitationCard extends StatelessWidget {
               ],
             ),
           ],
-        ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _copyToClipboard(BuildContext context) {
     final text = citation.formattedCitation;
