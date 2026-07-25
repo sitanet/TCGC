@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
+import '../../pages/audio/transcript_list_page.dart';
 
 /// Card displaying sermon citation
 class CitationCard extends StatelessWidget {
@@ -16,17 +17,32 @@ class CitationCard extends StatelessWidget {
     final primaryColor = Theme.of(context).primaryColor;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[900] : primaryColor.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.grey[800]! : primaryColor.withOpacity(0.12),
-          width: 1,
+    return InkWell(
+      onTap: () {
+        // Navigate to the webview of the message's transcript directly
+        final url = 'https://tcgc.thecitygatechurch.org/transcript/${citation.sermonId}/';
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TranscriptViewPage(
+              overrideUrl: url,
+              overrideTitle: citation.sermonTitle,
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[900] : primaryColor.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? Colors.grey[800]! : primaryColor.withOpacity(0.12),
+            width: 1,
+          ),
         ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
