@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/ask_wing_ai/ask_wing_ai_response_model.dart';
 import '../models/ask_wing_ai/chat_message_model.dart';
@@ -101,20 +102,9 @@ class AskWingAIService {
     } on FeatureDisabledException {
       rethrow;
     } catch (e) {
-      if (e.toString().contains('ask-wing-ai')) {
-        // It's our custom error, pass it through
-        throw Exception(e.toString());
-      }
-      // For now, return a mock response while backend is being set up
-      print('Warning: Using mock response. Error was: $e');
-      return AskWingAIResponseModel(
-        messageId: DateTime.now().millisecondsSinceEpoch.toString(),
-        question: question,
-        response: 'I\'m currently listening to teachings from The CityGate Church and taking some time to learn and reflect. Please check back later I’ll be happy to answer your questions when I’m ready.',
-        citations: [],
-        processingTimeMs: 1000,
-        timestamp: DateTime.now(),
-      );
+      // Surface the real error instead of hiding it with a mock response
+      debugPrint('Wing AI submitQuestion error: $e');
+      throw Exception('Failed to connect to Wing AI. Please check your connection and try again. (${e.toString()})');
     }
   }
 
