@@ -152,7 +152,7 @@ class CitationModel extends Equatable {
   factory CitationModel.fromJson(Map<String, dynamic> json) {
     final timestamp = json['timestamp'] ?? json['estimated_timestamp'];
     return CitationModel(
-      sermonId: json['sermon_id'] ?? '',
+      sermonId: (json['sermon_id'] ?? '').toString(),
       sermonTitle: json['sermon_title'] ?? '',
       speakerName: json['speaker_name'],
       timestamp: timestamp,
