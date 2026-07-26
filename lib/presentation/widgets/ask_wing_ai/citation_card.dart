@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
@@ -20,22 +23,66 @@ class CitationCard extends StatelessWidget {
     
     return InkWell(
       onTap: () async {
-        // If PDF URL is uploaded, launch it natively on the device (maintains custom design)
+        // If PDF URL is uploaded, download and save it to the phone
         if (citation.pdfUrl != null && citation.pdfUrl!.isNotEmpty) {
-          final uri = Uri.parse(citation.pdfUrl!);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          } else {
-            // Fallback to internal webview if launching fails
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => TranscriptViewPage(
-                  overrideUrl: citation.pdfUrl,
-                  overrideTitle: citation.sermonTitle,
-                ),
+          try {
+            // Show start toast
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Downloading message PDF...'),
+                duration: Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
               ),
             );
+
+            // Fetch the bytes
+            final response = await http.get(Uri.parse(citation.pdfUrl!));
+            if (response.statusCode == 200) {
+              // Find the standard phone downloads directory
+              Directory? downloadDir;
+              if (Platform.isAndroid) {
+                downloadDir = Directory('/storage/emulated/0/Download');
+                if (!await downloadDir.exists()) {
+                  downloadDir = await getExternalStorageDirectory();
+                }
+              } else {
+                downloadDir = await getApplicationDocumentsDirectory();
+              }
+
+              if (downloadDir != null) {
+                // Sanitize file name
+                final safeTitle = citation.sermonTitle.replaceAll(RegExp(r'[^\w\s\.-]'), '_').trim();
+                final filePath = '${downloadDir.path}/$safeTitle.pdf';
+                final file = File(filePath);
+                
+                // Write bytes to storage
+                await file.writeAsBytes(response.bodyBytes);
+
+                // Show success message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Saved to Downloads: $safeTitle.pdf'),
+                    backgroundColor: Colors.green,
+                    duration: const Duration(seconds: 4),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+
+                // Open the downloaded local file natively
+                final fileUri = Uri.file(filePath);
+                if (await canLaunchUrl(fileUri)) {
+                  await launchUrl(fileUri, mode: LaunchMode.externalApplication);
+                } else {
+                  // Fallback to opening the web URL if file:// launch is restricted
+                  await launchUrl(Uri.parse(citation.pdfUrl!), mode: LaunchMode.externalApplication);
+                }
+                return;
+              }
+            }
+            throw Exception('Failed to fetch file');
+          } catch (e) {
+            // Fallback to direct web browser download if local write fails
+            await launchUrl(Uri.parse(citation.pdfUrl!), mode: LaunchMode.externalApplication);
           }
         } else {
           // Fallback to HTML transcript page
