@@ -141,8 +141,11 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
             _showFeatureDisabledDialog(context, state.message);
           }
 
-          // Scroll to bottom on question submission or response success
-          if (state is AskWingAIQuestionSuccess || state is AskWingAIQuestionSubmitting) {
+          // Scroll to bottom on load, question submission, or response success
+          if (state is AskWingAIQuestionSuccess || 
+              state is AskWingAIQuestionSubmitting || 
+              state is AskWingAIHistoryLoaded || 
+              state is AskWingAIReady) {
             _scrollToBottom();
           }
         },
