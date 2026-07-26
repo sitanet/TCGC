@@ -9,6 +9,7 @@ class ChatMessageModel extends Equatable {
   final DateTime createdAt;
   final List<CitationModel>? citations; // For AI responses
   final int? processingTimeMs; // For AI responses
+  final int? creditsCost;
 
   const ChatMessageModel({
     required this.id,
@@ -18,6 +19,7 @@ class ChatMessageModel extends Equatable {
     required this.createdAt,
     this.citations,
     this.processingTimeMs,
+    this.creditsCost,
   });
 
   /// Check if message is from user
@@ -35,6 +37,7 @@ class ChatMessageModel extends Equatable {
     DateTime? createdAt,
     List<CitationModel>? citations,
     int? processingTimeMs,
+    int? creditsCost,
   }) {
     return ChatMessageModel(
       id: id ?? this.id,
@@ -44,6 +47,7 @@ class ChatMessageModel extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       citations: citations ?? this.citations,
       processingTimeMs: processingTimeMs ?? this.processingTimeMs,
+      creditsCost: creditsCost ?? this.creditsCost,
     );
   }
 
@@ -57,11 +61,18 @@ class ChatMessageModel extends Equatable {
       'created_at': createdAt.toIso8601String(),
       'citations': citations?.map((c) => c.toJson()).toList(),
       'processing_time_ms': processingTimeMs,
+      'credits_cost': creditsCost,
     };
   }
 
   /// Create from JSON response
   factory ChatMessageModel.fromJson(Map<String, dynamic> json) {
+    // Attempt to extract cost from direct key or nested rate limit payload
+    int? costVal = json['credits_cost'] ?? json['cost'];
+    if (costVal == null && json['rate_limit'] != null) {
+      costVal = json['rate_limit']['cost'];
+    }
+    
     return ChatMessageModel(
       id: json['id'] ?? json['message_id'] ?? 0,
       sessionId: json['session_id'] ?? '',
@@ -72,6 +83,7 @@ class ChatMessageModel extends Equatable {
               ?.map((c) => CitationModel.fromJson(c as Map<String, dynamic>))
               .toList(),
       processingTimeMs: json['processing_time_ms'],
+      creditsCost: costVal,
     );
   }
 
@@ -84,6 +96,7 @@ class ChatMessageModel extends Equatable {
         createdAt,
         citations,
         processingTimeMs,
+        creditsCost,
       ];
 }
 

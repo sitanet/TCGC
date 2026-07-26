@@ -204,7 +204,10 @@ class ChatMessageBubble extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        'Responded in ${(message.processingTimeMs! / 1000).toStringAsFixed(1)}s',
+                        'Responded in ${(message.processingTimeMs! / 1000).toStringAsFixed(1)}s' +
+                        (message.creditsCost != null
+                            ? ' • ${message.creditsCost} ${message.creditsCost == 1 ? 'credit' : 'credits'}'
+                            : ''),
                         style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey[500],
