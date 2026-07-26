@@ -76,13 +76,18 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
 
       _messages.add(userMessage);
 
+      // Get previous messages (excluding the one we just added)
+      final previousMessages = _messages.sublist(0, _messages.length - 1);
+      // Limit to the last 5 messages for context
+      final recentIds = previousMessages.length > 5
+          ? previousMessages.sublist(previousMessages.length - 5).map((m) => m.id).toList()
+          : previousMessages.map((m) => m.id).toList();
+
       // Submit to backend
       final response = await _service.submitQuestion(
         question: question,
         sessionId: _currentSessionId,
-        previousMessageIds: _messages.length > 1
-            ? _messages.map((m) => m.id).toList()
-            : null,
+        previousMessageIds: recentIds.isNotEmpty ? recentIds : null,
       );
 
       // Update session ID
