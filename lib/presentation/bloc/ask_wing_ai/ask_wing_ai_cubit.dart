@@ -78,10 +78,10 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
 
       // Get previous messages (excluding the one we just added)
       final previousMessages = _messages.sublist(0, _messages.length - 1);
-      // Limit to the last 5 messages for context
+      // Limit to the last 5 messages for context and filter out temporary timestamp IDs
       final recentIds = previousMessages.length > 5
-          ? previousMessages.sublist(previousMessages.length - 5).map((m) => m.id).toList()
-          : previousMessages.map((m) => m.id).toList();
+          ? previousMessages.sublist(previousMessages.length - 5).map((m) => m.id).where((id) => id <= 2147483647).toList()
+          : previousMessages.map((m) => m.id).where((id) => id <= 2147483647).toList();
 
       // Submit to backend
       final response = await _service.submitQuestion(
