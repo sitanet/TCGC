@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../pages/audio/transcript_list_page.dart';
 
 /// Card displaying sermon citation
@@ -18,21 +19,37 @@ class CitationCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return InkWell(
-      onTap: () {
-        // Use PDF URL if uploaded, otherwise fallback to HTML transcript page
-        final url = (citation.pdfUrl != null && citation.pdfUrl!.isNotEmpty)
-            ? 'https://docs.google.com/gview?embedded=true&url=${Uri.encodeComponent(citation.pdfUrl!)}'
-            : 'https://tcgc.thecitygatechurch.org/transcript/${citation.sermonId}/';
-            
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => TranscriptViewPage(
-              overrideUrl: url,
-              overrideTitle: citation.sermonTitle,
+      onTap: () async {
+        // If PDF URL is uploaded, launch it natively on the device (maintains custom design)
+        if (citation.pdfUrl != null && citation.pdfUrl!.isNotEmpty) {
+          final uri = Uri.parse(citation.pdfUrl!);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } else {
+            // Fallback to internal webview if launching fails
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => TranscriptViewPage(
+                  overrideUrl: citation.pdfUrl,
+                  overrideTitle: citation.sermonTitle,
+                ),
+              ),
+            );
+          }
+        } else {
+          // Fallback to HTML transcript page
+          final url = 'https://tcgc.thecitygatechurch.org/transcript/${citation.sermonId}/';
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TranscriptViewPage(
+                overrideUrl: url,
+                overrideTitle: citation.sermonTitle,
+              ),
             ),
-          ),
-        );
+          );
+        }
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
