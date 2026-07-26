@@ -250,41 +250,6 @@ class ChatMessageBubble extends StatelessWidget {
           ),
         ),
 
-        // Citations (Sources list)
-        if (message.citations != null && message.citations!.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8, left: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.bookmark_outline,
-                        size: 13,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'SOURCES:',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.7,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ...message.citations!.map((citation) => CitationCard(
-                  citation: citation,
-                )),
-              ],
-            ),
-          ),
 
         // Timestamp
         Padding(
