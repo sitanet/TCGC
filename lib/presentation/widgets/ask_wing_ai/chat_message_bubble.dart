@@ -410,9 +410,32 @@ class _TypewriterMarkdownState extends State<TypewriterMarkdown> {
 
   @override
   Widget build(BuildContext context) {
+    final processedText = _preProcessMarkdown(_displayedText);
     return MarkdownBody(
-      data: _displayedText,
+      data: processedText,
       styleSheet: widget.styleSheet,
     );
+  }
+
+  String _preProcessMarkdown(String text) {
+    final RegExp regExp = RegExp(
+      r'```mermaid\s*([\s\S]*?)```',
+      multiLine: true,
+    );
+    
+    return text.replaceAllMapped(regExp, (match) {
+      try {
+        final mermaidCode = match.group(1)?.trim() ?? '';
+        if (mermaidCode.isEmpty) return '';
+        
+        // Convert to base64 representation for mermaid.ink
+        final bytes = utf8.encode(mermaidCode);
+        final base64Str = base64.encode(bytes);
+        
+        return '\n\n![Theological Concept Diagram](https://mermaid.ink/img/$base64Str)\n\n';
+      } catch (_) {
+        return match.group(0) ?? '';
+      }
+    });
   }
 }
