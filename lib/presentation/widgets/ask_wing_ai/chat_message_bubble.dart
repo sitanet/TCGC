@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
 import 'citation_card.dart';
@@ -12,6 +13,17 @@ class ChatMessageBubble extends StatelessWidget {
     Key? key,
     required this.message,
   }) : super(key: key);
+
+  void _copyToClipboard(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: message.content));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Message copied to clipboard'),
+        duration: Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,16 +49,19 @@ class ChatMessageBubble extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                primaryColor,
-                primaryColor.withBlue(primaryColor.blue + 30).withGreen(primaryColor.green + 10),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+        GestureDetector(
+          onDoubleTap: () => _copyToClipboard(context),
+          onLongPress: () => _copyToClipboard(context),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  primaryColor,
+                  primaryColor.withBlue(primaryColor.blue + 30).withGreen(primaryColor.green + 10),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
             ),
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(20),
@@ -71,6 +86,7 @@ class ChatMessageBubble extends StatelessWidget {
               height: 1.3,
             ),
           ),
+        ),
         ),
         Padding(
           padding: const EdgeInsets.only(top: 4, right: 4),
@@ -175,12 +191,12 @@ class ChatMessageBubble extends StatelessWidget {
                 ),
               ),
 
-              // Processing time footer
-              if (message.processingTimeMs != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Row(
-                    children: [
+              // Processing time & copy footer
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Row(
+                  children: [
+                    if (message.processingTimeMs != null) ...[
                       Icon(
                         Icons.done_all,
                         size: 14,
@@ -196,8 +212,36 @@ class ChatMessageBubble extends StatelessWidget {
                         ),
                       ),
                     ],
-                  ),
+                    const Spacer(),
+                    // Copy Response Button
+                    InkWell(
+                      onTap: () => _copyToClipboard(context),
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.copy_outlined,
+                              size: 13,
+                              color: primaryColor.withOpacity(0.7),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Copy',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: primaryColor.withOpacity(0.8),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+              ),
             ],
           ),
         ),
