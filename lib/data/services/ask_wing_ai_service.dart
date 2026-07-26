@@ -186,7 +186,7 @@ class AskWingAIService {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: body != null ? json.encode(body) : null,
+        body: json.encode(body ?? {}),
       );
 
       if (response.statusCode != 200) {
