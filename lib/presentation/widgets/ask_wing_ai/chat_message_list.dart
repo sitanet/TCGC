@@ -18,25 +18,32 @@ class ChatMessageList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
+    return Scrollbar(
       controller: scrollController,
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      itemCount: messages.length + (isLoading ? 1 : 0),
-      itemBuilder: (context, index) {
-        // Show loading indicator at the end
-        if (isLoading && index == messages.length) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            child: LoadingIndicator(),
+      thumbVisibility: true, // Always show the scroll bar when scrolling
+      thickness: 6.0,
+      radius: const Radius.circular(3),
+      interactive: true,
+      child: ListView.builder(
+        controller: scrollController,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        itemCount: messages.length + (isLoading ? 1 : 0),
+        itemBuilder: (context, index) {
+          // Show loading indicator at the end
+          if (isLoading && index == messages.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              child: LoadingIndicator(),
+            );
+          }
+  
+          final message = messages[index];
+          return ChatMessageBubble(
+            key: ValueKey(message.id),
+            message: message,
           );
-        }
-
-        final message = messages[index];
-        return ChatMessageBubble(
-          key: ValueKey(message.id),
-          message: message,
-        );
-      },
+        },
+      ),
     );
   }
 }
