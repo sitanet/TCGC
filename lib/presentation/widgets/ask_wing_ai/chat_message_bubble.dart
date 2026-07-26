@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
@@ -152,9 +153,10 @@ class ChatMessageBubble extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // AI response with markdown support
-              MarkdownBody(
-                data: message.content,
+              // AI response with typewriter animated typing support
+              TypewriterMarkdown(
+                text: message.content,
+                isNewMessage: DateTime.now().difference(message.createdAt).inSeconds < 15,
                 styleSheet: MarkdownStyleSheet(
                   p: TextStyle(
                     fontSize: 15, 
@@ -265,5 +267,92 @@ class ChatMessageBubble extends StatelessWidget {
     } else {
       return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
     }
+  }
+}
+
+/// Custom Widget to simulate Typing (typewriter) animation for Markdown content
+class TypewriterMarkdown extends StatefulWidget {
+  final String text;
+  final MarkdownStyleSheet styleSheet;
+  final bool isNewMessage;
+  final Duration speed;
+
+  const TypewriterMarkdown({
+    Key? key,
+    required this.text,
+    required this.styleSheet,
+    required this.isNewMessage,
+    this.speed = const Duration(milliseconds: 30),
+  }) : super(key: key);
+
+  @override
+  State<TypewriterMarkdown> createState() => _TypewriterMarkdownState();
+}
+
+class _TypewriterMarkdownState extends State<TypewriterMarkdown> {
+  String _displayedText = '';
+  late List<String> _words;
+  int _currentIndex = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isNewMessage && widget.text.isNotEmpty) {
+      // Split text into words, keeping whitespace
+      _words = widget.text.split(RegExp(r'(?<=\s)|(?=\s)'));
+      _startTyping();
+    } else {
+      _displayedText = widget.text;
+    }
+  }
+
+  void _startTyping() {
+    _timer = Timer.periodic(widget.speed, (timer) {
+      if (_currentIndex < _words.length) {
+        if (mounted) {
+          setState(() {
+            _displayedText += _words[_currentIndex];
+            _currentIndex++;
+          });
+        }
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(TypewriterMarkdown oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text) {
+      _timer?.cancel();
+      if (widget.isNewMessage && widget.text.isNotEmpty) {
+        setState(() {
+          _displayedText = '';
+          _currentIndex = 0;
+        });
+        _words = widget.text.split(RegExp(r'(?<=\s)|(?=\s)'));
+        _startTyping();
+      } else {
+        setState(() {
+          _displayedText = widget.text;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MarkdownBody(
+      data: _displayedText,
+      styleSheet: widget.styleSheet,
+    );
   }
 }
