@@ -24,6 +24,7 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
   final AuthService _authService = AuthService();
   
   AppUser? _currentUser;
+  bool _showScrollDownButton = false;
 
   @override
   void initState() {
@@ -31,10 +32,27 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
     // Load user data
     _loadUserData();
     
+    // Add scroll controller listener for scroll down button
+    _scrollController.addListener(_scrollListener);
+    
     // Initialize if needed
     final cubit = context.read<AskWingAICubit>();
     if (cubit.state is AskWingAIInitial) {
       cubit.initialize();
+    }
+  }
+
+  void _scrollListener() {
+    if (_scrollController.hasClients) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final currentScroll = _scrollController.position.pixels;
+      // Show button if user scrolls up more than 200 logical pixels from the bottom
+      final show = maxScroll - currentScroll > 200;
+      if (show != _showScrollDownButton) {
+        setState(() {
+          _showScrollDownButton = show;
+        });
+      }
     }
   }
 
@@ -54,6 +72,7 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_scrollListener);
     _scrollController.dispose();
     _textController.dispose();
     super.dispose();
@@ -191,7 +210,27 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
             children: [
               // Messages list
               Expanded(
-                child: _buildMessagesList(state),
+                child: Stack(
+                  children: [
+                    _buildMessagesList(state),
+                    if (_showScrollDownButton)
+                      Positioned(
+                        right: 16,
+                        bottom: 16,
+                        child: FloatingActionButton(
+                          mini: true,
+                          elevation: 3,
+                          backgroundColor: Theme.of(context).primaryColor,
+                          onPressed: _scrollToBottom,
+                          child: const Icon(
+                            Icons.arrow_downward_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
               // Input field
               ChatInputField(
