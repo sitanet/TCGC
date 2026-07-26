@@ -112,6 +112,7 @@ class CitationModel extends Equatable {
   final double similarityScore;
   final String? textChunk; // For excerpt display
   final String? estimatedTimestamp; // Alias for timestamp
+  final String? pdfUrl;
 
   const CitationModel({
     required this.sermonId,
@@ -121,6 +122,7 @@ class CitationModel extends Equatable {
     this.similarityScore = 1.0,
     this.textChunk,
     this.estimatedTimestamp,
+    this.pdfUrl,
   });
 
   /// Formatted citation text for display/copying
@@ -145,6 +147,7 @@ class CitationModel extends Equatable {
       'similarity_score': similarityScore,
       'text_chunk': textChunk,
       'estimated_timestamp': estimatedTimestamp ?? timestamp,
+      'pdf_url': pdfUrl,
     };
   }
 
@@ -160,6 +163,7 @@ class CitationModel extends Equatable {
       similarityScore: (json['similarity_score'] as num?)?.toDouble() ?? 1.0,
       textChunk: json['text_chunk'] as String?,
       estimatedTimestamp: timestamp,
+      pdfUrl: json['pdf_url'],
     );
   }
 
