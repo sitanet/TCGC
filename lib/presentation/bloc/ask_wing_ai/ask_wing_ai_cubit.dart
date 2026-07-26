@@ -59,12 +59,6 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
     }
 
     try {
-      // Show loading state with previous messages
-      emit(AskWingAIQuestionSubmitting(
-        previousMessages: _messages,
-        question: question,
-      ));
-
       // Add user message to local list immediately
       final userMessage = ChatMessageModel(
         id: DateTime.now().millisecondsSinceEpoch, // Temporary ID
@@ -75,6 +69,12 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
       );
 
       _messages.add(userMessage);
+
+      // Show loading state with updated messages list
+      emit(AskWingAIQuestionSubmitting(
+        previousMessages: List.from(_messages),
+        question: question,
+      ));
 
       // Get previous messages (excluding the one we just added)
       final previousMessages = _messages.sublist(0, _messages.length - 1);
