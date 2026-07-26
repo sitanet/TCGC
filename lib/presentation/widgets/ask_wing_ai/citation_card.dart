@@ -73,16 +73,26 @@ class CitationCard extends StatelessWidget {
                 if (await canLaunchUrl(fileUri)) {
                   await launchUrl(fileUri, mode: LaunchMode.externalApplication);
                 } else {
-                  // Fallback to opening the web URL if file:// launch is restricted
-                  await launchUrl(Uri.parse(citation.pdfUrl!), mode: LaunchMode.externalApplication);
+                  // Fallback to opening the web URL with highlight parameter if file:// launch is restricted
+                  final cleanPhrase = _cleanSearchPhrase(citation.textChunk);
+                  final searchParam = cleanPhrase.isNotEmpty ? '#search="${Uri.encodeComponent(cleanPhrase)}"' : '';
+                  await launchUrl(
+                    Uri.parse('${citation.pdfUrl}$searchParam'),
+                    mode: LaunchMode.externalApplication,
+                  );
                 }
                 return;
               }
             }
             throw Exception('Failed to fetch file');
           } catch (e) {
-            // Fallback to direct web browser download if local write fails
-            await launchUrl(Uri.parse(citation.pdfUrl!), mode: LaunchMode.externalApplication);
+            // Fallback to direct web browser download with highlight parameter if local write fails
+            final cleanPhrase = _cleanSearchPhrase(citation.textChunk);
+            final searchParam = cleanPhrase.isNotEmpty ? '#search="${Uri.encodeComponent(cleanPhrase)}"' : '';
+            await launchUrl(
+              Uri.parse('${citation.pdfUrl}$searchParam'),
+              mode: LaunchMode.externalApplication,
+            );
           }
         } else {
           // Fallback to HTML transcript page
@@ -98,6 +108,7 @@ class CitationCard extends StatelessWidget {
           );
         }
       },
+      
       borderRadius: BorderRadius.circular(12),
       child: Container(
         margin: const EdgeInsets.only(bottom: 6),
@@ -236,6 +247,18 @@ class CitationCard extends StatelessWidget {
     ),
   );
 }
+
+  String _cleanSearchPhrase(String? text) {
+    if (text == null || text.trim().isEmpty) return '';
+    // Clean newlines, carriage returns and double quotes
+    final clean = text.replaceAll(RegExp(r'[\r\n"]+'), ' ').trim();
+    // Use first 8 words to make a clean, unique phrase search key
+    final words = clean.split(RegExp(r'\s+'));
+    if (words.length > 8) {
+      return words.sublist(0, 8).join(' ');
+    }
+    return clean;
+  }
 
   void _copyToClipboard(BuildContext context) {
     final text = citation.formattedCitation;
