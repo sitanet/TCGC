@@ -19,8 +19,11 @@ class CitationCard extends StatelessWidget {
     
     return InkWell(
       onTap: () {
-        // Navigate to the webview of the message's transcript directly
-        final url = 'https://tcgc.thecitygatechurch.org/transcript/${citation.sermonId}/';
+        // Use PDF URL if uploaded, otherwise fallback to HTML transcript page
+        final url = (citation.pdfUrl != null && citation.pdfUrl!.isNotEmpty)
+            ? 'https://docs.google.com/gview?embedded=true&url=${Uri.encodeComponent(citation.pdfUrl!)}'
+            : 'https://tcgc.thecitygatechurch.org/transcript/${citation.sermonId}/';
+            
         Navigator.push(
           context,
           MaterialPageRoute(
