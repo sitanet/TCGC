@@ -141,8 +141,8 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
             _showFeatureDisabledDialog(context, state.message);
           }
 
-          // Scroll to bottom on new message
-          if (state is AskWingAIQuestionSuccess) {
+          // Scroll to bottom on question submission or response success
+          if (state is AskWingAIQuestionSuccess || state is AskWingAIQuestionSubmitting) {
             _scrollToBottom();
           }
         },
