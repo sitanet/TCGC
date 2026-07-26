@@ -89,9 +89,6 @@ android {
     
     // Packaging options to exclude unnecessary files
     packaging {
-        jniLibs {
-            keepDebugSymbols.add("**/*.so")
-        }
         resources {
             excludes += listOf(
                 "META-INF/DEPENDENCIES",
