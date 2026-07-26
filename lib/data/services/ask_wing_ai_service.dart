@@ -27,7 +27,7 @@ class AskWingAIService {
 
       try {
         final response = await http.get(
-          Uri.parse('$_baseUrl/ask-wing-ai/feature-status'),
+          Uri.parse('$_baseUrl/ask-wing-ai/feature-status/'),
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json',
@@ -72,7 +72,7 @@ class AskWingAIService {
       };
 
       final response = await http.post(
-        Uri.parse('$_baseUrl/ask-wing-ai/questions'),
+        Uri.parse('$_baseUrl/ask-wing-ai/questions/'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -132,7 +132,7 @@ class AskWingAIService {
         if (sessionId != null) 'session_id': sessionId,
       };
 
-      final uri = Uri.parse('$_baseUrl/ask-wing-ai/history')
+      final uri = Uri.parse('$_baseUrl/ask-wing-ai/history/')
           .replace(queryParameters: queryParams);
 
       try {
@@ -181,7 +181,7 @@ class AskWingAIService {
       final body = sessionId != null ? {'session_id': sessionId} : null;
 
       final response = await http.post(
-        Uri.parse('$_baseUrl/ask-wing-ai/clear'),
+        Uri.parse('$_baseUrl/ask-wing-ai/clear/'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -190,7 +190,7 @@ class AskWingAIService {
       );
 
       if (response.statusCode != 200) {
-        throw Exception('Failed to clear chat history');
+        throw Exception('Failed to clear chat history: Status ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
       throw Exception('Failed to clear chat history: $e');
@@ -213,7 +213,7 @@ class AskWingAIService {
 
       try {
         final response = await http.get(
-          Uri.parse('$_baseUrl/ask-wing-ai/limits'),
+          Uri.parse('$_baseUrl/ask-wing-ai/limits/'),
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json',
