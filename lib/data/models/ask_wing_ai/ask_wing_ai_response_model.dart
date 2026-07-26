@@ -111,12 +111,14 @@ class RateLimitModel extends Equatable {
   final int dailyUsed;
   final int dailyRemaining;
   final DateTime resetTime;
+  final int? cost;
 
   const RateLimitModel({
     required this.dailyLimit,
     required this.dailyUsed,
     required this.dailyRemaining,
     required this.resetTime,
+    this.cost,
   });
 
   /// Check if at limit
@@ -139,6 +141,7 @@ class RateLimitModel extends Equatable {
       dailyRemaining: json['daily_remaining'] ?? 50,
       resetTime: DateTime.parse(
           json['reset_time'] ?? DateTime.now().toIso8601String()),
+      cost: json['cost'] as int?,
     );
   }
 
@@ -149,6 +152,7 @@ class RateLimitModel extends Equatable {
       'daily_used': dailyUsed,
       'daily_remaining': dailyRemaining,
       'reset_time': resetTime.toIso8601String(),
+      'cost': cost,
     };
   }
 
@@ -158,6 +162,7 @@ class RateLimitModel extends Equatable {
         dailyUsed,
         dailyRemaining,
         resetTime,
+        cost,
       ];
 }
 
