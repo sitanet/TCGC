@@ -315,6 +315,19 @@ class _TypewriterMarkdownState extends State<TypewriterMarkdown> {
             _displayedText += _words[_currentIndex];
             _currentIndex++;
           });
+          
+          // Auto scroll to bottom as new words are typed
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            try {
+              final scrollable = Scrollable.of(context);
+              if (scrollable.position.pixels < scrollable.position.maxScrollExtent) {
+                scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+              }
+            } catch (_) {
+              // Ignore if scrollable is not yet attached or not found
+            }
+          });
         }
       } else {
         timer.cancel();
