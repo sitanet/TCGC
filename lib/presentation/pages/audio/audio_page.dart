@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/utils/image_cache_manager.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/audio_cache_service.dart';
 import '../../../data/services/played_audio_service.dart';
@@ -69,15 +70,16 @@ class _AudioPageState extends ConsumerState<AudioPage>
       final isGeneralMarried = user?.isGeneralMarried ?? false;
       final isInHouseMarried = user?.isInHouseMarried ?? false;
 
-      // Load categories and sermons from cache FIRST (instant)
-      // Don't wait for transcripts - load them in background
+      // Load categories, sermons, AND transcripts from cache FIRST (instant)
       final results = await Future.wait([
         _dataService.getMessageCategories(), // Uses cache-first
         _dataService.getMessages(), // Uses cache-first
+        _dataService.getTranscripts(), // Uses cache-first (instant display)
       ]);
 
       final categories = results[0] as List<MessageCategory>;
       final allSermons = results[1] as List<Sermon>;
+      final transcripts = results[2] as List<Transcript>;
 
       // Filter based on permissions
       final filteredCategories = categories.where((category) {
@@ -102,6 +104,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
         setState(() {
           _categories = processedCategories;
           _sermons = sermons;
+          _transcripts = transcripts; // Set transcripts immediately from cache
           _isLoading = false;
           _initialLoadDone = true;
         });
@@ -110,8 +113,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
         _audioCacheService.preBufferCategory(sermons, count: 3);
       }
 
-      // Load transcripts in background (non-blocking)
-      _loadTranscriptsInBackground();
+      // Refresh from server in background (non-blocking)
+      _refreshDataInBackground();
     } catch (e) {
       debugPrint('Error loading cached data: $e');
       if (mounted) {
@@ -120,17 +123,55 @@ class _AudioPageState extends ConsumerState<AudioPage>
     }
   }
 
-  /// Load transcripts in background without blocking UI
-  Future<void> _loadTranscriptsInBackground() async {
+  /// Refresh data from server in background without blocking UI
+  Future<void> _refreshDataInBackground() async {
     try {
-      final transcripts = await _dataService.getTranscripts();
+      final authProvider = ref.read(authChangeNotifierProvider);
+      final user = authProvider.user;
+      final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+      final isGeneralMarried = user?.isGeneralMarried ?? false;
+      final isInHouseMarried = user?.isInHouseMarried ?? false;
+
+      // Fetch fresh data from server
+      final results = await Future.wait([
+        _dataService.getMessageCategories(forceRefresh: true),
+        _dataService.getMessages(forceRefresh: true),
+        _dataService.getTranscripts(forceRefresh: true),
+      ]);
+
+      final categories = results[0] as List<MessageCategory>;
+      final allSermons = results[1] as List<Sermon>;
+      final transcripts = results[2] as List<Transcript>;
+
+      // Filter based on permissions
+      final filteredCategories = categories.where((category) {
+        if (category.isServiceTeamOnly && !isServiceTeamMember) return false;
+        return true;
+      }).toList();
+
+      final sermons = allSermons.where((sermon) {
+        if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
+        if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
+        if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
+        return true;
+      }).toList();
+
+      final processedCategories = _processCategories(
+        filteredCategories,
+        sermons,
+      );
+
       if (mounted) {
         setState(() {
+          _categories = processedCategories;
+          _sermons = sermons;
           _transcripts = transcripts;
         });
       }
+
+      debugPrint('Background refresh completed - ${transcripts.length} transcripts loaded');
     } catch (e) {
-      debugPrint('Error loading transcripts: $e');
+      debugPrint('Error refreshing data in background: $e');
     }
   }
 
@@ -561,11 +602,14 @@ class _AudioPageState extends ConsumerState<AudioPage>
     if (category.imageUrl!.startsWith('http')) {
       return CachedNetworkImage(
         imageUrl: category.imageUrl!,
+        cacheManager: CustomImageCacheManager.instance,
         width: 80,
         height: 80,
         fit: BoxFit.cover,
         placeholder: (context, url) => placeholder,
         errorWidget: (context, url, error) => placeholder,
+        fadeInDuration: const Duration(milliseconds: 0), // Instant display from cache
+        fadeOutDuration: const Duration(milliseconds: 0),
       );
     }
 
