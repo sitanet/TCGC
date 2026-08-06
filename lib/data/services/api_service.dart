@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/utils/error_handler.dart';
 
 // Top-level function for compute isolate - parses JSON in background
 List<dynamic> _parseJsonList(String body) {
@@ -128,13 +129,13 @@ class ApiService {
       var response = await http.get(
         Uri.parse('${ApiConstants.baseUrl}$endpoint'),
         headers: _headers,
-      );
+      ).timeout(const Duration(seconds: 120));
 
       if (response.statusCode == 401 && await _refreshAccessToken()) {
         response = await http.get(
           Uri.parse('${ApiConstants.baseUrl}$endpoint'),
           headers: _headers,
-        );
+        ).timeout(const Duration(seconds: 120));
       }
 
       return ApiResponse(
@@ -158,7 +159,7 @@ class ApiService {
         Uri.parse('${ApiConstants.baseUrl}$endpoint'),
         headers: _headers,
         body: jsonEncode(data),
-      ).timeout(const Duration(seconds: 60));
+      ).timeout(const Duration(seconds: 120));
 
       print('ApiService POST response: ${response.statusCode}');
 
@@ -167,7 +168,7 @@ class ApiService {
           Uri.parse('${ApiConstants.baseUrl}$endpoint'),
           headers: _headers,
           body: jsonEncode(data),
-        ).timeout(const Duration(seconds: 60));
+        ).timeout(const Duration(seconds: 120));
       }
 
       return ApiResponse(
@@ -467,6 +468,8 @@ class ApiResponse {
 
   Map<String, dynamic> get data => jsonDecode(body);
   List<dynamic> get dataList => jsonDecode(body);
+  
+  /// Get technical error message from API
   String? get errorMessage {
     try {
       final decoded = jsonDecode(body);
@@ -475,6 +478,31 @@ class ApiResponse {
       }
     } catch (_) {}
     return null;
+  }
+  
+  /// Get user-friendly error message (uses ErrorHandler)
+  String get userFriendlyError {
+    // If there's a specific error message from API, try to convert it
+    if (errorMessage != null) {
+      return ErrorHandler.getErrorMessage(errorMessage);
+    }
+    
+    // Otherwise, convert based on status code
+    if (statusCode == 0) {
+      return 'No internet connection. Please check your network and try again.';
+    } else if (statusCode == 401) {
+      return 'Session expired. Please login again.';
+    } else if (statusCode == 403) {
+      return 'You don\'t have permission to access this.';
+    } else if (statusCode == 404) {
+      return 'The requested content was not found.';
+    } else if (statusCode >= 500) {
+      return 'Server is experiencing issues. Please try again later.';
+    } else if (!isSuccess) {
+      return 'Something went wrong. Please try again.';
+    }
+    
+    return 'Operation completed successfully.';
   }
   
   /// Check if response has pagination info
