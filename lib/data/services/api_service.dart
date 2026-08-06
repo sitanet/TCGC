@@ -129,13 +129,13 @@ class ApiService {
       var response = await http.get(
         Uri.parse('${ApiConstants.baseUrl}$endpoint'),
         headers: _headers,
-      ).timeout(const Duration(seconds: 120));
+      ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 401 && await _refreshAccessToken()) {
         response = await http.get(
           Uri.parse('${ApiConstants.baseUrl}$endpoint'),
           headers: _headers,
-        ).timeout(const Duration(seconds: 120));
+        ).timeout(const Duration(seconds: 60));
       }
 
       return ApiResponse(
@@ -159,7 +159,7 @@ class ApiService {
         Uri.parse('${ApiConstants.baseUrl}$endpoint'),
         headers: _headers,
         body: jsonEncode(data),
-      ).timeout(const Duration(seconds: 120));
+      ).timeout(const Duration(seconds: 60));
 
       print('ApiService POST response: ${response.statusCode}');
 
@@ -168,7 +168,7 @@ class ApiService {
           Uri.parse('${ApiConstants.baseUrl}$endpoint'),
           headers: _headers,
           body: jsonEncode(data),
-        ).timeout(const Duration(seconds: 120));
+        ).timeout(const Duration(seconds: 60));
       }
 
       return ApiResponse(
