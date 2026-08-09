@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/utils/error_handler.dart';
 import '../../../main.dart';
 import 'signup_success_page.dart';
 
@@ -54,23 +55,17 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
         _emailController.text.isEmpty ||
         _passwordController.text.isEmpty ||
         _confirmPasswordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
+      ErrorHandler.showWarning(context, 'Please fill in all fields');
       return;
     }
 
     if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match')),
-      );
+      ErrorHandler.showError(context, 'Passwords do not match. Please check and try again.');
       return;
     }
 
     if (_passwordController.text.length < 8) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password must be at least 8 characters')),
-      );
+      ErrorHandler.showError(context, 'Password must be at least 8 characters long');
       return;
     }
 
@@ -113,12 +108,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       }
     } else {
       print('SignUpPage: Registration failed with error: ${authProvider.error}');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.error ?? 'Registration failed'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ErrorHandler.showError(context, authProvider.error ?? 'Registration failed. Please try again.');
     }
   }
 

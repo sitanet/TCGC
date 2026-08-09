@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/utils/error_handler.dart';
 import '../../../main.dart';
 import '../../../data/services/credential_storage_service.dart';
 
@@ -60,9 +61,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     final authenticated = await biometricProvider.authenticateForLogin();
     if (!authenticated) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Authentication failed')),
-        );
+        ErrorHandler.showError(context, 'Biometric authentication failed. Please try again.');
       }
       return;
     }
@@ -70,9 +69,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     final credentials = await biometricProvider.getSavedCredentials();
     if (credentials == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No saved credentials found')),
-        );
+        ErrorHandler.showError(context, 'No saved credentials found. Please sign in manually.');
       }
       return;
     }
@@ -90,12 +87,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       widget.onSignIn();
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(authProvider.error ?? 'Login failed'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ErrorHandler.showError(context, authProvider.error ?? 'Login failed. Please try again.');
       }
     }
   }
@@ -181,9 +173,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
 
   Future<void> _handleSignIn() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
+      ErrorHandler.showWarning(context, 'Please fill in all fields');
       return;
     }
 
@@ -202,12 +192,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       widget.onSignIn();
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(authProvider.error ?? 'Login failed'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ErrorHandler.showError(context, authProvider.error ?? 'Login failed. Please try again.');
       }
     }
   }
@@ -251,12 +236,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
             ElevatedButton(
               onPressed: isLoading ? null : () async {
                 if (resetEmailController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please enter your email'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
+                  ErrorHandler.showWarning(context, 'Please enter your email address');
                   return;
                 }
                 
@@ -272,14 +252,17 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                 }
                 
                 if (mounted) {
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    SnackBar(
-                      content: Text(success 
-                        ? authProvider.message ?? 'Password reset link sent to your email'
-                        : authProvider.error ?? 'Failed to send reset link'),
-                      backgroundColor: success ? AppColors.primaryGold : Colors.red,
-                    ),
-                  );
+                  if (success) {
+                    ErrorHandler.showSuccess(
+                      this.context,
+                      authProvider.message ?? 'Password reset link sent to your email',
+                    );
+                  } else {
+                    ErrorHandler.showError(
+                      this.context,
+                      authProvider.error ?? 'Failed to send reset link. Please try again.',
+                    );
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(

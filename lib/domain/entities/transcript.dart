@@ -6,6 +6,7 @@ class Transcript {
   final String? htmlContent;
   final String? speaker;
   final String? imageUrl;
+  final String? pdfUrl;
   final String category;
   final String categoryName;
   final DateTime date;
@@ -22,6 +23,7 @@ class Transcript {
     this.htmlContent,
     this.speaker,
     this.imageUrl,
+    this.pdfUrl,
     required this.category,
     this.categoryName = '',
     required this.date,
@@ -39,6 +41,7 @@ class Transcript {
     String? htmlContent,
     String? speaker,
     String? imageUrl,
+    String? pdfUrl,
     String? category,
     String? categoryName,
     DateTime? date,
@@ -55,6 +58,7 @@ class Transcript {
       htmlContent: htmlContent ?? this.htmlContent,
       speaker: speaker ?? this.speaker,
       imageUrl: imageUrl ?? this.imageUrl,
+      pdfUrl: pdfUrl ?? this.pdfUrl,
       category: category ?? this.category,
       categoryName: categoryName ?? this.categoryName,
       date: date ?? this.date,
@@ -78,6 +82,7 @@ class Transcript {
       htmlContent: json['html_content'],
       speaker: json['speaker'],
       imageUrl: json['image_url'],
+      pdfUrl: json['pdf_url'],
       category: categoryStr,
       categoryName: categoryName,
       date: json['date'] != null 
@@ -99,6 +104,7 @@ class Transcript {
       'html_content': htmlContent,
       'speaker': speaker,
       'image_url': imageUrl,
+      'pdf_url': pdfUrl,
       'category': category,
       'category_name': categoryName,
       'date': date.toIso8601String(),

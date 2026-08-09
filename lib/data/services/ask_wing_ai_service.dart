@@ -5,6 +5,7 @@ import '../models/ask_wing_ai/ask_wing_ai_response_model.dart';
 import '../models/ask_wing_ai/chat_message_model.dart';
 import '../../core/services/token_service.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/utils/error_handler.dart';
 
 class AskWingAIService {
   final TokenService _tokenService;
@@ -92,10 +93,11 @@ class AskWingAIService {
         final data = json.decode(response.body) as Map<String, dynamic>;
         throw FeatureDisabledException(data['message'] as String? ?? 'Ask Wing AI is temporarily unavailable');
       } else if (response.statusCode == 401) {
-        throw Exception('Authentication failed. Please log in again.');
+        throw Exception('Session expired. Please login again.');
       } else {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        throw Exception(data['message'] ?? data['error'] ?? 'Failed to submit question');
+        final errorMessage = data['message'] ?? data['error'] ?? 'Failed to submit question';
+        throw Exception(ErrorHandler.getErrorMessage(Exception(errorMessage)));
       }
     } on RateLimitException {
       rethrow;
@@ -104,7 +106,7 @@ class AskWingAIService {
     } catch (e) {
       // Surface the real error instead of hiding it with a mock response
       debugPrint('Wing AI submitQuestion error: $e');
-      throw Exception('Failed to connect to Wing AI. Please check your connection and try again. (${e.toString()})');
+      throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }
 
@@ -190,10 +192,10 @@ class AskWingAIService {
       );
 
       if (response.statusCode != 200) {
-        throw Exception('Failed to clear chat history: Status ${response.statusCode}, Body: ${response.body}');
+        throw Exception(ErrorHandler.getErrorMessage(Exception('Failed to clear chat history')));
       }
     } catch (e) {
-      throw Exception('Failed to clear chat history: $e');
+      throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/error_handler.dart';
 
 class SignupSuccessPage extends StatefulWidget {
   final String email;
@@ -61,14 +62,11 @@ class _SignupSuccessPageState extends State<SignupSuccessPage>
     final success = await widget.onResendEmail();
     setState(() => _isResending = false);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            success ? 'Confirmation email resent!' : 'Failed to resend email',
-          ),
-          backgroundColor: success ? AppColors.success : Colors.red,
-        ),
-      );
+      if (success) {
+        ErrorHandler.showSuccess(context, 'Confirmation email resent successfully!');
+      } else {
+        ErrorHandler.showError(context, 'Failed to resend email. Please try again.');
+      }
     }
   }
 

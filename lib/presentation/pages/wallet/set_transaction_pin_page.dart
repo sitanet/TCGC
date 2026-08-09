@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/utils/error_handler.dart';
 import '../../../main.dart' show walletChangeNotifierProvider;
 import '../../widgets/custom_app_bar.dart';
 import 'give_page.dart';
@@ -102,12 +103,7 @@ class _SetTransactionPinPageState extends ConsumerState<SetTransactionPinPage> {
     setState(() => _isLoading = false);
     
     if (!pinSuccess && walletProvider.error == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Request timed out. Please try again.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      ErrorHandler.showError(context, 'Request timed out. Please try again.');
       return;
     }
 
@@ -186,12 +182,7 @@ class _SetTransactionPinPageState extends ConsumerState<SetTransactionPinPage> {
         );
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(walletProvider.error ?? 'Failed to set transaction PIN'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      ErrorHandler.showError(context, walletProvider.error ?? 'Failed to set transaction PIN. Please try again.');
     }
   }
 

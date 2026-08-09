@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/image_cache_manager.dart';
 import '../../domain/entities/sermon.dart';
 
 String _stripHtmlTags(String htmlText) {
@@ -59,9 +60,12 @@ class SermonCard extends StatelessWidget {
                 child: sermon.imageUrl != null && sermon.imageUrl!.startsWith('http')
                     ? CachedNetworkImage(
                         imageUrl: sermon.imageUrl!,
+                        cacheManager: CustomImageCacheManager.instance,
                         fit: BoxFit.cover,
                         placeholder: (context, url) => _buildPlaceholder(isDark),
                         errorWidget: (context, url, error) => _buildPlaceholder(isDark),
+                        fadeInDuration: const Duration(milliseconds: 0),
+                        fadeOutDuration: const Duration(milliseconds: 0),
                       )
                     : sermon.imageUrl != null
                         ? Image.asset(

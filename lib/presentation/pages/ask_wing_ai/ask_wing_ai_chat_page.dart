@@ -9,6 +9,7 @@ import '../../widgets/ask_wing_ai/rate_limit_indicator.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../domain/entities/user.dart';
+import '../../../core/utils/error_handler.dart';
 
 /// Main chat page for Ask Wing AI
 class AskWingAIChatPage extends StatefulWidget {
@@ -137,17 +138,7 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
         listener: (context, state) {
           // Handle errors
           if (state is AskWingAIError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-                action: SnackBarAction(
-                  label: 'Dismiss',
-                  textColor: Colors.white,
-                  onPressed: () {},
-                ),
-              ),
-            );
+            ErrorHandler.showError(context, state.message);
           }
 
           // Handle rate limit exceeded

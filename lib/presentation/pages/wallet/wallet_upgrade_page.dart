@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/error_handler.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 
@@ -88,13 +89,7 @@ class _WalletUpgradePageState extends ConsumerState<WalletUpgradePage> {
     
     if (walletProvider.hasPendingUpgrade && mounted) {
       // Show message and navigate back
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You already have a pending upgrade request. Please wait for it to be reviewed.'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 3),
-        ),
-      );
+      ErrorHandler.showWarning(context, 'You already have a pending upgrade request. Please wait for it to be reviewed.');
       Navigator.pop(context);
     }
   }
@@ -246,9 +241,7 @@ class _WalletUpgradePageState extends ConsumerState<WalletUpgradePage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
+    ErrorHandler.showError(context, message);
   }
 
   void _showDetailedError(String message) {

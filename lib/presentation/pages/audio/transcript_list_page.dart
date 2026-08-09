@@ -6,8 +6,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/api_constants.dart';
+import '../../../core/utils/image_cache_manager.dart';
+import '../../../core/utils/error_handler.dart';
 import '../../../domain/entities/transcript.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/transcript_cache_service.dart';
@@ -152,9 +155,7 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isRefreshing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to refresh')),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -574,7 +575,10 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
                         : photoUrl != null && photoUrl.isNotEmpty
                             ? CachedNetworkImage(
                                 imageUrl: photoUrl,
+                                cacheManager: CustomImageCacheManager.instance,
                                 fit: BoxFit.cover,
+                                fadeInDuration: const Duration(milliseconds: 0),
+                                fadeOutDuration: const Duration(milliseconds: 0),
                                 placeholder: (_, __) => Container(
                                   color: isDark ? AppColors.cardDark : AppColors.dividerLight,
                                   child: Icon(
@@ -697,7 +701,10 @@ class _TranscriptListItem extends StatelessWidget {
     if (transcript.imageUrl!.startsWith('http')) {
       return CachedNetworkImage(
         imageUrl: transcript.imageUrl!,
+        cacheManager: CustomImageCacheManager.instance,
         fit: BoxFit.cover,
+        fadeInDuration: const Duration(milliseconds: 0),
+        fadeOutDuration: const Duration(milliseconds: 0),
         placeholder: (context, url) => Container(
           color: isDark ? AppColors.cardDark : AppColors.dividerLight,
         ),
@@ -830,7 +837,15 @@ class _TranscriptViewPageState extends State<TranscriptViewPage> {
             if (mounted) setState(() => _isLoading = true);
           },
           onPageFinished: (url) {
-            if (mounted) setState(() => _isLoading = false);
+            if (mounted) {
+              setState(() => _isLoading = false);
+              // Inject CSS to ensure proper rendering
+              _webViewController.runJavaScript('''
+                document.body.style.overflowX = 'hidden';
+                document.body.style.wordWrap = 'break-word';
+                document.body.style.overflowWrap = 'break-word';
+              ''');
+            }
           },
           onWebResourceError: (error) {
             debugPrint('WebView error: ${error.description}');
@@ -878,13 +893,43 @@ Download: $playStoreLink''';
     Share.share(shareText, subject: title);
   }
 
+  Future<void> _openPdf() async {
+    final pdfUrl = widget.transcript?.pdfUrl;
+    if (pdfUrl == null || pdfUrl.isEmpty) {
+      if (mounted) {
+        ErrorHandler.showWarning(context, 'PDF not available for this transcript');
+      }
+      return;
+    }
+
+    try {
+      final uri = Uri.parse(pdfUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        if (mounted) {
+          ErrorHandler.showError(context, 'Unable to open PDF. Please try again.');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error opening PDF: $e');
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasPdf = widget.transcript?.pdfUrl != null && widget.transcript!.pdfUrl!.isNotEmpty;
 
     // For web platform, fall back to simple text display
     if (kIsWeb) {
-      return _buildFallbackView(context, isDark);
+      return _buildFallbackView(context, isDark, hasPdf);
     }
 
     return Scaffold(
@@ -901,17 +946,92 @@ Download: $playStoreLink''';
       ),
       body: Stack(
         children: [
+          // WebView content (full screen)
           WebViewWidget(controller: _webViewController),
+          
+          // Loading indicator
           if (_isLoading)
             const Center(
               child: CircularProgressIndicator(color: AppColors.primaryGold),
+            ),
+          
+          // Floating PDF button at bottom (if PDF exists)
+          if (hasPdf)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: _buildFloatingPdfButton(isDark),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildFallbackView(BuildContext context, bool isDark) {
+  Widget _buildFloatingPdfButton(bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primaryGold, Color(0xFFB8860B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _openPdf,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.picture_as_pdf,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'View PDF Version',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.open_in_new,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFallbackView(BuildContext context, bool isDark, bool hasPdf) {
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
       appBar: CustomAppBar(
@@ -924,30 +1044,43 @@ Download: $playStoreLink''';
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.overrideTitle ?? widget.transcript?.title ?? 'Transcript',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-              ),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(20, 20, 20, hasPdf ? 90 : 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.overrideTitle ?? widget.transcript?.title ?? 'Transcript',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SelectableText(
+                  widget.transcript?.content ?? '',
+                  style: TextStyle(
+                    fontSize: 16,
+                    height: 1.8,
+                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            SelectableText(
-              widget.transcript?.content ?? '',
-              style: TextStyle(
-                fontSize: 16,
-                height: 1.8,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-              ),
+          ),
+          
+          // Floating PDF button
+          if (hasPdf)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: _buildFloatingPdfButton(isDark),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }

@@ -136,9 +136,11 @@ class AuthService {
         }
       }
 
-      return response.errorMessage ?? 'An error occurred. Please try again.';
+      // Use user-friendly error message (includes ErrorHandler conversion)
+      return response.userFriendlyError;
     } catch (e) {
-      return response.errorMessage ?? 'An error occurred. Please try again.';
+      // Fallback to user-friendly error message
+      return response.userFriendlyError;
     }
   }
 

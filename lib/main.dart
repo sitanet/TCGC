@@ -28,7 +28,6 @@ import 'presentation/pages/get_started/get_started_page.dart';
 import 'presentation/pages/auth/sign_in_page.dart';
 import 'presentation/pages/auth/sign_up_page.dart';
 import 'presentation/pages/interests/interests_page.dart';
-import 'presentation/pages/audio/offline_downloads_page.dart';
 import 'data/services/interests_service.dart';
 import 'presentation/widgets/bottom_nav_bar.dart';
 import 'presentation/widgets/mini_player.dart';
@@ -38,7 +37,6 @@ import 'data/services/data_service.dart' show DataService, AppUpdateInfo;
 import 'data/services/notification_service.dart';
 import 'presentation/pages/audio/audio_player_page.dart';
 import 'domain/entities/promotion.dart';
-import 'core/services/connectivity_service.dart';
 import 'core/widgets/network_aware_widget.dart';
 import 'data/services/biometric_service.dart';
 import 'core/providers/community_provider.dart';
@@ -127,15 +125,6 @@ void main() async {
           debugPrint('Audio service initialization error: $e');
         }
       });
-
-      // Initialize non-critical services in background with longer delay
-      Future.delayed(const Duration(seconds: 3), () async {
-        try {
-          await ConnectivityService().initialize();
-        } catch (e) {
-          debugPrint('Connectivity service initialization error: $e');
-        }
-      });
     },
     (error, stackTrace) {
       debugPrint('Uncaught async error: $error');
@@ -156,9 +145,7 @@ class _MyAppState extends ConsumerState<MyApp> {
   bool _showSignUp = false;
   bool _showInterests = false;
   bool _initialized = false;
-  bool _isOffline = false;
   final InterestsService _interestsService = InterestsService();
-  final ConnectivityService _connectivityService = ConnectivityService();
   final DataService _dataService = DataService();
   AppUpdateInfo? _updateInfo;
   bool _showUpdateDialog = false;
@@ -595,44 +582,10 @@ class _MyAppState extends ConsumerState<MyApp> {
   }
 
   Future<void> _initializeApp() async {
-    // Check connectivity FIRST before anything else
-    bool isConnected = false;
-    try {
-      await _connectivityService.initialize().timeout(
-        const Duration(seconds: 3),
-        onTimeout: () {
-          debugPrint('Connectivity check timed out - assuming offline');
-        },
-      );
-      isConnected = _connectivityService.isConnected;
-      debugPrint('Connectivity check: isConnected = $isConnected');
-    } catch (e) {
-      debugPrint('Connectivity check error: $e - assuming offline');
-      isConnected = false;
-    }
-
-    // If no internet, show offline page immediately
-    if (!isConnected) {
-      if (mounted) {
-        setState(() {
-          _initialized = true;
-          _isOffline = true;
-        });
-      }
-      // Listen for connection changes
-      _connectivityService.connectionStream.listen((connected) {
-        if (connected && mounted) {
-          _onConnectionRestored();
-        }
-      });
-      return;
-    }
-
-    // Show UI now that we confirmed we have internet
+    // Show UI immediately without connectivity check
     if (mounted) {
       setState(() {
         _initialized = true;
-        _isOffline = false;
       });
       _checkForAppUpdate();
     }
@@ -671,16 +624,6 @@ class _MyAppState extends ConsumerState<MyApp> {
         debugPrint('Initialization error: $e');
       }
     });
-  }
-
-  void _onConnectionRestored() {
-    if (mounted) {
-      setState(() {
-        _isOffline = false;
-      });
-      // Re-initialize the app now that we have connection
-      _initializeApp();
-    }
   }
 
   Future<void> _initializeNotifications() async {
@@ -747,10 +690,8 @@ class _MyAppState extends ConsumerState<MyApp> {
 
     Widget homeWidget;
 
-    // Check if offline - show downloads page directly
-    if (_isOffline) {
-      homeWidget = OfflineDownloadsPage(onConnected: _onConnectionRestored);
-    } else if (authProvider.isAuthenticated) {
+    // Always show main app interface (removed offline page check)
+    if (authProvider.isAuthenticated) {
       if (_showInterests) {
         homeWidget = InterestsPage(onComplete: _onInterestsComplete);
       } else {

@@ -8,6 +8,7 @@ import '../../../core/constants/nigerian_banks.dart';
 import '../../../core/providers/wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/utils/error_handler.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'tithe_page.dart';
@@ -573,13 +574,7 @@ class _GivePageState extends ConsumerState<GivePage> with WidgetsBindingObserver
     if (!context.mounted) return;
     
     // Show confirmation
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Account number copied! Opening ${bank.name}...'),
-        duration: const Duration(seconds: 2),
-        backgroundColor: AppColors.primaryGold,
-      ),
-    );
+    ErrorHandler.showSuccess(context, 'Account number copied! Opening ${bank.name}...');
     
     Navigator.pop(context);
     
@@ -646,13 +641,7 @@ class _GivePageState extends ConsumerState<GivePage> with WidgetsBindingObserver
                 onTap: () {
                   if (value != 'N/A') {
                     Clipboard.setData(ClipboardData(text: value));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Account number copied to clipboard'),
-                        duration: Duration(seconds: 2),
-                        backgroundColor: AppColors.primaryGold,
-                      ),
-                    );
+                    ErrorHandler.showSuccess(context, 'Account number copied to clipboard');
                   }
                 },
                 child: Container(
@@ -700,12 +689,7 @@ class _GivePageState extends ConsumerState<GivePage> with WidgetsBindingObserver
     final giveOptions = walletProvider.giveOptions;
 
     if (giveOptions.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No giving options available. Please try again later.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ErrorHandler.showError(context, 'No giving options available. Please try again later.');
       return;
     }
 
@@ -953,13 +937,7 @@ class _GivePageState extends ConsumerState<GivePage> with WidgetsBindingObserver
                                 ? GestureDetector(
                                     onTap: () {
                                       Clipboard.setData(ClipboardData(text: walletProvider.accountNumber!));
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Account number copied'),
-                                          duration: Duration(seconds: 2),
-                                          backgroundColor: AppColors.primaryGold,
-                                        ),
-                                      );
+                                      ErrorHandler.showSuccess(context, 'Account number copied');
                                     },
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.center,

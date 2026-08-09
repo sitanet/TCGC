@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../data/services/ask_wing_ai_service.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
 import '../../../data/models/ask_wing_ai/ask_wing_ai_response_model.dart';
+import '../../../core/utils/error_handler.dart';
 import 'ask_wing_ai_state.dart';
 
 class AskWingAICubit extends Cubit<AskWingAIState> {
@@ -47,7 +48,7 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
         sessionId: _currentSessionId,
       ));
     } catch (e) {
-      emit(AskWingAIError(message: 'Failed to initialize: $e'));
+      emit(AskWingAIError(message: ErrorHandler.getErrorMessage(e)));
     }
   }
 
@@ -138,7 +139,7 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
     } catch (e) {
       _messages.removeLast(); // Remove the user message we added
       emit(AskWingAIError(
-        message: 'Failed to submit question: $e',
+        message: ErrorHandler.getErrorMessage(e),
         previousMessages: _messages,
       ));
     }
@@ -180,7 +181,7 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
       ));
     } catch (e) {
       emit(AskWingAIError(
-        message: 'Failed to reload history: $e',
+        message: ErrorHandler.getErrorMessage(e),
         previousMessages: _messages,
       ));
     }
@@ -205,7 +206,7 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
       ));
     } catch (e) {
       emit(AskWingAIError(
-        message: 'Failed to clear history: $e',
+        message: ErrorHandler.getErrorMessage(e),
         previousMessages: _messages,
       ));
     }

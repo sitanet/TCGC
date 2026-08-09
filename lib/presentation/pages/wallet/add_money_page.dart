@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/wallet_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/utils/error_handler.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'success_page.dart';
 
@@ -22,12 +23,7 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
     final amountValue = double.tryParse(cleanAmount) ?? 0;
     
     if (amountValue <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid amount'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ErrorHandler.showWarning(context, 'Please enter a valid amount');
       return;
     }
 
@@ -49,12 +45,7 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
         ),
       );
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(walletProvider.error ?? 'Failed to add money'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ErrorHandler.showError(context, walletProvider.error ?? 'Failed to add money. Please try again.');
     }
   }
 
