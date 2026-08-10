@@ -333,7 +333,13 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
         statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
-        appBar: const CustomAppBar(title: '', lightBackground: true),
+        appBar: CustomAppBar(
+          title: widget.category != 'All'
+              ? widget.category
+              : (widget.initialSpeaker != null ? widget.initialSpeaker! : 'Audio Messages'),
+          showBackButton: Navigator.canPop(context),
+          lightBackground: true,
+        ),
         body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

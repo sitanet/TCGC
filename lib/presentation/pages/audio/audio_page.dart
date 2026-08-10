@@ -48,6 +48,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
   List<MessageCategory> _categories = [];
   List<Sermon> _sermons = [];
   List<Transcript> _transcripts = [];
+  List<SpeakerModel> _speakerModels = [];
+  FilterType _filterType = FilterType.category;
   bool _isLoading = true;
   bool _initialLoadDone = false;
 
@@ -70,16 +72,18 @@ class _AudioPageState extends ConsumerState<AudioPage>
       final isGeneralMarried = user?.isGeneralMarried ?? false;
       final isInHouseMarried = user?.isInHouseMarried ?? false;
 
-      // Load categories, sermons, AND transcripts from cache FIRST (instant)
+      // Load categories, sermons, transcripts AND speakers from cache FIRST (instant)
       final results = await Future.wait([
         _dataService.getMessageCategories(), // Uses cache-first
         _dataService.getMessages(), // Uses cache-first
         _dataService.getTranscripts(), // Uses cache-first (instant display)
+        _dataService.getSpeakers(), // Uses cache-first
       ]);
 
       final categories = results[0] as List<MessageCategory>;
       final allSermons = results[1] as List<Sermon>;
       final transcripts = results[2] as List<Transcript>;
+      final speakers = results[3] as List<SpeakerModel>;
 
       // Filter based on permissions
       final filteredCategories = categories.where((category) {
@@ -104,7 +108,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
         setState(() {
           _categories = processedCategories;
           _sermons = sermons;
-          _transcripts = transcripts; // Set transcripts immediately from cache
+          _transcripts = transcripts;
+          _speakerModels = speakers;
           _isLoading = false;
           _initialLoadDone = true;
         });
@@ -397,87 +402,173 @@ class _AudioPageState extends ConsumerState<AudioPage>
       return const Center(child: CircularProgressIndicator());
     }
 
-    final isTabletOrLarger = !Responsive.isMobile(context);
     final padding = Responsive.horizontalPadding(context);
-
-    if (_categories.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: _loadData,
-        color: AppColors.primaryGold,
-        child: ListView(
-          children: [
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.5,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.music_off,
-                      size: 64,
-                      color: isDark
-                          ? AppColors.textSecondaryDark.withValues(alpha: 0.5)
-                          : AppColors.textSecondaryLight.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No audio categories available',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (isTabletOrLarger) {
-      return RefreshIndicator(
-        onRefresh: _loadData,
-        color: AppColors.primaryGold,
-        child: GridView.builder(
-          padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: Responsive.gridCrossAxisCount(
-              context,
-              mobile: 1,
-              tablet: 2,
-              desktop: 3,
-            ),
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 2.5,
-          ),
-          itemCount: _categories.length,
-          itemBuilder: (context, index) =>
-              _buildCategoryCard(context, isDark, _categories[index]),
-        ),
-      );
-    }
 
     return RefreshIndicator(
       onRefresh: _loadData,
       color: AppColors.primaryGold,
-      child: ListView.builder(
-        padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
-        itemCount: _categories.length,
-        itemBuilder: (context, index) =>
-            _buildCategoryCard(context, isDark, _categories[index]),
+      child: Column(
+        children: [
+          // Filter Toggle Row (Categories | Ministers)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: padding, vertical: 12),
+            child: Row(
+              children: [
+                _buildToggleChip('Categories', FilterType.category, isDark),
+                const SizedBox(width: 12),
+                _buildToggleChip('Ministers', FilterType.speaker, isDark),
+              ],
+            ),
+          ),
+
+          // Grid Body
+          Expanded(
+            child: _filterType == FilterType.category
+                ? _buildCategoryGrid(context, isDark, padding)
+                : _buildSpeakerGrid(context, isDark, padding),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCategoryCard(
+  Widget _buildToggleChip(String label, FilterType type, bool isDark) {
+    final isSelected = _filterType == type;
+
+    return GestureDetector(
+      onTap: () {
+        if (_filterType != type) {
+          setState(() {
+            _filterType = type;
+          });
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primaryGold
+              : (isDark ? AppColors.cardDark : AppColors.surfaceLight),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? AppColors.primaryGold
+                : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primaryGold.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected
+                ? Colors.white
+                : (isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight),
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryGrid(BuildContext context, bool isDark, double padding) {
+    if (_categories.isEmpty) {
+      return ListView(
+        children: [
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.4,
+            child: Center(
+              child: Text(
+                'No audio categories available',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return GridView.builder(
+      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
+      physics: const BouncingScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: Responsive.isMobile(context) ? 2 : 3,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
+        childAspectRatio: 1.15,
+      ),
+      itemCount: _categories.length,
+      itemBuilder: (context, index) {
+        return _buildCategoryGridCard(context, isDark, _categories[index]);
+      },
+    );
+  }
+
+  Widget _buildSpeakerGrid(BuildContext context, bool isDark, double padding) {
+    final speakers = _speakerModels.where((s) => s.isMainSpeaker || s.isActive).toList();
+
+    if (speakers.isEmpty) {
+      return ListView(
+        children: [
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.4,
+            child: Center(
+              child: Text(
+                'No ministers available',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return GridView.builder(
+      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
+      physics: const BouncingScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: Responsive.isMobile(context) ? 2 : 4,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
+        childAspectRatio: 0.95,
+      ),
+      itemCount: speakers.length,
+      itemBuilder: (context, index) {
+        return _buildSpeakerCard(context, isDark, speakers[index]);
+      },
+    );
+  }
+
+  Widget _buildCategoryGridCard(
     BuildContext context,
     bool isDark,
     MessageCategory category,
   ) {
+    final count = _sermons.where((s) =>
+      s.category == category.id ||
+      s.category.toString() == category.id.toString() ||
+      s.categoryName.toLowerCase() == category.name.toLowerCase()
+    ).length;
+
     return GestureDetector(
       onTap: () async {
         final categoryNameToId = {for (var c in _categories) c.name: c.id};
@@ -493,7 +584,6 @@ class _AudioPageState extends ConsumerState<AudioPage>
             ),
           ),
         );
-        // Refresh categories to update "NEW" badge after returning
         if (mounted) {
           setState(() {
             _categories = _processCategories(_categories, _sermons);
@@ -501,83 +591,293 @@ class _AudioPageState extends ConsumerState<AudioPage>
         }
       },
       child: Container(
-        margin: Responsive.isMobile(context)
-            ? const EdgeInsets.only(bottom: 16)
-            : EdgeInsets.zero,
-        child: Row(
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: _buildCategoryImage(category, isDark),
-                ),
-                if (category.hasNewMessage)
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        'NEW',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : AppColors.dividerLight.withValues(alpha: 0.6),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Category Artwork Header
+              Expanded(
+                flex: 3,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: _buildCategoryImage(category, isDark),
+                    ),
+                    // Gradient overlay
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.5),
+                            ],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                    // NEW Badge
+                    if (category.hasNewMessage)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.redAccent.withValues(alpha: 0.5),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                          child: const Text(
+                            'NEW',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // Category Title & Count
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _stripHtmlTags(category.name),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                          ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '$count messages',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.primaryGold,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 11,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSpeakerCard(
+    BuildContext context,
+    bool isDark,
+    SpeakerModel speaker,
+  ) {
+    final count = _sermons.where((s) =>
+      s.speaker != null &&
+      (s.speaker!.toLowerCase() == speaker.fullName.toLowerCase() ||
+       s.speaker!.toLowerCase() == speaker.name.toLowerCase())
+    ).length;
+
+    final formattedName = _formatSpeakerName(speaker.fullName);
+
+    return GestureDetector(
+      onTap: () async {
+        final categoryNameToId = {for (var c in _categories) c.name: c.id};
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AudioListPage(
+              category: 'All',
+              audioItems: _sermons,
+              categories: _categories.map((c) => c.name).toList(),
+              categoryNameToId: categoryNameToId,
+              initialFilterType: FilterType.speaker,
+              initialSpeaker: speaker.fullName,
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _stripHtmlTags(category.name),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _stripHtmlTags(
-                      category.description ??
-                          'It is a time for to come together to worship, hear God\'s word, and fellowship.',
-                    ),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontFamily: 'ClashDisplay',
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
-                    ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : AppColors.dividerLight.withValues(alpha: 0.6),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Speaker Circular Photo with Gold Ring Border
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.primaryGold,
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primaryGold.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
+              child: ClipOval(
+                child: speaker.photoUrl != null && speaker.photoUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: speaker.photoUrl!,
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 128,
+                        memCacheHeight: 128,
+                        placeholder: (_, __) => Container(
+                          width: 64,
+                          height: 64,
+                          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                          child: const Icon(Icons.person, size: 32, color: AppColors.primaryGold),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          width: 64,
+                          height: 64,
+                          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                          child: const Icon(Icons.person, size: 32, color: AppColors.primaryGold),
+                        ),
+                      )
+                    : Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primaryGold.withValues(alpha: 0.4),
+                              isDark ? const Color(0xFF2A2A2A) : Colors.grey[300]!,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            speaker.name.isNotEmpty ? speaker.name[0].toUpperCase() : 'M',
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
             ),
-            Icon(
-              Icons.chevron_right,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
+            const SizedBox(height: 8),
+
+            // Formatted Speaker Name
+            Text(
+              formattedName,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                height: 1.15,
+                color: isDark ? Colors.white : AppColors.textPrimaryLight,
+              ),
+            ),
+            const SizedBox(height: 4),
+
+            // Messages Count Pill
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primaryGold.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count messages',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryGold,
+                ),
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  String _formatSpeakerName(String fullName) {
+    if (fullName.isEmpty) return fullName;
+
+    return fullName
+        .replaceAll(RegExp(r'\bPastor\b', caseSensitive: false), 'Pst.')
+        .replaceAll(RegExp(r'\bApostle\b', caseSensitive: false), 'Apst.')
+        .replaceAll(RegExp(r'\bReverend\b', caseSensitive: false), 'Rev.')
+        .replaceAll(RegExp(r'\bBishop\b', caseSensitive: false), 'Bsp.');
   }
 
   Widget _buildCategoryImage(MessageCategory category, bool isDark) {
