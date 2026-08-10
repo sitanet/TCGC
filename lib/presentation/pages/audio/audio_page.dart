@@ -540,7 +540,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
         crossAxisCount: Responsive.isMobile(context) ? 2 : 3,
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
-        childAspectRatio: 1.15,
+        childAspectRatio: 0.95,
       ),
       itemCount: _categories.length,
       itemBuilder: (context, index) {
@@ -737,11 +737,12 @@ class _AudioPageState extends ConsumerState<AudioPage>
                   children: [
                     Text(
                       _stripHtmlTags(category.name),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                            fontSize: 12.5,
+                            height: 1.25,
                             color: isDark ? Colors.white : AppColors.textPrimaryLight,
                           ),
                     ),
