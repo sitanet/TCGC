@@ -94,7 +94,7 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
       
       // Fetch fresh data from API
       final transcripts = await _dataService.getTranscripts(forceRefresh: true);
-      if (mounted) {
+      if (mounted && transcripts.isNotEmpty) {
         setState(() {
           _allItems = transcripts;
           _extractSpeakers();

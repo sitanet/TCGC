@@ -1180,111 +1180,42 @@ class _AudioPageState extends ConsumerState<AudioPage>
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Filter categories that have standalone transcripts
-    final categoriesWithTranscripts = _categories.where((category) {
-      return _transcripts.any(
-        (transcript) =>
-            transcript.category == category.id ||
-            transcript.categoryName == category.name,
-      );
-    }).toList();
-
     final padding = Responsive.horizontalPadding(context);
-    final isTabletOrLarger = !Responsive.isMobile(context);
+    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+    final hasMiniPlayer = audioProvider.currentSermon != null;
+    final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
 
-    if (categoriesWithTranscripts.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: _loadData,
-        color: AppColors.primaryGold,
-        child: ListView(
-          children: [
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.5,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(40),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryGold.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.article_outlined,
-                          size: 64,
-                          color: AppColors.primaryGold.withOpacity(0.6),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'No Transcripts Yet',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Message transcripts will be available here soon.\nStay tuned for written versions of our messages.',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (isTabletOrLarger) {
-      return RefreshIndicator(
-        onRefresh: _loadData,
-        color: AppColors.primaryGold,
-        child: GridView.builder(
-          padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: Responsive.gridCrossAxisCount(
-              context,
-              mobile: 1,
-              tablet: 2,
-              desktop: 3,
-            ),
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 2.5,
-          ),
-          itemCount: categoriesWithTranscripts.length,
-          itemBuilder: (context, index) => _buildTranscriptCategoryCard(
-            context,
-            isDark,
-            categoriesWithTranscripts[index],
-          ),
-        ),
-      );
-    }
+    final categoriesToDisplay = _categories.isNotEmpty
+        ? _categories
+        : [
+            MessageCategory(id: 'all', name: 'All Transcripts', description: ''),
+          ];
 
     return RefreshIndicator(
       onRefresh: _loadData,
       color: AppColors.primaryGold,
-      child: ListView.builder(
-        padding: EdgeInsets.symmetric(horizontal: padding, vertical: 10),
-        itemCount: categoriesWithTranscripts.length,
-        itemBuilder: (context, index) => _buildTranscriptCategoryCard(
-          context,
-          isDark,
-          categoriesWithTranscripts[index],
+      child: GridView.builder(
+        padding: EdgeInsets.only(
+          left: padding,
+          right: padding,
+          top: 12,
+          bottom: bottomInset,
         ),
+        physics: const BouncingScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: Responsive.isMobile(context) ? 2 : 3,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 18,
+          childAspectRatio: 0.73,
+        ),
+        itemCount: categoriesToDisplay.length,
+        itemBuilder: (context, index) {
+          return _buildTranscriptCategoryCard(
+            context,
+            isDark,
+            categoriesToDisplay[index],
+          );
+        },
       ),
     );
   }
@@ -1294,27 +1225,15 @@ class _AudioPageState extends ConsumerState<AudioPage>
     bool isDark,
     MessageCategory category,
   ) {
-    // Count standalone transcripts in this category
-    final transcriptCount = _transcripts
-        .where(
-          (transcript) =>
-              transcript.category == category.id ||
-              transcript.categoryName == category.name,
-        )
-        .length;
+    // Count transcripts for this category
+    final count = _transcripts.where((t) {
+      if (category.id == 'all') return true;
+      return t.category == category.id ||
+          t.category.toString() == category.id.toString() ||
+          t.categoryName.toLowerCase() == category.name.toLowerCase();
+    }).length;
 
-    // Get categories that have transcripts for filter list
-    final categoriesWithTranscripts = _categories.where((cat) {
-      return _transcripts.any(
-        (transcript) =>
-            transcript.category == cat.id ||
-            transcript.categoryName == cat.name,
-      );
-    }).toList();
-
-    final categoryNameToId = {
-      for (var c in categoriesWithTranscripts) c.name: c.id,
-    };
+    final categoryNameToId = {for (var c in _categories) c.name: c.id};
 
     return GestureDetector(
       onTap: () {
@@ -1324,57 +1243,98 @@ class _AudioPageState extends ConsumerState<AudioPage>
             builder: (_) => TranscriptListPage(
               category: category.name,
               categoryId: category.id,
-              categories: categoriesWithTranscripts.map((c) => c.name).toList(),
+              categories: _categories.map((c) => c.name).toList(),
               categoryNameToId: categoryNameToId,
             ),
           ),
         );
       },
-      child: Container(
-        margin: Responsive.isMobile(context)
-            ? const EdgeInsets.only(bottom: 16)
-            : EdgeInsets.zero,
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: _buildCategoryImage(category, isDark),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _stripHtmlTags(category.name),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '$transcriptCount transcript${transcriptCount != 1 ? 's' : ''} available',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
-                    ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Square Artwork Card
+          AspectRatio(
+            aspectRatio: 1.0,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: _buildCategoryImage(category, isDark),
+                    ),
+                    // Transcript Badge Icon
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGold,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.article, size: 10, color: Colors.white),
+                            SizedBox(width: 3),
+                            Text(
+                              'TEXT',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            Icon(
-              Icons.chevron_right,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
+          ),
+          const SizedBox(height: 8),
+
+          // 2. Category Title directly below artwork
+          Text(
+            _stripHtmlTags(category.name),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13.5,
+              height: 1.2,
+              color: isDark ? Colors.white : AppColors.textPrimaryLight,
             ),
-          ],
-        ),
+          ),
+
+          const SizedBox(height: 2),
+
+          // 3. Transcript Count
+          Text(
+            '$count transcript${count != 1 ? 's' : ''}',
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.primaryGold,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }

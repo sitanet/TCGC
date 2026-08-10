@@ -245,10 +245,21 @@ class DataService {
     }
 
     // 2. Fetch from server
-    return await _fetchTranscriptsFromServer() ?? [];
+    final serverTranscripts = await _fetchTranscriptsFromServer();
+    if (serverTranscripts != null && serverTranscripts.isNotEmpty) {
+      return serverTranscripts;
+    }
+
+    // 3. Fallback: Return disk cache ignoring TTL if server fetch failed or offline
+    final expiredCache = await _getCachedTranscripts(ignoreTtl: true);
+    if (expiredCache != null && expiredCache.isNotEmpty) {
+      return expiredCache;
+    }
+
+    return [];
   }
 
-  Future<List<Transcript>?> _getCachedTranscripts() async {
+  Future<List<Transcript>?> _getCachedTranscripts({bool ignoreTtl = false}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedJson = prefs.getString(_transcriptsCacheKey);
@@ -256,11 +267,12 @@ class DataService {
 
       if (cachedJson == null) return null;
 
-      // Check TTL
-      final age = DateTime.now().millisecondsSinceEpoch - cachedTime;
-      if (age > _transcriptsCacheTtl.inMilliseconds) {
-        debugPrint('Transcripts cache expired, will refresh');
-        return null;
+      if (!ignoreTtl) {
+        final age = DateTime.now().millisecondsSinceEpoch - cachedTime;
+        if (age > _transcriptsCacheTtl.inMilliseconds) {
+          debugPrint('Transcripts cache expired, trying server refresh');
+          return null;
+        }
       }
 
       final List<dynamic> jsonList = jsonDecode(cachedJson);
