@@ -831,10 +831,10 @@ class _AudioPageState extends ConsumerState<AudioPage>
       ),
       physics: const BouncingScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: Responsive.isMobile(context) ? 2 : 4,
-        crossAxisSpacing: 14,
-        mainAxisSpacing: 14,
-        childAspectRatio: 0.95,
+        crossAxisCount: Responsive.isMobile(context) ? 2 : 3,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 18,
+        childAspectRatio: 0.73,
       ),
       itemCount: speakers.length,
       itemBuilder: (context, index) {
@@ -979,6 +979,21 @@ class _AudioPageState extends ConsumerState<AudioPage>
 
     final formattedName = _formatSpeakerName(speaker.fullName);
 
+    // Check for sample sermon image if speaker photo is missing
+    String? sampleSermonImage;
+    if (speaker.photoUrl == null || speaker.photoUrl!.isEmpty) {
+      for (var s in _sermons) {
+        if (s.speaker != null &&
+            (s.speaker!.toLowerCase().contains(speaker.name.toLowerCase()) ||
+             speaker.fullName.toLowerCase().contains(s.speaker!.toLowerCase())) &&
+            s.imageUrl != null &&
+            s.imageUrl!.isNotEmpty) {
+          sampleSermonImage = s.imageUrl;
+          break;
+        }
+      }
+    }
+
     return GestureDetector(
       onTap: () async {
         final categoryNameToId = {for (var c in _categories) c.name: c.id};
@@ -996,127 +1011,128 @@ class _AudioPageState extends ConsumerState<AudioPage>
           ),
         );
       },
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.cardDark : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : AppColors.dividerLight.withValues(alpha: 0.6),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Speaker Circular Photo with Gold Ring Border
-            Container(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Square 1:1 Artwork Card
+          AspectRatio(
+            aspectRatio: 1.0,
+            child: Container(
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.primaryGold,
-                  width: 2,
-                ),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primaryGold.withValues(alpha: 0.25),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: ClipOval(
-                child: speaker.photoUrl != null && speaker.photoUrl!.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: speaker.photoUrl!,
-                        cacheManager: CustomImageCacheManager.instance,
-                        width: 64,
-                        height: 64,
-                        fit: BoxFit.cover,
-                        memCacheWidth: 128,
-                        memCacheHeight: 128,
-                        useOldImageOnUrlChange: true,
-                        fadeInDuration: Duration.zero,
-                        fadeOutDuration: Duration.zero,
-                        placeholder: (_, __) => Container(
-                          width: 64,
-                          height: 64,
-                          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                          child: const Icon(Icons.person, size: 32, color: AppColors.primaryGold),
-                        ),
-                        errorWidget: (_, __, ___) => Container(
-                          width: 64,
-                          height: 64,
-                          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                          child: const Icon(Icons.person, size: 32, color: AppColors.primaryGold),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Stack(
+                  children: [
+                    if (speaker.photoUrl != null && speaker.photoUrl!.isNotEmpty)
+                      Positioned.fill(
+                        child: CachedNetworkImage(
+                          imageUrl: speaker.photoUrl!,
+                          cacheManager: CustomImageCacheManager.instance,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 400,
+                          memCacheHeight: 400,
+                          useOldImageOnUrlChange: true,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                          errorWidget: (_, __, ___) => _buildSpeakerFallbackImage(speaker, sampleSermonImage, isDark),
                         ),
                       )
-                    : Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              AppColors.primaryGold.withValues(alpha: 0.4),
-                              isDark ? const Color(0xFF2A2A2A) : Colors.grey[300]!,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            speaker.name.isNotEmpty ? speaker.name[0].toUpperCase() : 'M',
-                            style: const TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // Formatted Speaker Name
-            Text(
-              formattedName,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                height: 1.15,
-                color: isDark ? Colors.white : AppColors.textPrimaryLight,
-              ),
-            ),
-            const SizedBox(height: 4),
-
-            // Messages Count Pill
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.primaryGold.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$count messages',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryGold,
+                    else
+                      _buildSpeakerFallbackImage(speaker, sampleSermonImage, isDark),
+                  ],
                 ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 2. Minister Name directly below artwork card
+          Text(
+            formattedName,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13.5,
+              height: 1.2,
+              color: isDark ? Colors.white : AppColors.textPrimaryLight,
+            ),
+          ),
+
+          const SizedBox(height: 2),
+
+          // 3. Message Count
+          Text(
+            '$count messages',
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.primaryGold,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpeakerFallbackImage(SpeakerModel speaker, String? sampleSermonImage, bool isDark) {
+    if (sampleSermonImage != null && sampleSermonImage.isNotEmpty) {
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: CachedNetworkImage(
+              imageUrl: sampleSermonImage,
+              cacheManager: CustomImageCacheManager.instance,
+              fit: BoxFit.cover,
+              memCacheWidth: 400,
+              memCacheHeight: 400,
+              fadeInDuration: Duration.zero,
+              fadeOutDuration: Duration.zero,
+            ),
+          ),
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.35),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primaryGold.withValues(alpha: 0.7),
+            isDark ? AppColors.cardDark : const Color(0xFF1E293B),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.person, size: 36, color: Colors.white),
+            const SizedBox(height: 4),
+            Text(
+              speaker.name.isNotEmpty ? speaker.name[0].toUpperCase() : 'M',
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
             ),
           ],
