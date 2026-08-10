@@ -34,16 +34,26 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    final initialSubIndex = ref.read(liveStreamSubTabIndexProvider);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: initialSubIndex,
+    );
     _tabController.addListener(_onTabChanged);
-    // Lazy load: only initialize the first tab's WebView after frame renders
+    // Lazy load: initialize corresponding tab's WebView after frame renders
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeStreamLiveWebView();
+      if (initialSubIndex == 1) {
+        _initializeWatchLiveWebView();
+      } else {
+        _initializeStreamLiveWebView();
+      }
     });
   }
 
   void _onTabChanged() {
     if (!_tabController.indexIsChanging) return;
+    ref.read(liveStreamSubTabIndexProvider.notifier).state = _tabController.index;
     // Lazy load WebView when tab is selected
     if (_tabController.index == 0 && !_streamLiveInitialized) {
       _initializeStreamLiveWebView();
@@ -113,6 +123,16 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final targetSubIndex = ref.watch(liveStreamSubTabIndexProvider);
+
+    if (_tabController.index != targetSubIndex) {
+      _tabController.animateTo(targetSubIndex);
+      if (targetSubIndex == 1 && !_watchLiveInitialized) {
+        _initializeWatchLiveWebView();
+      } else if (targetSubIndex == 0 && !_streamLiveInitialized) {
+        _initializeStreamLiveWebView();
+      }
+    }
 
     return Scaffold(
       appBar: CustomAppBar(

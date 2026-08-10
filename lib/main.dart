@@ -74,6 +74,8 @@ final appConfigChangeNotifierProvider =
 
 // Navigation provider to allow tab pages to navigate to home
 final mainTabIndexProvider = StateProvider<int>((ref) => 0);
+// Sub-tab navigation provider for LiveStream (0: Audio / Stream Live, 1: Video / Watch Live)
+final liveStreamSubTabIndexProvider = StateProvider<int>((ref) => 0);
 
 void main() async {
   // Catch Flutter framework errors
@@ -923,11 +925,29 @@ class _MainScreenState extends ConsumerState<MainScreen>
       return;
     }
 
-    // Navigate based on path/host for tab navigation
+    // Check for audio live stream: http(s)://.../app/audio, tcgc://audio, or tcgc://app/audio
+    final isAudioLiveStream = host == 'audio' ||
+        path.endsWith('/audio') ||
+        path.endsWith('/audio/') ||
+        uri.pathSegments.contains('audio');
+
+    // Check for video live stream: http(s)://.../app/video, tcgc://video, or tcgc://app/video
+    final isVideoLiveStream = host == 'video' ||
+        path.endsWith('/video') ||
+        path.endsWith('/video/') ||
+        uri.pathSegments.contains('video');
+
     final simplePath = path.replaceAll('/', '');
-    if (host == 'wallet' || simplePath == 'wallet') {
+
+    if (isAudioLiveStream) {
+      ref.read(liveStreamSubTabIndexProvider.notifier).state = 0; // Audio live stream
+      ref.read(mainTabIndexProvider.notifier).state = 2; // LiveStream page
+    } else if (isVideoLiveStream) {
+      ref.read(liveStreamSubTabIndexProvider.notifier).state = 1; // Video live stream
+      ref.read(mainTabIndexProvider.notifier).state = 2; // LiveStream page
+    } else if (host == 'wallet' || simplePath == 'wallet') {
       ref.read(mainTabIndexProvider.notifier).state = 3;
-    } else if (host == 'audio' || simplePath == 'audio') {
+    } else if (host == 'messages' || simplePath == 'messages' || host == 'sermons' || simplePath == 'sermons') {
       ref.read(mainTabIndexProvider.notifier).state = 1;
     } else if (host == 'teens' || simplePath == 'teens') {
       ref.read(mainTabIndexProvider.notifier).state = 4;
