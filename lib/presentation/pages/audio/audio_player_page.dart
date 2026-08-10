@@ -48,6 +48,8 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
 
   SpeakerModel? _speaker;
   List<Sermon> _otherMessages = [];
+  List<Sermon> _relatedCategoryMessages = [];
+  bool _isLoadingRelatedCategory = true;
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
@@ -60,6 +62,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAccessAndPlay();
       _loadSpeakerInfo();
+      _loadRelatedCategoryMessages();
     });
   }
 
@@ -167,6 +170,50 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     } catch (e, st) {
       debugPrint('Error loading speaker info: $e');
       debugPrint('Stack: $st');
+    }
+  }
+
+  Future<void> _loadRelatedCategoryMessages() async {
+    try {
+      List<Sermon> categoryMessages = [];
+
+      // 1. Try loading by category ID / category string
+      if (widget.sermon.category.isNotEmpty) {
+        categoryMessages = await _dataService.getMessagesByCategory(widget.sermon.category);
+      }
+
+      // 2. Fallback to category name if category ID returned no items
+      if (categoryMessages.isEmpty && widget.sermon.categoryName.isNotEmpty) {
+        categoryMessages = await _dataService.getMessagesByCategoryName(widget.sermon.categoryName);
+      }
+
+      // 3. Fallback: load all messages and filter by category or categoryName
+      if (categoryMessages.isEmpty) {
+        final allMessages = await _dataService.getAllMessages();
+        categoryMessages = allMessages.where((m) =>
+          (widget.sermon.category.isNotEmpty && m.category == widget.sermon.category) ||
+          (widget.sermon.categoryName.isNotEmpty && m.categoryName.toLowerCase() == widget.sermon.categoryName.toLowerCase())
+        ).toList();
+      }
+
+      // Filter out the currently playing sermon
+      final filteredCategoryMessages = categoryMessages
+          .where((m) => m.id != widget.sermon.id)
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _relatedCategoryMessages = filteredCategoryMessages;
+          _isLoadingRelatedCategory = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading related category messages: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingRelatedCategory = false;
+        });
+      }
     }
   }
 
@@ -431,11 +478,277 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                   if (errorMessage != null)
                     _buildCompactDownloadNotice(isDark, audioProvider),
                   const SizedBox(height: 24),
+                  _buildRelatedCategorySection(isDark),
                   if (_speaker != null) _buildExploreSection(isDark),
                 ],
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRelatedCategorySection(bool isDark) {
+    if (_isLoadingRelatedCategory || _relatedCategoryMessages.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final categoryTitle = widget.sermon.categoryName.isNotEmpty
+        ? widget.sermon.categoryName
+        : 'Related Messages';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(),
+        const SizedBox(height: 20),
+
+        // Section Header Row
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryGold.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.grid_view_rounded,
+                size: 20,
+                color: AppColors.primaryGold,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'More in $categoryTitle',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    '${_relatedCategoryMessages.length} related messages',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+
+        // Horizontal Carousel List
+        SizedBox(
+          height: 215,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: _relatedCategoryMessages.length,
+            itemBuilder: (context, index) {
+              final message = _relatedCategoryMessages[index];
+              return _buildRelatedCategoryCard(message, isDark);
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildRelatedCategoryCard(Sermon message, bool isDark) {
+    final formattedDate = _formatDate(message.date);
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: message)),
+        );
+      },
+      child: Container(
+        width: 170,
+        margin: const EdgeInsets.only(right: 14),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : AppColors.dividerLight.withValues(alpha: 0.6),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image / Thumbnail Header with gradient & floating Play button
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
+                  child: message.imageUrl != null && message.imageUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: message.imageUrl!,
+                          width: 170,
+                          height: 105,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 340,
+                          memCacheHeight: 210,
+                          placeholder: (_, __) => Container(
+                            width: 170,
+                            height: 105,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.primaryGold.withValues(alpha: 0.3),
+                                  isDark ? AppColors.cardDark : Colors.grey[200]!,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: const Icon(Icons.music_note, size: 36, color: AppColors.primaryGold),
+                          ),
+                          errorWidget: (_, __, ___) => Container(
+                            width: 170,
+                            height: 105,
+                            color: isDark ? AppColors.cardDark : Colors.grey[200]!,
+                            child: const Icon(Icons.music_note, size: 36, color: AppColors.primaryGold),
+                          ),
+                        )
+                      : Container(
+                          width: 170,
+                          height: 105,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.primaryGold.withValues(alpha: 0.4),
+                                isDark ? const Color(0xFF1E1E1E) : Colors.grey[300]!,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: const Icon(Icons.church_outlined, size: 40, color: Colors.white),
+                        ),
+                ),
+                // Subtle gradient overlay
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.4),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                ),
+                // Floating Play Button
+                Positioned(
+                  right: 8,
+                  bottom: 8,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGold,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primaryGold.withValues(alpha: 0.5),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // Details section
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      height: 1.2,
+                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  if (message.speaker != null && message.speaker!.isNotEmpty)
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.person_outline_rounded,
+                          size: 12,
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            message.speaker!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 2),
+                  Text(
+                    formattedDate,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.primaryGold,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
