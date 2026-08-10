@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/image_cache_manager.dart';
@@ -14,11 +15,12 @@ import '../../../core/utils/error_handler.dart';
 import '../../../domain/entities/transcript.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/transcript_cache_service.dart';
+import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 
 enum TranscriptFilterType { category, speaker }
 
-class TranscriptListPage extends StatefulWidget {
+class TranscriptListPage extends ConsumerStatefulWidget {
   final String category;
   final String? categoryId;
   final List<String> categories;
@@ -37,10 +39,10 @@ class TranscriptListPage extends StatefulWidget {
   });
 
   @override
-  State<TranscriptListPage> createState() => _TranscriptListPageState();
+  ConsumerState<TranscriptListPage> createState() => _TranscriptListPageState();
 }
 
-class _TranscriptListPageState extends State<TranscriptListPage> {
+class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final DataService _dataService = DataService();
