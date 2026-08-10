@@ -14,6 +14,7 @@ import '../../../domain/entities/transcript.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_list_page.dart';
+import 'audio_player_page.dart';
 import 'favorites_page.dart';
 import 'playlists_page.dart';
 import 'downloads_page.dart';
@@ -528,24 +529,243 @@ class _AudioPageState extends ConsumerState<AudioPage>
     final hasMiniPlayer = audioProvider.currentSermon != null;
     final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
 
-    return GridView.builder(
-      padding: EdgeInsets.only(
-        left: padding,
-        right: padding,
-        top: 8,
-        bottom: bottomInset,
-      ),
+    return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: Responsive.isMobile(context) ? 2 : 3,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 18,
-        childAspectRatio: 0.73,
+      padding: EdgeInsets.only(top: 8, bottom: bottomInset),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Recently Added 15 Messages Section
+          _buildRecentlyAddedSection(isDark, padding),
+
+          // 2. Categories Section Header
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: padding),
+            child: Text(
+              'Categories',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                  ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 3. Category Cards Grid
+          if (_categories.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: padding, vertical: 30),
+              child: Center(
+                child: Text(
+                  'No categories available',
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+              ),
+            )
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.symmetric(horizontal: padding),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: Responsive.isMobile(context) ? 2 : 3,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 18,
+                childAspectRatio: 0.73,
+              ),
+              itemCount: _categories.length,
+              itemBuilder: (context, index) {
+                return _buildCategoryGridCard(context, isDark, _categories[index]);
+              },
+            ),
+        ],
       ),
-      itemCount: _categories.length,
-      itemBuilder: (context, index) {
-        return _buildCategoryGridCard(context, isDark, _categories[index]);
+    );
+  }
+
+  Widget _buildRecentlyAddedSection(bool isDark, double padding) {
+    if (_sermons.isEmpty) return const SizedBox.shrink();
+
+    final recentSermons = List<Sermon>.from(_sermons)
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final top15 = recentSermons.take(15).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section Header Row: "Recently Added" | "See All"
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: padding),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Recently Added',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                    ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  final categoryNameToId = {for (var c in _categories) c.name: c.id};
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AudioListPage(
+                        category: 'All',
+                        audioItems: _sermons,
+                        categories: _categories.map((c) => c.name).toList(),
+                        categoryNameToId: categoryNameToId,
+                      ),
+                    ),
+                  );
+                },
+                child: const Text(
+                  'See All',
+                  style: TextStyle(
+                    color: AppColors.primaryGold,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Horizontal Carousel of 15 Recent Messages
+        SizedBox(
+          height: 185,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: padding),
+            itemCount: (top15.length / 3).ceil(),
+            itemBuilder: (context, colIndex) {
+              final startIndex = colIndex * 3;
+              final colItems = top15.skip(startIndex).take(3).toList();
+
+              return Container(
+                width: 280,
+                margin: const EdgeInsets.only(right: 16),
+                child: Column(
+                  children: colItems.map((sermon) {
+                    return _buildRecentMessageTile(sermon, isDark, top15);
+                  }).toList(),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 22),
+      ],
+    );
+  }
+
+  Widget _buildRecentMessageTile(Sermon sermon, bool isDark, List<Sermon> queue) {
+    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+    final isPlaying = audioProvider.currentSermon?.id == sermon.id && audioProvider.isPlaying;
+    final speakerName = _formatSpeakerName(sermon.speaker ?? 'TCGC');
+
+    return GestureDetector(
+      onTap: () {
+        final index = queue.indexOf(sermon);
+        audioProvider.setQueue(queue, index >= 0 ? index : 0);
+        audioProvider.playSermon(sermon);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AudioPlayerPage(sermon: sermon),
+          ),
+        );
       },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            // Thumbnail Image
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: sermon.imageUrl != null && sermon.imageUrl!.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: sermon.imageUrl!,
+                      cacheManager: CustomImageCacheManager.instance,
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 96,
+                      memCacheHeight: 96,
+                      fadeInDuration: Duration.zero,
+                      fadeOutDuration: Duration.zero,
+                      placeholder: (_, __) => Container(
+                        width: 48,
+                        height: 48,
+                        color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                        child: const Icon(Icons.music_note, size: 22, color: AppColors.primaryGold),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
+                        width: 48,
+                        height: 48,
+                        color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                        child: const Icon(Icons.music_note, size: 22, color: AppColors.primaryGold),
+                      ),
+                    )
+                  : Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.music_note, size: 22, color: AppColors.primaryGold),
+                    ),
+            ),
+            const SizedBox(width: 12),
+
+            // Title & Subtitle
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _stripHtmlTags(sermon.title),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: isPlaying
+                          ? AppColors.primaryGold
+                          : (isDark ? Colors.white : AppColors.textPrimaryLight),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$speakerName • ${sermon.categoryName.isNotEmpty ? sermon.categoryName : 'Messages'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
