@@ -92,6 +92,7 @@ class AppUser {
       'middle_name': middleName,
       'last_name': lastName,
       'email': email,
+      'photo_url': photoUrl,
       'phone_number': phoneNumber,
       'country_code': countryCode,
       'gender': gender,
@@ -99,7 +100,17 @@ class AppUser {
       'kcc': kcc,
       'department': department,
       'membership_status': membershipStatus,
+      'nin': nin,
+      'bvn': bvn,
+      'transaction_pin': transactionPin,
       'address': address,
+      'is_online': isOnline,
+      'nin_verified': ninVerified,
+      'bvn_verified': bvnVerified,
+      'role': role,
+      'is_service_team_member': isServiceTeamMember,
+      'is_general_married': isGeneralMarried,
+      'is_in_house_married': isInHouseMarried,
     };
   }
 

@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/api_constants.dart';
 import '../../domain/entities/user.dart';
 import '../models/contact_message.dart';
@@ -158,6 +160,7 @@ class AuthService {
 
   Future<void> logout() async {
     await _api.clearTokens();
+    await clearCachedProfile();
   }
 
   Future<AuthResult> deleteAccount() async {
@@ -165,6 +168,7 @@ class AuthService {
 
     if (response.isSuccess) {
       await _api.clearTokens();
+      await clearCachedProfile();
       return AuthResult(success: true, message: 'Account deleted successfully');
     }
 
@@ -172,18 +176,57 @@ class AuthService {
     return AuthResult(success: false, error: errorMessage);
   }
 
+  static const String _cachedProfileKey = 'cached_user_profile';
+
   Future<AppUser?> getProfile() async {
     final response = await _api.get(ApiConstants.userProfile);
 
     if (response.isSuccess) {
       try {
         final user = AppUser.fromJson(response.data);
+        // Cache the profile locally for offline login
+        await _cacheProfile(response.data);
         return user;
       } catch (e) {
         return null;
       }
     }
     return null;
+  }
+
+  /// Load user profile from local cache (no network needed)
+  Future<AppUser?> getCachedProfile() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final profileJson = prefs.getString(_cachedProfileKey);
+      if (profileJson != null) {
+        final data = jsonDecode(profileJson) as Map<String, dynamic>;
+        return AppUser.fromJson(data);
+      }
+    } catch (e) {
+      debugPrint('Failed to load cached profile: $e');
+    }
+    return null;
+  }
+
+  /// Save user profile to local storage
+  Future<void> _cacheProfile(Map<String, dynamic> profileData) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cachedProfileKey, jsonEncode(profileData));
+    } catch (e) {
+      debugPrint('Failed to cache profile: $e');
+    }
+  }
+
+  /// Clear cached profile (call on logout)
+  Future<void> clearCachedProfile() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cachedProfileKey);
+    } catch (e) {
+      debugPrint('Failed to clear cached profile: $e');
+    }
   }
 
   Future<AuthResult> updateProfile(Map<String, dynamic> data) async {

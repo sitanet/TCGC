@@ -32,12 +32,39 @@ class AuthProvider extends ChangeNotifier {
     await _authService.loadSession();
 
     if (_authService.isAuthenticated) {
+      // Load cached profile immediately (no network needed - instant login)
+      _user = await _authService.getCachedProfile();
+      if (_user != null) {
+        _isLoading = false;
+        _isInitialized = true;
+        notifyListeners();
+
+        // Refresh profile from network in background (silent update)
+        _refreshProfileInBackground();
+        return;
+      }
+
+      // No cached profile - must fetch from network (first login or cache cleared)
       _user = await _authService.getProfile();
     }
 
     _isLoading = false;
     _isInitialized = true;
     notifyListeners();
+  }
+
+  /// Silently refresh profile from network without blocking the UI
+  Future<void> _refreshProfileInBackground() async {
+    try {
+      final freshUser = await _authService.getProfile();
+      if (freshUser != null && _user != freshUser) {
+        _user = freshUser;
+        notifyListeners();
+      }
+    } catch (e) {
+      // Offline or network error - keep using cached profile
+      debugPrint('Background profile refresh failed (using cached): $e');
+    }
   }
 
   Future<bool> login(String email, String password) async {
