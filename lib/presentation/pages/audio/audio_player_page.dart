@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_cache_manager.dart';
 import '../../../core/providers/audio_player_provider.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../data/services/favorites_service.dart';
