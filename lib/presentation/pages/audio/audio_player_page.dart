@@ -189,7 +189,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
 
       // 3. Fallback: load all messages and filter by category or categoryName
       if (categoryMessages.isEmpty) {
-        final allMessages = await _dataService.getAllMessages();
+        final allMessages = await _dataService.getMessages();
         categoryMessages = allMessages.where((m) =>
           (widget.sermon.category.isNotEmpty && m.category == widget.sermon.category) ||
           (widget.sermon.categoryName.isNotEmpty && m.categoryName.toLowerCase() == widget.sermon.categoryName.toLowerCase())
