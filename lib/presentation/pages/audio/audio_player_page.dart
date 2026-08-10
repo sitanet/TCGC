@@ -479,7 +479,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                     _buildCompactDownloadNotice(isDark, audioProvider),
                   const SizedBox(height: 24),
                   _buildRelatedCategorySection(isDark),
-                  if (_speaker != null) _buildExploreSection(isDark),
+                  _buildSpeakerSection(isDark),
                 ],
               ),
             );
@@ -754,25 +754,216 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     );
   }
 
-  Widget _buildExploreSection(bool isDark) {
+  Widget _buildSpeakerSection(bool isDark) {
+    final speakerName = (_speaker != null && _speaker!.fullName.isNotEmpty)
+        ? _speaker!.fullName
+        : widget.sermon.speaker;
+
+    if (speakerName == null || speakerName.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final hasBio = _speaker?.bio != null && _speaker!.bio!.isNotEmpty;
+    final hasPhoto = _speaker?.photoUrl != null && _speaker!.photoUrl!.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Divider(),
         const SizedBox(height: 20),
 
-        // Section 1: Related Messages
+        // Section Header Row
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryGold.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.person_pin_rounded,
+                size: 20,
+                color: AppColors.primaryGold,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'About the Speaker',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+
+        // Speaker Bio Card
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : AppColors.dividerLight.withValues(alpha: 0.6),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // Speaker photo with gold border
+              GestureDetector(
+                onTap: () {
+                  if (hasPhoto || hasBio) {
+                    _showFullMinisterPhoto(isDark);
+                  }
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.primaryGold,
+                      width: 2.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryGold.withValues(alpha: 0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: hasPhoto
+                        ? CachedNetworkImage(
+                            imageUrl: _speaker!.photoUrl!,
+                            width: 90,
+                            height: 90,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 180,
+                            memCacheHeight: 180,
+                            placeholder: (_, __) => Container(
+                              width: 90,
+                              height: 90,
+                              color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                              child: const Icon(Icons.person, size: 44, color: AppColors.primaryGold),
+                            ),
+                            errorWidget: (_, __, ___) => Container(
+                              width: 90,
+                              height: 90,
+                              color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                              child: const Icon(Icons.person, size: 44, color: AppColors.primaryGold),
+                            ),
+                          )
+                        : Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.primaryGold.withValues(alpha: 0.4),
+                                  isDark ? const Color(0xFF2A2A2A) : Colors.grey[300]!,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                speakerName.isNotEmpty ? speakerName[0].toUpperCase() : 'M',
+                                style: const TextStyle(
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Speaker Name
+              Text(
+                speakerName,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+
+              // Title / Subtitle
+              Text(
+                (_speaker?.title != null && _speaker!.title!.isNotEmpty)
+                    ? _speaker!.title!
+                    : 'Minister at The CityGate Church',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.primaryGold,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              // Bio excerpt if present
+              if (hasBio) ...[
+                const SizedBox(height: 14),
+                Text(
+                  _speaker!.bio!.length > 200
+                      ? '${_speaker!.bio!.substring(0, 200)}...'
+                      : _speaker!.bio!,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                        height: 1.5,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                if (_speaker!.bio!.length > 200) ...[
+                  const SizedBox(height: 10),
+                  TextButton.icon(
+                    onPressed: () => _showSpeakerBioDialog(isDark),
+                    icon: const Icon(Icons.info_outline, size: 16, color: AppColors.primaryGold),
+                    label: const Text(
+                      'Read Full Bio',
+                      style: TextStyle(
+                        color: AppColors.primaryGold,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Other Messages from this speaker (if any)
         if (_otherMessages.isNotEmpty) ...[
           Row(
             children: [
-              Icon(Icons.library_music, size: 20, color: AppColors.primaryGold),
+              const Icon(Icons.library_music, size: 20, color: AppColors.primaryGold),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'More from ${_speaker!.fullName}',
+                  'More from $speakerName',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ),
               Text(
@@ -787,11 +978,11 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
             ],
           ),
           const SizedBox(height: 16),
-          // Horizontal scrollable messages list
           SizedBox(
             height: 180,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
               itemCount: _otherMessages.length,
               itemBuilder: (context, index) {
                 final message = _otherMessages[index];
@@ -801,164 +992,6 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
           ),
           const SizedBox(height: 24),
         ],
-
-        // Section 2: Minister Bio Card (only show if we have a real speaker profile)
-        if (_speaker!.id > 0) ...[
-          Row(
-            children: [
-              Icon(Icons.person, size: 20, color: AppColors.primaryGold),
-              const SizedBox(width: 8),
-              Text(
-                'About the Minister',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Minister bio card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                // Minister photo - tappable to show full image with bio
-                GestureDetector(
-                  onTap: () => _showFullMinisterPhoto(isDark),
-                  child: ClipOval(
-                    child:
-                        _speaker!.photoUrl != null &&
-                            _speaker!.photoUrl!.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: _speaker!.photoUrl!,
-                            width: 100,
-                            height: 100,
-                            fit: BoxFit.cover,
-                            memCacheWidth: 200,
-                            memCacheHeight: 200,
-                            placeholder: (_, __) => Container(
-                              width: 100,
-                              height: 100,
-                              color: isDark
-                                  ? AppColors.dividerDark
-                                  : AppColors.dividerLight,
-                              child: const Icon(Icons.person, size: 50),
-                            ),
-                            errorWidget: (_, __, ___) => Container(
-                              width: 100,
-                              height: 100,
-                              color: isDark
-                                  ? AppColors.dividerDark
-                                  : AppColors.dividerLight,
-                              child: const Icon(Icons.person, size: 50),
-                            ),
-                          )
-                        : Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppColors.dividerDark
-                                  : AppColors.dividerLight,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(
-                                _speaker!.fullName.isNotEmpty
-                                    ? _speaker!.fullName[0].toUpperCase()
-                                    : '?',
-                                style: TextStyle(
-                                  fontSize: 40,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primaryGold,
-                                ),
-                              ),
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Name
-                Text(
-                  _speaker!.fullName,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                // Title
-                if (_speaker!.title != null && _speaker!.title!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    _speaker!.title!,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.primaryGold,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-                // Bio preview
-                if (_speaker!.bio != null && _speaker!.bio!.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    _speaker!.bio!.length > 200
-                        ? '${_speaker!.bio!.substring(0, 200)}...'
-                        : _speaker!.bio!,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
-                      height: 1.5,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (_speaker!.bio!.length > 200) ...[
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () => _showSpeakerBioDialog(isDark),
-                      child: Text(
-                        'Read Full Bio',
-                        style: TextStyle(
-                          color: AppColors.primaryGold,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ] else ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'Minister at The Citygate Church',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-        ], // End of if (_speaker!.id > 0)
       ],
     );
   }
