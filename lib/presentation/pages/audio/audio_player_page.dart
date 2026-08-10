@@ -566,10 +566,132 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   }
 
   Widget _buildRelatedCategoryCard(Sermon message, bool isDark) {
-                      fontWeight: FontWeight.w500,
+    final speakerName = message.speaker != null && message.speaker!.isNotEmpty
+        ? message.speaker!
+        : 'TCGC';
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: message)),
+        );
+      },
+      child: Container(
+        width: 155,
+        margin: const EdgeInsets.only(right: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. 1:1 Square Poster Artwork Card
+            AspectRatio(
+              aspectRatio: 1.0,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: message.imageUrl != null && message.imageUrl!.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: message.imageUrl!,
+                                cacheManager: CustomImageCacheManager.instance,
+                                fit: BoxFit.cover,
+                                memCacheWidth: 310,
+                                memCacheHeight: 310,
+                                fadeInDuration: Duration.zero,
+                                fadeOutDuration: Duration.zero,
+                                placeholder: (_, __) => Container(
+                                  color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                  child: const Icon(Icons.music_note, size: 32, color: AppColors.primaryGold),
+                                ),
+                                errorWidget: (_, __, ___) => Container(
+                                  color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                  child: const Icon(Icons.music_note, size: 32, color: AppColors.primaryGold),
+                                ),
+                              )
+                            : Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppColors.primaryGold.withValues(alpha: 0.7),
+                                      isDark ? AppColors.cardDark : const Color(0xFF1E293B),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                ),
+                                child: const Center(
+                                  child: Icon(Icons.music_note, size: 36, color: Colors.white),
+                                ),
+                              ),
+                      ),
+                      // Floating Play Button
+                      Positioned(
+                        right: 8,
+                        bottom: 8,
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGold,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.play_arrow_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // 2. Title directly below artwork card
+            Text(
+              message.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                height: 1.2,
+                color: isDark ? Colors.white : AppColors.textPrimaryLight,
+              ),
+            ),
+
+            const SizedBox(height: 2),
+
+            // 3. Speaker Subtitle
+            Text(
+              speakerName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.primaryGold,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
