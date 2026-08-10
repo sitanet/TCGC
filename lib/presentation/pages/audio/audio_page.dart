@@ -786,11 +786,15 @@ class _AudioPageState extends ConsumerState<AudioPage>
                 child: speaker.photoUrl != null && speaker.photoUrl!.isNotEmpty
                     ? CachedNetworkImage(
                         imageUrl: speaker.photoUrl!,
+                        cacheManager: CustomImageCacheManager.instance,
                         width: 64,
                         height: 64,
                         fit: BoxFit.cover,
                         memCacheWidth: 128,
                         memCacheHeight: 128,
+                        useOldImageOnUrlChange: true,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
                         placeholder: (_, __) => Container(
                           width: 64,
                           height: 64,
@@ -882,16 +886,15 @@ class _AudioPageState extends ConsumerState<AudioPage>
 
   Widget _buildCategoryImage(MessageCategory category, bool isDark) {
     Widget placeholder = Container(
-      width: 80,
-      height: 80,
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-        borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(
-        Icons.music_note,
-        size: 32,
-        color: AppColors.primaryGold.withValues(alpha: 0.5),
+      child: Center(
+        child: Icon(
+          Icons.music_note,
+          size: 36,
+          color: AppColors.primaryGold.withValues(alpha: 0.5),
+        ),
       ),
     );
 
@@ -903,20 +906,23 @@ class _AudioPageState extends ConsumerState<AudioPage>
       return CachedNetworkImage(
         imageUrl: category.imageUrl!,
         cacheManager: CustomImageCacheManager.instance,
-        width: 80,
-        height: 80,
+        width: double.infinity,
+        height: double.infinity,
         fit: BoxFit.cover,
+        memCacheWidth: 400,
+        memCacheHeight: 400,
+        useOldImageOnUrlChange: true,
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
         placeholder: (context, url) => placeholder,
         errorWidget: (context, url, error) => placeholder,
-        fadeInDuration: const Duration(milliseconds: 0), // Instant display from cache
-        fadeOutDuration: const Duration(milliseconds: 0),
       );
     }
 
     return Image.asset(
       category.imageUrl!,
-      width: 80,
-      height: 80,
+      width: double.infinity,
+      height: double.infinity,
       fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) => placeholder,
     );
