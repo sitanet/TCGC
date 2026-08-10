@@ -174,12 +174,15 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   
   void _setupListeners() {
     if (_listenersSetup) return;
-    _listenersSetup = true;
     
     if (_useAudioService && _audioHandler != null) {
+      _listenersSetup = true;
       _setupAudioServiceListeners();
+      debugPrint('[AUDIO] AudioService listeners attached successfully');
     } else if (_fallbackPlayer != null) {
+      _listenersSetup = true;
       _setupFallbackListeners();
+      debugPrint('[AUDIO] Fallback player listeners attached successfully');
     }
   }
   
@@ -378,8 +381,8 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
     // Initialize audio service if needed (should already be done)
     if (!_audioServiceInitialized) {
       await initAudioService();
-      _setupListeners();
     }
+    _setupListeners();
 
     // Fix malformed URLs (e.g., "ttps://" -> "https://")
     final fixedAudioUrl = _fixAudioUrl(audioUrl);
@@ -512,6 +515,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> play() async {
+    _setupListeners();
     try {
       if (_useAudioService && _audioHandler != null) {
         // Check if the audio source is still loaded
@@ -636,8 +640,8 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
 
     if (!_audioServiceInitialized) {
       await initAudioService();
-      _setupListeners();
     }
+    _setupListeners();
 
     // Fix malformed URLs
     final fixedAudioUrl = _fixAudioUrl(audioUrl);
