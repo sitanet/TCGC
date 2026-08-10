@@ -30,6 +30,8 @@ class AppTheme {
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light, // White status bar icons by default
         statusBarBrightness: Brightness.dark, // iOS: dark status bar content
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarDividerColor: Colors.transparent,
       ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
@@ -139,6 +141,8 @@ class AppTheme {
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light, // Light icons for dark background
         statusBarBrightness: Brightness.dark, // iOS: dark status bar content
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarDividerColor: Colors.transparent,
       ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(

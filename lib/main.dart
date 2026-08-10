@@ -5,6 +5,7 @@ import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -85,6 +86,17 @@ void main() async {
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+
+      // Enable edge-to-edge display so the system navigation bar is transparent
+      // and doesn't overlap the app's bottom nav bar on any Android device
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarDividerColor: Colors.transparent,
+          systemNavigationBarIconBrightness: Brightness.dark,
+        ),
+      );
 
       // Initialize image cache with conservative memory limits first
       ImageCacheService.initialize();
@@ -895,20 +907,54 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
   void _handleDeepLink(Uri uri) {
     debugPrint('Deep link received: $uri');
-    // tcgc://app or https://thecitygatechurch.org/app
-    final path = uri.path.replaceAll('/', '');
+    // tcgc://app or https://tcgc.thecitygatechurch.org/app
+    final path = uri.path;
     final host = uri.host;
 
-    // Navigate based on path/host
-    if (host == 'wallet' || path == 'wallet') {
+    // Check for message deep link: /app/message/<id> or tcgc://message/<id>
+    final messageMatch = RegExp(r'message[/\\]?(\d+)').firstMatch(path);
+    if (messageMatch != null) {
+      _navigateToMessage(messageMatch.group(1)!);
+      return;
+    }
+    // Also handle tcgc://message/<id> where host is "message"
+    if (host == 'message' && uri.pathSegments.isNotEmpty) {
+      _navigateToMessage(uri.pathSegments.first);
+      return;
+    }
+
+    // Navigate based on path/host for tab navigation
+    final simplePath = path.replaceAll('/', '');
+    if (host == 'wallet' || simplePath == 'wallet') {
       ref.read(mainTabIndexProvider.notifier).state = 3;
-    } else if (host == 'audio' || path == 'audio') {
+    } else if (host == 'audio' || simplePath == 'audio') {
       ref.read(mainTabIndexProvider.notifier).state = 1;
-    } else if (host == 'teens' || path == 'teens') {
+    } else if (host == 'teens' || simplePath == 'teens') {
       ref.read(mainTabIndexProvider.notifier).state = 4;
     } else {
       // Default — open home
       ref.read(mainTabIndexProvider.notifier).state = 0;
+    }
+  }
+
+  Future<void> _navigateToMessage(String messageId) async {
+    debugPrint('Navigating to message: $messageId');
+    try {
+      final sermon = await _dataService.getMessageById(messageId);
+      if (sermon != null && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => AudioPlayerPage(sermon: sermon),
+          ),
+        );
+      } else {
+        debugPrint('Message not found: $messageId');
+        // Fall back to audio tab
+        ref.read(mainTabIndexProvider.notifier).state = 1;
+      }
+    } catch (e) {
+      debugPrint('Error navigating to message: $e');
+      ref.read(mainTabIndexProvider.notifier).state = 1;
     }
   }
 

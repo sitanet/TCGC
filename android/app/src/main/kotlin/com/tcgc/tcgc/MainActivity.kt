@@ -1,9 +1,7 @@
 package com.tcgc.tcgc
 
-import android.os.Build
 import android.os.Bundle
 import androidx.core.view.WindowCompat
-import io.flutter.embedding.engine.FlutterEngine
 import com.ryanheise.audioservice.AudioServiceFragmentActivity
 
 class MainActivity : AudioServiceFragmentActivity() {
@@ -11,9 +9,9 @@ class MainActivity : AudioServiceFragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Enable edge-to-edge display for Android 15+ (backward compatible)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-        }
+        // Enable edge-to-edge display on all Android versions
+        // This makes the system navigation bar transparent so our app
+        // draws behind it, preventing overlap with the bottom nav bar
+        WindowCompat.setDecorFitsSystemWindows(window, false)
     }
 }

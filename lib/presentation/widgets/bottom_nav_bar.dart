@@ -14,12 +14,14 @@ class BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Account for system navigation bar (gesture bar) height on edge-to-edge
+    final bottomInset = MediaQuery.of(context).padding.bottom;
     
     return Center(
       child: Container(
         width: 380,
         height: 70,
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: EdgeInsets.only(bottom: 16 + bottomInset),
         decoration: BoxDecoration(
           color: isDark ? AppColors.cardDark : Colors.white,
           borderRadius: BorderRadius.circular(52),
