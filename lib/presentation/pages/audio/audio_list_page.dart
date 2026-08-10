@@ -378,7 +378,7 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
           const SizedBox(height: 12),
           // Category or Speaker filter list
           SizedBox(
-            height: _filterType == FilterType.speaker ? 90 : 32,
+            height: _filterType == FilterType.speaker ? 105 : 32,
             child: _filterType == FilterType.category
                 ? _buildCategoryFilterList(isDark)
                 : _buildSpeakerFilterList(isDark),
@@ -572,7 +572,7 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
     final itemCount = 1 + mainSpeakers.length + (hasOtherSpeakers ? 1 : 0);
 
     return SizedBox(
-      height: 100,
+      height: 105,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -630,7 +630,7 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 80,
+        width: 88,
         margin: const EdgeInsets.only(right: 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -742,12 +742,33 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
   }
   
   String _formatSpeakerName(String fullName) {
-    final parts = fullName.split(' ');
-    if (parts.length >= 2) {
-      // Return first name on first line, last name on second line
-      return '${parts.first}\n${parts.last}';
+    if (fullName.isEmpty) return fullName;
+
+    // Abbreviate common religious titles to save horizontal space and reveal full names
+    String formatted = fullName
+        .replaceAll(RegExp(r'\bPastor\b', caseSensitive: false), 'Pst.')
+        .replaceAll(RegExp(r'\bApostle\b', caseSensitive: false), 'Apst.')
+        .replaceAll(RegExp(r'\bReverend\b', caseSensitive: false), 'Rev.')
+        .replaceAll(RegExp(r'\bBishop\b', caseSensitive: false), 'Bsp.')
+        .replaceAll(RegExp(r'\bEvangelist\b', caseSensitive: false), 'Evg.')
+        .replaceAll(RegExp(r'\bDeaconess\b', caseSensitive: false), 'Dcns.')
+        .replaceAll(RegExp(r'\bDeacon\b', caseSensitive: false), 'Dcn.')
+        .replaceAll(RegExp(r'\bMinister\b', caseSensitive: false), 'Min.');
+
+    final parts = formatted.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+
+    if (parts.length <= 1) {
+      return formatted;
     }
-    return fullName;
+
+    if (parts.length == 2) {
+      return '${parts[0]}\n${parts[1]}';
+    }
+
+    // 3 or more parts e.g. ["Pst.", "John", "Doe"] -> "Pst. John\nDoe"
+    final firstLine = parts.sublist(0, parts.length - 1).join(' ');
+    final secondLine = parts.last;
+    return '$firstLine\n$secondLine';
   }
 }
 
