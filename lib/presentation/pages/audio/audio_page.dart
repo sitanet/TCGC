@@ -524,8 +524,17 @@ class _AudioPageState extends ConsumerState<AudioPage>
       );
     }
 
+    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+    final hasMiniPlayer = audioProvider.currentSermon != null;
+    final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
+
     return GridView.builder(
-      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
+      padding: EdgeInsets.only(
+        left: padding,
+        right: padding,
+        top: 8,
+        bottom: bottomInset,
+      ),
       physics: const BouncingScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: Responsive.isMobile(context) ? 2 : 3,
@@ -563,8 +572,17 @@ class _AudioPageState extends ConsumerState<AudioPage>
       );
     }
 
+    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+    final hasMiniPlayer = audioProvider.currentSermon != null;
+    final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
+
     return GridView.builder(
-      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
+      padding: EdgeInsets.only(
+        left: padding,
+        right: padding,
+        top: 8,
+        bottom: bottomInset,
+      ),
       physics: const BouncingScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: Responsive.isMobile(context) ? 2 : 4,

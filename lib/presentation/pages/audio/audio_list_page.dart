@@ -421,10 +421,17 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                         final isServiceTeamMember = user?.isServiceTeamMember ?? false;
                         final isGeneralMarried = user?.isGeneralMarried ?? false;
                         final isInHouseMarried = user?.isInHouseMarried ?? false;
+                        final hasMiniPlayer = audioProvider.currentSermon != null;
+                        final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
                         return ListView.builder(
                           controller: _scrollController,
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: EdgeInsets.only(
+                            left: 20,
+                            right: 20,
+                            top: 8,
+                            bottom: bottomInset,
+                          ),
                           itemCount: _filteredItems.length,
                           itemBuilder: (context, index) {
                             final audio = _filteredItems[index];

@@ -338,16 +338,28 @@ class _TranscriptListPageState extends State<TranscriptListPage> {
                           ),
                         ],
                       )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: _filteredItems.length,
-                        itemBuilder: (context, index) {
-                          final item = _filteredItems[index];
-                          return _TranscriptListItem(
-                            transcript: item,
-                            isDark: isDark,
-                            onTap: () => _openTranscript(context, item),
+                    : Builder(
+                        builder: (context) {
+                          final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+                          final hasMiniPlayer = audioProvider.currentSermon != null;
+                          final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
+                          return ListView.builder(
+                            controller: _scrollController,
+                            padding: EdgeInsets.only(
+                              left: 20,
+                              right: 20,
+                              top: 8,
+                              bottom: bottomInset,
+                            ),
+                            itemCount: _filteredItems.length,
+                            itemBuilder: (context, index) {
+                              final item = _filteredItems[index];
+                              return _TranscriptListItem(
+                                transcript: item,
+                                isDark: isDark,
+                                onTap: () => _openTranscript(context, item),
+                              );
+                            },
                           );
                         },
                       ),
