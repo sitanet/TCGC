@@ -346,8 +346,8 @@ class _HomePageState extends ConsumerState<HomePage> {
               bottomRight: Radius.circular(borderRadius),
             ),
           ),
-        child: Stack(
-          children: [
+          child: Stack(
+            children: [
             Padding(
               padding: EdgeInsets.only(
                 bottom: bottomPadding,
@@ -559,12 +559,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                   );
                 },
               ),
-            ),
-          ],
-      ),
+            ],
+          ),
+        ),
+      ],
     ),
-  );
-}
+  ),
+);
+  }
 
   Widget _buildUpcomingEvents(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
