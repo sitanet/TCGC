@@ -12,7 +12,7 @@ import 'package:flutter/services.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_player_page.dart';
 
-enum FilterType { category, speaker }
+enum FilterType { category, speaker, date }
 
 class AudioListPage extends ConsumerStatefulWidget {
   final String category;

@@ -431,14 +431,16 @@ class _AudioPageState extends ConsumerState<AudioPage>
       color: AppColors.primaryGold,
       child: Column(
         children: [
-          // Filter Toggle Row (Categories | Ministers)
+          // Filter Toggle Row (Categories | Ministers | Date)
           Padding(
             padding: EdgeInsets.symmetric(horizontal: padding, vertical: 12),
             child: Row(
               children: [
                 _buildToggleChip('Categories', FilterType.category, isDark),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 _buildToggleChip('Ministers', FilterType.speaker, isDark),
+                const SizedBox(width: 10),
+                _buildToggleChip('Date', FilterType.date, isDark),
               ],
             ),
           ),
@@ -447,7 +449,9 @@ class _AudioPageState extends ConsumerState<AudioPage>
           Expanded(
             child: _filterType == FilterType.category
                 ? _buildCategoryGrid(context, isDark, padding)
-                : _buildSpeakerGrid(context, isDark, padding),
+                : (_filterType == FilterType.speaker
+                    ? _buildSpeakerGrid(context, isDark, padding)
+                    : _buildDateGrid(context, isDark, padding)),
           ),
         ],
       ),
@@ -1117,6 +1121,206 @@ class _AudioPageState extends ConsumerState<AudioPage>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDateGrid(BuildContext context, bool isDark, double padding) {
+    if (_sermons.isEmpty) {
+      return ListView(
+        children: [
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.4,
+            child: Center(
+              child: Text(
+                'No dated messages available',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Group sermons by year
+    final Map<int, List<Sermon>> yearMap = {};
+    for (var sermon in _sermons) {
+      final year = sermon.date.year;
+      yearMap.putIfAbsent(year, () => []).add(sermon);
+    }
+
+    final sortedYears = yearMap.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+    final hasMiniPlayer = audioProvider.currentSermon != null;
+    final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
+
+    return GridView.builder(
+      padding: EdgeInsets.only(
+        left: padding,
+        right: padding,
+        top: 8,
+        bottom: bottomInset,
+      ),
+      physics: const BouncingScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: Responsive.isMobile(context) ? 2 : 3,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 18,
+        childAspectRatio: 0.73,
+      ),
+      itemCount: sortedYears.length,
+      itemBuilder: (context, index) {
+        final year = sortedYears[index];
+        final yearSermons = yearMap[year] ?? [];
+        return _buildDateGridCard(context, isDark, year, yearSermons);
+      },
+    );
+  }
+
+  Widget _buildDateGridCard(
+    BuildContext context,
+    bool isDark,
+    int year,
+    List<Sermon> yearSermons,
+  ) {
+    final count = yearSermons.length;
+    String? sampleImage;
+    for (var s in yearSermons) {
+      if (s.imageUrl != null && s.imageUrl!.isNotEmpty) {
+        sampleImage = s.imageUrl;
+        break;
+      }
+    }
+
+    return GestureDetector(
+      onTap: () {
+        final categoryNameToId = {for (var c in _categories) c.name: c.id};
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AudioListPage(
+              category: '$year Messages',
+              audioItems: yearSermons,
+              categories: _categories.map((c) => c.name).toList(),
+              categoryNameToId: categoryNameToId,
+              initialFilterType: FilterType.date,
+            ),
+          ),
+        );
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Square Artwork / Year Card
+          AspectRatio(
+            aspectRatio: 1.0,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primaryGold.withValues(alpha: 0.8),
+                    isDark ? AppColors.cardDark : const Color(0xFF1E293B),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Stack(
+                  children: [
+                    if (sampleImage != null && sampleImage.isNotEmpty)
+                      Positioned.fill(
+                        child: CachedNetworkImage(
+                          imageUrl: sampleImage,
+                          cacheManager: CustomImageCacheManager.instance,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 400,
+                          memCacheHeight: 400,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                        ),
+                      ),
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.black.withValues(alpha: 0.35),
+                              Colors.black.withValues(alpha: 0.75),
+                            ],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.calendar_today_rounded,
+                            size: 32,
+                            color: AppColors.primaryGold,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '$year',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 2. Title
+          Text(
+            '$year Messages',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13.5,
+              color: isDark ? Colors.white : AppColors.textPrimaryLight,
+            ),
+          ),
+
+          const SizedBox(height: 2),
+
+          // 3. Message Count
+          Text(
+            '$count messages',
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.primaryGold,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }
