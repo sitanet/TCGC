@@ -172,31 +172,37 @@ class _HomePageState extends ConsumerState<HomePage> {
         statusBarBrightness: Brightness.dark,
       ),
       child: Scaffold(
-        body: RefreshIndicator(
-          onRefresh: () => _loadData(forceRefresh: true),
-          color: AppColors.primaryGold,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeaderBanner(context, isDark),
-                SizedBox(height: spacing * 1.5),
-                _buildUpcomingEvents(context, isDark),
-                if (_pickedInterestSermons.isNotEmpty) ...[
-                  SizedBox(height: spacing * 1.5),
-                  _buildPickedInterests(context, isDark),
-                ],
-                if (_recommendedSermons.isNotEmpty) ...[
-                  SizedBox(height: spacing * 1.5),
-                  _buildRecommendedMessages(context, isDark),
-                ],
-                SizedBox(height: spacing * 1.5),
-                _buildRecentActivities(context, isDark),
-                SizedBox(height: spacing * 6),
-              ],
+        body: Column(
+          children: [
+            _buildHeaderBanner(context, isDark),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () => _loadData(forceRefresh: true),
+                color: AppColors.primaryGold,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(height: spacing * 1.5),
+                      _buildUpcomingEvents(context, isDark),
+                      if (_pickedInterestSermons.isNotEmpty) ...[
+                        SizedBox(height: spacing * 1.5),
+                        _buildPickedInterests(context, isDark),
+                      ],
+                      if (_recommendedSermons.isNotEmpty) ...[
+                        SizedBox(height: spacing * 1.5),
+                        _buildRecommendedMessages(context, isDark),
+                      ],
+                      SizedBox(height: spacing * 1.5),
+                      _buildRecentActivities(context, isDark),
+                      SizedBox(height: spacing * 6),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
         floatingActionButton: GestureDetector(
           onTap: () {
@@ -313,23 +319,33 @@ class _HomePageState extends ConsumerState<HomePage> {
         ? 25.0
         : 30.0;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.only(
-        bottomLeft: Radius.circular(borderRadius),
-        bottomRight: Radius.circular(borderRadius),
+    return Container(
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Container(
-        width: screenWidth,
-        decoration: BoxDecoration(
-          image: const DecorationImage(
-            image: AssetImage('assets/images/home_page.png'),
-            fit: BoxFit.cover,
-          ),
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(borderRadius),
-            bottomRight: Radius.circular(borderRadius),
-          ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(borderRadius),
+          bottomRight: Radius.circular(borderRadius),
         ),
+        child: Container(
+          width: screenWidth,
+          decoration: BoxDecoration(
+            image: const DecorationImage(
+              image: AssetImage('assets/images/home_page.png'),
+              fit: BoxFit.cover,
+            ),
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(borderRadius),
+              bottomRight: Radius.circular(borderRadius),
+            ),
+          ),
         child: Stack(
           children: [
             Padding(
@@ -545,10 +561,10 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
             ),
           ],
-        ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildUpcomingEvents(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
