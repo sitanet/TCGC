@@ -538,9 +538,9 @@ class _AudioPageState extends ConsumerState<AudioPage>
       physics: const BouncingScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: Responsive.isMobile(context) ? 2 : 3,
-        crossAxisSpacing: 14,
-        mainAxisSpacing: 14,
-        childAspectRatio: 0.95,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 18,
+        childAspectRatio: 0.73,
       ),
       itemCount: _categories.length,
       itemBuilder: (context, index) {
@@ -651,52 +651,30 @@ class _AudioPageState extends ConsumerState<AudioPage>
           });
         }
       },
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.cardDark : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : AppColors.dividerLight.withValues(alpha: 0.6),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Category Artwork Header
-              Expanded(
-                flex: 3,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Square Artwork Card with rounded corners and elevation
+          AspectRatio(
+            aspectRatio: 1.0,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
                 child: Stack(
                   children: [
                     Positioned.fill(
                       child: _buildCategoryImage(category, isDark),
                     ),
-                    // Gradient overlay
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.5),
-                            ],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // NEW Badge
                     if (category.hasNewMessage)
                       Positioned(
                         top: 8,
@@ -729,50 +707,35 @@ class _AudioPageState extends ConsumerState<AudioPage>
                   ],
                 ),
               ),
-              // Category Title & Count
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _stripHtmlTags(category.name),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12.5,
-                            height: 1.25,
-                            color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                          ),
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '$count messages',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.primaryGold,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Icon(
-                          Icons.arrow_forward_ios_rounded,
-                          size: 11,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+          const SizedBox(height: 8),
+
+          // 2. Category Title directly below the artwork card
+          Text(
+            _stripHtmlTags(category.name),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13.5,
+              height: 1.2,
+              color: isDark ? Colors.white : AppColors.textPrimaryLight,
+            ),
+          ),
+
+          const SizedBox(height: 2),
+
+          // 3. Message Count
+          Text(
+            '$count messages',
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.primaryGold,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }
