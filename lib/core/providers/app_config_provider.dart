@@ -9,16 +9,16 @@ class AppConfig {
   final String teensPageDisabledMessage;
 
   AppConfig({
-    this.walletPageDisabled = false,
-    this.walletPageDisabledMessage = 'Wallet is temporarily disabled as we are working on improvements. Please check back later.',
+    this.walletPageDisabled = true,
+    this.walletPageDisabledMessage = 'Wallet is temporarily under maintenance while we perform system upgrades. Please check back later.',
     this.teensPageDisabled = false,
     this.teensPageDisabledMessage = 'Teens page is temporarily disabled as we are working on improvements. Please check back later.',
   });
 
   factory AppConfig.fromJson(Map<String, dynamic> json) {
     return AppConfig(
-      walletPageDisabled: json['wallet_page_disabled'] ?? false,
-      walletPageDisabledMessage: json['wallet_page_disabled_message'] ?? 'Wallet is temporarily disabled as we are working on improvements. Please check back later.',
+      walletPageDisabled: json['wallet_page_disabled'] ?? true,
+      walletPageDisabledMessage: json['wallet_page_disabled_message'] ?? 'Wallet is temporarily under maintenance while we perform system upgrades. Please check back later.',
       teensPageDisabled: json['teens_page_disabled'] ?? false,
       teensPageDisabledMessage: json['teens_page_disabled_message'] ?? 'Teens page is temporarily disabled as we are working on improvements. Please check back later.',
     );

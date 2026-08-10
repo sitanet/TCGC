@@ -653,12 +653,103 @@ class _WalletPageState extends ConsumerState<WalletPage>
 
   @override
   Widget build(BuildContext context) {
+    final appConfig = ref.watch(appConfigChangeNotifierProvider);
+
+    if (appConfig.config.walletPageDisabled) {
+      return _buildMaintenancePage(
+        context,
+        appConfig.config.walletPageDisabledMessage,
+      );
+    }
+
     if (!_hasInitialized) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _startAuthentication();
       });
     }
     return _buildWalletUI(context);
+  }
+
+  Widget _buildMaintenancePage(BuildContext context, String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final horizontalPadding = Responsive.horizontalPadding(context);
+
+    return Scaffold(
+      appBar: CustomAppBar(
+        title: 'Wallet',
+        showBackButton: true,
+        lightBackground: true,
+        onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.primaryGold.withValues(alpha: 0.4),
+                    width: 2,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.build_circle_outlined,
+                  size: 48,
+                  color: AppColors.primaryGold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Wallet Under Maintenance',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                message.isNotEmpty
+                    ? message
+                    : 'Wallet is temporarily under maintenance while we perform system upgrades. Please check back later.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                      height: 1.5,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    ref.read(mainTabIndexProvider.notifier).state = 0;
+                  },
+                  icon: const Icon(Icons.home_outlined),
+                  label: const Text('Back to Home'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    backgroundColor: AppColors.primaryGold,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// Build the actual wallet UI (extracted from original build method)
