@@ -559,14 +559,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                   );
                 },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ],
+      ),
     ),
-  ),
-);
-  }
+  );
+}
 
   Widget _buildUpcomingEvents(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
