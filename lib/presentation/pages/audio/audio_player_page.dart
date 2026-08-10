@@ -1140,67 +1140,70 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.cardDark : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(
-                'Playback Speed',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ),
-            const Divider(),
-            ...AudioPlayerProvider.availableSpeeds.map(
-              (speed) => ListTile(
-                leading: Icon(
-                  audioProvider.playbackSpeed == speed
-                      ? Icons.check_circle
-                      : Icons.circle_outlined,
-                  color: audioProvider.playbackSpeed == speed
-                      ? AppColors.primaryGold
-                      : (isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight),
+      builder: (context) {
+        final bottomPadding = MediaQuery.of(context).padding.bottom;
+        return Container(
+          padding: EdgeInsets.only(top: 16, bottom: 24 + bottomPadding),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                title: Text(
-                  '${speed}x${speed == 1.0 ? ' (Normal)' : ''}',
-                  style: TextStyle(
-                    fontWeight: audioProvider.playbackSpeed == speed
-                        ? FontWeight.w600
-                        : FontWeight.normal,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  'Playback Speed',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ),
+              const Divider(),
+              ...AudioPlayerProvider.availableSpeeds.map(
+                (speed) => ListTile(
+                  leading: Icon(
+                    audioProvider.playbackSpeed == speed
+                        ? Icons.check
+                        : Icons.speed,
                     color: audioProvider.playbackSpeed == speed
                         ? AppColors.primaryGold
-                        : null,
+                        : (isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight),
                   ),
+                  title: Text(
+                    '${speed}x${speed == 1.0 ? ' (Normal)' : ''}',
+                    style: TextStyle(
+                      fontWeight: audioProvider.playbackSpeed == speed
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                      color: audioProvider.playbackSpeed == speed
+                          ? AppColors.primaryGold
+                          : null,
+                    ),
+                  ),
+                  onTap: () {
+                    audioProvider.setPlaybackSpeed(speed);
+                    Navigator.pop(context);
+                  },
                 ),
-                onTap: () {
-                  audioProvider.setPlaybackSpeed(speed);
-                  Navigator.pop(context);
-                },
               ),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+              SizedBox(height: 8 + bottomPadding),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1654,8 +1657,10 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
             widget.sermon.id,
           );
 
+          final bottomPadding = MediaQuery.of(context).padding.bottom;
+
           return Container(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: EdgeInsets.only(top: 16, bottom: 24 + bottomPadding),
             decoration: BoxDecoration(
               color: isDark ? AppColors.cardDark : Colors.white,
               borderRadius: const BorderRadius.vertical(
@@ -1766,7 +1771,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                     _shareSermon();
                   },
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8 + bottomPadding),
               ],
             ),
           );
@@ -1788,19 +1793,15 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   }
 
   void _shareSermon() {
-    const playStoreLink =
-        'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
     final sermon = widget.sermon;
+    final shareUrl = 'https://tcgc.thecitygatechurch.org/app/message/${sermon.id}/';
     final formattedTitle = '${_formatDate(sermon.date)} - ${sermon.title}';
     final shareText =
-        '''
-Check out this message: "$formattedTitle"
+        '''🎧 "$formattedTitle"
 
 ${sermon.description}
 
-Listen on Citygate Mobile
-
-Download Citygate mobile: $playStoreLink''';
+Listen now: $shareUrl''';
     Share.share(shareText, subject: formattedTitle);
     // Track share action to backend
     _trackMessageStat('share', true);
