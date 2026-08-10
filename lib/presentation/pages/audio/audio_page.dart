@@ -550,7 +550,29 @@ class _AudioPageState extends ConsumerState<AudioPage>
   }
 
   Widget _buildSpeakerGrid(BuildContext context, bool isDark, double padding) {
-    final speakers = _speakerModels.where((s) => s.isMainSpeaker || s.isActive).toList();
+    List<SpeakerModel> speakers = _speakerModels.where((s) => s.isMainSpeaker || s.isActive).toList();
+
+    // Offline fallback: synthesize speaker cards from cached _sermons if no speakers loaded
+    if (speakers.isEmpty && _sermons.isNotEmpty) {
+      final Map<String, SpeakerModel> synthMap = {};
+      int synthId = 2000;
+      for (var sermon in _sermons) {
+        if (sermon.speaker != null && sermon.speaker!.trim().isNotEmpty) {
+          final name = sermon.speaker!.trim();
+          final key = name.toLowerCase();
+          if (!synthMap.containsKey(key)) {
+            synthMap[key] = SpeakerModel(
+              id: synthId++,
+              name: name,
+              fullName: name,
+              isMainSpeaker: true,
+              isActive: true,
+            );
+          }
+        }
+      }
+      speakers = synthMap.values.toList();
+    }
 
     if (speakers.isEmpty) {
       return ListView(
@@ -759,11 +781,13 @@ class _AudioPageState extends ConsumerState<AudioPage>
     bool isDark,
     SpeakerModel speaker,
   ) {
-    final count = _sermons.where((s) =>
-      s.speaker != null &&
-      (s.speaker!.toLowerCase() == speaker.fullName.toLowerCase() ||
-       s.speaker!.toLowerCase() == speaker.name.toLowerCase())
-    ).length;
+    final count = _sermons.where((s) {
+      if (s.speaker == null || s.speaker!.trim().isEmpty) return false;
+      final spk = s.speaker!.toLowerCase().trim();
+      final spkName = speaker.name.toLowerCase().trim();
+      final spkFullName = speaker.fullName.toLowerCase().trim();
+      return spk == spkFullName || spk == spkName || spk.contains(spkName) || spkFullName.contains(spk);
+    }).length;
 
     final formattedName = _formatSpeakerName(speaker.fullName);
 

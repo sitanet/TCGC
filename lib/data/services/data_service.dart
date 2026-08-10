@@ -105,24 +105,93 @@ class DataService {
   }
 
   static List<SpeakerModel>? _cachedSpeakers;
+  static const String _speakersCacheKey = 'cached_speakers_json';
 
-  // Get all speakers with memory caching
+  // Get all speakers with offline disk caching and sermon-fallback synthesis
   Future<List<SpeakerModel>> getSpeakers({bool forceRefresh = false}) async {
+    // 1. Memory Cache
     if (_cachedSpeakers != null && _cachedSpeakers!.isNotEmpty && !forceRefresh) {
       return _cachedSpeakers!;
     }
 
+    // 2. Disk Cache (SharedPreferences)
+    if (!forceRefresh) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedJsonStr = prefs.getString(_speakersCacheKey);
+        if (cachedJsonStr != null && cachedJsonStr.isNotEmpty) {
+          final List<dynamic> decoded = jsonDecode(cachedJsonStr);
+          _cachedSpeakers = decoded.map((s) => SpeakerModel.fromJson(s)).toList();
+          if (_cachedSpeakers!.isNotEmpty) {
+            // Background refresh from server without blocking UI
+            _refreshInBackground(() => getSpeakers(forceRefresh: true));
+            return _cachedSpeakers!;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error reading cached speakers from disk: $e');
+      }
+    }
+
+    // 3. Fetch from Server
     try {
       final response = await _api.get('${ApiConstants.messages}speakers/');
       if (response.isSuccess) {
         final data = response.data;
         final List<dynamic> speakers = data['speakers'] ?? [];
-        _cachedSpeakers = speakers.map((s) => SpeakerModel.fromJson(s)).toList();
+        final list = speakers.map((s) => SpeakerModel.fromJson(s)).toList();
+        if (list.isNotEmpty) {
+          _cachedSpeakers = list;
+          // Persist to disk
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(_speakersCacheKey, jsonEncode(speakers));
+          } catch (e) {
+            debugPrint('Error caching speakers to disk: $e');
+          }
+          return _cachedSpeakers!;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching speakers from API: $e');
+    }
+
+    // 4. Fallback: Synthesize speakers from cached offline sermons if API returned empty / offline
+    try {
+      final sermons = await getMessages();
+      final Map<String, SpeakerModel> synthesizedMap = {};
+
+      if (_cachedSpeakers != null) {
+        for (var s in _cachedSpeakers!) {
+          synthesizedMap[s.fullName.toLowerCase().trim()] = s;
+        }
+      }
+
+      int synthId = 1000;
+      for (var sermon in sermons) {
+        if (sermon.speaker != null && sermon.speaker!.trim().isNotEmpty) {
+          final name = sermon.speaker!.trim();
+          final key = name.toLowerCase();
+          if (!synthesizedMap.containsKey(key)) {
+            synthesizedMap[key] = SpeakerModel(
+              id: synthId++,
+              name: name,
+              fullName: name,
+              isMainSpeaker: true,
+              isActive: true,
+            );
+          }
+        }
+      }
+
+      if (synthesizedMap.isNotEmpty) {
+        _cachedSpeakers = synthesizedMap.values.toList();
         return _cachedSpeakers!;
       }
     } catch (e) {
-      debugPrint('Error fetching speakers: $e');
+      debugPrint('Error synthesizing speakers from sermons: $e');
     }
+
     return _cachedSpeakers ?? [];
   }
 
