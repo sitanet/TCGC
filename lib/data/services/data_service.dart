@@ -104,19 +104,26 @@ class DataService {
     return [];
   }
 
-  // Get all speakers
-  Future<List<SpeakerModel>> getSpeakers() async {
-    final response = await _api.get('${ApiConstants.messages}speakers/');
-    if (response.isSuccess) {
-      final data = response.data;
-      final List<dynamic> speakers = data['speakers'] ?? [];
-      debugPrint('Speakers API response: $speakers');
-      return speakers.map((s) {
-        debugPrint('Parsing speaker: $s');
-        return SpeakerModel.fromJson(s);
-      }).toList();
+  static List<SpeakerModel>? _cachedSpeakers;
+
+  // Get all speakers with memory caching
+  Future<List<SpeakerModel>> getSpeakers({bool forceRefresh = false}) async {
+    if (_cachedSpeakers != null && _cachedSpeakers!.isNotEmpty && !forceRefresh) {
+      return _cachedSpeakers!;
     }
-    return [];
+
+    try {
+      final response = await _api.get('${ApiConstants.messages}speakers/');
+      if (response.isSuccess) {
+        final data = response.data;
+        final List<dynamic> speakers = data['speakers'] ?? [];
+        _cachedSpeakers = speakers.map((s) => SpeakerModel.fromJson(s)).toList();
+        return _cachedSpeakers!;
+      }
+    } catch (e) {
+      debugPrint('Error fetching speakers: $e');
+    }
+    return _cachedSpeakers ?? [];
   }
 
   // Get recommended messages - Now uses cache-first strategy

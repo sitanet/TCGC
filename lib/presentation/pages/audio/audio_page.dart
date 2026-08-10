@@ -40,10 +40,15 @@ class AudioPage extends ConsumerStatefulWidget {
 }
 
 class _AudioPageState extends ConsumerState<AudioPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late TabController _tabController;
   final DataService _dataService = DataService();
   final AudioCacheService _audioCacheService = AudioCacheService();
+
+  static List<MessageCategory> _staticCategories = [];
+  static List<Sermon> _staticSermons = [];
+  static List<Transcript> _staticTranscripts = [];
+  static List<SpeakerModel> _staticSpeakers = [];
 
   List<MessageCategory> _categories = [];
   List<Sermon> _sermons = [];
@@ -54,9 +59,20 @@ class _AudioPageState extends ConsumerState<AudioPage>
   bool _initialLoadDone = false;
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    if (_staticCategories.isNotEmpty) {
+      _categories = _staticCategories;
+      _sermons = _staticSermons;
+      _transcripts = _staticTranscripts;
+      _speakerModels = _staticSpeakers;
+      _isLoading = false;
+      _initialLoadDone = true;
+    }
     // Load cached data immediately, then refresh in background
     _audioCacheService.initialize();
     _loadCachedDataFirst();
@@ -113,6 +129,10 @@ class _AudioPageState extends ConsumerState<AudioPage>
           _isLoading = false;
           _initialLoadDone = true;
         });
+        _staticCategories = processedCategories;
+        _staticSermons = sermons;
+        _staticTranscripts = transcripts;
+        _staticSpeakers = speakers;
 
         // Pre-buffer in background
         _audioCacheService.preBufferCategory(sermons, count: 3);
@@ -297,6 +317,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
