@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/audio_player_provider.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/image_cache_manager.dart';
 import '../../../core/utils/error_handler.dart';
@@ -837,7 +838,7 @@ class _TranscriptListItem extends StatelessWidget {
   }
 }
 
-class TranscriptViewPage extends StatefulWidget {
+class TranscriptViewPage extends ConsumerStatefulWidget {
   final Transcript? transcript;
   final String? overrideUrl;
   final String? overrideTitle;
@@ -850,10 +851,10 @@ class TranscriptViewPage extends StatefulWidget {
   });
 
   @override
-  State<TranscriptViewPage> createState() => _TranscriptViewPageState();
+  ConsumerState<TranscriptViewPage> createState() => _TranscriptViewPageState();
 }
 
-class _TranscriptViewPageState extends State<TranscriptViewPage> {
+class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
   late WebViewController _webViewController;
   final TranscriptCacheService _cacheService = TranscriptCacheService();
   bool _isLoading = true;
@@ -988,9 +989,13 @@ $playStoreLink''';
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final hasPdf = widget.transcript?.pdfUrl != null && widget.transcript!.pdfUrl!.isNotEmpty;
 
+    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+    final hasMiniPlayer = audioProvider.currentSermon != null;
+    final bottomInset = 20.0 + MediaQuery.of(context).padding.bottom + (hasMiniPlayer ? 75.0 : 0.0);
+
     // For web platform, fall back to simple text display
     if (kIsWeb) {
-      return _buildFallbackView(context, isDark, hasPdf);
+      return _buildFallbackView(context, isDark, hasPdf, bottomInset);
     }
 
     return Scaffold(
@@ -1021,7 +1026,7 @@ $playStoreLink''';
             Positioned(
               left: 16,
               right: 16,
-              bottom: 16,
+              bottom: bottomInset,
               child: _buildFloatingPdfButton(isDark),
             ),
         ],
@@ -1092,7 +1097,7 @@ $playStoreLink''';
     );
   }
 
-  Widget _buildFallbackView(BuildContext context, bool isDark, bool hasPdf) {
+  Widget _buildFallbackView(BuildContext context, bool isDark, bool hasPdf, double bottomInset) {
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
       appBar: CustomAppBar(
@@ -1108,7 +1113,7 @@ $playStoreLink''';
       body: Stack(
         children: [
           SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 20, 20, hasPdf ? 90 : 20),
+            padding: EdgeInsets.fromLTRB(20, 20, 20, hasPdf ? (bottomInset + 70) : (bottomInset + 10)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1138,7 +1143,7 @@ $playStoreLink''';
             Positioned(
               left: 16,
               right: 16,
-              bottom: 16,
+              bottom: bottomInset,
               child: _buildFloatingPdfButton(isDark),
             ),
         ],
