@@ -193,11 +193,12 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
         final wasLoading = _isLoading;
         
         _isPlaying = state.playing;
-        _isLoading = state.processingState == ProcessingState.loading ||
-                     state.processingState == ProcessingState.buffering;
+        _isLoading = (state.processingState == ProcessingState.loading ||
+                     state.processingState == ProcessingState.buffering) && !_isPlaying;
         
         if (state.processingState == ProcessingState.ready ||
-            state.processingState == ProcessingState.idle) {
+            state.processingState == ProcessingState.idle ||
+            _isPlaying) {
           _isLoading = false;
         }
         
@@ -257,11 +258,12 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
         final wasLoading = _isLoading;
         
         _isPlaying = state.playing;
-        _isLoading = state.processingState == ProcessingState.loading ||
-                     state.processingState == ProcessingState.buffering;
+        _isLoading = (state.processingState == ProcessingState.loading ||
+                     state.processingState == ProcessingState.buffering) && !_isPlaying;
         
         if (state.processingState == ProcessingState.ready ||
-            state.processingState == ProcessingState.idle) {
+            state.processingState == ProcessingState.idle ||
+            _isPlaying) {
           _isLoading = false;
         }
         
@@ -428,24 +430,24 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
           await _audioHandler!.setAudioSource('file://$downloadedPath', mediaItem);
           await _audioHandler!.play();
         } else {
-          // Stream from URL - set source and play without blocking
-          debugPrint('Streaming from URL');
+          // Stream from URL - set source and play immediately to stream progressively
+          debugPrint('Streaming from URL (progressive stream)');
           try {
-            // Use unawaited setAudioSource to start buffering while we show loading UI
-            // The play() will start as soon as enough data is buffered
-            _audioHandler!.setAudioSource(fixedAudioUrl, mediaItem).then((_) {
-              debugPrint('Audio source ready, starting playback');
-              _audioHandler!.play();
-            }).catchError((e) {
-              debugPrint('Error setting audio source: $e');
-              _isLoading = false;
-              _errorMessage = 'Unable to load audio. Check your connection.';
-              notifyListeners();
+            // Set source asynchronously and play immediately so ExoPlayer/AVPlayer streams progressively
+            _audioHandler!.setAudioSource(fixedAudioUrl, mediaItem).catchError((e) {
+              debugPrint('Error setting audio source asynchronously: $e');
+              if (!_isPlaying) {
+                _isLoading = false;
+                _errorMessage = 'Unable to load audio. Please check your internet connection.';
+                notifyListeners();
+              }
+              return null;
             });
+            await _audioHandler!.play();
           } catch (e) {
-            debugPrint('Error setting audio source: $e');
+            debugPrint('Error initiating playback: $e');
             _isLoading = false;
-            _errorMessage = 'Unable to load audio. Check your connection.';
+            _errorMessage = 'Unable to load audio. Please check your internet connection.';
             notifyListeners();
             return;
           }
@@ -462,22 +464,23 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
           await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse('file://$downloadedPath')));
           await _fallbackPlayer!.play();
         } else {
-          // Stream from URL - use async loading to not block
-          debugPrint('Streaming from URL (fallback)');
+          // Stream from URL (fallback) - set source and play immediately
+          debugPrint('Streaming from URL (fallback progressive stream)');
           try {
-            _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(fixedAudioUrl))).then((_) {
-              debugPrint('Audio source ready (fallback), starting playback');
-              _fallbackPlayer!.play();
-            }).catchError((e) {
+            _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(fixedAudioUrl))).catchError((e) {
               debugPrint('Error setting audio source (fallback): $e');
-              _isLoading = false;
-              _errorMessage = 'Unable to load audio. Check your connection.';
-              notifyListeners();
+              if (!_isPlaying) {
+                _isLoading = false;
+                _errorMessage = 'Unable to load audio. Please check your internet connection.';
+                notifyListeners();
+              }
+              return null;
             });
+            await _fallbackPlayer!.play();
           } catch (e) {
             debugPrint('Error setting audio source (fallback): $e');
             _isLoading = false;
-            _errorMessage = 'Unable to load audio. Check your connection.';
+            _errorMessage = 'Unable to load audio. Please check your internet connection.';
             notifyListeners();
             return;
           }
