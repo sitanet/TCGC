@@ -1329,11 +1329,40 @@ class _AudioPageState extends ConsumerState<AudioPage>
     final hasMiniPlayer = audioProvider.currentSermon != null;
     final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
 
-    final categoriesToDisplay = _categories.isNotEmpty
-        ? _categories
-        : [
-            MessageCategory(id: 'all', name: 'All Transcripts', description: ''),
-          ];
+    // Filter categories to only include those that have 1 or more transcripts
+    final categoriesToDisplay = _categories.where((category) {
+      final count = _transcripts.where((t) {
+        if (category.id == 'all') return true;
+        return t.category == category.id ||
+            t.category.toString() == category.id.toString() ||
+            t.categoryName.toLowerCase() == category.name.toLowerCase();
+      }).length;
+      return count > 0;
+    }).toList();
+
+    if (categoriesToDisplay.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        color: AppColors.primaryGold,
+        child: ListView(
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.4,
+              child: Center(
+                child: Text(
+                  'No transcript categories available',
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return RefreshIndicator(
       onRefresh: _loadData,
