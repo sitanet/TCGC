@@ -418,7 +418,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
       debugPrint('Downloaded path: $downloadedPath');
 
       if (_useAudioService && _audioHandler != null) {
-        // Stop previous without waiting
+        // Stop previous audio cleanly
         try {
           await _audioHandler!.stop();
         } catch (e) {
@@ -426,26 +426,17 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
         }
         
         if (downloadedPath != null) {
-          debugPrint('Playing from local file');
+          debugPrint('Playing from local file: $downloadedPath');
           await _audioHandler!.setAudioSource('file://$downloadedPath', mediaItem);
           await _audioHandler!.play();
         } else {
-          // Stream from URL - set source and play immediately to stream progressively
-          debugPrint('Streaming from URL (progressive stream)');
+          // Stream from URL - await setAudioSource so ExoPlayer initializes the media pipeline cleanly
+          debugPrint('Streaming from URL: $fixedAudioUrl');
           try {
-            // Set source asynchronously and play immediately so ExoPlayer/AVPlayer streams progressively
-            _audioHandler!.setAudioSource(fixedAudioUrl, mediaItem).catchError((e) {
-              debugPrint('Error setting audio source asynchronously: $e');
-              if (!_isPlaying) {
-                _isLoading = false;
-                _errorMessage = 'Unable to load audio. Please check your internet connection.';
-                notifyListeners();
-              }
-              return null;
-            });
+            await _audioHandler!.setAudioSource(fixedAudioUrl, mediaItem);
             await _audioHandler!.play();
           } catch (e) {
-            debugPrint('Error initiating playback: $e');
+            debugPrint('Error setting audio source: $e');
             _isLoading = false;
             _errorMessage = 'Unable to load audio. Please check your internet connection.';
             notifyListeners();
@@ -464,18 +455,9 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
           await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse('file://$downloadedPath')));
           await _fallbackPlayer!.play();
         } else {
-          // Stream from URL (fallback) - set source and play immediately
-          debugPrint('Streaming from URL (fallback progressive stream)');
+          debugPrint('Streaming from URL (fallback): $fixedAudioUrl');
           try {
-            _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(fixedAudioUrl))).catchError((e) {
-              debugPrint('Error setting audio source (fallback): $e');
-              if (!_isPlaying) {
-                _isLoading = false;
-                _errorMessage = 'Unable to load audio. Please check your internet connection.';
-                notifyListeners();
-              }
-              return null;
-            });
+            await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(fixedAudioUrl)));
             await _fallbackPlayer!.play();
           } catch (e) {
             debugPrint('Error setting audio source (fallback): $e');
