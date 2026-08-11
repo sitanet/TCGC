@@ -37,6 +37,8 @@ import 'presentation/widgets/ready_to_play_popup.dart';
 import 'data/services/data_service.dart' show DataService, AppUpdateInfo;
 import 'data/services/notification_service.dart';
 import 'presentation/pages/audio/audio_player_page.dart';
+import 'presentation/pages/audio/transcript_list_page.dart';
+import 'domain/entities/transcript.dart';
 import 'domain/entities/promotion.dart';
 import 'core/widgets/network_aware_widget.dart';
 import 'data/services/biometric_service.dart';
@@ -925,6 +927,17 @@ class _MainScreenState extends ConsumerState<MainScreen>
       return;
     }
 
+    // Check for transcript deep link: /app/transcript/<id> or tcgc://transcript/<id>
+    final transcriptMatch = RegExp(r'transcript[/\\]?(\d+)').firstMatch(path);
+    if (transcriptMatch != null) {
+      _navigateToTranscript(transcriptMatch.group(1)!);
+      return;
+    }
+    if (host == 'transcript' && uri.pathSegments.isNotEmpty) {
+      _navigateToTranscript(uri.pathSegments.first);
+      return;
+    }
+
     // Check for audio live stream: http(s)://.../app/audio, tcgc://audio, or tcgc://app/audio
     final isAudioLiveStream = host == 'audio' ||
         path.endsWith('/audio') ||
@@ -974,6 +987,34 @@ class _MainScreenState extends ConsumerState<MainScreen>
       }
     } catch (e) {
       debugPrint('Error navigating to message: $e');
+      ref.read(mainTabIndexProvider.notifier).state = 1;
+    }
+  }
+
+  Future<void> _navigateToTranscript(String transcriptId) async {
+    debugPrint('Navigating to transcript: $transcriptId');
+    try {
+      final transcripts = await _dataService.getTranscripts();
+      Transcript? targetTranscript;
+      for (var t in transcripts) {
+        if (t.id.toString() == transcriptId.toString()) {
+          targetTranscript = t;
+          break;
+        }
+      }
+
+      if (targetTranscript != null && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => TranscriptViewPage(transcript: targetTranscript),
+          ),
+        );
+      } else {
+        debugPrint('Transcript not found: $transcriptId');
+        ref.read(mainTabIndexProvider.notifier).state = 1;
+      }
+    } catch (e) {
+      debugPrint('Error navigating to transcript: $e');
       ref.read(mainTabIndexProvider.notifier).state = 1;
     }
   }

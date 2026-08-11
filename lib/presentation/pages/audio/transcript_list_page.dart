@@ -920,12 +920,19 @@ class _TranscriptViewPageState extends State<TranscriptViewPage> {
   void _shareTranscript() {
     const playStoreLink = 'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
     final title = widget.overrideTitle ?? widget.transcript?.title ?? 'Sermon Transcript';
+    final transcriptId = widget.transcript?.id ?? '';
     
-    final shareText = '''$title
+    final shareUrl = transcriptId.toString().isNotEmpty
+        ? 'https://tcgc.thecitygatechurch.org/app/transcript/$transcriptId'
+        : playStoreLink;
+    
+    final shareText = '''📖 "$title" - Sermon Transcript
 
-Read the full transcript in the Citygate mobile app
+Read the full transcript on the TCGC App:
+$shareUrl
 
-Download: $playStoreLink''';
+If you don't have the app installed yet, download it from Google Play Store:
+$playStoreLink''';
     
     Share.share(shareText, subject: title);
   }
