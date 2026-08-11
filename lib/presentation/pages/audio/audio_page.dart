@@ -457,6 +457,15 @@ class _AudioPageState extends ConsumerState<AudioPage>
     final hasMiniPlayer = audioProvider.currentSermon != null;
     final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
 
+    final categoriesWithSermons = _categories.where((category) {
+      final count = _sermons.where((s) =>
+        s.category == category.id ||
+        s.category.toString() == category.id.toString() ||
+        s.categoryName.toLowerCase() == category.name.toLowerCase()
+      ).length;
+      return count > 0;
+    }).toList();
+
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: EdgeInsets.only(top: 8, bottom: bottomInset),
@@ -481,7 +490,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
           const SizedBox(height: 14),
 
           // 3. Category Cards Grid
-          if (_categories.isEmpty)
+          if (categoriesWithSermons.isEmpty)
             Padding(
               padding: EdgeInsets.symmetric(horizontal: padding, vertical: 30),
               child: Center(
@@ -506,9 +515,9 @@ class _AudioPageState extends ConsumerState<AudioPage>
                 mainAxisSpacing: 18,
                 childAspectRatio: 0.73,
               ),
-              itemCount: _categories.length,
+              itemCount: categoriesWithSermons.length,
               itemBuilder: (context, index) {
-                return _buildCategoryGridCard(context, isDark, _categories[index]);
+                return _buildCategoryGridCard(context, isDark, categoriesWithSermons[index]);
               },
             ),
         ],
