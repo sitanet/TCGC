@@ -917,10 +917,11 @@ class _TranscriptViewPageState extends State<TranscriptViewPage> {
     }
   }
 
-  void _shareTranscript() {
+  Future<void> _shareTranscript() async {
     const playStoreLink = 'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
     final title = widget.overrideTitle ?? widget.transcript?.title ?? 'Sermon Transcript';
     final transcriptId = widget.transcript?.id ?? '';
+    final imageUrl = widget.transcript?.imageUrl;
     
     final shareUrl = transcriptId.toString().isNotEmpty
         ? 'https://tcgc.thecitygatechurch.org/app/transcript/$transcriptId'
@@ -934,7 +935,23 @@ $shareUrl
 If you don't have the app installed yet, download it from Google Play Store:
 $playStoreLink''';
     
-    Share.share(shareText, subject: title);
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      try {
+        final file = await CustomImageCacheManager.instance.getSingleFile(imageUrl);
+        if (await file.exists()) {
+          await Share.shareXFiles(
+            [XFile(file.path)],
+            text: shareText,
+            subject: title,
+          );
+          return;
+        }
+      } catch (e) {
+        debugPrint('Error getting thumbnail for share: $e');
+      }
+    }
+
+    await Share.share(shareText, subject: title);
   }
 
   Future<void> _openPdf() async {
