@@ -55,7 +55,6 @@ class _AudioPageState extends ConsumerState<AudioPage>
   List<Sermon> _sermons = [];
   List<Transcript> _transcripts = [];
   List<SpeakerModel> _speakerModels = [];
-  FilterType _filterType = FilterType.category;
   bool _isLoading = true;
   bool _initialLoadDone = false;
 
@@ -429,82 +428,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
     return RefreshIndicator(
       onRefresh: _loadData,
       color: AppColors.primaryGold,
-      child: Column(
-        children: [
-          // Filter Toggle Row (Categories | Ministers | Date)
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: padding, vertical: 12),
-            child: Row(
-              children: [
-                _buildToggleChip('Categories', FilterType.category, isDark),
-                const SizedBox(width: 10),
-                _buildToggleChip('Ministers', FilterType.speaker, isDark),
-                const SizedBox(width: 10),
-                _buildToggleChip('Date', FilterType.date, isDark),
-              ],
-            ),
-          ),
-
-          // Grid Body
-          Expanded(
-            child: _filterType == FilterType.category
-                ? _buildCategoryGrid(context, isDark, padding)
-                : (_filterType == FilterType.speaker
-                    ? _buildSpeakerGrid(context, isDark, padding)
-                    : _buildDateGrid(context, isDark, padding)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggleChip(String label, FilterType type, bool isDark) {
-    final isSelected = _filterType == type;
-
-    return GestureDetector(
-      onTap: () {
-        if (_filterType != type) {
-          setState(() {
-            _filterType = type;
-          });
-        }
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primaryGold
-              : (isDark ? AppColors.cardDark : AppColors.surfaceLight),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.primaryGold
-                : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppColors.primaryGold.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected
-                ? Colors.white
-                : (isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-            fontSize: 13,
-          ),
-        ),
-      ),
+      child: _buildCategoryGrid(context, isDark, padding),
     );
   }
 
