@@ -33,6 +33,7 @@ class ApiConstants {
 
   // Messages
   static const String messageCategories = '/message-categories/';
+  static const String beginnerCategories = '/beginner-categories/';
   static const String messages = '/messages/';
   static const String messagesByCategory = '/messages/by_category/';
   static const String messageStats =

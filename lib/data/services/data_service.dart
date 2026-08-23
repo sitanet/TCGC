@@ -10,6 +10,7 @@ import '../../domain/entities/wallet.dart';
 import '../../domain/entities/transaction.dart';
 import '../../domain/entities/promotion.dart';
 import '../../domain/entities/transcript.dart';
+import '../../domain/entities/beginner_category.dart';
 import 'api_service.dart';
 import 'content_cache_service.dart';
 
@@ -33,6 +34,25 @@ class DataService {
           ? decoded
           : (decoded['results'] ?? decoded);
       return data.map((json) => MessageCategory.fromJson(json)).toList();
+    }
+    return [];
+  }
+
+  // Beginner Categories
+  Future<List<BeginnerCategory>> getBeginnerCategories({
+    bool forceRefresh = false,
+  }) async {
+    try {
+      final response = await _api.get(ApiConstants.beginnerCategories);
+      if (response.isSuccess) {
+        final decoded = response.data;
+        final List<dynamic> data = decoded is List
+            ? decoded
+            : (decoded['results'] ?? decoded);
+        return data.map((json) => BeginnerCategory.fromJson(json)).toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching beginner categories: $e');
     }
     return [];
   }

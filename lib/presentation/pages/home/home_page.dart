@@ -11,7 +11,9 @@ import '../../../data/services/interests_service.dart';
 import '../../../data/services/download_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/event.dart';
+import '../../../domain/entities/beginner_category.dart';
 import '../audio/audio_player_page.dart';
+import '../audio/audio_list_page.dart';
 import '../profile/profile_page.dart';
 import '../support/complaint_page.dart';
 import '../notifications/notifications_page.dart';
@@ -36,6 +38,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   List<Sermon> _sermons = [];
   List<Event> _events = [];
+  List<BeginnerCategory> _beginnerCategories = [];
   List<Sermon> _pickedInterestSermons = [];
   List<Sermon> _recommendedSermons = [];
   bool _isLoading = true;
@@ -118,8 +121,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         });
       }
 
-      // Load events and recommended in parallel (non-blocking)
+      // Load events, beginner categories and recommended in parallel (non-blocking)
       _loadEventsAsync(forceRefresh);
+      _loadBeginnerCategoriesAsync(forceRefresh);
       _loadRecommendedAsync(forceRefresh, canAccessSermon);
     } catch (e) {
       debugPrint('Error loading home data: $e');
@@ -130,6 +134,15 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   // Async loaders that don't block UI
+  Future<void> _loadBeginnerCategoriesAsync(bool forceRefresh) async {
+    try {
+      final categories = await _dataService.getBeginnerCategories(forceRefresh: forceRefresh);
+      if (mounted) setState(() => _beginnerCategories = categories);
+    } catch (e) {
+      debugPrint('Beginner categories load error: $e');
+    }
+  }
+
   Future<void> _loadEventsAsync(bool forceRefresh) async {
     try {
       final events = await _dataService.getEvents(forceRefresh: forceRefresh);
@@ -186,7 +199,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                     children: [
                       SizedBox(height: spacing * 1.5),
                       _buildUpcomingEvents(context, isDark),
-                      if (_pickedInterestSermons.isNotEmpty) ...[
+                      if (_beginnerCategories.isNotEmpty) ...[
+                        SizedBox(height: spacing * 1.5),
+                        _buildBeginnerCategories(context, isDark),
+                      ] else if (_pickedInterestSermons.isNotEmpty) ...[
                         SizedBox(height: spacing * 1.5),
                         _buildPickedInterests(context, isDark),
                       ],
@@ -778,6 +794,169 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Image.asset(
       imageUrl,
       fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => placeholder,
+    );
+  }
+
+  Widget _buildBeginnerCategories(BuildContext context, bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final subtitleFontSize = Responsive.subtitleFontSize(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.bookmark_border,
+                color: AppColors.primaryGold,
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Beginner Categories',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: AppColors.primaryGold,
+                      fontWeight: FontWeight.bold,
+                      fontSize: subtitleFontSize,
+                    ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: spacing * 0.8),
+        SizedBox(
+          height: 220,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            itemCount: _beginnerCategories.length,
+            itemBuilder: (context, index) {
+              final cat = _beginnerCategories[index];
+              return _buildBeginnerCategoryCard(context, isDark, cat);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBeginnerCategoryCard(
+    BuildContext context,
+    bool isDark,
+    BeginnerCategory category,
+  ) {
+    const cardSize = 150.0;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AudioListPage(
+              category: category.name,
+              audioItems: category.sermons,
+              categories: _beginnerCategories.map((c) => c.name).toList(),
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: cardSize,
+        margin: const EdgeInsets.only(right: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. Square Artwork Card (1:1 Ratio)
+            AspectRatio(
+              aspectRatio: 1.0,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: _buildCategoryCardImage(category.imageUrl, isDark),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // 2. Category Name Title
+            Text(
+              category.name,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppColors.textPrimaryLight,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+
+            // 3. Gold Message Count Subtitle (e.g. "6 Messages")
+            Text(
+              '${category.sermonCount} ${category.sermonCount == 1 ? 'Message' : 'Messages'}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.primaryGold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryCardImage(String? imageUrl, bool isDark) {
+    Widget placeholder = Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+      ),
+      child: Center(
+        child: Icon(
+          Icons.music_note,
+          size: 40,
+          color: AppColors.primaryGold.withValues(alpha: 0.5),
+        ),
+      ),
+    );
+
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return placeholder;
+    }
+
+    if (imageUrl.startsWith('http')) {
+      return CachedNetworkImage(
+        imageUrl: imageUrl,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        memCacheWidth: 300,
+        memCacheHeight: 300,
+        placeholder: (context, url) => placeholder,
+        errorWidget: (context, url, error) => placeholder,
+      );
+    }
+
+    return Image.asset(
+      imageUrl,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
       errorBuilder: (context, error, stackTrace) => placeholder,
     );
   }
