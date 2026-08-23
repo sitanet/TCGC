@@ -44,10 +44,14 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _isLoading = true;
   int _currentEventIndex = 0;
   double _currentPage = 0;
+  late final ScrollController _homeScrollController;
+  bool _isScrolledPastHeader = false;
 
   @override
   void initState() {
     super.initState();
+    _homeScrollController = ScrollController();
+    _homeScrollController.addListener(_onHomeScroll);
     _eventsPageController = PageController(
       viewportFraction: 0.52,
       initialPage: 0,
@@ -167,8 +171,20 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  void _onHomeScroll() {
+    if (!mounted) return;
+    final isScrolledPast = _homeScrollController.offset > 120;
+    if (isScrolledPast != _isScrolledPastHeader) {
+      setState(() {
+        _isScrolledPastHeader = isScrolledPast;
+      });
+    }
+  }
+
   @override
   void dispose() {
+    _homeScrollController.removeListener(_onHomeScroll);
+    _homeScrollController.dispose();
     _eventsPageController.dispose();
     super.dispose();
   }
@@ -178,42 +194,44 @@ class _HomePageState extends ConsumerState<HomePage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final spacing = Responsive.verticalSpacing(context);
 
+    final statusBarIconBrightness = _isScrolledPastHeader
+        ? (isDark ? Brightness.light : Brightness.dark)
+        : Brightness.light;
+    final statusBarBrightness = _isScrolledPastHeader
+        ? (isDark ? Brightness.dark : Brightness.light)
+        : Brightness.dark;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
+      value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light, // White status bar icons
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: statusBarIconBrightness,
+        statusBarBrightness: statusBarBrightness,
       ),
       child: Scaffold(
-        body: Column(
-          children: [
-            _buildHeaderBanner(context, isDark),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () => _loadData(forceRefresh: true),
-                color: AppColors.primaryGold,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(height: spacing * 1.5),
-                      _buildUpcomingEvents(context, isDark),
-                      SizedBox(height: spacing * 1.5),
-                      _buildBeginnerCategories(context, isDark),
-                      if (_recommendedSermons.isNotEmpty) ...[
-                        SizedBox(height: spacing * 1.5),
-                        _buildRecommendedMessages(context, isDark),
-                      ],
-                      SizedBox(height: spacing * 1.5),
-                      _buildRecentActivities(context, isDark),
-                      SizedBox(height: spacing * 6),
-                    ],
-                  ),
-                ),
-              ),
+        body: RefreshIndicator(
+          onRefresh: () => _loadData(forceRefresh: true),
+          color: AppColors.primaryGold,
+          child: SingleChildScrollView(
+            controller: _homeScrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeaderBanner(context, isDark),
+                SizedBox(height: spacing * 1.5),
+                _buildUpcomingEvents(context, isDark),
+                SizedBox(height: spacing * 1.5),
+                _buildBeginnerCategories(context, isDark),
+                if (_recommendedSermons.isNotEmpty) ...[
+                  SizedBox(height: spacing * 1.5),
+                  _buildRecommendedMessages(context, isDark),
+                ],
+                SizedBox(height: spacing * 1.5),
+                _buildRecentActivities(context, isDark),
+                SizedBox(height: spacing * 6),
+              ],
             ),
-          ],
+          ),
         ),
         floatingActionButton: GestureDetector(
           onTap: () {
