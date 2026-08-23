@@ -199,13 +199,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                     children: [
                       SizedBox(height: spacing * 1.5),
                       _buildUpcomingEvents(context, isDark),
-                      if (_beginnerCategories.isNotEmpty) ...[
-                        SizedBox(height: spacing * 1.5),
-                        _buildBeginnerCategories(context, isDark),
-                      ] else if (_pickedInterestSermons.isNotEmpty) ...[
-                        SizedBox(height: spacing * 1.5),
-                        _buildPickedInterests(context, isDark),
-                      ],
+                      SizedBox(height: spacing * 1.5),
+                      _buildBeginnerCategories(context, isDark),
                       if (_recommendedSermons.isNotEmpty) ...[
                         SizedBox(height: spacing * 1.5),
                         _buildRecommendedMessages(context, isDark),
@@ -828,20 +823,91 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
         SizedBox(height: spacing * 0.8),
-        SizedBox(
-          height: 220,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
+        if (_beginnerCategories.isEmpty && _isLoading)
+          SizedBox(
+            height: 220,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              itemCount: 3,
+              itemBuilder: (context, index) => _buildCategoryShimmerPlaceholder(isDark),
+            ),
+          )
+        else if (_beginnerCategories.isEmpty)
+          Padding(
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            itemCount: _beginnerCategories.length,
-            itemBuilder: (context, index) {
-              final cat = _beginnerCategories[index];
-              return _buildBeginnerCategoryCard(context, isDark, cat);
-            },
+            child: Container(
+              height: 100,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.cardDark : Colors.grey[100],
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Center(
+                child: Text(
+                  'No beginner categories created yet.',
+                  style: TextStyle(
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 220,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              itemCount: _beginnerCategories.length,
+              itemBuilder: (context, index) {
+                final cat = _beginnerCategories[index];
+                return _buildBeginnerCategoryCard(context, isDark, cat);
+              },
+            ),
           ),
-        ),
       ],
+    );
+  }
+
+  Widget _buildCategoryShimmerPlaceholder(bool isDark) {
+    return Container(
+      width: 150,
+      margin: const EdgeInsets.only(right: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 1.0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.cardDark : Colors.grey[300],
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 100,
+            height: 12,
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.grey[300],
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            width: 60,
+            height: 10,
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.grey[300],
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -958,48 +1024,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       width: double.infinity,
       height: double.infinity,
       errorBuilder: (context, error, stackTrace) => placeholder,
-    );
-  }
-
-  Widget _buildPickedInterests(BuildContext context, bool isDark) {
-    final horizontalPadding = Responsive.horizontalPadding(context);
-    final spacing = Responsive.verticalSpacing(context);
-    final subtitleFontSize = Responsive.subtitleFontSize(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: Row(
-            children: [
-              Icon(
-                Icons.star,
-                color: AppColors.primaryGold,
-                size: Responsive.iconSize(context) * 0.9,
-              ),
-              SizedBox(width: spacing * 0.5),
-              Text(
-                'Picked for You',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.primaryGold,
-                  fontWeight: FontWeight.w600,
-                  fontSize: subtitleFontSize,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: spacing),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: Column(
-            children: _pickedInterestSermons
-                .map((sermon) => _buildActivityTile(context, isDark, sermon))
-                .toList(),
-          ),
-        ),
-      ],
     );
   }
 
