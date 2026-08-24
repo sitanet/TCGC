@@ -816,6 +816,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     final spacing = Responsive.verticalSpacing(context);
     final subtitleFontSize = Responsive.subtitleFontSize(context);
 
+    final columnCount = (_beginnerCategories.length / 3).ceil();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -843,12 +845,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         SizedBox(height: spacing * 0.8),
         if (_beginnerCategories.isEmpty && _isLoading)
           SizedBox(
-            height: 220,
+            height: 236,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              itemCount: 3,
-              itemBuilder: (context, index) => _buildCategoryShimmerPlaceholder(isDark),
+              itemCount: 2,
+              itemBuilder: (context, index) => _buildCategoryShimmerColumn(isDark),
             ),
           )
         else if (_beginnerCategories.isEmpty)
@@ -874,15 +876,32 @@ class _HomePageState extends ConsumerState<HomePage> {
           )
         else
           SizedBox(
-            height: 220,
+            height: 236, // Height for 3 rows of tiles
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              itemCount: _beginnerCategories.length,
-              itemBuilder: (context, index) {
-                final cat = _beginnerCategories[index];
-                return _buildBeginnerCategoryCard(context, isDark, cat);
+              itemCount: columnCount,
+              itemBuilder: (context, columnIndex) {
+                final startIndex = columnIndex * 3;
+                final endIndex = (startIndex + 3 > _beginnerCategories.length)
+                    ? _beginnerCategories.length
+                    : startIndex + 3;
+                final columnCategories = _beginnerCategories.sublist(startIndex, endIndex);
+
+                return Container(
+                  width: MediaQuery.of(context).size.width * 0.85,
+                  margin: const EdgeInsets.only(right: 14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: columnCategories.map((cat) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: _buildBeginnerCategoryListTile(context, isDark, cat),
+                      );
+                    }).toList(),
+                  ),
+                );
               },
             ),
           ),
@@ -890,53 +909,17 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildCategoryShimmerPlaceholder(bool isDark) {
-    return Container(
-      width: 150,
-      margin: const EdgeInsets.only(right: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AspectRatio(
-            aspectRatio: 1.0,
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.cardDark : Colors.grey[300],
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: 100,
-            height: 12,
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.cardDark : Colors.grey[300],
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Container(
-            width: 60,
-            height: 10,
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.cardDark : Colors.grey[300],
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBeginnerCategoryCard(
+  Widget _buildBeginnerCategoryListTile(
     BuildContext context,
     bool isDark,
     BeginnerCategory category,
   ) {
-    const cardSize = 150.0;
+    final cardColor = isDark ? AppColors.cardDark : Colors.white;
+    final border = isDark
+        ? Border.all(color: Colors.white.withValues(alpha: 0.08))
+        : Border.all(color: Colors.grey.withValues(alpha: 0.15));
 
-    return GestureDetector(
+    return InkWell(
       onTap: () {
         Navigator.push(
           context,
@@ -949,58 +932,91 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         );
       },
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        width: cardSize,
-        margin: const EdgeInsets.only(right: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(14),
+          border: border,
+          boxShadow: isDark
+              ? []
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: Row(
           children: [
-            // 1. Square Artwork Card (1:1 Ratio)
-            AspectRatio(
-              aspectRatio: 1.0,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.12),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
+            // Thumbnail artwork on left
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: 52,
+                height: 52,
+                child: _buildCategoryCardImage(category.imageUrl, isDark),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Title & Gold Message Count in middle
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    category.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
                     ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: _buildCategoryCardImage(category.imageUrl, isDark),
-                ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${category.sermonCount} ${category.sermonCount == 1 ? 'Message' : 'Messages'}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryGold,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-
-            // 2. Category Name Title
-            Text(
-              category.name,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : AppColors.textPrimaryLight,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-
-            // 3. Gold Message Count Subtitle (e.g. "6 Messages")
-            Text(
-              '${category.sermonCount} ${category.sermonCount == 1 ? 'Message' : 'Messages'}',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.primaryGold,
-              ),
+            const SizedBox(width: 8),
+            // Right chevron arrow
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.primaryGold,
+              size: 22,
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryShimmerColumn(bool isDark) {
+    return Container(
+      width: 280,
+      margin: const EdgeInsets.only(right: 14),
+      child: Column(
+        children: List.generate(3, (index) => Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Container(
+            height: 68,
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.grey[200],
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        )),
       ),
     );
   }
