@@ -857,19 +857,34 @@ class _HomePageState extends ConsumerState<HomePage> {
           Padding(
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             child: Container(
-              height: 100,
+              height: 90,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: isDark ? AppColors.cardDark : Colors.grey[100],
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? Colors.white10 : Colors.black12,
+                ),
               ),
               child: Center(
-                child: Text(
-                  'No beginner categories created yet.',
-                  style: TextStyle(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    fontSize: 14,
-                  ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.bookmark_outline,
+                      color: AppColors.primaryGold.withValues(alpha: 0.7),
+                      size: 26,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'No beginner categories created yet.',
+                      style: TextStyle(
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
