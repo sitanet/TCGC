@@ -54,10 +54,12 @@ class Sermon {
       transcript: json['transcript'],
       category: categoryStr,
       categoryName: categoryName,
-      date: json['date'] != null 
-          ? DateTime.parse(json['date']) 
+      date: (json['date'] != null && json['date'].toString().isNotEmpty)
+          ? (DateTime.tryParse(json['date'].toString()) ?? DateTime.now())
           : DateTime.now(),
-      duration: Duration(minutes: json['duration_minutes'] ?? 0),
+      duration: Duration(
+        minutes: int.tryParse((json['duration_minutes'] ?? json['duration'] ?? 0).toString()) ?? 0,
+      ),
       isRecommended: json['is_recommended'] ?? false,
       isServiceTeamOnly: json['is_service_team_only'] ?? false,
       isGeneralMarriedOnly: json['is_general_married_only'] ?? false,
