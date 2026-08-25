@@ -109,25 +109,26 @@ class _HomePageState extends ConsumerState<HomePage> {
         return true;
       }
 
-      // Load sermons first (most important for home page)
+      // Load sermons and beginner categories
       final allSermons = await _dataService.getMessages(
         forceRefresh: forceRefresh,
       );
       final sermons = allSermons.where(canAccessSermon).toList();
+      final beginnerCats = await _dataService.getBeginnerCategories(forceRefresh: forceRefresh);
 
       if (mounted) {
         final pickedInterests = _interestsService
             .getRandomMessagesFromInterests(sermons, count: 3);
         setState(() {
           _sermons = sermons;
+          _beginnerCategories = beginnerCats;
           _pickedInterestSermons = pickedInterests;
-          _isLoading = false; // Show content immediately
+          _isLoading = false; // Show content after loading
         });
       }
 
-      // Load events, beginner categories and recommended in parallel (non-blocking)
+      // Load events and recommended in parallel
       _loadEventsAsync(forceRefresh);
-      _loadBeginnerCategoriesAsync(forceRefresh);
       _loadRecommendedAsync(forceRefresh, canAccessSermon);
     } catch (e) {
       debugPrint('Error loading home data: $e');

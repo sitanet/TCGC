@@ -36,22 +36,19 @@ class Sermon {
   });
 
   factory Sermon.fromJson(Map<String, dynamic> json) {
-    // Handle category - could be int or string
     final categoryValue = json['category'];
     final categoryStr = categoryValue?.toString() ?? '';
-    
-    // Handle category_name
     final categoryName = json['category_name']?.toString() ?? '';
     
     return Sermon(
-      id: json['id'].toString(),
-      title: json['title'] ?? '',
-      description: json['description'] ?? '',
-      speaker: json['speaker'],
-      imageUrl: json['image_url'],
-      audioUrl: json['audio_url'],
-      videoUrl: json['video_url'],
-      transcript: json['transcript'],
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      speaker: json['speaker']?.toString() ?? '',
+      imageUrl: json['image_url']?.toString(),
+      audioUrl: json['audio_url']?.toString(),
+      videoUrl: json['video_url']?.toString(),
+      transcript: json['transcript']?.toString(),
       category: categoryStr,
       categoryName: categoryName,
       date: (json['date'] != null && json['date'].toString().isNotEmpty)
@@ -60,10 +57,10 @@ class Sermon {
       duration: Duration(
         minutes: int.tryParse((json['duration_minutes'] ?? json['duration'] ?? 0).toString()) ?? 0,
       ),
-      isRecommended: json['is_recommended'] ?? false,
-      isServiceTeamOnly: json['is_service_team_only'] ?? false,
-      isGeneralMarriedOnly: json['is_general_married_only'] ?? false,
-      isInHouseMarriedOnly: json['is_in_house_married_only'] ?? false,
+      isRecommended: json['is_recommended'] == true,
+      isServiceTeamOnly: json['is_service_team_only'] == true,
+      isGeneralMarriedOnly: json['is_general_married_only'] == true,
+      isInHouseMarriedOnly: json['is_in_house_married_only'] == true,
     );
   }
 
