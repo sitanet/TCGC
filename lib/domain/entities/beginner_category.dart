@@ -20,9 +20,13 @@ class BeginnerCategory {
   factory BeginnerCategory.fromJson(Map<String, dynamic> json) {
     List<Sermon> sermonList = [];
     if (json['messages'] != null && json['messages'] is List) {
-      sermonList = (json['messages'] as List)
-          .map((m) => Sermon.fromJson(m as Map<String, dynamic>))
-          .toList();
+      for (var item in json['messages']) {
+        if (item != null && item is Map<String, dynamic>) {
+          try {
+            sermonList.add(Sermon.fromJson(item));
+          } catch (_) {}
+        }
+      }
     }
 
     return BeginnerCategory(
