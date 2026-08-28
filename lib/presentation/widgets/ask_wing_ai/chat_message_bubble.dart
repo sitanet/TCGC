@@ -329,13 +329,15 @@ class _TypewriterMarkdownState extends State<TypewriterMarkdown> {
             _currentIndex++;
           });
           
-          // Auto scroll to bottom as new words are typed
+          // Auto scroll to bottom only if user is already at the bottom (within 100px)
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
             try {
               final scrollable = Scrollable.of(context);
-              if (scrollable.position.pixels < scrollable.position.maxScrollExtent) {
-                scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+              final pos = scrollable.position;
+              // If user has scrolled up to read, do NOT force jump down
+              if (pos.maxScrollExtent - pos.pixels < 100) {
+                pos.jumpTo(pos.maxScrollExtent);
               }
             } catch (_) {
               // Ignore if scrollable is not yet attached or not found

@@ -79,7 +79,7 @@ class AskWingAIService {
           'Content-Type': 'application/json',
         },
         body: json.encode(body),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 75));
 
       if (response.statusCode == 200 || response.statusCode == 202) {
         final data = json.decode(response.body) as Map<String, dynamic>;

@@ -153,7 +153,9 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
         sessionId: _currentSessionId,
       );
 
-      _messages = response.messages;
+      final sortedMessages = List<ChatMessageModel>.from(response.messages)
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      _messages = sortedMessages;
       _currentSessionId = response.sessionId;
     } catch (e) {
       print('Failed to load chat history: $e');
@@ -171,7 +173,9 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
         sessionId: _currentSessionId,
       );
 
-      _messages = response.messages;
+      final sortedMessages = List<ChatMessageModel>.from(response.messages)
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      _messages = sortedMessages;
 
       emit(AskWingAIHistoryLoaded(
         messages: _messages,
