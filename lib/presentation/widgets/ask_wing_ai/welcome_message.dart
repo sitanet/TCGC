@@ -24,17 +24,37 @@ class WelcomeMessage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Eagle Icon
+            // Golden Eagle Wings Avatar
             Container(
-              padding: const EdgeInsets.all(20),
+              width: 90,
+              height: 90,
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.1),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE5A93C).withOpacity(0.35),
+                    blurRadius: 20,
+                    spreadRadius: 3,
+                  ),
+                ],
+                border: Border.all(
+                  color: const Color(0xFFE5A93C),
+                  width: 2.5,
+                ),
               ),
-              child: Icon(
-                Icons.flutter_dash,
-                size: 60,
-                color: Theme.of(context).primaryColor,
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/wing_ai_eagle.jpg',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: Theme.of(context).primaryColor.withOpacity(0.1),
+                    child: Icon(
+                      Icons.flight,
+                      size: 48,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 20),

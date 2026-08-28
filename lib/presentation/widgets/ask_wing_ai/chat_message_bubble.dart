@@ -119,15 +119,25 @@ class ChatMessageBubble extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(5),
+                width: 22,
+                height: 22,
                 decoration: BoxDecoration(
-                  color: primaryColor.withOpacity(0.12),
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFFE5A93C),
+                    width: 1,
+                  ),
                 ),
-                child: Icon(
-                  Icons.auto_awesome,
-                  size: 14,
-                  color: primaryColor,
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/wing_ai_eagle.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.flight,
+                      size: 14,
+                      color: primaryColor,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),

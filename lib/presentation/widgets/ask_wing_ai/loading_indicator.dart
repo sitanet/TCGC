@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
-/// Flying eagle animation indicator for AI response
+/// Flying eagle animation indicator for AI response with moving wings
 class LoadingIndicator extends StatefulWidget {
   const LoadingIndicator({Key? key}) : super(key: key);
 
@@ -12,98 +12,137 @@ class LoadingIndicator extends StatefulWidget {
 class _LoadingIndicatorState extends State<LoadingIndicator>
     with TickerProviderStateMixin {
   late AnimationController _flightController;
-  late AnimationController _wingController;
+  late AnimationController _wingFlapController;
+  late AnimationController _glowController;
   late Animation<double> _flightAnimation;
-  late Animation<double> _wingAnimation;
+  late Animation<double> _wingScaleX;
+  late Animation<double> _wingScaleY;
+  late Animation<double> _glowAnimation;
 
   @override
   void initState() {
     super.initState();
     
-    // Flight path animation (circular motion)
+    // Gentle soaring vertical motion (smooth floating oscillation)
     _flightController = AnimationController(
-      duration: const Duration(seconds: 3),
-      vsync: this,
-    )..repeat();
-
-    // Wing flapping animation
-    _wingController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 1800),
       vsync: this,
     )..repeat(reverse: true);
 
-    _flightAnimation = _flightController.drive(
-      Tween<double>(begin: 0, end: 2 * 3.14159), // Full circle in radians
+    // Realistic wing flapping motion
+    _wingFlapController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    // Subtle golden glow pulse
+    _glowController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _flightAnimation = CurvedAnimation(
+      parent: _flightController,
+      curve: Curves.easeInOutSine,
     );
 
-    _wingAnimation = _wingController.drive(
-      Tween<double>(begin: 0.8, end: 1.2), // Scale for wing flapping
+    // Wing flapping curves (expands and contracts wings rhythmically)
+    _wingScaleX = Tween<double>(begin: 0.88, end: 1.15).animate(
+      CurvedAnimation(parent: _wingFlapController, curve: Curves.easeInOut),
+    );
+    _wingScaleY = Tween<double>(begin: 0.95, end: 1.08).animate(
+      CurvedAnimation(parent: _wingFlapController, curve: Curves.easeInOut),
+    );
+
+    _glowAnimation = Tween<double>(begin: 0.2, end: 0.8).animate(
+      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
   }
 
   @override
   void dispose() {
     _flightController.dispose();
-    _wingController.dispose();
+    _wingFlapController.dispose();
+    _glowController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).primaryColor;
     
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isDark ? Colors.grey[800] : Colors.grey[100],
-          borderRadius: BorderRadius.circular(16),
+          color: isDark ? const Color(0xFF1E222A) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: Theme.of(context).primaryColor.withOpacity(0.2),
+            color: primaryColor.withOpacity(0.25),
+            width: 1.2,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: primaryColor.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Flying Eagle Animation
-            SizedBox(
-              width: 40,
-              height: 40,
-              child: AnimatedBuilder(
-                animation: Listenable.merge([_flightAnimation, _wingAnimation]),
-                builder: (context, child) {
-                  // Calculate circular position
-                  final radius = 12.0;
-                  final x = radius * (1 + 0.8 * math.cos(_flightAnimation.value));
-                  final y = radius * (1 + 0.6 * math.sin(_flightAnimation.value));
-                  
-                  return Stack(
-                    children: [
-                      // Eagle with circular flight path
-                      Positioned(
-                        left: x,
-                        top: y,
-                        child: Transform.scale(
-                          scale: _wingAnimation.value,
-                          child: Transform.rotate(
-                            angle: _flightAnimation.value * 0.5, // Slight rotation during flight
+            // Moving Golden Eagle Wings Animation
+            AnimatedBuilder(
+              animation: Listenable.merge([_flightAnimation, _wingScaleX, _wingScaleY, _glowAnimation]),
+              builder: (context, child) {
+                final verticalOffset = (_flightAnimation.value - 0.5) * 6.0;
+                
+                return Transform.translate(
+                  offset: Offset(0, verticalOffset),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE5A93C).withOpacity(_glowAnimation.value * 0.4),
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Transform(
+                      alignment: Alignment.center,
+                      transform: Matrix4.identity()
+                        ..scale(_wingScaleX.value, _wingScaleY.value),
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/images/wing_ai_eagle.jpg',
+                          width: 44,
+                          height: 44,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            color: primaryColor.withOpacity(0.1),
                             child: Icon(
-                              Icons.flutter_dash,
-                              color: Theme.of(context).primaryColor,
-                              size: 20,
+                              Icons.flight,
+                              color: primaryColor,
+                              size: 24,
                             ),
                           ),
                         ),
                       ),
-                    ],
-                  );
-                },
-              ),
+                    ),
+                  ),
+                );
+              },
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             
-            // Church-themed loading text
+            // Text indicator
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -114,26 +153,26 @@ class _LoadingIndicatorState extends State<LoadingIndicator>
                     Text(
                       'Wing AI',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).primaryColor,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: primaryColor,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.4,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 AnimatedBuilder(
                   animation: _flightController,
                   builder: (context, child) {
-                    // Create dots animation for "praying"
-                    final dotCount = ((_flightController.value * 3) % 3).floor() + 1;
+                    final dotCount = ((_flightController.value * 3.9)).floor() % 3 + 1;
                     final dots = '.' * dotCount;
                     
                     return Text(
-                      'Praying for wisdom$dots',
+                      'Soaring in the Word$dots',
                       style: TextStyle(
-                        fontSize: 14,
-                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        fontSize: 13,
+                        color: isDark ? Colors.grey[300] : Colors.grey[700],
                         fontStyle: FontStyle.italic,
                       ),
                     );
