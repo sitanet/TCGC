@@ -258,10 +258,19 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
     final messages = _getMessages(state);
 
     if (messages.isEmpty) {
-      // Show welcome message with user's name
+      // Extract rate limit data for the welcome page prompt counter
+      int? remaining;
+      int? limit;
+      if (state is AskWingAIReady && state.rateLimitStatus != null) {
+        remaining = state.rateLimitStatus!.dailyRemaining;
+        limit = state.rateLimitStatus!.dailyLimit;
+      }
+
       return WelcomeMessage(
         onQuestionTap: (question) => _submitQuestion(question, state),
         userName: _currentUser?.firstName,
+        dailyRemaining: remaining,
+        dailyLimit: limit,
       );
     }
 
@@ -353,15 +362,91 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
   }
 
   void _showRateLimitDialog(BuildContext context, AskWingAIRateLimitExceeded state) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Daily Limit Reached'),
-        content: Text(state.message),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: isDark ? const Color(0xFF1E222A) : Colors.white,
+        title: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE53935).withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.hourglass_empty_rounded,
+                color: Color(0xFFE53935),
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Daily Limit Reached',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'You\'ve used all 20 prompts for today. Your allowance resets at midnight.',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? Colors.grey[300] : Colors.grey[700],
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[900] : const Color(0xFFFFF9EE),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFE5A93C).withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.schedule, size: 18, color: Color(0xFFE5A93C)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Come back tomorrow with 20 fresh prompts!',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? Colors.grey[300] : Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text('Got it'),
+            ),
           ),
         ],
       ),
