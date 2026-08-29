@@ -228,6 +228,7 @@ class ChatMessageBubble extends StatelessWidget {
             children: [
               // AI response with typewriter animated typing support
               TypewriterMarkdown(
+                messageId: message.id,
                 text: message.content,
                 isNewMessage: DateTime.now().difference(message.createdAt).inSeconds < 15,
                 styleSheet: MarkdownStyleSheet(
@@ -387,6 +388,7 @@ class ChatMessageBubble extends StatelessWidget {
 
 /// Custom Widget to simulate Typing (typewriter) animation for Markdown content
 class TypewriterMarkdown extends StatefulWidget {
+  final String? messageId;
   final String text;
   final MarkdownStyleSheet styleSheet;
   final bool isNewMessage;
@@ -394,6 +396,7 @@ class TypewriterMarkdown extends StatefulWidget {
 
   const TypewriterMarkdown({
     Key? key,
+    this.messageId,
     required this.text,
     required this.styleSheet,
     required this.isNewMessage,
@@ -404,16 +407,26 @@ class TypewriterMarkdown extends StatefulWidget {
   State<TypewriterMarkdown> createState() => _TypewriterMarkdownState();
 }
 
-class _TypewriterMarkdownState extends State<TypewriterMarkdown> {
+class _TypewriterMarkdownState extends State<TypewriterMarkdown> with AutomaticKeepAliveClientMixin {
+  // Global set to ensure a message is ONLY animated once and NEVER re-generates on scroll
+  static final Set<String> _animatedMessageIds = {};
+
   String _displayedText = '';
   late List<String> _words;
   int _currentIndex = 0;
   Timer? _timer;
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   void initState() {
     super.initState();
-    if (widget.isNewMessage && widget.text.isNotEmpty) {
+    final msgKey = widget.messageId ?? widget.text.hashCode.toString();
+    final alreadyAnimated = _animatedMessageIds.contains(msgKey);
+
+    if (widget.isNewMessage && widget.text.isNotEmpty && !alreadyAnimated) {
+      _animatedMessageIds.add(msgKey);
       // Split text into words, keeping whitespace
       _words = widget.text.split(RegExp(r'(?<=\s)|(?=\s)'));
       _startTyping();
@@ -429,21 +442,6 @@ class _TypewriterMarkdownState extends State<TypewriterMarkdown> {
           setState(() {
             _displayedText += _words[_currentIndex];
             _currentIndex++;
-          });
-          
-          // Auto scroll to bottom only if user is already at the bottom (within 100px)
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            try {
-              final scrollable = Scrollable.of(context);
-              final pos = scrollable.position;
-              // If user has scrolled up to read, do NOT force jump down
-              if (pos.maxScrollExtent - pos.pixels < 100) {
-                pos.jumpTo(pos.maxScrollExtent);
-              }
-            } catch (_) {
-              // Ignore if scrollable is not yet attached or not found
-            }
           });
         }
       } else {
@@ -463,7 +461,11 @@ class _TypewriterMarkdownState extends State<TypewriterMarkdown> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.text != widget.text) {
       _timer?.cancel();
-      if (widget.isNewMessage && widget.text.isNotEmpty) {
+      final msgKey = widget.messageId ?? widget.text.hashCode.toString();
+      final alreadyAnimated = _animatedMessageIds.contains(msgKey);
+
+      if (widget.isNewMessage && widget.text.isNotEmpty && !alreadyAnimated) {
+        _animatedMessageIds.add(msgKey);
         setState(() {
           _displayedText = '';
           _currentIndex = 0;
@@ -480,6 +482,7 @@ class _TypewriterMarkdownState extends State<TypewriterMarkdown> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final processedText = _preProcessMarkdown(_displayedText);
     return MarkdownBody(
       data: processedText,
