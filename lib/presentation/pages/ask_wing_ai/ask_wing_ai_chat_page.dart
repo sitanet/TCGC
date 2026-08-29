@@ -86,24 +86,24 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
         title: Row(
           children: [
             Container(
-              width: 30,
-              height: 30,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFFE5A93C),
-                  width: 1.5,
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFE5A93C),
+                    Theme.of(context).primaryColor,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
               ),
-              child: ClipOval(
-                child: Image.asset(
-                  'assets/images/wing_ai_eagle.jpg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Icon(
-                    Icons.flight,
-                    color: Theme.of(context).primaryColor,
-                    size: 20,
-                  ),
+              child: const Center(
+                child: Icon(
+                  Icons.flutter_dash,
+                  color: Colors.white,
+                  size: 18,
                 ),
               ),
             ),

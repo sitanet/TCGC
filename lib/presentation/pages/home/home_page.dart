@@ -291,15 +291,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                     color: Colors.white,
                     shape: BoxShape.circle,
                   ),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/images/wing_ai_eagle.jpg',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const Icon(
-                        Icons.flight,
-                        color: AppColors.primaryGold,
-                        size: 20,
-                      ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.flutter_dash,
+                      color: AppColors.primaryGold,
+                      size: 22,
                     ),
                   ),
                 ),

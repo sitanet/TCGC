@@ -30,15 +30,23 @@ class WelcomeMessage extends StatelessWidget {
           children: [
             const SizedBox(height: 8),
 
-            // ── Golden Eagle Avatar ──
+            // ── Golden Wing Emblem ──
             Container(
               width: 90,
               height: 90,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFE5A93C),
+                    primaryColor,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFE5A93C).withValues(alpha: 0.35),
+                    color: const Color(0xFFE5A93C).withValues(alpha: 0.4),
                     blurRadius: 22,
                     spreadRadius: 4,
                   ),
@@ -48,14 +56,11 @@ class WelcomeMessage extends StatelessWidget {
                   width: 2.5,
                 ),
               ),
-              child: ClipOval(
-                child: Image.asset(
-                  'assets/images/wing_ai_eagle.jpg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: primaryColor.withValues(alpha: 0.1),
-                    child: Icon(Icons.flight, size: 48, color: primaryColor),
-                  ),
+              child: const Center(
+                child: Icon(
+                  Icons.flutter_dash,
+                  size: 52,
+                  color: Colors.white,
                 ),
               ),
             ),

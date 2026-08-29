@@ -20,23 +20,10 @@ class AskWingAIFAB extends StatelessWidget {
 
         return FloatingActionButton.extended(
           onPressed: () => _onPressed(context, state),
-          icon: Container(
-            width: 28,
-            height: 28,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-            ),
-            child: ClipOval(
-              child: Image.asset(
-                'assets/images/wing_ai_eagle.jpg',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.flight,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-            ),
+          icon: const Icon(
+            Icons.flutter_dash,
+            color: Colors.white,
+            size: 22,
           ),
           label: const Text('Ask Wing AI'),
           backgroundColor: Theme.of(context).primaryColor,

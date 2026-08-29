@@ -94,7 +94,7 @@ class _LoadingIndicatorState extends State<LoadingIndicator>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Moving Golden Eagle Wings Animation
+            // Moving Golden Wings Icon Animation
             AnimatedBuilder(
               animation: Listenable.merge([_flightAnimation, _wingScaleX, _wingScaleY, _glowAnimation]),
               builder: (context, child) {
@@ -107,10 +107,18 @@ class _LoadingIndicatorState extends State<LoadingIndicator>
                     height: 44,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFFE5A93C),
+                          primaryColor,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFE5A93C).withOpacity(_glowAnimation.value * 0.4),
-                          blurRadius: 10,
+                          color: const Color(0xFFE5A93C).withValues(alpha: _glowAnimation.value * 0.45),
+                          blurRadius: 12,
                           spreadRadius: 2,
                         ),
                       ],
@@ -119,20 +127,11 @@ class _LoadingIndicatorState extends State<LoadingIndicator>
                       alignment: Alignment.center,
                       transform: Matrix4.identity()
                         ..scale(_wingScaleX.value, _wingScaleY.value),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/wing_ai_eagle.jpg',
-                          width: 44,
-                          height: 44,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            color: primaryColor.withOpacity(0.1),
-                            child: Icon(
-                              Icons.flight,
-                              color: primaryColor,
-                              size: 24,
-                            ),
-                          ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.flutter_dash,
+                          color: Colors.white,
+                          size: 26,
                         ),
                       ),
                     ),
