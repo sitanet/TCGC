@@ -19,8 +19,8 @@ class WelcomeMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).primaryColor;
-    final remaining = dailyRemaining ?? 20;
-    final limit = dailyLimit ?? 20;
+    final remaining = dailyRemaining ?? 15;
+    final limit = dailyLimit ?? 15;
 
     return Center(
       child: SingleChildScrollView(

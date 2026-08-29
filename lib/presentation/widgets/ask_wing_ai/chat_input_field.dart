@@ -102,7 +102,7 @@ class _ChatInputFieldState extends State<ChatInputField> {
                   decoration: InputDecoration(
                     hintText: widget.enabled
                         ? 'Ask Wing AI a question...'
-                        : 'Daily limit reached',
+                        : 'Daily limit reached (15/15) • Please wait until tomorrow',
                     hintStyle: TextStyle(
                       color: isDark ? Colors.grey[500] : Colors.grey[400],
                       fontSize: 15,

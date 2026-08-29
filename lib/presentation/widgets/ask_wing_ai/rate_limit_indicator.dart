@@ -15,7 +15,7 @@ class RateLimitIndicator extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final badgeColor = _getBadgeColor();
     final remaining = status.dailyRemaining;
-    final total = status.dailyLimit > 0 ? status.dailyLimit : 20;
+    final total = status.dailyLimit > 0 ? status.dailyLimit : 15;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
@@ -68,7 +68,7 @@ class RateLimitIndicator extends StatelessWidget {
 
   void _showRateLimitDialog(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final total = status.dailyLimit > 0 ? status.dailyLimit : 20;
+    final total = status.dailyLimit > 0 ? status.dailyLimit : 15;
     
     showDialog(
       context: context,
@@ -210,7 +210,7 @@ class RateLimitIndicator extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Every user receives 20 prompts per day. Each message submitted reduces your count by 1.',
+                      'Every user receives 15 prompts per day. When you hit your daily limit, please wait until tomorrow (midnight) to ask more questions.',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? Colors.grey[300] : Colors.grey[700],

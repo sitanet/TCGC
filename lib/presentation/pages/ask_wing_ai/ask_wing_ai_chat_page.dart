@@ -400,7 +400,7 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'You\'ve used all 20 prompts for today. Your allowance resets at midnight.',
+              'You\'ve used all 15 prompts for today. Please wait until tomorrow (resets at midnight) to ask more questions.',
               style: TextStyle(
                 fontSize: 14,
                 color: isDark ? Colors.grey[300] : Colors.grey[700],
