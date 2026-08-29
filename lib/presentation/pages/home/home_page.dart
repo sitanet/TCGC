@@ -968,6 +968,8 @@ class _HomePageState extends ConsumerState<HomePage> {
               category: category.name,
               audioItems: category.sermons,
               categories: _beginnerCategories.map((c) => c.name).toList(),
+              beginnerCategories: _beginnerCategories,
+              isDirectCollection: true,
             ),
           ),
         );
@@ -997,7 +999,13 @@ class _HomePageState extends ConsumerState<HomePage> {
               child: SizedBox(
                 width: 52,
                 height: 52,
-                child: _buildCategoryCardImage(category.imageUrl, isDark),
+                child: _buildCategoryCardImage(
+                  category.imageUrl ??
+                      (category.sermons.isNotEmpty
+                          ? category.sermons.first.imageUrl
+                          : null),
+                  isDark,
+                ),
               ),
             ),
             const SizedBox(width: 12),

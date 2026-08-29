@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/sermon.dart';
+import '../../../domain/entities/beginner_category.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/download_service.dart';
 import '../../../data/services/played_audio_service.dart';
@@ -22,6 +23,8 @@ class AudioListPage extends ConsumerStatefulWidget {
   final Map<String, String>? categoryNameToId;
   final FilterType initialFilterType;
   final String? initialSpeaker;
+  final List<BeginnerCategory>? beginnerCategories;
+  final bool isDirectCollection;
 
   const AudioListPage({
     super.key,
@@ -32,6 +35,8 @@ class AudioListPage extends ConsumerStatefulWidget {
     this.categoryNameToId,
     this.initialFilterType = FilterType.category,
     this.initialSpeaker,
+    this.beginnerCategories,
+    this.isDirectCollection = false,
   });
 
   @override
@@ -256,29 +261,34 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
           matchesFilter = audio.speaker?.toLowerCase() == _selectedSpeaker?.toLowerCase();
         }
       } else {
-        // Filter by category
-        matchesFilter = _selectedCategory == 'All';
-        
-        if (!matchesFilter) {
-          // Try matching by category ID (audio.category could be ID)
-          if (_selectedCategoryId != null && _selectedCategoryId!.isNotEmpty) {
-            matchesFilter = audio.category == _selectedCategoryId ||
-                audio.category.toString() == _selectedCategoryId.toString();
-          }
-          // Try matching by category name (case-insensitive)
-          if (!matchesFilter && audio.categoryName.isNotEmpty) {
-            matchesFilter = audio.categoryName.toLowerCase() == _selectedCategory.toLowerCase();
-          }
-          // Try matching category field against name (case-insensitive)
-          if (!matchesFilter && audio.category.isNotEmpty) {
-            matchesFilter = audio.category.toLowerCase() == _selectedCategory.toLowerCase();
-          }
-          // Also check if audio.category matches the name via categoryNameToId lookup
-          if (!matchesFilter && widget.categoryNameToId != null) {
-            final categoryIdFromName = widget.categoryNameToId![_selectedCategory];
-            if (categoryIdFromName != null) {
-              matchesFilter = audio.category == categoryIdFromName ||
-                  audio.category.toString() == categoryIdFromName.toString();
+        // Direct collection / Beginner Category mode
+        if (widget.isDirectCollection || widget.beginnerCategories != null) {
+          matchesFilter = true;
+        } else {
+          // Filter by standard category
+          matchesFilter = _selectedCategory == 'All';
+          
+          if (!matchesFilter) {
+            // Try matching by category ID (audio.category could be ID)
+            if (_selectedCategoryId != null && _selectedCategoryId!.isNotEmpty) {
+              matchesFilter = audio.category == _selectedCategoryId ||
+                  audio.category.toString() == _selectedCategoryId.toString();
+            }
+            // Try matching by category name (case-insensitive)
+            if (!matchesFilter && audio.categoryName.isNotEmpty) {
+              matchesFilter = audio.categoryName.toLowerCase() == _selectedCategory.toLowerCase();
+            }
+            // Try matching category field against name (case-insensitive)
+            if (!matchesFilter && audio.category.isNotEmpty) {
+              matchesFilter = audio.category.toLowerCase() == _selectedCategory.toLowerCase();
+            }
+            // Also check if audio.category matches the name via categoryNameToId lookup
+            if (!matchesFilter && widget.categoryNameToId != null) {
+              final categoryIdFromName = widget.categoryNameToId![_selectedCategory];
+              if (categoryIdFromName != null) {
+                matchesFilter = audio.category == categoryIdFromName ||
+                    audio.category.toString() == categoryIdFromName.toString();
+              }
             }
           }
         }
@@ -307,6 +317,20 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
       _selectedCategory = category;
       _selectedCategoryId = widget.categoryNameToId?[category];
       _selectedSpeaker = null;
+
+      // When in beginner category mode, switch the active sermon list to the selected beginner category
+      if (widget.beginnerCategories != null) {
+        final match = widget.beginnerCategories!.firstWhere(
+          (c) => c.name.toLowerCase() == category.toLowerCase(),
+          orElse: () => BeginnerCategory(id: '', name: category, sermons: []),
+        );
+        if (match.sermons.isNotEmpty) {
+          _allItems = match.sermons;
+        } else if (category == 'All') {
+          _allItems = widget.beginnerCategories!.expand((c) => c.sermons).toList();
+        }
+      }
+
       _filteredItems = _getFilteredItems(query);
     });
   }
