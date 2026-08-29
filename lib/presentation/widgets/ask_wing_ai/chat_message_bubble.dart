@@ -31,15 +31,38 @@ class ChatMessageBubble extends StatelessWidget {
 
   void _shareMessage(BuildContext context) {
     final buffer = StringBuffer();
+    
+    // 1. Question
     if (question != null && question!.trim().isNotEmpty) {
       buffer.writeln('❓ Question:');
       buffer.writeln(question!.trim());
       buffer.writeln();
     }
+    
+    // 2. Full Wing AI Response
     buffer.writeln('🦅 Wing AI Response (The CityGate Church):');
     buffer.writeln(message.content.trim());
     buffer.writeln();
+    
+    // 3. Complete Citations & Message Sources (if any)
+    if (message.citations != null && message.citations!.isNotEmpty) {
+      buffer.writeln('📚 Sermon Sources & Citations:');
+      for (final citation in message.citations!) {
+        final title = citation.sermonTitle.isNotEmpty ? citation.sermonTitle : 'Sermon Teaching';
+        final speaker = citation.speakerName != null && citation.speakerName!.isNotEmpty 
+            ? 'by ${citation.speakerName}' 
+            : '';
+        final timestamp = citation.timestamp != null && citation.timestamp!.isNotEmpty 
+            ? '(${citation.timestamp})' 
+            : '';
+        buffer.writeln('• "$title" $speaker $timestamp'.trim());
+      }
+      buffer.writeln();
+    }
+    
+    // 4. Footer & Church App Tag
     buffer.writeln('— Shared from The CityGate Church App (Ask Wing AI)');
+    buffer.writeln('🌐 https://thecitygatechurch.org');
 
     Share.share(
       buffer.toString(),
