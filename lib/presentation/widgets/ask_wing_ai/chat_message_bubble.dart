@@ -3,16 +3,19 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
 import 'citation_card.dart';
 
 /// Message bubble for chat messages
 class ChatMessageBubble extends StatelessWidget {
   final ChatMessageModel message;
+  final String? question;
 
   const ChatMessageBubble({
     Key? key,
     required this.message,
+    this.question,
   }) : super(key: key);
 
   void _copyToClipboard(BuildContext context) {
@@ -23,6 +26,26 @@ class ChatMessageBubble extends StatelessWidget {
         duration: Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
       ),
+    );
+  }
+
+  void _shareMessage(BuildContext context) {
+    final buffer = StringBuffer();
+    if (question != null && question!.trim().isNotEmpty) {
+      buffer.writeln('❓ Question:');
+      buffer.writeln(question!.trim());
+      buffer.writeln();
+    }
+    buffer.writeln('🦅 Wing AI Response (The CityGate Church):');
+    buffer.writeln(message.content.trim());
+    buffer.writeln();
+    buffer.writeln('— Shared from The CityGate Church App (Ask Wing AI)');
+
+    Share.share(
+      buffer.toString(),
+      subject: question != null && question!.isNotEmpty
+          ? 'Wing AI: $question'
+          : 'Insight from Wing AI (The CityGate Church)',
     );
   }
 
@@ -63,31 +86,31 @@ class ChatMessageBubble extends StatelessWidget {
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-            ),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-              bottomLeft: Radius.circular(20),
-              bottomRight: Radius.circular(4),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: primaryColor.withOpacity(0.2),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
               ),
-            ],
-          ),
-          child: Text(
-            message.content,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              height: 1.3,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+                bottomLeft: Radius.circular(20),
+                bottomRight: Radius.circular(4),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withValues(alpha: 0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Text(
+              message.content,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                height: 1.3,
+              ),
             ),
           ),
-        ),
         ),
         Padding(
           padding: const EdgeInsets.only(top: 4, right: 4),
@@ -171,7 +194,7 @@ class ChatMessageBubble extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -187,7 +210,7 @@ class ChatMessageBubble extends StatelessWidget {
                 styleSheet: MarkdownStyleSheet(
                   p: TextStyle(
                     fontSize: 15, 
-                    color: isDark ? Colors.white.withOpacity(0.9) : Colors.black.withOpacity(0.8),
+                    color: isDark ? Colors.white.withValues(alpha: 0.9) : Colors.black.withValues(alpha: 0.8),
                     height: 1.45,
                   ),
                   strong: TextStyle(
@@ -202,7 +225,7 @@ class ChatMessageBubble extends StatelessWidget {
                 ),
               ),
 
-              // Processing time & copy footer
+              // Processing time & copy/share footer
               Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: Row(
@@ -211,13 +234,13 @@ class ChatMessageBubble extends StatelessWidget {
                       Icon(
                         Icons.done_all,
                         size: 14,
-                        color: primaryColor.withOpacity(0.6),
+                        color: primaryColor.withValues(alpha: 0.6),
                       ),
                       const SizedBox(width: 4),
                       Text(
                         'Responded in ${(message.processingTimeMs! / 1000).toStringAsFixed(1)}s' +
                         (message.creditsCost != null
-                            ? ' • ${message.creditsCost} ${message.creditsCost == 1 ? 'credit' : 'credits'}'
+                            ? ' • ${message.creditsCost} ${message.creditsCost == 1 ? 'prompt' : 'prompts'}'
                             : ''),
                         style: TextStyle(
                           fontSize: 11,
@@ -238,14 +261,41 @@ class ChatMessageBubble extends StatelessWidget {
                             Icon(
                               Icons.copy_outlined,
                               size: 13,
-                              color: primaryColor.withOpacity(0.7),
+                              color: primaryColor.withValues(alpha: 0.7),
                             ),
                             const SizedBox(width: 4),
                             Text(
                               'Copy',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: primaryColor.withOpacity(0.8),
+                                color: primaryColor.withValues(alpha: 0.8),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Share Response Button (includes Question + Response)
+                    InkWell(
+                      onTap: () => _shareMessage(context),
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.share_outlined,
+                              size: 13,
+                              color: primaryColor.withValues(alpha: 0.7),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Share',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: primaryColor.withValues(alpha: 0.8),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),

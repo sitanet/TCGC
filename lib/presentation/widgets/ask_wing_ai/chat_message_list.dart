@@ -41,6 +41,17 @@ class ChatMessageList extends StatelessWidget {
           final showDateHeader = index == 0 ||
               !_isSameDay(messages[index - 1].createdAt, message.createdAt);
 
+          // Find the preceding user question for this AI response
+          String? promptQuestion;
+          if (!message.isUserMessage) {
+            for (int i = index - 1; i >= 0; i--) {
+              if (messages[i].isUserMessage) {
+                promptQuestion = messages[i].content;
+                break;
+              }
+            }
+          }
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -48,6 +59,7 @@ class ChatMessageList extends StatelessWidget {
               ChatMessageBubble(
                 key: ValueKey(message.id),
                 message: message,
+                question: promptQuestion,
               ),
             ],
           );
