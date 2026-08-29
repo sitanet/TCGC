@@ -18,7 +18,7 @@ class RateLimitIndicator extends StatelessWidget {
     final total = status.dailyLimit > 0 ? status.dailyLimit : 20;
 
     return Padding(
-      padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       child: Material(
         color: Colors.transparent,
         child: InkWell(

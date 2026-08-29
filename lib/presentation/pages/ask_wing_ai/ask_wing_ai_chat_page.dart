@@ -83,7 +83,9 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 32,
@@ -107,8 +109,11 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            const Text('Ask Wing AI'),
+            const SizedBox(width: 8),
+            const Text(
+              'Wing AI',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
           ],
         ),
         actions: [

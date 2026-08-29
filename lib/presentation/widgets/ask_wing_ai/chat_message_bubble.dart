@@ -252,79 +252,98 @@ class ChatMessageBubble extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    if (message.processingTimeMs != null) ...[
-                      Icon(
-                        Icons.done_all,
-                        size: 14,
-                        color: primaryColor.withValues(alpha: 0.6),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Responded in ${(message.processingTimeMs! / 1000).toStringAsFixed(1)}s' +
-                        (message.creditsCost != null
-                            ? ' • ${message.creditsCost} ${message.creditsCost == 1 ? 'prompt' : 'prompts'}'
-                            : ''),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[500],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                    const Spacer(),
-                    // Copy Response Button
-                    InkWell(
-                      onTap: () => _copyToClipboard(context),
-                      borderRadius: BorderRadius.circular(4),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    if (message.processingTimeMs != null)
+                      Expanded(
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.copy_outlined,
+                              Icons.done_all,
                               size: 13,
-                              color: primaryColor.withValues(alpha: 0.7),
+                              color: primaryColor.withValues(alpha: 0.6),
                             ),
                             const SizedBox(width: 4),
-                            Text(
-                              'Copy',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: primaryColor.withValues(alpha: 0.8),
-                                fontWeight: FontWeight.bold,
+                            Flexible(
+                              child: Text(
+                                '${(message.processingTimeMs! / 1000).toStringAsFixed(1)}s' +
+                                (message.creditsCost != null
+                                    ? ' • ${message.creditsCost} ${message.creditsCost == 1 ? 'prompt' : 'prompts'}'
+                                    : ''),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[500],
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Share Response Button (includes Question + Response)
-                    InkWell(
-                      onTap: () => _shareMessage(context),
-                      borderRadius: BorderRadius.circular(4),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.share_outlined,
-                              size: 13,
-                              color: primaryColor.withValues(alpha: 0.7),
+                      )
+                    else
+                      const Spacer(),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Copy Response Button
+                        InkWell(
+                          onTap: () => _copyToClipboard(context),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.copy_outlined,
+                                  size: 12,
+                                  color: primaryColor.withValues(alpha: 0.75),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Copy',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: primaryColor.withValues(alpha: 0.85),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Share',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: primaryColor.withValues(alpha: 0.8),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 4),
+                        // Share Response Button (includes Question + Response)
+                        InkWell(
+                          onTap: () => _shareMessage(context),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.share_outlined,
+                                  size: 12,
+                                  color: primaryColor.withValues(alpha: 0.75),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Share',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: primaryColor.withValues(alpha: 0.85),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
