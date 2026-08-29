@@ -116,12 +116,32 @@ class _HomePageState extends ConsumerState<HomePage> {
       final sermons = allSermons.where(canAccessSermon).toList();
       final beginnerCats = await _dataService.getBeginnerCategories(forceRefresh: forceRefresh);
 
+      // If no custom beginner categories are returned from API, automatically group existing sermons into categories
+      List<BeginnerCategory> resolvedCategories = beginnerCats;
+      if (resolvedCategories.isEmpty && sermons.isNotEmpty) {
+        final Map<String, List<Sermon>> grouped = {};
+        for (final s in sermons) {
+          final catName = s.categoryName.isNotEmpty ? s.categoryName : 'Spiritual Growth';
+          grouped.putIfAbsent(catName, () => []).add(s);
+        }
+        resolvedCategories = grouped.entries.map((e) {
+          return BeginnerCategory(
+            id: e.value.first.category.isNotEmpty ? e.value.first.category : e.key,
+            name: e.key,
+            description: 'Foundational teachings on ${e.key}',
+            imageUrl: e.value.first.imageUrl,
+            sermonCount: e.value.length,
+            sermons: e.value,
+          );
+        }).toList();
+      }
+
       if (mounted) {
         final pickedInterests = _interestsService
             .getRandomMessagesFromInterests(sermons, count: 3);
         setState(() {
           _sermons = sermons;
-          _beginnerCategories = beginnerCats;
+          _beginnerCategories = resolvedCategories;
           _pickedInterestSermons = pickedInterests;
           _isLoading = false; // Show content after loading
         });
@@ -142,7 +162,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _loadBeginnerCategoriesAsync(bool forceRefresh) async {
     try {
       final categories = await _dataService.getBeginnerCategories(forceRefresh: forceRefresh);
-      if (mounted) setState(() => _beginnerCategories = categories);
+      if (mounted && categories.isNotEmpty) {
+        setState(() => _beginnerCategories = categories);
+      }
     } catch (e) {
       debugPrint('Beginner categories load error: $e');
     }
@@ -263,16 +285,22 @@ class _HomePageState extends ConsumerState<HomePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    Icons.smart_toy_outlined,
-                    color: AppColors.primaryGold,
-                    size: 20,
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/wing_ai_eagle.jpg',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.flight,
+                        color: AppColors.primaryGold,
+                        size: 20,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
