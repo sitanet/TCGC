@@ -228,7 +228,7 @@ class ChatMessageBubble extends StatelessWidget {
             children: [
               // AI response with typewriter animated typing support
               TypewriterMarkdown(
-                messageId: message.id,
+                messageId: message.id.toString(),
                 text: message.content,
                 isNewMessage: DateTime.now().difference(message.createdAt).inSeconds < 15,
                 styleSheet: MarkdownStyleSheet(
