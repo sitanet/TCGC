@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../core/services/connectivity_service.dart';
 
-/// Elegant chat input field with animated send button
+/// Elegant chat input field with network awareness and animated send button
 class ChatInputField extends StatefulWidget {
   final TextEditingController controller;
   final Function(String) onSubmit;
@@ -22,11 +24,41 @@ class _ChatInputFieldState extends State<ChatInputField> {
   final FocusNode _focusNode = FocusNode();
   bool _isFocused = false;
 
+  final ConnectivityService _connectivityService = ConnectivityService();
+  bool _isConnected = true;
+  StreamSubscription<bool>? _connectivitySubscription;
+
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_onTextChanged);
     _focusNode.addListener(_onFocusChanged);
+    _initConnectivity();
+  }
+
+  void _initConnectivity() {
+    _connectivityService.initialize();
+    _isConnected = _connectivityService.isConnected;
+
+    // Check live connectivity
+    _connectivityService.checkConnectivity().then((connected) {
+      if (mounted && _isConnected != connected) {
+        setState(() {
+          _isConnected = connected;
+        });
+      }
+    });
+
+    _connectivitySubscription = _connectivityService.connectionStream.listen((connected) {
+      if (mounted && _isConnected != connected) {
+        setState(() {
+          _isConnected = connected;
+        });
+        if (!connected) {
+          _showNoNetworkToast(context);
+        }
+      }
+    });
   }
 
   @override
@@ -34,6 +66,7 @@ class _ChatInputFieldState extends State<ChatInputField> {
     widget.controller.removeListener(_onTextChanged);
     _focusNode.removeListener(_onFocusChanged);
     _focusNode.dispose();
+    _connectivitySubscription?.cancel();
     super.dispose();
   }
 
@@ -52,11 +85,46 @@ class _ChatInputFieldState extends State<ChatInputField> {
     });
   }
 
+  void _showNoNetworkToast(BuildContext context) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'No internet connection. Please check your network and try again.',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFFD32F2F),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    );
+  }
+
+  String _getHintText() {
+    if (!_isConnected) {
+      return 'No internet connection • Connect to network';
+    }
+    if (!widget.enabled) {
+      return 'Daily limit reached (15/15) • Please wait until tomorrow';
+    }
+    return 'Ask Wing AI a question...';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).primaryColor;
-    final isActive = _hasText && widget.enabled;
+    final isActive = _hasText && widget.enabled && _isConnected;
 
     return Container(
       decoration: BoxDecoration(
@@ -82,9 +150,11 @@ class _ChatInputFieldState extends State<ChatInputField> {
                   color: isDark ? Colors.grey[850] : Colors.grey[50],
                   borderRadius: BorderRadius.circular(28),
                   border: Border.all(
-                    color: _isFocused
-                        ? primaryColor.withValues(alpha: 0.6)
-                        : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                    color: !_isConnected
+                        ? Colors.red.withValues(alpha: 0.5)
+                        : (_isFocused
+                            ? primaryColor.withValues(alpha: 0.6)
+                            : (isDark ? Colors.grey[700]! : Colors.grey[300]!)),
                     width: _isFocused ? 1.5 : 1,
                   ),
                 ),
@@ -100,12 +170,12 @@ class _ChatInputFieldState extends State<ChatInputField> {
                     color: isDark ? Colors.white : Colors.black87,
                   ),
                   decoration: InputDecoration(
-                    hintText: widget.enabled
-                        ? 'Ask Wing AI a question...'
-                        : 'Daily limit reached (15/15) • Please wait until tomorrow',
+                    hintText: _getHintText(),
                     hintStyle: TextStyle(
-                      color: isDark ? Colors.grey[500] : Colors.grey[400],
-                      fontSize: 15,
+                      color: !_isConnected
+                          ? Colors.red[300]
+                          : (isDark ? Colors.grey[500] : Colors.grey[400]),
+                      fontSize: 14,
                     ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
@@ -154,11 +224,17 @@ class _ChatInputFieldState extends State<ChatInputField> {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: isActive ? _handleSubmit : null,
+                    onTap: () {
+                      if (!_isConnected) {
+                        _showNoNetworkToast(context);
+                      } else if (isActive) {
+                        _handleSubmit();
+                      }
+                    },
                     borderRadius: BorderRadius.circular(28),
                     child: Center(
                       child: Icon(
-                        Icons.send_rounded,
+                        !_isConnected ? Icons.wifi_off_rounded : Icons.send_rounded,
                         color: isActive
                             ? Colors.white
                             : (isDark ? Colors.grey[500] : Colors.grey[500]),
@@ -176,6 +252,10 @@ class _ChatInputFieldState extends State<ChatInputField> {
   }
 
   void _handleSubmit() {
+    if (!_isConnected) {
+      _showNoNetworkToast(context);
+      return;
+    }
     final text = widget.controller.text.trim();
     if (text.isNotEmpty && widget.enabled) {
       widget.onSubmit(text);
