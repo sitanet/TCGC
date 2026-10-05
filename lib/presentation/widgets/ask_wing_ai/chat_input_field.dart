@@ -1,25 +1,26 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../core/services/connectivity_service.dart';
 
-/// Elegant chat input field with network awareness and animated send button
+/// Elegant chat input field with network awareness, voice input (speech-to-text), and animated send button
 class ChatInputField extends StatefulWidget {
   final TextEditingController controller;
   final Function(String) onSubmit;
   final bool enabled;
 
   const ChatInputField({
-    Key? key,
+    super.key,
     required this.controller,
     required this.onSubmit,
     this.enabled = true,
-  }) : super(key: key);
+  });
 
   @override
   State<ChatInputField> createState() => _ChatInputFieldState();
 }
 
-class _ChatInputFieldState extends State<ChatInputField> {
+class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProviderStateMixin {
   bool _hasText = false;
   final FocusNode _focusNode = FocusNode();
   bool _isFocused = false;
@@ -28,12 +29,144 @@ class _ChatInputFieldState extends State<ChatInputField> {
   bool _isConnected = true;
   StreamSubscription<bool>? _connectivitySubscription;
 
+  // Speech-to-text
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isListening = false;
+  bool _speechAvailable = false;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_onTextChanged);
     _focusNode.addListener(_onFocusChanged);
     _initConnectivity();
+    _initSpeech();
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.25).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  Future<void> _initSpeech() async {
+    try {
+      final available = await _speech.initialize(
+        onStatus: (status) {
+          if (!mounted) return;
+          if (status == 'done' || status == 'notListening') {
+            setState(() {
+              _isListening = false;
+            });
+          }
+        },
+        onError: (errorNotification) {
+          if (!mounted) return;
+          setState(() {
+            _isListening = false;
+          });
+          debugPrint('Speech recognition error: ${errorNotification.errorMsg}');
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _speechAvailable = available;
+        });
+      }
+    } catch (e) {
+      debugPrint('Speech recognition init error: $e');
+    }
+  }
+
+  Future<void> _toggleListening() async {
+    if (!_isConnected) {
+      _showNoNetworkToast(context);
+      return;
+    }
+
+    if (!widget.enabled) {
+      return;
+    }
+
+    if (_isListening) {
+      await _speech.stop();
+      if (mounted) {
+        setState(() {
+          _isListening = false;
+        });
+      }
+      return;
+    }
+
+    if (!_speechAvailable) {
+      final reinit = await _speech.initialize(
+        onStatus: (status) {
+          if (!mounted) return;
+          if (status == 'done' || status == 'notListening') {
+            setState(() {
+              _isListening = false;
+            });
+          }
+        },
+        onError: (errorNotification) {
+          if (!mounted) return;
+          setState(() {
+            _isListening = false;
+          });
+        },
+      );
+      if (!reinit) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Voice recognition is not available or microphone permission was denied.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+      _speechAvailable = true;
+    }
+
+    setState(() {
+      _isListening = true;
+    });
+
+    try {
+      await _speech.listen(
+        onResult: (result) {
+          if (!mounted) return;
+          final words = result.recognizedWords;
+          if (words.isNotEmpty) {
+            setState(() {
+              widget.controller.text = words;
+              widget.controller.selection = TextSelection.fromPosition(
+                TextPosition(offset: words.length),
+              );
+            });
+          }
+        },
+        listenOptions: stt.SpeechListenOptions(
+          listenMode: stt.ListenMode.dictation,
+          pauseFor: const Duration(seconds: 3),
+          partialResults: true,
+          cancelOnError: true,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error starting speech listen: $e');
+      if (mounted) {
+        setState(() {
+          _isListening = false;
+        });
+      }
+    }
   }
 
   void _initConnectivity() {
@@ -61,14 +194,7 @@ class _ChatInputFieldState extends State<ChatInputField> {
     });
   }
 
-  @override
-  void dispose() {
-    widget.controller.removeListener(_onTextChanged);
-    _focusNode.removeListener(_onFocusChanged);
-    _focusNode.dispose();
-    _connectivitySubscription?.cancel();
-    super.dispose();
-  }
+
 
   void _onTextChanged() {
     final hasText = widget.controller.text.trim().isNotEmpty;
@@ -111,13 +237,29 @@ class _ChatInputFieldState extends State<ChatInputField> {
   }
 
   String _getHintText() {
+    if (_isListening) {
+      return 'Listening to your voice...';
+    }
     if (!_isConnected) {
       return 'No internet connection • Connect to network';
     }
     if (!widget.enabled) {
       return 'Daily limit reached (15/15) • Please wait until tomorrow';
     }
-    return 'Ask Wing AI a question...';
+    return 'Search messages or ask Wing AI...';
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    if (_isListening) {
+      _speech.stop();
+    }
+    widget.controller.removeListener(_onTextChanged);
+    _focusNode.removeListener(_onFocusChanged);
+    _focusNode.dispose();
+    _connectivitySubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -150,40 +292,80 @@ class _ChatInputFieldState extends State<ChatInputField> {
                   color: isDark ? Colors.grey[850] : Colors.grey[50],
                   borderRadius: BorderRadius.circular(28),
                   border: Border.all(
-                    color: !_isConnected
-                        ? Colors.red.withValues(alpha: 0.5)
-                        : (_isFocused
-                            ? primaryColor.withValues(alpha: 0.6)
-                            : (isDark ? Colors.grey[700]! : Colors.grey[300]!)),
-                    width: _isFocused ? 1.5 : 1,
+                    color: _isListening
+                        ? const Color(0xFFE5A93C)
+                        : (!_isConnected
+                            ? Colors.red.withValues(alpha: 0.5)
+                            : (_isFocused
+                                ? primaryColor.withValues(alpha: 0.6)
+                                : (isDark ? Colors.grey[700]! : Colors.grey[300]!))),
+                    width: (_isFocused || _isListening) ? 1.5 : 1,
                   ),
                 ),
-                child: TextField(
-                  controller: widget.controller,
-                  focusNode: _focusNode,
-                  enabled: widget.enabled,
-                  maxLines: 4,
-                  minLines: 1,
-                  textCapitalization: TextCapitalization.sentences,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: _getHintText(),
-                    hintStyle: TextStyle(
-                      color: !_isConnected
-                          ? Colors.red[300]
-                          : (isDark ? Colors.grey[500] : Colors.grey[400]),
-                      fontSize: 14,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: widget.controller,
+                        focusNode: _focusNode,
+                        enabled: widget.enabled,
+                        maxLines: 4,
+                        minLines: 1,
+                        textCapitalization: TextCapitalization.sentences,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: _getHintText(),
+                          hintStyle: TextStyle(
+                            color: _isListening
+                                ? const Color(0xFFE5A93C)
+                                : (!_isConnected
+                                    ? Colors.red[300]
+                                    : (isDark ? Colors.grey[500] : Colors.grey[400])),
+                            fontSize: 14,
+                            fontStyle: _isListening ? FontStyle.italic : FontStyle.normal,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.only(
+                            left: 18,
+                            right: 8,
+                            top: 14,
+                            bottom: 14,
+                          ),
+                        ),
+                        onSubmitted: widget.enabled ? (text) => _handleSubmit() : null,
+                      ),
                     ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 14,
+                    // Voice Mic Button inside the text field
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ScaleTransition(
+                        scale: _isListening ? _pulseAnimation : const AlwaysStoppedAnimation(1.0),
+                        child: Material(
+                          color: _isListening
+                              ? const Color(0xFFE5A93C).withValues(alpha: 0.2)
+                              : Colors.transparent,
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            onTap: _toggleListening,
+                            customBorder: const CircleBorder(),
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Icon(
+                                _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                                color: _isListening
+                                    ? const Color(0xFFE5A93C)
+                                    : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                                size: 22,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  onSubmitted: widget.enabled ? (text) => _handleSubmit() : null,
+                  ],
                 ),
               ),
             ),

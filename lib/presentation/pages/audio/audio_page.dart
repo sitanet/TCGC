@@ -192,6 +192,9 @@ class _AudioPageState extends ConsumerState<AudioPage>
           _sermons = sermons;
           _transcripts = transcripts;
         });
+        _staticCategories = processedCategories;
+        _staticSermons = sermons;
+        _staticTranscripts = transcripts;
       }
 
       debugPrint('Background refresh completed - ${transcripts.length} transcripts loaded');
@@ -1339,7 +1342,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
     final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
 
     // Filter categories to only include those that have 1 or more transcripts
-    final categoriesToDisplay = _categories.where((category) {
+    final List<MessageCategory> categoriesToDisplay = _categories.where((category) {
       final count = _transcripts.where((t) {
         if (category.id == 'all') return true;
         return t.category == category.id ||
@@ -1348,6 +1351,32 @@ class _AudioPageState extends ConsumerState<AudioPage>
       }).length;
       return count > 0;
     }).toList();
+
+    // Dynamically include any category found on transcripts that isn't already in categoriesToDisplay
+    final Set<String> existingCategoryIds =
+        categoriesToDisplay.map((c) => c.id.toString()).toSet();
+    final Set<String> existingCategoryNames =
+        categoriesToDisplay.map((c) => c.name.toLowerCase()).toSet();
+
+    for (final t in _transcripts) {
+      final catId = t.category.toString().trim();
+      final catName = t.categoryName.trim();
+      if (catName.isNotEmpty &&
+          !existingCategoryNames.contains(catName.toLowerCase()) &&
+          (catId.isEmpty || !existingCategoryIds.contains(catId))) {
+        existingCategoryNames.add(catName.toLowerCase());
+        if (catId.isNotEmpty) existingCategoryIds.add(catId);
+        categoriesToDisplay.add(
+          MessageCategory(
+            id: catId.isNotEmpty ? catId : catName,
+            name: catName,
+            description: '',
+            imageUrl: t.imageUrl,
+            isActive: true,
+          ),
+        );
+      }
+    }
 
     if (categoriesToDisplay.isEmpty) {
       return RefreshIndicator(
@@ -1396,6 +1425,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
             context,
             isDark,
             categoriesToDisplay[index],
+            categoriesToDisplay,
           );
         },
       ),
@@ -1406,6 +1436,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
     BuildContext context,
     bool isDark,
     MessageCategory category,
+    List<MessageCategory> allCategories,
   ) {
     // Count transcripts for this category
     final count = _transcripts.where((t) {
@@ -1415,7 +1446,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
           t.categoryName.toLowerCase() == category.name.toLowerCase();
     }).length;
 
-    final categoryNameToId = {for (var c in _categories) c.name: c.id};
+    final categoryNameToId = {for (var c in allCategories) c.name: c.id};
 
     return GestureDetector(
       onTap: () {
@@ -1425,7 +1456,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
             builder: (_) => TranscriptListPage(
               category: category.name,
               categoryId: category.id,
-              categories: _categories.map((c) => c.name).toList(),
+              categories: allCategories.map((c) => c.name).toList(),
               categoryNameToId: categoryNameToId,
             ),
           ),

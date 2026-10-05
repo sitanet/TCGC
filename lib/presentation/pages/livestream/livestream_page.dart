@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
@@ -16,7 +17,7 @@ class LiveStreamPage extends ConsumerStatefulWidget {
 }
 
 class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
   WebViewController? _webViewController;
   WebViewController? _watchLiveController;
@@ -34,6 +35,8 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WakelockPlus.enable();
     final initialSubIndex = ref.read(liveStreamSubTabIndexProvider);
     _tabController = TabController(
       length: 2,
@@ -109,7 +112,19 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      WakelockPlus.enable();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      WakelockPlus.disable();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    WakelockPlus.disable();
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     // Clear WebView resources to free memory

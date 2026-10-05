@@ -45,11 +45,11 @@ class DataService {
     try {
       final response = await _api.get(ApiConstants.beginnerCategories);
       if (response.isSuccess) {
-        final decoded = response.data;
+        final decoded = jsonDecode(response.body);
         final List<dynamic> data = decoded is List
             ? decoded
-            : (decoded['results'] ?? decoded);
-        return data.map((json) => BeginnerCategory.fromJson(json)).toList();
+            : (decoded is Map ? (decoded['results'] ?? decoded['data'] ?? []) : []);
+        return data.map((json) => BeginnerCategory.fromJson(json as Map<String, dynamic>)).toList();
       }
     } catch (e) {
       debugPrint('Error fetching beginner categories: $e');
@@ -305,18 +305,41 @@ class DataService {
 
   Future<List<Transcript>?> _fetchTranscriptsFromServer() async {
     try {
-      final response = await _api.get(ApiConstants.transcripts);
-      if (response.isSuccess) {
-        final data = response.data;
-        final List<dynamic> results = data is List
-            ? data
-            : (data['results'] ?? data);
-        final transcripts = results
-            .map((json) => Transcript.fromJson(json))
-            .toList();
-        // Save to cache
-        await _saveTranscriptsCache(transcripts);
-        return transcripts;
+      // Fetch all pages from server to ensure all latest transcripts are retrieved
+      final allResults = await _api.getAllPages(ApiConstants.transcripts);
+      List<Transcript> serverTranscripts = [];
+      if (allResults.isNotEmpty) {
+        serverTranscripts =
+            allResults.map((json) => Transcript.fromJson(json)).toList();
+      } else {
+        final response = await _api.get(ApiConstants.transcripts);
+        if (response.isSuccess) {
+          final data = response.data;
+          final List<dynamic> results =
+              data is List ? data : (data['results'] ?? data);
+          serverTranscripts =
+              results.map((json) => Transcript.fromJson(json)).toList();
+        }
+      }
+
+      if (serverTranscripts.isNotEmpty) {
+        // Merge with existing cached transcripts so older ones are preserved ("load the latest with the one there before")
+        final existingCache =
+            await _getCachedTranscripts(ignoreTtl: true) ?? [];
+
+        final Set<String> seenIds =
+            serverTranscripts.map((t) => t.id.toString()).toSet();
+        final List<Transcript> merged = List.from(serverTranscripts);
+        for (final item in existingCache) {
+          if (!seenIds.contains(item.id.toString())) {
+            seenIds.add(item.id.toString());
+            merged.add(item);
+          }
+        }
+
+        // Save merged list to cache
+        await _saveTranscriptsCache(merged);
+        return merged;
       }
     } catch (e) {
       debugPrint('Error fetching transcripts from server: $e');

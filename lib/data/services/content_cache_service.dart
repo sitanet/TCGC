@@ -85,28 +85,46 @@ class ContentCacheService {
         return cachedCategories;
       }
       
-      final response = await _api.get(ApiConstants.messageCategories);
-      if (response.isSuccess) {
-        final decoded = response.data;
-        final List<dynamic> data = decoded is List ? decoded : (decoded['results'] ?? decoded);
-        final categories = data.map((json) => MessageCategory.fromJson(json)).toList();
-        
-        _memoryCachedCategories = categories; // Store in memory
+      final allResults = await _api.getAllPages(ApiConstants.messageCategories);
+      List<MessageCategory> categories = [];
+      if (allResults.isNotEmpty) {
+        categories = allResults.map((json) => MessageCategory.fromJson(json as Map<String, dynamic>)).toList();
+      } else {
+        final response = await _api.get(ApiConstants.messageCategories);
+        if (response.isSuccess) {
+          final decoded = response.data;
+          final List<dynamic> data = decoded is List ? decoded : (decoded['results'] ?? decoded);
+          categories = data.map((json) => MessageCategory.fromJson(json as Map<String, dynamic>)).toList();
+        }
+      }
+
+      if (categories.isNotEmpty) {
+        // Merge with existing cached categories so existing categories are preserved
+        final Set<String> seenIds = categories.map((c) => c.id.toString()).toSet();
+        final List<MessageCategory> merged = List.from(categories);
+        for (final item in cachedCategories) {
+          if (!seenIds.contains(item.id.toString())) {
+            seenIds.add(item.id.toString());
+            merged.add(item);
+          }
+        }
+
+        _memoryCachedCategories = merged; // Store in memory
         
         // Cache in background to not block UI
         Future.microtask(() async {
-          await _db.cacheCategories(categories);
+          await _db.cacheCategories(merged);
           await _db.updateSyncMetadata('categories');
         });
         
-        debugPrint('Fetched and cached ${categories.length} categories');
-        return categories;
+        debugPrint('Fetched and cached ${merged.length} categories (all pages)');
+        return merged;
       }
     } catch (e) {
       debugPrint('Error fetching categories: $e');
     }
     
-    return cachedCategories;
+    return cachedCategories.isNotEmpty ? cachedCategories : (_memoryCachedCategories ?? []);
   }
 
   // Get sermons with cache-first strategy (fetches ALL pages)
@@ -140,23 +158,25 @@ class ContentCacheService {
       
       // Use getAllPages to fetch all paginated results
       final allResults = await _api.getAllPages(ApiConstants.messages);
-      final sermons = allResults.map((json) => Sermon.fromJson(json)).toList();
-      
-      _memoryCachedSermons = sermons; // Store in memory
-      
-      // Cache in background to not block UI
-      Future.microtask(() async {
-        await _db.cacheSermons(sermons);
-        await _db.updateSyncMetadata('sermons');
-      });
-      
-      debugPrint('Fetched and cached ${sermons.length} sermons (all pages)');
-      return sermons;
+      if (allResults.isNotEmpty) {
+        final sermons = allResults.map((json) => Sermon.fromJson(json)).toList();
+        
+        _memoryCachedSermons = sermons; // Store in memory
+        
+        // Cache in background to not block UI
+        Future.microtask(() async {
+          await _db.cacheSermons(sermons);
+          await _db.updateSyncMetadata('sermons');
+        });
+        
+        debugPrint('Fetched and cached ${sermons.length} sermons (all pages)');
+        return sermons;
+      }
     } catch (e) {
       debugPrint('Error fetching sermons: $e');
     }
     
-    return cachedSermons;
+    return cachedSermons.isNotEmpty ? cachedSermons : (_memoryCachedSermons ?? []);
   }
 
   /// Clears all cached sermons and fetches fresh data from server

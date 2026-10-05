@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,7 +16,6 @@ import '../../../domain/entities/beginner_category.dart';
 import '../audio/audio_player_page.dart';
 import '../audio/audio_list_page.dart';
 import '../profile/profile_page.dart';
-import '../support/complaint_page.dart';
 import '../notifications/notifications_page.dart';
 import '../ask_wing_ai/ask_wing_ai_chat_page.dart';
 import '../../bloc/ask_wing_ai/ask_wing_ai_cubit.dart';
@@ -150,6 +150,12 @@ class _HomePageState extends ConsumerState<HomePage> {
       // Load events and recommended in parallel
       _loadEventsAsync(forceRefresh);
       _loadRecommendedAsync(forceRefresh, canAccessSermon);
+
+      // Automatically refresh latest messages and data from server in background on app launch
+      // so user does not need to swipe down to see the latest messages!
+      if (!forceRefresh) {
+        _refreshHomeDataInBackground();
+      }
     } catch (e) {
       debugPrint('Error loading home data: $e');
       if (mounted) {
@@ -158,18 +164,74 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  // Async loaders that don't block UI
-  Future<void> _loadBeginnerCategoriesAsync(bool forceRefresh) async {
+  /// Automatically fetches latest messages and content from server in the background
+  /// without blocking UI or requiring user to swipe down.
+  Future<void> _refreshHomeDataInBackground() async {
     try {
-      final categories = await _dataService.getBeginnerCategories(forceRefresh: forceRefresh);
-      if (mounted && categories.isNotEmpty) {
-        setState(() => _beginnerCategories = categories);
+      final authProvider = ref.read(authChangeNotifierProvider);
+      final user = authProvider.user;
+      final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+      final isGeneralMarried = user?.isGeneralMarried ?? false;
+      final isInHouseMarried = user?.isInHouseMarried ?? false;
+
+      bool canAccessSermon(Sermon sermon) {
+        if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
+        if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
+        if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
+        return true;
       }
+
+      // 1. Fetch fresh messages and beginner categories from server
+      final freshSermonsRaw = await _dataService.getMessages(forceRefresh: true);
+      final freshBeginnerCats = await _dataService.getBeginnerCategories(forceRefresh: true);
+
+      // Also refresh categories and transcripts in background so newest items are ready immediately
+      unawaited(_dataService.getMessageCategories(forceRefresh: true));
+      unawaited(_dataService.getTranscripts(forceRefresh: true));
+
+      if (!mounted) return;
+
+      if (freshSermonsRaw.isNotEmpty) {
+        final sermons = freshSermonsRaw.where(canAccessSermon).toList();
+
+        List<BeginnerCategory> resolvedCategories = freshBeginnerCats;
+        if (resolvedCategories.isEmpty && sermons.isNotEmpty) {
+          final Map<String, List<Sermon>> grouped = {};
+          for (final s in sermons) {
+            final catName = s.categoryName.isNotEmpty ? s.categoryName : 'Spiritual Growth';
+            grouped.putIfAbsent(catName, () => []).add(s);
+          }
+          resolvedCategories = grouped.entries.map((e) {
+            return BeginnerCategory(
+              id: e.value.first.category.isNotEmpty ? e.value.first.category : e.key,
+              name: e.key,
+              description: 'Foundational teachings on ${e.key}',
+              imageUrl: e.value.first.imageUrl,
+              sermonCount: e.value.length,
+              sermons: e.value,
+            );
+          }).toList();
+        }
+
+        final pickedInterests = _interestsService
+            .getRandomMessagesFromInterests(sermons, count: 3);
+
+        setState(() {
+          _sermons = sermons;
+          _beginnerCategories = resolvedCategories;
+          _pickedInterestSermons = pickedInterests;
+        });
+      }
+
+      // Also refresh events and recommended
+      _loadEventsAsync(true);
+      _loadRecommendedAsync(true, canAccessSermon);
     } catch (e) {
-      debugPrint('Beginner categories load error: $e');
+      debugPrint('Background home refresh error: $e');
     }
   }
 
+  // Async loaders that don't block UI
   Future<void> _loadEventsAsync(bool forceRefresh) async {
     try {
       final events = await _dataService.getEvents(forceRefresh: forceRefresh);
@@ -857,7 +919,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
               const SizedBox(width: 8),
               Text(
-                'Beginner Categories',
+                'Welcome to CityGate Mobile',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: AppColors.primaryGold,
                       fontWeight: FontWeight.bold,
@@ -902,7 +964,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'No beginner categories created yet.',
+                      'No categories available yet.',
                       style: TextStyle(
                         color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                         fontSize: 13,

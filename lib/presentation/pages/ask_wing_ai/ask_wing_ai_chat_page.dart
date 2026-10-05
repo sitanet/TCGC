@@ -12,9 +12,15 @@ import '../../../domain/entities/user.dart';
 import '../../../core/utils/error_handler.dart';
 import '../../../core/services/connectivity_service.dart';
 
+import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../domain/entities/sermon.dart';
+import '../../../data/services/data_service.dart';
+import '../audio/audio_player_page.dart';
+
 /// Main chat page for Ask Wing AI
 class AskWingAIChatPage extends StatefulWidget {
-  const AskWingAIChatPage({Key? key}) : super(key: key);
+  const AskWingAIChatPage({super.key});
 
   @override
   State<AskWingAIChatPage> createState() => _AskWingAIChatPageState();
@@ -24,16 +30,27 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _textController = TextEditingController();
   final AuthService _authService = AuthService();
+  final DataService _dataService = DataService();
   
   AppUser? _currentUser;
   bool _showScrollDownButton = false;
+
+  List<Sermon> _allSermons = [];
+  List<Sermon> _matchedSermons = [];
+  Timer? _searchDebounce;
+  bool _isSearchDismissed = false;
 
   @override
   void initState() {
     super.initState();
     // Load user data
     _loadUserData();
+    // Load sermons for real-time search
+    _loadSermons();
     
+    // Add text listener for instant sermon search
+    _textController.addListener(_onSearchQueryChanged);
+
     // Add scroll controller listener for scroll down button
     _scrollController.addListener(_scrollListener);
     
@@ -42,6 +59,100 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
     if (cubit.state is AskWingAIInitial) {
       cubit.initialize();
     }
+  }
+
+  Future<void> _loadSermons() async {
+    try {
+      final sermons = await _dataService.getMessages();
+      if (mounted) {
+        setState(() {
+          _allSermons = sermons;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load sermons for search: $e');
+    }
+  }
+
+  void _onSearchQueryChanged() {
+    final query = _textController.text.trim();
+    if (_isSearchDismissed && query.isEmpty) {
+      _isSearchDismissed = false;
+    }
+
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      _performSermonSearch(query);
+    });
+  }
+
+  void _performSermonSearch(String query) {
+    if (query.length < 2 || _isSearchDismissed) {
+      if (_matchedSermons.isNotEmpty) {
+        setState(() {
+          _matchedSermons = [];
+        });
+      }
+      return;
+    }
+
+    final lower = query.toLowerCase();
+    final tokens = lower.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+
+    if (tokens.isEmpty) {
+      if (_matchedSermons.isNotEmpty) {
+        setState(() {
+          _matchedSermons = [];
+        });
+      }
+      return;
+    }
+
+    final matches = _allSermons.where((s) {
+      final title = s.title.toLowerCase();
+      final speaker = (s.speaker ?? '').toLowerCase();
+      final category = (s.categoryName.isNotEmpty ? s.categoryName : s.category).toLowerCase();
+      final description = s.description.toLowerCase();
+
+      // All tokens must match somewhere in title, speaker, category, or description
+      return tokens.every((token) =>
+          title.contains(token) ||
+          speaker.contains(token) ||
+          category.contains(token) ||
+          description.contains(token));
+    }).toList();
+
+    // Sort: Title starts with query first, then title contains, then recent date
+    matches.sort((a, b) {
+      final aTitleLower = a.title.toLowerCase();
+      final bTitleLower = b.title.toLowerCase();
+
+      final aExactTitle = aTitleLower.startsWith(lower);
+      final bExactTitle = bTitleLower.startsWith(lower);
+      if (aExactTitle && !bExactTitle) return -1;
+      if (!aExactTitle && bExactTitle) return 1;
+
+      final aHasTitle = tokens.every((t) => aTitleLower.contains(t));
+      final bHasTitle = tokens.every((t) => bTitleLower.contains(t));
+      if (aHasTitle && !bHasTitle) return -1;
+      if (!aHasTitle && bHasTitle) return 1;
+
+      return b.date.compareTo(a.date);
+    });
+
+    setState(() {
+      _matchedSermons = matches.take(15).toList();
+    });
+  }
+
+  void _playSermon(Sermon sermon) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AudioPlayerPage(sermon: sermon),
+      ),
+    );
   }
 
   void _scrollListener() {
@@ -68,12 +179,14 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
       }
     } catch (e) {
       // Continue without user data if fetch fails
-      print('Failed to load user profile: $e');
+      debugPrint('Failed to load user profile: $e');
     }
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _textController.removeListener(_onSearchQueryChanged);
     _scrollController.removeListener(_scrollListener);
     _scrollController.dispose();
     _textController.dispose();
@@ -246,6 +359,8 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
                   ],
                 ),
               ),
+              // Matched sermons overlay above input field
+              if (_matchedSermons.isNotEmpty) _buildMatchedSermonsWidget(),
               // Input field
               ChatInputField(
                 controller: _textController,
@@ -255,6 +370,210 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildMatchedSermonsWidget() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).primaryColor;
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 260),
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E222A) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: primaryColor.withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: primaryColor.withValues(alpha: 0.08),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5A93C).withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome,
+                    size: 16,
+                    color: Color(0xFFE5A93C),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Wing AI Found ${_matchedSermons.length} ${_matchedSermons.length == 1 ? "Message" : "Messages"}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ),
+                Text(
+                  'Tap to play',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: primaryColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _isSearchDismissed = true;
+                      _matchedSermons = [];
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, thickness: 0.5),
+          // Scrollable messages list
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              itemCount: _matchedSermons.length,
+              separatorBuilder: (context, index) => Divider(
+                height: 1,
+                thickness: 0.5,
+                indent: 64,
+                color: isDark ? Colors.grey[800] : Colors.grey[200],
+              ),
+              itemBuilder: (context, index) {
+                final sermon = _matchedSermons[index];
+                return ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: (sermon.imageUrl != null && sermon.imageUrl!.isNotEmpty)
+                          ? CachedNetworkImage(
+                              imageUrl: sermon.imageUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: primaryColor.withValues(alpha: 0.1),
+                                child: Icon(Icons.music_note, color: primaryColor, size: 20),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: primaryColor.withValues(alpha: 0.1),
+                                child: Icon(Icons.music_note, color: primaryColor, size: 20),
+                              ),
+                            )
+                          : Container(
+                              color: primaryColor.withValues(alpha: 0.1),
+                              child: Icon(Icons.music_note, color: primaryColor, size: 20),
+                            ),
+                    ),
+                  ),
+                  title: Text(
+                    sermon.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                  subtitle: Row(
+                    children: [
+                      if (sermon.speaker != null && sermon.speaker!.isNotEmpty) ...[
+                        Flexible(
+                          child: Text(
+                            sermon.speaker!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '•',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? Colors.grey[500] : Colors.grey[400],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Text(
+                        sermon.categoryName.isNotEmpty ? sermon.categoryName : sermon.category,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: const Color(0xFFE5A93C),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  trailing: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5A93C),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE5A93C).withValues(alpha: 0.4),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  onTap: () => _playSermon(sermon),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

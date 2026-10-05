@@ -55,6 +55,7 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
   String? _selectedSpeaker;
   List<SpeakerModel> _speakerModels = [];
   List<String> _speakers = [];
+  List<String> _displayCategories = [];
   bool _isLoading = true;
   bool _isRefreshing = false;
   
@@ -67,6 +68,7 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
     _selectedCategoryId = widget.categoryId;
     _filterType = widget.initialFilterType;
     _selectedSpeaker = widget.initialSpeaker;
+    _displayCategories = List.from(widget.categories);
     _searchController.addListener(_filterTranscripts);
     _loadTranscripts();
   }
@@ -80,6 +82,7 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
         setState(() {
           _allItems = cachedTranscripts;
           _extractSpeakers();
+          _extractCategories();
           _filteredItems = _getFilteredItems('');
           _isLoading = false;
         });
@@ -99,6 +102,7 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
         setState(() {
           _allItems = transcripts;
           _extractSpeakers();
+          _extractCategories();
           _filteredItems = _getFilteredItems('');
           _isLoading = false;
         });
@@ -143,12 +147,13 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
     try {
       // Load speakers with photos
       final speakers = await _dataService.getSpeakers();
-      final transcripts = await _dataService.getTranscripts();
+      final transcripts = await _dataService.getTranscripts(forceRefresh: true);
       if (mounted) {
         setState(() {
           _speakerModels = speakers;
           _allItems = transcripts;
           _extractSpeakers();
+          _extractCategories();
           _filteredItems = _getFilteredItems(_searchController.text);
           _isRefreshing = false;
         });
@@ -171,6 +176,19 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
       }
     }
     _speakers = speakerSet.toList()..sort();
+  }
+
+  void _extractCategories() {
+    final catSet = <String>{};
+    for (var cat in widget.categories) {
+      if (cat.trim().isNotEmpty) catSet.add(cat.trim());
+    }
+    for (var item in _allItems) {
+      if (item.categoryName.trim().isNotEmpty) {
+        catSet.add(item.categoryName.trim());
+      }
+    }
+    _displayCategories = catSet.toList();
   }
 
   @override
@@ -431,10 +449,10 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
     return ListView.separated(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: widget.categories.length,
+      itemCount: _displayCategories.length,
       separatorBuilder: (_, __) => const SizedBox(width: 16),
       itemBuilder: (context, index) {
-        final category = widget.categories[index];
+        final category = _displayCategories[index];
         final isSelected = category == _selectedCategory && _filterType == TranscriptFilterType.category;
         return GestureDetector(
           onTap: () => _selectCategory(category),

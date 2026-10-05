@@ -11,11 +11,18 @@
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <!-- Camera & Storage for image/file attachments -->
+    <!-- Camera & Storage for image/file attachments -->
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Voice input for Wing AI speech-to-text -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
-    <!-- Queries for url_launcher package visibility on Android 11+ -->
+    <!-- Queries for url_launcher and speech recognition on Android 11+ -->
     <queries>
+        <!-- Speech recognition query -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
         <!-- Support opening web URLs -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
