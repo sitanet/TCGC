@@ -887,6 +887,7 @@ class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.transparent)
+      ..setUserAgent('Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36')
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (url) {
@@ -895,11 +896,36 @@ class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
           onPageFinished: (url) {
             if (mounted) {
               setState(() => _isLoading = false);
-              // Inject CSS to ensure proper rendering
+              // Inject CSS to lock content to device width
               _webViewController.runJavaScript('''
-                document.body.style.overflowX = 'hidden';
-                document.body.style.wordWrap = 'break-word';
-                document.body.style.overflowWrap = 'break-word';
+                (function() {
+                  // Ensure viewport meta exists
+                  var vp = document.querySelector('meta[name="viewport"]');
+                  if (!vp) {
+                    vp = document.createElement('meta');
+                    vp.name = 'viewport';
+                    document.head.appendChild(vp);
+                  }
+                  vp.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+
+                  var style = document.createElement('style');
+                  style.textContent = `
+                    html, body {
+                      max-width: 100vw !important;
+                      overflow-x: hidden !important;
+                      word-wrap: break-word !important;
+                      overflow-wrap: break-word !important;
+                      -webkit-text-size-adjust: 100% !important;
+                    }
+                    img, video, iframe, table, pre, code {
+                      max-width: 100% !important;
+                      height: auto !important;
+                    }
+                    table { table-layout: fixed !important; }
+                    pre { white-space: pre-wrap !important; }
+                  `;
+                  document.head.appendChild(style);
+                })();
               ''');
             }
           },
@@ -922,18 +948,43 @@ class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
     if (transcriptId == null) return;
     
     final cachedHtml = await _cacheService.getCachedHtml(transcriptId);
+    final baseUrl = ApiConstants.standaloneTranscriptUrl(transcriptId);
     if (cachedHtml != null && cachedHtml.isNotEmpty) {
-      await _webViewController.loadHtmlString(cachedHtml);
+      await _webViewController.loadHtmlString(_prepareHtml(cachedHtml), baseUrl: baseUrl);
       _cacheService.fetchAndCacheHtml(transcriptId);
     } else {
       final html = await _cacheService.fetchAndCacheHtml(transcriptId);
       if (html != null && mounted) {
-        await _webViewController.loadHtmlString(html);
+        await _webViewController.loadHtmlString(_prepareHtml(html), baseUrl: baseUrl);
       } else {
-        final transcriptUrl = ApiConstants.standaloneTranscriptUrl(transcriptId);
-        await _webViewController.loadRequest(Uri.parse(transcriptUrl));
+        await _webViewController.loadRequest(Uri.parse(baseUrl));
       }
     }
+  }
+
+  /// Force a mobile layout before first paint so the page never renders "scattered".
+  String _prepareHtml(String html) {
+    const injection = '''
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+  html, body { max-width: 100vw !important; overflow-x: hidden !important;
+    word-wrap: break-word !important; overflow-wrap: break-word !important;
+    -webkit-text-size-adjust: 100% !important; }
+  img, video, iframe, table, pre, code { max-width: 100% !important; height: auto !important; }
+  table { table-layout: fixed !important; }
+  pre { white-space: pre-wrap !important; }
+</style>
+''';
+    // Drop any existing viewport tag so ours wins
+    final out = html.replaceAll(
+      RegExp(r'<meta[^>]*name=["\x27]viewport["\x27][^>]*>', caseSensitive: false),
+      '',
+    );
+    final headMatch = RegExp(r'<head(\s[^>]*)?>', caseSensitive: false).firstMatch(out);
+    if (headMatch != null) {
+      return out.replaceRange(headMatch.end, headMatch.end, injection);
+    }
+    return '<!DOCTYPE html><html><head>$injection</head><body>$out</body></html>';
   }
 
   Future<void> _shareTranscript() async {
