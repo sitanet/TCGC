@@ -69,6 +69,21 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
     );
   }
 
+  /// Build an audio source without custom headers.
+  /// Passing headers forces just_audio to route through a local proxy server,
+  /// which breaks streaming on newer Flutter/Android builds. ExoPlayer/AVPlayer
+  /// stream directly from the CDN much more reliably.
+  static AudioSource buildSource(String url) {
+    if (url.startsWith('file://')) {
+      return AudioSource.file(Uri.parse(url).toFilePath());
+    }
+    if (url.startsWith('/')) {
+      return AudioSource.file(url);
+    }
+    final safeUrl = url.trim().contains(' ') ? Uri.encodeFull(url.trim()) : url.trim();
+    return AudioSource.uri(Uri.parse(safeUrl));
+  }
+
   Future<void> setAudioSource(String url, MediaItem item) async {
     debugPrint('Setting audio source: $url');
     _currentUrl = url;
@@ -76,15 +91,7 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
     _lastPosition = Duration.zero;
     mediaItem.add(item);
     try {
-      await _player.setAudioSource(
-        AudioSource.uri(
-          Uri.parse(url),
-          headers: {
-            'Accept': 'audio/mpeg, audio/*;q=0.9, */*;q=0.5',
-            'User-Agent': 'TCGC-App/1.0',
-          },
-        ),
-      );
+      await _player.setAudioSource(buildSource(url));
       debugPrint('Audio source set successfully, duration: ${_player.duration}');
     } catch (e, st) {
       debugPrint('Error setting audio source: $e');
@@ -101,13 +108,7 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
     mediaItem.add(item);
     try {
       await _player.setAudioSource(
-        AudioSource.uri(
-          Uri.parse(url),
-          headers: {
-            'Accept': 'audio/mpeg, audio/*;q=0.9, */*;q=0.5',
-            'User-Agent': 'TCGC-App/1.0',
-          },
-        ),
+        buildSource(url),
         initialPosition: position,
       );
       debugPrint('Audio source set successfully with position');

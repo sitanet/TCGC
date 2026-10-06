@@ -619,7 +619,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
       onTap: () {
         final index = queue.indexOf(sermon);
         audioProvider.setQueue(queue, index >= 0 ? index : 0);
-        audioProvider.playSermon(sermon);
+        // AudioPlayerPage starts playback itself (avoids double-start race)
         Navigator.push(
           context,
           MaterialPageRoute(

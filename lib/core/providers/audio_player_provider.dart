@@ -203,6 +203,12 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
         }
         
         // Mark first successful play for rating prompt
+        if (state.playing && state.processingState == ProcessingState.ready) {
+          if (_errorMessage != null) {
+            _errorMessage = null;
+            notifyListeners();
+          }
+        }
         if (state.playing && state.processingState == ProcessingState.ready && !_hasMarkedFirstSuccessfulPlay) {
           _hasMarkedFirstSuccessfulPlay = true;
           _appRatingService.incrementPlayCount();
@@ -348,14 +354,24 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   String _sanitizeFileName(String id) => id.replaceAll(RegExp(r'[^\w\-]'), '_');
 
   Future<void> playSermon(Sermon sermon) async {
-    // Toggle play/pause if same sermon
+    // Toggle play/pause if same sermon AND it is actually loaded
     if (_currentSermon?.id == sermon.id) {
-      if (_isPlaying) {
-        await pause();
-      } else {
-        await play();
+      if (_isLoading) return; // already loading - don't interrupt
+      final state = _useAudioService && _audioHandler != null
+          ? _audioHandler!.processingState
+          : _fallbackPlayer?.processingState;
+      if (_errorMessage == null &&
+          state != null &&
+          state != ProcessingState.idle) {
+        if (_isPlaying) {
+          await pause();
+        } else {
+          await play();
+        }
+        return;
       }
-      return;
+      // Source not loaded or previous attempt failed: fall through and reload
+      _currentSermon = null;
     }
 
     // Mark audio as played (removes "NEW" badge)
@@ -436,11 +452,20 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
             await _audioHandler!.setAudioSource(fixedAudioUrl, mediaItem);
             await _audioHandler!.play();
           } catch (e) {
-            debugPrint('Error setting audio source: $e');
-            _isLoading = false;
-            _errorMessage = 'Unable to load audio. Please check your internet connection.';
-            notifyListeners();
-            return;
+            debugPrint('Error setting audio source (attempt 1): $e');
+            try {
+              await Future.delayed(const Duration(milliseconds: 600));
+              if (_currentSermon?.id != sermon.id) return;
+              await _audioHandler!.stop();
+              await _audioHandler!.setAudioSource(fixedAudioUrl, mediaItem);
+              await _audioHandler!.play();
+            } catch (e2) {
+              debugPrint('Error setting audio source (attempt 2): $e2');
+              _isLoading = false;
+              _errorMessage = 'Unable to load audio. Please check your internet connection.';
+              notifyListeners();
+              return;
+            }
           }
         }
       } else if (_fallbackPlayer != null) {
