@@ -436,7 +436,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
       if (_useAudioService && _audioHandler != null) {
         // Stop previous audio cleanly
         try {
-          await _audioHandler!.stop();
+          await _audioHandler!.pause();
         } catch (e) {
           debugPrint('Error stopping previous audio: $e');
         }
@@ -679,7 +679,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
 
       if (_useAudioService && _audioHandler != null) {
         try {
-          await _audioHandler!.stop();
+          await _audioHandler!.pause();
         } catch (e) {
           debugPrint('Error stopping previous audio: $e');
         }

@@ -4,7 +4,20 @@ import 'package:just_audio/just_audio.dart';
 import 'seamless_audio_source.dart';
 
 class MyAudioHandler extends BaseAudioHandler with SeekHandler {
-  final AudioPlayer _player = AudioPlayer();
+  final AudioPlayer _player = AudioPlayer(
+    audioLoadConfiguration: const AudioLoadConfiguration(
+      androidLoadControl: AndroidLoadControl(
+        minBufferDuration: Duration(seconds: 15),
+        maxBufferDuration: Duration(seconds: 60),
+        bufferForPlaybackDuration: Duration(milliseconds: 500),
+        bufferForPlaybackAfterRebufferDuration: Duration(seconds: 2),
+        prioritizeTimeOverSizeThresholds: true,
+      ),
+      darwinLoadControl: DarwinLoadControl(
+        automaticallyWaitsToMinimizeStalling: false,
+      ),
+    ),
+  );
   
   // Store current audio info for reloading after system kills the source
   String? _currentUrl;
@@ -81,7 +94,15 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
       return AudioSource.file(url);
     }
     final safeUrl = url.trim().contains(' ') ? Uri.encodeFull(url.trim()) : url.trim();
-    return AudioSource.uri(Uri.parse(safeUrl));
+    return ProgressiveAudioSource(
+      Uri.parse(safeUrl),
+      options: const ProgressiveAudioSourceOptions(
+        androidExtractorOptions: AndroidExtractorOptions(
+          constantBitrateSeekingEnabled: true,
+          constantBitrateSeekingAlwaysEnabled: true,
+        ),
+      ),
+    );
   }
 
   Future<void> setAudioSource(String url, MediaItem item) async {

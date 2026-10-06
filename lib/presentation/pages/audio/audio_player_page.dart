@@ -62,8 +62,11 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     _initializeServices();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAccessAndPlay();
-      _loadSpeakerInfo();
-      _loadRelatedCategoryMessages();
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (!mounted) return;
+        _loadSpeakerInfo();
+        _loadRelatedCategoryMessages();
+      });
     });
   }
 
@@ -325,12 +328,34 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     final savedPosition = audioProvider.getSavedPosition(widget.sermon.id);
 
     if (savedPosition != null && savedPosition.isSignificant) {
-      _showResumeDialog(savedPosition);
+      // Start playing immediately from where the user left off
+      audioProvider.playSermonFromPosition(
+        widget.sermon,
+        savedPosition.position,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Resumed from ${savedPosition.formattedPosition}'),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'Start over',
+              textColor: AppColors.primaryGold,
+              onPressed: () {
+                audioProvider.clearSavedPosition(widget.sermon.id);
+                audioProvider.seek(Duration.zero);
+              },
+            ),
+          ),
+        );
+      }
     } else {
       await audioProvider.playSermon(widget.sermon);
     }
   }
 
+  // ignore: unused_element
   void _showResumeDialog(PlaybackPosition savedPosition) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
