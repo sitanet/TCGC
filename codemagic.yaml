@@ -61,6 +61,14 @@ workflows:
           elif [ -f "ios/Runner/GoogleService-Info.plist" ]; then
             echo "GoogleService-Info.plist found in repository."
           fi
+      - name: Set up keychain to be used for codesigning
+        script: |
+          keychain initialize
+      - name: Fetch signing files from Apple Developer Portal
+        script: |
+          app-store-connect fetch-signing-files "com.tcgc.tcgc" \
+            --type IOS_APP_STORE \
+            --create
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
