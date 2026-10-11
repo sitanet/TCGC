@@ -20,9 +20,11 @@ class CitationWidget extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 4.0),
         padding: const EdgeInsets.all(12.0),
         decoration: BoxDecoration(
-          border: Border.left(
-            color: Theme.of(context).primaryColor,
-            width: 3.0,
+          border: Border(
+            left: BorderSide(
+              color: Theme.of(context).primaryColor,
+              width: 3.0,
+            ),
           ),
           color: Theme.of(context).primaryColor.withOpacity(0.05),
         ),

@@ -5,9 +5,17 @@ import 'package:provider/provider.dart';
 import 'package:tcgc/presentation/bloc/ask_wing_ai/ask_wing_ai_cubit.dart';
 import 'package:tcgc/presentation/bloc/ask_wing_ai/ask_wing_ai_state.dart';
 import 'package:tcgc/data/services/ask_wing_ai_service.dart';
+import 'package:tcgc/core/services/token_service.dart';
+
+class _FakeTokenService extends TokenService {
+  @override
+  Future<String?> getToken() async => 'fake_token';
+}
 
 /// Mock AskWingAIService for testing
-class MockAskWingAIService extends Mock implements AskWingAIService {}
+class MockAskWingAIService extends AskWingAIService {
+  MockAskWingAIService() : super(tokenService: _FakeTokenService());
+}
 
 /// Test widget that attempts to read AskWingAICubit
 class TestHomePageFAB extends StatelessWidget {
@@ -101,7 +109,7 @@ void main() {
           await tester.tap(find.byType(FloatingActionButton));
           await tester.pumpAndSettle();
         },
-        throwsA(isA<ProviderNotFoundError>()),
+        throwsA(isA<ProviderNotFoundException>()),
       );
     });
 
@@ -121,7 +129,7 @@ void main() {
       // On unfixed code, this causes ProviderNotFoundError
       expect(
         tester.takeException(),
-        isA<ProviderNotFoundError>(),
+        isA<ProviderNotFoundException>(),
       );
     });
 
@@ -140,7 +148,7 @@ void main() {
       // On unfixed code, this causes ProviderNotFoundError
       expect(
         tester.takeException(),
-        isA<ProviderNotFoundError>(),
+        isA<ProviderNotFoundException>(),
       );
     });
 
@@ -166,7 +174,7 @@ void main() {
       // Multiple access attempts should all fail on unfixed code
       expect(
         tester.takeException(),
-        isA<ProviderNotFoundError>(),
+        isA<ProviderNotFoundException>(),
       );
     });
 
@@ -192,7 +200,7 @@ void main() {
 
       expect(
         exception,
-        isA<ProviderNotFoundError>(),
+        isA<ProviderNotFoundException>(),
       );
 
       // Verify error message mentions AskWingAICubit

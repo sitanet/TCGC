@@ -1,0 +1,57 @@
+workflows:
+  ios-release:
+    name: Citygate iOS Release
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      groups:
+        # Configure these credentials in Codemagic UI: Teams > Shared variables
+        - app_store_credentials
+      vars:
+        BUNDLE_ID: "com.tcgc.tcgc"
+        XCODE_WORKSPACE: "Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
+    scripts:
+      - name: Setup GoogleService-Info.plist
+        script: |
+          if [ -n "$GOOGLE_SERVICE_INFO_BASE64" ]; then
+            echo "Decoding GoogleService-Info.plist from environment variable..."
+            echo "$GOOGLE_SERVICE_INFO_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
+          elif [ -f "ios/Runner/GoogleService-Info.plist" ]; then
+            echo "GoogleService-Info.plist found in repository."
+          else
+            echo "⚠️ GoogleService-Info.plist not found! Note: Firebase push notifications on iOS require this file."
+          fi
+      - name: Set up code signing settings on Xcode project
+        script: |
+          xcode-project use-profiles
+      - name: Get Flutter dependencies
+        script: |
+          flutter packages get
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install
+          cd ..
+      - name: Flutter build IPA
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+    publishing:
+      email:
+        recipients:
+          - admin@thecitygatechurch.org
+        notify:
+          success: true
+          failure: true
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        expire_build_submitted_for_testing: false
