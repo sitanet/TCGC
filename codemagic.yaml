@@ -1,6 +1,45 @@
 workflows:
+  ios-unsigned:
+    name: Citygate iOS Build (No Apple Keys Needed)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Verify GoogleService-Info.plist
+        script: |
+          if [ -f "ios/Runner/GoogleService-Info.plist" ]; then
+            echo "GoogleService-Info.plist verified."
+          else
+            echo "GoogleService-Info.plist not found in repository."
+          fi
+      - name: Get Flutter dependencies
+        script: |
+          flutter packages get
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install
+          cd ..
+      - name: Flutter build iOS (Unsigned)
+        script: |
+          flutter build ios --release --no-codesign
+      - name: Package unsigned IPA
+        script: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r Citygate-unsigned.ipa Payload
+          mkdir -p build/ios/ipa
+          mv Citygate-unsigned.ipa build/ios/ipa/
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/ios/iphoneos/Runner.app
+      - /tmp/xcodebuild_logs/*.log
+
   ios-release:
-    name: Citygate iOS Release
+    name: Citygate iOS Release (App Store / TestFlight)
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
@@ -8,7 +47,6 @@ workflows:
       xcode: latest
       cocoapods: default
       groups:
-        # Configure these credentials in Codemagic UI: Teams > Shared variables
         - app_store_credentials
       vars:
         BUNDLE_ID: "com.tcgc.tcgc"
@@ -22,8 +60,6 @@ workflows:
             echo "$GOOGLE_SERVICE_INFO_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
           elif [ -f "ios/Runner/GoogleService-Info.plist" ]; then
             echo "GoogleService-Info.plist found in repository."
-          else
-            echo "⚠️ GoogleService-Info.plist not found! Note: Firebase push notifications on iOS require this file."
           fi
       - name: Set up code signing settings on Xcode project
         script: |
