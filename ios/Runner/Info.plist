@@ -78,6 +78,8 @@
 	<string>Citygate Mobile uses the microphone to allow you to speak questions and search messages using your voice with Wing AI.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Citygate Mobile uses speech recognition to convert your voice into text when speaking with Wing AI.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Citygate Mobile uses your location to discover nearby church campuses, cell centers, and local church events.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>https</string>
