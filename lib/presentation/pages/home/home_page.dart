@@ -10,6 +10,7 @@ import '../../../main.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/interests_service.dart';
 import '../../../data/services/download_service.dart';
+import '../../../data/services/played_audio_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/event.dart';
 import '../../../domain/entities/beginner_category.dart';
@@ -331,46 +332,26 @@ class _HomePageState extends ConsumerState<HomePage> {
             );
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: AppColors.primaryGold,
-              borderRadius: BorderRadius.circular(50),
+              borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primaryGold.withValues(alpha: 0.4),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
+                  color: AppColors.primaryGold.withValues(alpha: 0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.flutter_dash,
-                      color: AppColors.primaryGold,
-                      size: 22,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Ask Wing AI',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+            child: const Text(
+              'Ask Wing AI',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
+              ),
             ),
           ),
         ),
@@ -903,28 +884,45 @@ class _HomePageState extends ConsumerState<HomePage> {
     final spacing = Responsive.verticalSpacing(context);
     final subtitleFontSize = Responsive.subtitleFontSize(context);
 
-    final columnCount = (_beginnerCategories.length / 3).ceil();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
-                Icons.bookmark_border,
-                color: AppColors.primaryGold,
-                size: 22,
+              Row(
+                children: [
+                  const Icon(
+                    Icons.auto_awesome,
+                    color: AppColors.primaryGold,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Welcome to CityGate Mobile',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.primaryGold,
+                          fontWeight: FontWeight.bold,
+                          fontSize: subtitleFontSize,
+                        ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                'Welcome to CityGate Mobile',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: AppColors.primaryGold,
-                      fontWeight: FontWeight.bold,
-                      fontSize: subtitleFontSize,
-                    ),
+              const SizedBox(height: 3),
+              Padding(
+                padding: const EdgeInsets.only(left: 28),
+                child: Text(
+                  'Essential series to build your spiritual journey',
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.textSecondaryDark.withValues(alpha: 0.8)
+                        : AppColors.textSecondaryLight.withValues(alpha: 0.8),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
               ),
             ],
           ),
@@ -932,11 +930,11 @@ class _HomePageState extends ConsumerState<HomePage> {
         SizedBox(height: spacing * 0.8),
         if (_beginnerCategories.isEmpty && _isLoading)
           SizedBox(
-            height: 236,
+            height: 155,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              itemCount: 2,
+              itemCount: 3,
               itemBuilder: (context, index) => _buildCategoryShimmerColumn(isDark),
             ),
           )
@@ -978,31 +976,17 @@ class _HomePageState extends ConsumerState<HomePage> {
           )
         else
           SizedBox(
-            height: 236, // Height for 3 rows of tiles
+            height: 155,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              itemCount: columnCount,
-              itemBuilder: (context, columnIndex) {
-                final startIndex = columnIndex * 3;
-                final endIndex = (startIndex + 3 > _beginnerCategories.length)
-                    ? _beginnerCategories.length
-                    : startIndex + 3;
-                final columnCategories = _beginnerCategories.sublist(startIndex, endIndex);
-
-                return Container(
-                  width: MediaQuery.of(context).size.width * 0.85,
-                  margin: const EdgeInsets.only(right: 14),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: columnCategories.map((cat) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: _buildBeginnerCategoryListTile(context, isDark, cat),
-                      );
-                    }).toList(),
-                  ),
+              itemCount: _beginnerCategories.length,
+              itemBuilder: (context, index) {
+                final cat = _beginnerCategories[index];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12.0),
+                  child: _buildBeginnerCategoryCard(context, isDark, cat),
                 );
               },
             ),
@@ -1011,17 +995,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildBeginnerCategoryListTile(
+  Widget _buildBeginnerCategoryCard(
     BuildContext context,
     bool isDark,
     BeginnerCategory category,
   ) {
-    final cardColor = isDark ? AppColors.cardDark : Colors.white;
-    final border = isDark
-        ? Border.all(color: Colors.white.withValues(alpha: 0.08))
-        : Border.all(color: Colors.grey.withValues(alpha: 0.15));
-
-    return InkWell(
+    return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
@@ -1036,77 +1015,93 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         );
       },
-      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.all(8),
+        width: 130,
         decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(14),
-          border: border,
-          boxShadow: isDark
-              ? []
-              : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
-        child: Row(
-          children: [
-            // Thumbnail artwork on left
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                width: 52,
-                height: 52,
-                child: _buildCategoryCardImage(
-                  category.imageUrl ??
-                      (category.sermons.isNotEmpty
-                          ? category.sermons.first.imageUrl
-                          : null),
-                  isDark,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Background Artwork
+              _buildCategoryCardImage(
+                category.imageUrl ??
+                    (category.sermons.isNotEmpty
+                        ? category.sermons.first.imageUrl
+                        : null),
+                isDark,
+              ),
+
+              // Gradient Overlay for Readability
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.15),
+                      Colors.black.withValues(alpha: 0.4),
+                      Colors.black.withValues(alpha: 0.88),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            // Title & Gold Message Count in middle
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    category.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
+
+              // Top Badge: Message Count
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.primaryGold.withValues(alpha: 0.6),
+                      width: 0.8,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${category.sermonCount} ${category.sermonCount == 1 ? 'Message' : 'Messages'}',
+                  child: Text(
+                    '${category.sermonCount} msg',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 10,
                       fontWeight: FontWeight.w600,
                       color: AppColors.primaryGold,
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            // Right chevron arrow
-            const Icon(
-              Icons.chevron_right,
-              color: AppColors.primaryGold,
-              size: 22,
-            ),
-          ],
+
+              // Bottom Title
+              Positioned(
+                bottom: 10,
+                left: 10,
+                right: 10,
+                child: Text(
+                  category.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 0.2,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1114,19 +1109,11 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Widget _buildCategoryShimmerColumn(bool isDark) {
     return Container(
-      width: 280,
-      margin: const EdgeInsets.only(right: 14),
-      child: Column(
-        children: List.generate(3, (index) => Padding(
-          padding: const EdgeInsets.only(bottom: 8.0),
-          child: Container(
-            height: 68,
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.cardDark : Colors.grey[200],
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        )),
+      width: 130,
+      margin: const EdgeInsets.only(right: 12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.grey[200],
+        borderRadius: BorderRadius.circular(16),
       ),
     );
   }
@@ -1176,6 +1163,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     final spacing = Responsive.verticalSpacing(context);
     final subtitleFontSize = Responsive.subtitleFontSize(context);
 
+    // Limit to exactly 3 recommended messages
+    final recommendedPicks = _recommendedSermons.take(3).toList();
+    if (recommendedPicks.isEmpty) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1183,67 +1174,281 @@ class _HomePageState extends ConsumerState<HomePage> {
           padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: Row(
             children: [
-              Icon(
-                Icons.thumb_up,
+              const Icon(
+                Icons.thumb_up_alt_outlined,
                 color: AppColors.primaryGold,
-                size: Responsive.iconSize(context) * 0.9,
+                size: 20,
               ),
-              SizedBox(width: spacing * 0.5),
+              const SizedBox(width: 8),
               Text(
-                'Recommended',
+                'Recommended for You',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.primaryGold,
-                  fontWeight: FontWeight.w600,
-                  fontSize: subtitleFontSize,
-                ),
+                      color: AppColors.primaryGold,
+                      fontWeight: FontWeight.bold,
+                      fontSize: subtitleFontSize,
+                    ),
               ),
             ],
           ),
         ),
-        SizedBox(height: spacing),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: Column(
-            children: _recommendedSermons
-                .map((sermon) => _buildActivityTile(context, isDark, sermon))
-                .toList(),
+        SizedBox(height: spacing * 0.8),
+        SizedBox(
+          height: 165,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            itemCount: recommendedPicks.length,
+            itemBuilder: (context, index) {
+              final sermon = recommendedPicks[index];
+              return Padding(
+                padding: const EdgeInsets.only(right: 14.0),
+                child: _buildSquareRecommendedCard(context, isDark, sermon),
+              );
+            },
           ),
         ),
       ],
     );
   }
 
+  Widget _buildSquareRecommendedCard(
+    BuildContext context,
+    bool isDark,
+    Sermon sermon,
+  ) {
+    final authProvider = ref.read(authChangeNotifierProvider);
+    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+    final user = authProvider.user;
+    final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+    final isGeneralMarried = user?.isGeneralMarried ?? false;
+    final isInHouseMarried = user?.isInHouseMarried ?? false;
+    final isLocked =
+        (sermon.isServiceTeamOnly && !isServiceTeamMember) ||
+        (sermon.isGeneralMarriedOnly && !isGeneralMarried) ||
+        (sermon.isInHouseMarriedOnly && !isInHouseMarried);
+    final isCurrentlyPlaying =
+        audioProvider.currentSermon?.id == sermon.id && audioProvider.isPlaying;
+
+    return GestureDetector(
+      onTap: () {
+        if (isLocked) {
+          _showLockedMessage(context, isDark);
+          return;
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: sermon)),
+        );
+      },
+      child: Container(
+        width: 150,
+        height: 150,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // 1. Square Thumbnail Artwork
+              _buildSermonImage(sermon, isDark),
+
+              // 2. Multi-stop Dark Gradient Scrim
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.1),
+                      Colors.black.withValues(alpha: 0.4),
+                      Colors.black.withValues(alpha: 0.92),
+                    ],
+                    stops: const [0.0, 0.45, 1.0],
+                  ),
+                ),
+              ),
+
+              // 3. Category Tag Chip (Top Left)
+              if (sermon.categoryName.isNotEmpty)
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.primaryGold.withValues(alpha: 0.5),
+                        width: 0.7,
+                      ),
+                    ),
+                    child: Text(
+                      sermon.categoryName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryGold,
+                      ),
+                    ),
+                  ),
+                ),
+
+              // 4. Quick Play Button or Wave Animation (Bottom Right)
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryGold.withValues(alpha: 0.5),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: isCurrentlyPlaying
+                        ? const Icon(Icons.pause, color: Colors.white, size: 16)
+                        : isLocked
+                            ? const Icon(Icons.lock, color: Colors.white, size: 14)
+                            : const Icon(Icons.play_arrow, color: Colors.white, size: 18),
+                  ),
+                ),
+              ),
+
+              // 5. Title & Speaker (Bottom Left)
+              Positioned(
+                bottom: 8,
+                left: 10,
+                right: 46,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      sermon.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      sermon.speaker ?? 'TCGC',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: Colors.white.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildRecentActivities(BuildContext context, bool isDark) {
-    final recentSermons = _sermons.take(10).toList();
+    final playedService = PlayedAudioService.instance;
+    final recentIds = playedService.recentlyPlayedIds;
+
+    // Filter sermons to those the user actually listened to, in order of playback
+    final Map<String, Sermon> sermonMap = {
+      for (final s in _sermons) s.id: s
+    };
+
+    List<Sermon> listenedSermons = [];
+    for (final id in recentIds) {
+      final s = sermonMap[id];
+      if (s != null) {
+        listenedSermons.add(s);
+      }
+      if (listenedSermons.length >= 4) break;
+    }
+
+    // Fallback: If user hasn't listened to any audio yet, gracefully display latest 4 items
+    final hasListeningHistory = listenedSermons.isNotEmpty;
+    final displaySermons = hasListeningHistory
+        ? listenedSermons
+        : _sermons.take(4).toList();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Recent Activities',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: AppColors.primaryGold,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                hasListeningHistory ? 'Recently Listened' : 'Recent Activities',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: AppColors.primaryGold,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              if (hasListeningHistory)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'History',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryGold,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 16),
           if (_isLoading)
             const Center(child: CircularProgressIndicator())
-          else if (recentSermons.isEmpty)
+          else if (displaySermons.isEmpty)
             Center(
-              child: Text(
-                'No recent activities',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Text(
+                  'No recent activities yet',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
                 ),
               ),
             )
           else
-            ...recentSermons.map(
+            ...displaySermons.map(
               (sermon) => _buildActivityTile(context, isDark, sermon),
             ),
         ],
