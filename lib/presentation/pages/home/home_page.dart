@@ -884,6 +884,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     final spacing = Responsive.verticalSpacing(context);
     final subtitleFontSize = Responsive.subtitleFontSize(context);
 
+    // Responsive card dimensions for mobile vs tablet/iPad
+    final cardWidth = Responsive.value(context, mobile: 135.0, tablet: 185.0, desktop: 210.0);
+    final sectionHeight = Responsive.value(context, mobile: 160.0, tablet: 210.0, desktop: 230.0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -919,7 +923,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     color: isDark
                         ? AppColors.textSecondaryDark.withValues(alpha: 0.8)
                         : AppColors.textSecondaryLight.withValues(alpha: 0.8),
-                    fontSize: 12.5,
+                    fontSize: Responsive.value(context, mobile: 12.5, tablet: 14.0),
                     fontWeight: FontWeight.w400,
                   ),
                 ),
@@ -930,12 +934,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         SizedBox(height: spacing * 0.8),
         if (_beginnerCategories.isEmpty && _isLoading)
           SizedBox(
-            height: 155,
+            height: sectionHeight,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              itemCount: 3,
-              itemBuilder: (context, index) => _buildCategoryShimmerColumn(isDark),
+              itemCount: 4,
+              itemBuilder: (context, index) => _buildCategoryShimmerColumn(context, isDark),
             ),
           )
         else if (_beginnerCategories.isEmpty)
@@ -976,7 +980,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           )
         else
           SizedBox(
-            height: 155,
+            height: sectionHeight,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -985,8 +989,8 @@ class _HomePageState extends ConsumerState<HomePage> {
               itemBuilder: (context, index) {
                 final cat = _beginnerCategories[index];
                 return Padding(
-                  padding: const EdgeInsets.only(right: 12.0),
-                  child: _buildBeginnerCategoryCard(context, isDark, cat),
+                  padding: const EdgeInsets.only(right: 14.0),
+                  child: _buildBeginnerCategoryCard(context, isDark, cat, cardWidth),
                 );
               },
             ),
@@ -999,7 +1003,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     BuildContext context,
     bool isDark,
     BeginnerCategory category,
+    double cardWidth,
   ) {
+    final titleFontSize = Responsive.value(context, mobile: 13.0, tablet: 15.0);
+    final badgeFontSize = Responsive.value(context, mobile: 10.0, tablet: 11.5);
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -1016,7 +1024,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         );
       },
       child: Container(
-        width: 130,
+        width: cardWidth,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
@@ -1062,7 +1070,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.65),
                     borderRadius: BorderRadius.circular(20),
@@ -1073,8 +1081,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                   child: Text(
                     '${category.sermonCount} msg',
-                    style: const TextStyle(
-                      fontSize: 10,
+                    style: TextStyle(
+                      fontSize: badgeFontSize,
                       fontWeight: FontWeight.w600,
                       color: AppColors.primaryGold,
                     ),
@@ -1084,15 +1092,15 @@ class _HomePageState extends ConsumerState<HomePage> {
 
               // Bottom Title
               Positioned(
-                bottom: 10,
-                left: 10,
-                right: 10,
+                bottom: 12,
+                left: 12,
+                right: 12,
                 child: Text(
                   category.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
+                  style: TextStyle(
+                    fontSize: titleFontSize,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                     letterSpacing: 0.2,
@@ -1107,10 +1115,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildCategoryShimmerColumn(bool isDark) {
+  Widget _buildCategoryShimmerColumn(BuildContext context, bool isDark) {
+    final cardWidth = Responsive.value(context, mobile: 135.0, tablet: 185.0, desktop: 210.0);
     return Container(
-      width: 130,
-      margin: const EdgeInsets.only(right: 12),
+      width: cardWidth,
+      margin: const EdgeInsets.only(right: 14),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : Colors.grey[200],
         borderRadius: BorderRadius.circular(16),
@@ -1167,6 +1176,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     final recommendedPicks = _recommendedSermons.take(3).toList();
     if (recommendedPicks.isEmpty) return const SizedBox.shrink();
 
+    // Responsive square card size for tablet/iPad vs mobile
+    final squareCardSize = Responsive.value(context, mobile: 150.0, tablet: 210.0, desktop: 230.0);
+    final containerHeight = squareCardSize + 16.0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1193,7 +1206,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         SizedBox(height: spacing * 0.8),
         SizedBox(
-          height: 165,
+          height: containerHeight,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -1203,7 +1216,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               final sermon = recommendedPicks[index];
               return Padding(
                 padding: const EdgeInsets.only(right: 14.0),
-                child: _buildSquareRecommendedCard(context, isDark, sermon),
+                child: _buildSquareRecommendedCard(context, isDark, sermon, squareCardSize),
               );
             },
           ),
@@ -1216,6 +1229,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     BuildContext context,
     bool isDark,
     Sermon sermon,
+    double cardSize,
   ) {
     final authProvider = ref.read(authChangeNotifierProvider);
     final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
@@ -1230,6 +1244,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     final isCurrentlyPlaying =
         audioProvider.currentSermon?.id == sermon.id && audioProvider.isPlaying;
 
+    final titleFontSize = Responsive.value(context, mobile: 12.5, tablet: 14.5);
+    final speakerFontSize = Responsive.value(context, mobile: 10.5, tablet: 12.0);
+    final playBtnSize = Responsive.value(context, mobile: 32.0, tablet: 40.0);
+    final playIconSize = Responsive.value(context, mobile: 18.0, tablet: 22.0);
+
     return GestureDetector(
       onTap: () {
         if (isLocked) {
@@ -1242,8 +1261,8 @@ class _HomePageState extends ConsumerState<HomePage> {
         );
       },
       child: Container(
-        width: 150,
-        height: 150,
+        width: cardSize,
+        height: cardSize,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
@@ -1297,8 +1316,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                       sermon.categoryName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 9.5,
+                      style: TextStyle(
+                        fontSize: Responsive.value(context, mobile: 9.5, tablet: 11.0),
                         fontWeight: FontWeight.w600,
                         color: AppColors.primaryGold,
                       ),
@@ -1311,8 +1330,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                 bottom: 8,
                 right: 8,
                 child: Container(
-                  width: 32,
-                  height: 32,
+                  width: playBtnSize,
+                  height: playBtnSize,
                   decoration: BoxDecoration(
                     color: AppColors.primaryGold,
                     shape: BoxShape.circle,
@@ -1325,10 +1344,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                   child: Center(
                     child: isCurrentlyPlaying
-                        ? const Icon(Icons.pause, color: Colors.white, size: 16)
+                        ? Icon(Icons.pause, color: Colors.white, size: playIconSize * 0.9)
                         : isLocked
-                            ? const Icon(Icons.lock, color: Colors.white, size: 14)
-                            : const Icon(Icons.play_arrow, color: Colors.white, size: 18),
+                            ? Icon(Icons.lock, color: Colors.white, size: playIconSize * 0.8)
+                            : Icon(Icons.play_arrow, color: Colors.white, size: playIconSize),
                   ),
                 ),
               ),
@@ -1337,7 +1356,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               Positioned(
                 bottom: 8,
                 left: 10,
-                right: 46,
+                right: playBtnSize + 14,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -1346,8 +1365,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                       sermon.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12.5,
+                      style: TextStyle(
+                        fontSize: titleFontSize,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                         height: 1.2,
@@ -1359,7 +1378,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: speakerFontSize,
                         color: Colors.white.withValues(alpha: 0.75),
                       ),
                     ),
@@ -1376,6 +1395,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildRecentActivities(BuildContext context, bool isDark) {
     final playedService = PlayedAudioService.instance;
     final recentIds = playedService.recentlyPlayedIds;
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final isTabletOrLarger = !Responsive.isMobile(context);
 
     // Filter sermons to those the user actually listened to, in order of playback
     final Map<String, Sermon> sermonMap = {
@@ -1398,7 +1419,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         : _sermons.take(4).toList();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1410,11 +1431,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: AppColors.primaryGold,
                       fontWeight: FontWeight.bold,
+                      fontSize: Responsive.subtitleFontSize(context),
                     ),
               ),
               if (hasListeningHistory)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.primaryGold.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
@@ -1447,7 +1469,24 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
             )
+          else if (isTabletOrLarger)
+            // 2-column grid layout for Tablets/iPads
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 12,
+                mainAxisExtent: 84,
+              ),
+              itemCount: displaySermons.length,
+              itemBuilder: (context, index) {
+                return _buildActivityTile(context, isDark, displaySermons[index]);
+              },
+            )
           else
+            // Single column stack for standard phones
             ...displaySermons.map(
               (sermon) => _buildActivityTile(context, isDark, sermon),
             ),
