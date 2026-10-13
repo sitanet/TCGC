@@ -669,7 +669,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     final spacing = Responsive.verticalSpacing(context);
     final subtitleFontSize = Responsive.subtitleFontSize(context);
     final bodyFontSize = Responsive.bodyFontSize(context);
-    const cardSize = 184.0;
+
+    // Responsive dimensions: larger card on tablets/iPads
+    final cardSize = Responsive.value(context, mobile: 184.0, tablet: 260.0, desktop: 300.0);
+    final containerHeight = cardSize + (Responsive.isMobile(context) ? 40.0 : 50.0);
+    final isTabletOrLarger = !Responsive.isMobile(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -699,7 +703,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               width: double.infinity,
               decoration: BoxDecoration(
                 color: isDark ? AppColors.cardDark : Colors.grey[100],
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Center(
                 child: Column(
@@ -725,9 +729,28 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
             ),
           )
-        else
+        else if (isTabletOrLarger)
+          // Smooth horizontal list for tablets/iPads (showing multiple full-size cards cleanly)
           SizedBox(
-            height: cardSize + 40,
+            height: cardSize + 16,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              itemCount: _events.length,
+              itemBuilder: (context, index) {
+                final event = _events[index];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 18.0),
+                  child: _buildEventCard(context, isDark, event, cardSize),
+                );
+              },
+            ),
+          )
+        else
+          // Carousel view with center-magnification for phones
+          SizedBox(
+            height: containerHeight,
             child: PageView.builder(
               controller: _eventsPageController,
               onPageChanged: (index) {
@@ -748,7 +771,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     child: AnimatedOpacity(
                       duration: const Duration(milliseconds: 200),
                       opacity: opacity,
-                      child: _buildEventCard(context, isDark, event),
+                      child: _buildEventCard(context, isDark, event, cardSize),
                     ),
                   ),
                 );
@@ -759,9 +782,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildEventCard(BuildContext context, bool isDark, Event event) {
-    const cardSize = 184.0;
-    const cornerRadius = 10.0;
+  Widget _buildEventCard(BuildContext context, bool isDark, Event event, double cardSize) {
+    final cornerRadius = Responsive.value(context, mobile: 12.0, tablet: 16.0);
+    final titleFontSize = Responsive.value(context, mobile: 12.0, tablet: 14.5);
 
     return GestureDetector(
       onTap: () => _showEventImageZoom(context, event),
@@ -772,8 +795,8 @@ class _HomePageState extends ConsumerState<HomePage> {
           borderRadius: BorderRadius.circular(cornerRadius),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 8,
+              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
+              blurRadius: 10,
               offset: const Offset(0, 4),
             ),
           ],
@@ -790,12 +813,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                 left: 0,
                 right: 0,
                 child: Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: EdgeInsets.all(Responsive.value(context, mobile: 10.0, tablet: 14.0)),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
                         Colors.transparent,
-                        Colors.black.withValues(alpha: 0.7),
+                        Colors.black.withValues(alpha: 0.8),
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
@@ -803,9 +826,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                   child: Text(
                     event.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 12,
+                      fontSize: titleFontSize,
                       fontWeight: FontWeight.w600,
                     ),
                     maxLines: 2,
