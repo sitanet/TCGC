@@ -40,7 +40,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   List<Sermon> _sermons = [];
   List<Event> _events = [];
   List<BeginnerCategory> _beginnerCategories = [];
-  List<Sermon> _pickedInterestSermons = [];
   List<Sermon> _recommendedSermons = [];
   bool _isLoading = true;
   int _currentEventIndex = 0;
@@ -138,12 +137,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       }
 
       if (mounted) {
-        final pickedInterests = _interestsService
-            .getRandomMessagesFromInterests(sermons, count: 3);
         setState(() {
           _sermons = sermons;
           _beginnerCategories = resolvedCategories;
-          _pickedInterestSermons = pickedInterests;
           _isLoading = false; // Show content after loading
         });
       }
@@ -214,13 +210,9 @@ class _HomePageState extends ConsumerState<HomePage> {
           }).toList();
         }
 
-        final pickedInterests = _interestsService
-            .getRandomMessagesFromInterests(sermons, count: 3);
-
         setState(() {
           _sermons = sermons;
           _beginnerCategories = resolvedCategories;
-          _pickedInterestSermons = pickedInterests;
         });
       }
 
