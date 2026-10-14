@@ -893,6 +893,8 @@ class SpeakerModel {
   final bool isMainSpeaker;
   final bool seniorPastor;
   final bool showExploreSection;
+  final bool isExternalMinister;
+  final bool isSongMinister;
 
   SpeakerModel({
     required this.id,
@@ -905,6 +907,8 @@ class SpeakerModel {
     this.isMainSpeaker = false,
     this.seniorPastor = false,
     this.showExploreSection = false,
+    this.isExternalMinister = false,
+    this.isSongMinister = false,
   });
 
   factory SpeakerModel.fromJson(Map<String, dynamic> json) {
@@ -931,6 +935,23 @@ class SpeakerModel {
       isMainSpeaker: json['is_main_speaker'] ?? false,
       seniorPastor: json['senior_pastor'] ?? false,
       showExploreSection: json['show_explore_section'] ?? false,
+      isExternalMinister: json['is_external_minister'] == true,
+      isSongMinister: json['is_song_minister'] == true,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'title': title,
+    'full_name': fullName,
+    'bio': bio,
+    'photo_url': photoUrl,
+    'is_active': isActive,
+    'is_main_speaker': isMainSpeaker,
+    'senior_pastor': seniorPastor,
+    'show_explore_section': showExploreSection,
+    'is_external_minister': isExternalMinister,
+    'is_song_minister': isSongMinister,
+  };
 }

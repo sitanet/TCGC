@@ -1690,6 +1690,67 @@ class _AudioPageState extends ConsumerState<AudioPage>
                       )
                     else
                       _buildSpeakerFallbackImage(speaker, sampleSermonImage, isDark),
+
+                    // External Minister Badge
+                    if (speaker.isExternalMinister)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.75),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.cyanAccent.withValues(alpha: 0.7),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: const Text(
+                            'EXTERNAL',
+                            style: TextStyle(
+                              color: Colors.cyanAccent,
+                              fontSize: 9.0,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    // Songs Minister Badge
+                    if (speaker.isSongMinister)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.75),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: AppColors.primaryGold.withValues(alpha: 0.7),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.music_note, size: 10, color: AppColors.primaryGold),
+                              SizedBox(width: 2),
+                              Text(
+                                'SONGS',
+                                style: TextStyle(
+                                  color: AppColors.primaryGold,
+                                  fontSize: 9.0,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
