@@ -28,7 +28,6 @@ import 'presentation/pages/teens/teens_page.dart';
 import 'presentation/pages/get_started/get_started_page.dart';
 import 'presentation/pages/auth/sign_in_page.dart';
 import 'presentation/pages/auth/sign_up_page.dart';
-import 'presentation/pages/interests/interests_page.dart';
 import 'data/services/interests_service.dart';
 import 'presentation/widgets/bottom_nav_bar.dart';
 import 'presentation/widgets/mini_player.dart';
@@ -159,7 +158,6 @@ class MyApp extends ConsumerStatefulWidget {
 class _MyAppState extends ConsumerState<MyApp> {
   bool _showGetStarted = true;
   bool _showSignUp = false;
-  bool _showInterests = false;
   bool _initialized = false;
   final InterestsService _interestsService = InterestsService();
   final DataService _dataService = DataService();
@@ -628,9 +626,6 @@ class _MyAppState extends ConsumerState<MyApp> {
         if (mounted && authProvider.isAuthenticated) {
           setState(() {
             _showGetStarted = false;
-            if (!_interestsService.interestsCompleted) {
-              _showInterests = true;
-            }
           });
           _startBackgroundPreBuffering();
         }
@@ -657,9 +652,6 @@ class _MyAppState extends ConsumerState<MyApp> {
     setState(() {
       _showGetStarted = false;
       _showSignUp = false;
-      if (!_interestsService.interestsCompleted) {
-        _showInterests = true;
-      }
     });
     // Start pre-buffering all messages in background after login
     _startBackgroundPreBuffering();
@@ -669,12 +661,6 @@ class _MyAppState extends ConsumerState<MyApp> {
     // Disabled heavy background caching to prevent ANR issues
     // Data will be fetched on demand from screens
     debugPrint('Background pre-buffering disabled to prevent ANR');
-  }
-
-  void _onInterestsComplete() {
-    setState(() {
-      _showInterests = false;
-    });
   }
 
   @override
@@ -708,11 +694,7 @@ class _MyAppState extends ConsumerState<MyApp> {
 
     // Always show main app interface (removed offline page check)
     if (authProvider.isAuthenticated) {
-      if (_showInterests) {
-        homeWidget = InterestsPage(onComplete: _onInterestsComplete);
-      } else {
-        homeWidget = const NetworkAwareWidget(child: MainScreen());
-      }
+      homeWidget = const NetworkAwareWidget(child: MainScreen());
     } else if (_showGetStarted) {
       homeWidget = GetStartedPage(
         onSignIn: () {
