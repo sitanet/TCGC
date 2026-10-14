@@ -995,6 +995,8 @@ class _HomePageState extends ConsumerState<HomePage> {
               categories: _beginnerCategories.map((c) => c.name).toList(),
               beginnerCategories: _beginnerCategories,
               isDirectCollection: true,
+              headerImageUrl: category.imageUrl,
+              headerDescription: category.description,
             ),
           ),
         );

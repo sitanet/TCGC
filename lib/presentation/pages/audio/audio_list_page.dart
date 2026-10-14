@@ -15,6 +15,18 @@ import 'audio_player_page.dart';
 
 enum FilterType { category, speaker, date }
 
+String _stripHtml(String text) {
+  return text
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .trim();
+}
+
 class AudioListPage extends ConsumerStatefulWidget {
   final String category;
   final String? categoryId;
@@ -25,6 +37,8 @@ class AudioListPage extends ConsumerStatefulWidget {
   final String? initialSpeaker;
   final List<BeginnerCategory>? beginnerCategories;
   final bool isDirectCollection;
+  final String? headerImageUrl;
+  final String? headerDescription;
 
   const AudioListPage({
     super.key,
@@ -37,6 +51,8 @@ class AudioListPage extends ConsumerStatefulWidget {
     this.initialSpeaker,
     this.beginnerCategories,
     this.isDirectCollection = false,
+    this.headerImageUrl,
+    this.headerDescription,
   });
 
   @override
@@ -366,121 +382,183 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
     });
   }
 
+  void _playAll() {
+    if (_filteredItems.isEmpty) return;
+    final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
+    audioProvider.setQueue(_filteredItems, 0);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AudioPlayerPage(sermon: _filteredItems.first),
+      ),
+    );
+  }
+
+  void _shuffleAndPlay() {
+    if (_filteredItems.isEmpty) return;
+    final shuffled = List<Sermon>.from(_filteredItems)..shuffle();
+    final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
+    audioProvider.setQueue(shuffled, 0);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AudioPlayerPage(sermon: shuffled.first),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final isSeries = widget.isDirectCollection || widget.beginnerCategories != null;
+    final isSpeakerMode = _filterType == FilterType.speaker;
+
+    String pageTitle = 'Audio Messages';
+    if (isSeries) {
+      pageTitle = _selectedCategory != 'All' ? _selectedCategory : widget.category;
+    } else if (isSpeakerMode && _selectedSpeaker != null && _selectedSpeaker != 'All') {
+      pageTitle = _formatSpeakerName(_selectedSpeaker!).replaceAll('\n', ' ');
+    } else if (widget.category != 'All') {
+      pageTitle = widget.category;
+    }
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
+      value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark, // Black status bar icons
-        statusBarBrightness: Brightness.light,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
         appBar: CustomAppBar(
-          title: widget.category != 'All'
-              ? widget.category
-              : (widget.initialSpeaker != null ? widget.initialSpeaker! : 'Audio Messages'),
+          title: pageTitle,
           showBackButton: Navigator.canPop(context),
-          lightBackground: true,
+          lightBackground: !isDark,
         ),
-        body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.cardDark : Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(
-                  color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                ),
-              ),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search by title or speaker...',
-                  prefixIcon: Icon(
-                    Icons.search,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                ),
-              ),
-            ),
-          ),
-          // Filter type toggle
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                _buildFilterToggle('Category', FilterType.category, isDark),
-                const SizedBox(width: 12),
-                _buildFilterToggle('Minister', FilterType.speaker, isDark),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Category or Speaker filter list
-          SizedBox(
-            height: _filterType == FilterType.speaker ? 105 : 32,
-            child: _filterType == FilterType.category
-                ? _buildCategoryFilterList(isDark)
-                : _buildSpeakerFilterList(isDark),
-          ),
-          const SizedBox(height: 16),
-          // Selected Minister Spotlight Banner
-          if (_filterType == FilterType.speaker && _selectedSpeaker != null && _selectedSpeaker != 'All')
-            _buildSelectedMinisterSpotlight(isDark),
-          Expanded(
-            child: RefreshIndicator(
+        body: Builder(
+          builder: (context) {
+            final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+            final authProvider = ref.watch(authChangeNotifierProvider);
+            final downloadService = DownloadService();
+            final user = authProvider.user;
+            final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+            final isGeneralMarried = user?.isGeneralMarried ?? false;
+            final isInHouseMarried = user?.isInHouseMarried ?? false;
+            final hasMiniPlayer = audioProvider.currentSermon != null;
+            final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
+
+            return RefreshIndicator(
               onRefresh: _onRefresh,
               color: AppColors.primaryGold,
-              child: _filteredItems.isEmpty
-                  ? ListView(
-                      children: [
-                        SizedBox(
-                          height: MediaQuery.of(context).size.height * 0.4,
-                          child: Center(
-                            child: Text(
-                              'No audio found',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: isDark
-                                        ? AppColors.textSecondaryDark
-                                        : AppColors.textSecondaryLight,
-                                  ),
+              child: CustomScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  // 1. Hero Header Card
+                  SliverToBoxAdapter(
+                    child: _buildHeroHeader(isDark),
+                  ),
+
+                  // 2. In-Page Search Bar
+                  SliverToBoxAdapter(
+                    child: _buildSearchBar(isDark),
+                  ),
+
+                  // 3. Sibling Filters (Ministers, Series, or Categories)
+                  if (isSpeakerMode)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildSpeakerFilterList(isDark),
+                      ),
+                    )
+                  else if (isSeries && (widget.beginnerCategories?.length ?? 0) > 1)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildSeriesFilterList(isDark),
+                      ),
+                    )
+                  else if (widget.categories.length > 1)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildCategoryFilterList(isDark),
+                      ),
+                    ),
+
+                  // 4. Section Header with count
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Messages',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : AppColors.textPrimaryLight,
                             ),
                           ),
-                        ),
-                      ],
-                    )
-                  : Builder(
-                      builder: (context) {
-                        final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
-                        final authProvider = ref.watch(authChangeNotifierProvider);
-                        final downloadService = DownloadService();
-                        final user = authProvider.user;
-                        final isServiceTeamMember = user?.isServiceTeamMember ?? false;
-                        final isGeneralMarried = user?.isGeneralMarried ?? false;
-                        final isInHouseMarried = user?.isInHouseMarried ?? false;
-                        final hasMiniPlayer = audioProvider.currentSermon != null;
-                        final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
-                        return ListView.builder(
-                          controller: _scrollController,
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: EdgeInsets.only(
-                            left: 20,
-                            right: 20,
-                            top: 8,
-                            bottom: bottomInset,
+                          Text(
+                            '${_filteredItems.length} available',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primaryGold,
+                            ),
                           ),
-                          itemCount: _filteredItems.length,
-                          itemBuilder: (context, index) {
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // 5. Messages List or Empty State
+                  if (_filteredItems.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.search_off_rounded,
+                                size: 54,
+                                color: isDark ? Colors.white30 : Colors.grey[400],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                _searchController.text.isNotEmpty
+                                    ? 'No messages found for "${_searchController.text}"'
+                                    : 'No audio messages in this collection',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white70 : AppColors.textSecondaryLight,
+                                ),
+                              ),
+                              if (_searchController.text.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: () => _searchController.clear(),
+                                  child: const Text('Clear search', style: TextStyle(color: AppColors.primaryGold)),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: EdgeInsets.only(left: 16, right: 16, bottom: bottomInset),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
                             final audio = _filteredItems[index];
                             final isPreBuffered = audioProvider.isPreBuffered(audio.id);
                             final isDownloaded = downloadService.isDownloaded(audio.id);
@@ -493,6 +571,7 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                             final threeDaysAgo = DateTime.now().subtract(const Duration(days: 3));
                             final isNew = audio.date.isAfter(threeDaysAgo) && !audioProvider.isAudioPlayed(audio.id);
                             final isCurrentlyPlaying = audioProvider.currentSermon?.id == audio.id && audioProvider.isPlaying;
+
                             return _AudioListItem(
                               sermon: audio,
                               isDark: isDark,
@@ -504,15 +583,19 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                               isInHouseMarried: isInHouseMarried,
                               isNew: isNew,
                               isPlaying: isCurrentlyPlaying,
-                              onThumbnailTap: () {
+                              onPlayTap: () {
                                 if (isLocked) {
                                   _showLockedMessage(context, isDark);
                                   return;
                                 }
-                                audioProvider.setQueue(_filteredItems, index);
-                                audioProvider.playSermon(audio);
+                                if (isCurrentlyPlaying) {
+                                  audioProvider.pause();
+                                } else {
+                                  audioProvider.setQueue(_filteredItems, index);
+                                  audioProvider.playSermon(audio);
+                                }
                               },
-                              onTitleTap: () {
+                              onCardTap: () {
                                 if (isLocked) {
                                   _showLockedMessage(context, isDark);
                                   return;
@@ -527,317 +610,441 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                               },
                             );
                           },
-                        );
-                      },
+                          childCount: _filteredItems.length,
+                        ),
+                      ),
                     ),
-            ),
-          ),
-        ],
-      ),
-      ),
-    );
-  }
-
-  Widget _buildFilterToggle(String label, FilterType type, bool isDark) {
-    final isSelected = _filterType == type;
-    return GestureDetector(
-      onTap: () {
-        if (_filterType != type) {
-          setState(() {
-            _filterType = type;
-            if (type == FilterType.speaker) {
-              _selectedSpeaker = null;
-            } else {
-              _selectedCategory = widget.category;
-              _selectedCategoryId = widget.categoryId;
-            }
-            _filteredItems = _getFilteredItems(_searchController.text.toLowerCase());
-          });
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? AppColors.primaryGold 
-              : (isDark ? AppColors.cardDark : Colors.white),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected 
-                ? AppColors.primaryGold 
-                : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-            color: isSelected 
-                ? Colors.white 
-                : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-          ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildCategoryFilterList(bool isDark) {
-    return ListView.separated(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: widget.categories.length,
-      separatorBuilder: (_, __) => const SizedBox(width: 16),
-      itemBuilder: (context, index) {
-        final category = widget.categories[index];
-        final isSelected = category == _selectedCategory && _filterType == FilterType.category;
-        return GestureDetector(
-          onTap: () => _selectCategory(category),
-          child: Text(
-            category,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              color: isSelected
-                  ? AppColors.maroon
-                  : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-            ),
-          ),
-        );
-      },
-    );
-  }
+  Widget _buildHeroHeader(bool isDark) {
+    final isSeries = widget.isDirectCollection || widget.beginnerCategories != null;
+    final isMinister = _filterType == FilterType.speaker && _selectedSpeaker != null && _selectedSpeaker != 'All';
+    final isCategory = !isSeries && !isMinister && _selectedCategory != 'All';
 
-  Widget _buildSelectedMinisterSpotlight(bool isDark) {
-    if (_selectedSpeaker == null || _selectedSpeaker == 'All') return const SizedBox.shrink();
+    String headerTypePill = 'ALL MESSAGES';
+    Color pillColor = AppColors.primaryGold;
+    IconData pillIcon = Icons.library_music_rounded;
+    String displayTitle = widget.category != 'All' ? widget.category : 'Audio Messages';
+    String subtitle = '${_filteredItems.length} Messages • The CityGate Church';
+    String? imageUrl = widget.headerImageUrl;
+    String? description = widget.headerDescription;
 
-    // Find speaker model if available
-    final selSpk = _selectedSpeaker!.toLowerCase().trim();
-    final model = _speakerModels.where((s) =>
-        s.fullName.toLowerCase().trim() == selSpk ||
-        s.name.toLowerCase().trim() == selSpk ||
-        selSpk.contains(s.fullName.toLowerCase().trim()) ||
-        s.fullName.toLowerCase().trim().contains(selSpk)).firstOrNull;
+    if (isSeries) {
+      headerTypePill = 'TEACHING SERIES';
+      pillColor = AppColors.primaryGold;
+      pillIcon = Icons.auto_stories_rounded;
+      displayTitle = _selectedCategory != 'All' ? _selectedCategory : widget.category;
+      if (imageUrl == null || imageUrl.isEmpty) {
+        final matchSeries = widget.beginnerCategories?.where((c) => c.name.toLowerCase() == displayTitle.toLowerCase()).firstOrNull;
+        imageUrl = matchSeries?.imageUrl;
+        description ??= matchSeries?.description;
+      }
+    } else if (isMinister) {
+      final selSpk = _selectedSpeaker!.toLowerCase().trim();
+      final model = _speakerModels.where((s) =>
+          s.fullName.toLowerCase().trim() == selSpk ||
+          s.name.toLowerCase().trim() == selSpk ||
+          selSpk.contains(s.fullName.toLowerCase().trim()) ||
+          s.fullName.toLowerCase().trim().contains(selSpk)).firstOrNull;
 
-    final isExternal = model?.isExternalMinister ?? false;
-    final isSong = model?.isSongMinister ?? false;
-    final isSenior = model?.seniorPastor ?? false;
-    final isMain = model?.isMainSpeaker ?? false;
+      final isExternal = model?.isExternalMinister ?? false;
+      final isSong = model?.isSongMinister ?? false;
+      final isSenior = model?.seniorPastor ?? false;
+      final isMain = model?.isMainSpeaker ?? false;
 
-    String roleLabel = 'MINISTER';
-    Color roleBadgeColor = AppColors.primaryGold;
-    IconData roleIcon = Icons.person;
+      if (isExternal && isSong) {
+        headerTypePill = 'GUEST WORSHIP MINISTER';
+        pillColor = Colors.cyanAccent.shade700;
+        pillIcon = Icons.public_rounded;
+      } else if (isExternal) {
+        headerTypePill = 'GUEST MINISTER';
+        pillColor = Colors.cyanAccent.shade700;
+        pillIcon = Icons.public_rounded;
+      } else if (isSong) {
+        headerTypePill = 'SONGS MINISTER';
+        pillColor = AppColors.primaryGold;
+        pillIcon = Icons.music_note_rounded;
+      } else if (isSenior) {
+        headerTypePill = 'SENIOR PASTOR';
+        pillColor = AppColors.primaryGold;
+        pillIcon = Icons.church_rounded;
+      } else if (isMain) {
+        headerTypePill = 'RESIDENT PASTOR';
+        pillColor = AppColors.primaryGold;
+        pillIcon = Icons.church_rounded;
+      } else {
+        headerTypePill = 'MINISTER';
+        pillColor = AppColors.primaryGold;
+        pillIcon = Icons.person_rounded;
+      }
 
-    if (isExternal && isSong) {
-      roleLabel = 'GUEST WORSHIP MINISTER';
-      roleBadgeColor = Colors.cyanAccent.shade700;
-      roleIcon = Icons.public;
-    } else if (isExternal) {
-      roleLabel = 'GUEST MINISTER';
-      roleBadgeColor = Colors.cyanAccent.shade700;
-      roleIcon = Icons.public;
-    } else if (isSong) {
-      roleLabel = 'SONGS MINISTER';
-      roleBadgeColor = AppColors.primaryGold;
-      roleIcon = Icons.music_note;
-    } else if (isSenior) {
-      roleLabel = 'SENIOR PASTOR';
-      roleBadgeColor = AppColors.primaryGold;
-      roleIcon = Icons.church;
-    } else if (isMain) {
-      roleLabel = 'RESIDENT PASTOR';
-      roleBadgeColor = AppColors.primaryGold;
-      roleIcon = Icons.church;
+      displayTitle = _formatSpeakerName(_selectedSpeaker!).replaceAll('\n', ' ');
+      imageUrl = model?.photoUrl ?? imageUrl;
+      description ??= model?.bio;
+    } else if (isCategory) {
+      headerTypePill = 'MESSAGE CATEGORY';
+      pillColor = AppColors.primaryGold;
+      pillIcon = Icons.category_rounded;
+      displayTitle = _selectedCategory;
     }
 
-    String? photoUrl = model?.photoUrl;
-    if (photoUrl == null || photoUrl.isEmpty) {
-      for (final sermon in _filteredItems) {
-        if (sermon.imageUrl != null && sermon.imageUrl!.isNotEmpty) {
-          photoUrl = sermon.imageUrl;
+    if ((imageUrl == null || imageUrl.isEmpty) && _filteredItems.isNotEmpty) {
+      for (final s in _filteredItems) {
+        if (s.imageUrl != null && s.imageUrl!.isNotEmpty) {
+          imageUrl = s.imageUrl;
           break;
         }
       }
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.cardDark : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isExternal
-                ? (isDark ? Colors.cyanAccent.withValues(alpha: 0.35) : Colors.cyan.shade200)
-                : (isDark ? AppColors.dividerDark : Colors.grey[200]!),
-            width: isExternal ? 1.2 : 1.0,
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isMinister && (pillColor == Colors.cyanAccent.shade700)
+              ? (isDark ? Colors.cyanAccent.withValues(alpha: 0.35) : Colors.cyan.shade200)
+              : (isDark ? AppColors.dividerDark : Colors.grey.shade200),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(isMinister ? 40 : 14),
+                child: Container(
+                  width: 76,
+                  height: 76,
+                  color: isDark ? Colors.white10 : Colors.grey.shade100,
+                  child: imageUrl != null && imageUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 152,
+                          memCacheHeight: 152,
+                          placeholder: (_, __) => Icon(
+                            isMinister ? Icons.person_rounded : Icons.music_note_rounded,
+                            size: 32,
+                            color: pillColor,
+                          ),
+                          errorWidget: (_, __, ___) => Icon(
+                            isMinister ? Icons.person_rounded : Icons.music_note_rounded,
+                            size: 32,
+                            color: pillColor,
+                          ),
+                        )
+                      : Icon(
+                          isMinister ? Icons.person_rounded : Icons.music_note_rounded,
+                          size: 32,
+                          color: pillColor,
+                        ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: pillColor.withValues(alpha: isDark ? 0.2 : 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: pillColor.withValues(alpha: 0.4),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(pillIcon, size: 11, color: pillColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            headerTypePill,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: pillColor,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      displayTitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        height: 1.2,
+                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (description != null && description.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              _stripHtml(description),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.white70 : Colors.black87,
+                height: 1.3,
+              ),
             ),
           ],
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _playAll,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 20, color: Colors.white),
+                  label: const Text(
+                    'Play All',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGold,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                onPressed: _shuffleAndPlay,
+                icon: Icon(
+                  Icons.shuffle_rounded,
+                  size: 18,
+                  color: isDark ? Colors.white70 : AppColors.textPrimaryLight,
+                ),
+                label: Text(
+                  'Shuffle',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                    color: isDark ? AppColors.dividerDark : Colors.grey.shade300,
+                    width: 1.2,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.grey[100],
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: _searchController.text.isNotEmpty
+                ? AppColors.primaryGold
+                : (isDark ? AppColors.dividerDark : Colors.grey[300]!),
+            width: _searchController.text.isNotEmpty ? 1.4 : 1.0,
+          ),
         ),
         child: Row(
           children: [
-            // Avatar
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isExternal ? Colors.cyanAccent.shade700 : AppColors.primaryGold,
-                  width: 2.0,
+            const SizedBox(width: 14),
+            Icon(
+              Icons.search_rounded,
+              size: 20,
+              color: _searchController.text.isNotEmpty
+                  ? AppColors.primaryGold
+                  : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Search in this collection...',
+                  hintStyle: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  ),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
-              child: ClipOval(
-                child: photoUrl != null && photoUrl.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: photoUrl,
-                        fit: BoxFit.cover,
-                        memCacheWidth: 104,
-                        memCacheHeight: 104,
-                        placeholder: (_, __) => Container(
-                          color: isDark ? Colors.white12 : Colors.grey[200],
-                          child: const Icon(Icons.person, size: 24, color: AppColors.primaryGold),
-                        ),
-                        errorWidget: (_, __, ___) => Container(
-                          color: isDark ? Colors.white12 : Colors.grey[200],
-                          child: const Icon(Icons.person, size: 24, color: AppColors.primaryGold),
-                        ),
-                      )
-                    : Container(
-                        color: isDark ? Colors.white12 : Colors.grey[200],
-                        child: Center(
-                          child: Text(
-                            _selectedSpeaker!.isNotEmpty ? _selectedSpeaker![0].toUpperCase() : '?',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primaryGold,
-                            ),
-                          ),
-                        ),
-                      ),
-              ),
             ),
-            const SizedBox(width: 12),
-
-            // Minister Name & Role Pill
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: roleBadgeColor.withValues(alpha: isDark ? 0.2 : 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: roleBadgeColor.withValues(alpha: 0.5),
-                            width: 0.8,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(roleIcon, size: 10, color: roleBadgeColor),
-                            const SizedBox(width: 3),
-                            Text(
-                              roleLabel,
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.bold,
-                                color: roleBadgeColor,
-                                letterSpacing: 0.4,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    _formatSpeakerName(_selectedSpeaker!).replaceAll('\n', ' '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${_filteredItems.length} ${_filteredItems.length == 1 ? 'Message' : 'Messages'}',
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: AppColors.primaryGold,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Play All Action Button
-            if (_filteredItems.isNotEmpty)
+            if (_searchController.text.isNotEmpty)
               GestureDetector(
                 onTap: () {
-                  final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
-                  audioProvider.setQueue(_filteredItems, 0);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AudioPlayerPage(sermon: _filteredItems.first),
-                    ),
-                  );
+                  _searchController.clear();
                 },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryGold,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.play_arrow_rounded, size: 16, color: Colors.white),
-                      SizedBox(width: 2),
-                      Text(
-                        'Play All',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                    color: isDark ? Colors.white60 : Colors.black54,
                   ),
                 ),
               ),
-
-            // Clear Filter Button
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: () => _selectSpeaker('All'),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(
-                  Icons.close_rounded,
-                  size: 20,
-                  color: isDark ? Colors.white60 : Colors.black45,
-                ),
-              ),
-            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSeriesFilterList(bool isDark) {
+    if (widget.beginnerCategories == null || widget.beginnerCategories!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: widget.beginnerCategories!.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final s = widget.beginnerCategories![index];
+          final isSelected = s.name.toLowerCase() == _selectedCategory.toLowerCase();
+          return _buildChipPill(
+            label: s.name,
+            isSelected: isSelected,
+            isDark: isDark,
+            onTap: () => _selectCategory(s.name),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCategoryFilterList(bool isDark) {
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: widget.categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final cat = widget.categories[index];
+          final isSelected = cat.toLowerCase() == _selectedCategory.toLowerCase();
+          return _buildChipPill(
+            label: cat,
+            isSelected: isSelected,
+            isDark: isDark,
+            onTap: () => _selectCategory(cat),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildChipPill({
+    required String label,
+    required bool isSelected,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primaryGold
+              : (isDark ? AppColors.cardDark : Colors.white),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? AppColors.primaryGold
+                : (isDark ? AppColors.dividerDark : Colors.grey.shade300),
+            width: isSelected ? 1.4 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primaryGold.withValues(alpha: 0.25),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected
+                ? Colors.white
+                : (isDark ? Colors.white70 : AppColors.textPrimaryLight),
+          ),
         ),
       ),
     );
@@ -1133,8 +1340,8 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
 class _AudioListItem extends StatelessWidget {
   final Sermon sermon;
   final bool isDark;
-  final VoidCallback? onThumbnailTap;
-  final VoidCallback? onTitleTap;
+  final VoidCallback? onPlayTap;
+  final VoidCallback? onCardTap;
   final bool isReadyToPlay;
   final bool isBuffering;
   final double bufferProgress;
@@ -1147,8 +1354,8 @@ class _AudioListItem extends StatelessWidget {
   const _AudioListItem({
     required this.sermon,
     required this.isDark,
-    this.onThumbnailTap,
-    this.onTitleTap,
+    this.onPlayTap,
+    this.onCardTap,
     this.isReadyToPlay = false,
     this.isBuffering = false,
     this.bufferProgress = 0.0,
@@ -1158,262 +1365,314 @@ class _AudioListItem extends StatelessWidget {
     this.isNew = false,
     this.isPlaying = false,
   });
-  
-  bool get _isLocked => 
+
+  bool get _isLocked =>
       (sermon.isServiceTeamOnly && !isServiceTeamMember) ||
       (sermon.isGeneralMarriedOnly && !isGeneralMarried) ||
       (sermon.isInHouseMarriedOnly && !isInHouseMarried);
 
-  String _formatTimeAgo(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays > 0) {
-      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
-    } else {
-      return 'Just now';
-    }
-  }
-
-  String _getCategoryName() {
-    if (sermon.categoryName.isNotEmpty) {
-      return sermon.categoryName;
-    } else if (sermon.category.isNotEmpty) {
-      return sermon.category;
-    }
-    return '';
-  }
-
   String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
-  String _getSpeakerAndTime() {
-    final parts = <String>[];
-    if (sermon.speaker != null && sermon.speaker!.isNotEmpty) {
-      parts.add(sermon.speaker!);
+  String _formatDuration(Duration d) {
+    if (d.inMinutes <= 0) return '';
+    final hours = d.inHours;
+    final mins = d.inMinutes % 60;
+    if (hours > 0) {
+      return '${hours}h ${mins > 0 ? '$mins m' : ''}';
     }
-    parts.add(_formatTimeAgo(sermon.date));
-    return parts.join(' - ');
-  }
-
-  Widget _buildImage(bool isDark) {
-    if (sermon.imageUrl == null || sermon.imageUrl!.isEmpty) {
-      return Icon(
-        Icons.music_note,
-        size: 20,
-        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-      );
-    }
-    
-    return CachedNetworkImage(
-      imageUrl: sermon.imageUrl!,
-      fit: BoxFit.cover,
-      memCacheWidth: 100,
-      memCacheHeight: 100,
-      placeholder: (_, __) => Icon(
-        Icons.music_note,
-        size: 20,
-        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-      ),
-      errorWidget: (_, __, ___) => Icon(
-        Icons.music_note,
-        size: 20,
-        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-      ),
-    );
+    return '$mins mins';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          // Thumbnail - tap to play/pause without opening player
-          GestureDetector(
-            onTap: onThumbnailTap,
-            child: Stack(
+    final title = _stripHtml(sermon.title);
+    final speaker = sermon.speaker?.trim() ?? '';
+    final categoryName = sermon.categoryName.isNotEmpty ? sermon.categoryName : sermon.category;
+    final durationStr = _formatDuration(sermon.duration);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isPlaying
+              ? AppColors.primaryGold
+              : (isDark ? AppColors.dividerDark : Colors.grey.shade200),
+          width: isPlaying ? 1.5 : 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onCardTap,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    width: 50,
-                    height: 50,
-                    color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-                    child: _buildImage(isDark),
-                  ),
-                ),
-                // Wave animation when playing
-                if (isPlaying && !_isLocked)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const _WaveAnimation(),
-                    ),
-                  ),
-                // Ready indicator (pre-buffered or downloaded) - only show when not playing
-                if (isReadyToPlay && !_isLocked && !isPlaying)
-                  Positioned(
-                    bottom: 2,
-                    right: 2,
-                    child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.green.withValues(alpha: 0.4),
-                            blurRadius: 4,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.play_arrow,
-                        size: 12,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                // Buffering progress indicator
-                if (isBuffering && !isReadyToPlay && !isPlaying)
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: 3,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withValues(alpha: 0.3),
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(8),
-                          bottomRight: Radius.circular(8),
+                // 1. Artwork Thumbnail
+                GestureDetector(
+                  onTap: onPlayTap,
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          width: 58,
+                          height: 58,
+                          color: isDark ? Colors.white10 : Colors.grey.shade200,
+                          child: sermon.imageUrl != null && sermon.imageUrl!.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: sermon.imageUrl!,
+                                  fit: BoxFit.cover,
+                                  memCacheWidth: 116,
+                                  memCacheHeight: 116,
+                                  placeholder: (_, __) => Container(
+                                    color: isDark ? Colors.white10 : Colors.grey.shade200,
+                                    child: const Icon(Icons.music_note_rounded, size: 24, color: AppColors.primaryGold),
+                                  ),
+                                  errorWidget: (_, __, ___) => Container(
+                                    color: isDark ? Colors.white10 : Colors.grey.shade200,
+                                    child: const Icon(Icons.music_note_rounded, size: 24, color: AppColors.primaryGold),
+                                  ),
+                                )
+                              : const Icon(Icons.music_note_rounded, size: 24, color: AppColors.primaryGold),
                         ),
                       ),
-                      child: FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: bufferProgress,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryGold,
-                            borderRadius: const BorderRadius.only(
-                              bottomLeft: Radius.circular(8),
+
+                      // Animated wave when playing
+                      if (isPlaying && !_isLocked)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.55),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const _WaveAnimation(),
+                          ),
+                        ),
+
+                      // Locked icon
+                      if (_isLocked)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.lock_rounded, size: 20, color: Colors.white),
                             ),
                           ),
                         ),
-                      ),
-                    ),
+
+                      // Ready / Prebuffered icon
+                      if (isReadyToPlay && !_isLocked && !isPlaying)
+                        Positioned(
+                          bottom: 2,
+                          right: 2,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                            ),
+                            child: const Icon(Icons.play_arrow_rounded, size: 10, color: Colors.white),
+                          ),
+                        ),
+
+                      // Buffering progress bar
+                      if (isBuffering && !isReadyToPlay && !isPlaying)
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: 3,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withValues(alpha: 0.3),
+                              borderRadius: const BorderRadius.only(
+                                bottomLeft: Radius.circular(10),
+                                bottomRight: Radius.circular(10),
+                              ),
+                            ),
+                            child: FractionallySizedBox(
+                              alignment: Alignment.centerLeft,
+                              widthFactor: bufferProgress,
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primaryGold,
+                                  borderRadius: BorderRadius.only(
+                                    bottomLeft: Radius.circular(10),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                // Lock icon for service team only content
-                if (_isLocked)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.lock,
-                          size: 20,
-                          color: Colors.white,
+                ),
+                const SizedBox(width: 12),
+
+                // 2. Sermon Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          height: 1.25,
+                          color: isPlaying
+                              ? AppColors.primaryGold
+                              : (isDark ? Colors.white : AppColors.textPrimaryLight),
                         ),
                       ),
+                      const SizedBox(height: 4),
+
+                      // Speaker Row
+                      if (speaker.isNotEmpty)
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.person_outline_rounded,
+                              size: 13,
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            ),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                speaker,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                      const SizedBox(height: 4),
+
+                      // Metadata Row (Category pill, date, duration)
+                      Row(
+                        children: [
+                          if (categoryName.isNotEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white10 : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                categoryName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark ? Colors.white70 : Colors.black87,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+
+                          Text(
+                            _formatDate(sermon.date),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            ),
+                          ),
+
+                          if (durationStr.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '• $durationStr',
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                color: AppColors.primaryGold,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+
+                          if (isNew) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'NEW',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // 3. Play Action Button
+                GestureDetector(
+                  onTap: onPlayTap,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isPlaying
+                          ? AppColors.primaryGold
+                          : AppColors.primaryGold.withValues(alpha: 0.14),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Icon(
+                        isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        size: 20,
+                        color: isPlaying ? Colors.white : AppColors.primaryGold,
+                      ),
                     ),
                   ),
+                ),
               ],
             ),
           ),
-          const SizedBox(width: 16),
-          // Title area - tap to open player
-          Expanded(
-            child: GestureDetector(
-              onTap: onTitleTap,
-              behavior: HitTestBehavior.opaque,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Category (bold dark) - Title (regular dark)
-                  RichText(
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    text: TextSpan(
-                      children: [
-                        if (_getCategoryName().isNotEmpty) ...[
-                          TextSpan(
-                            text: _getCategoryName(),
-                            style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black87,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          TextSpan(
-                            text: ' - ',
-                            style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black87,
-                              fontWeight: FontWeight.normal,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                        TextSpan(
-                          text: '${_formatDate(sermon.date)} - ${sermon.title}',
-                          style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black87,
-                            fontWeight: FontWeight.normal,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  // Speaker - Time ago
-                  Text(
-                    _getSpeakerAndTime(),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isDark
-                              ? AppColors.textSecondaryDark.withValues(alpha: 0.7)
-                              : AppColors.textSecondaryLight.withValues(alpha: 0.7),
-                          fontSize: 12,
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (isNew)
-            Container(
-              margin: const EdgeInsets.only(left: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'NEW',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }

@@ -1009,6 +1009,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
               categories: _beginnerCategories.map((c) => c.name).toList(),
               beginnerCategories: _beginnerCategories,
               isDirectCollection: true,
+              headerImageUrl: series.imageUrl,
+              headerDescription: series.description,
             ),
           ),
         );
@@ -1715,6 +1717,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
               audioItems: _sermons,
               categories: _categories.map((c) => c.name).toList(),
               categoryNameToId: categoryNameToId,
+              headerImageUrl: category.imageUrl,
+              headerDescription: category.description,
             ),
           ),
         );
@@ -1856,6 +1860,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
               categoryNameToId: categoryNameToId,
               initialFilterType: FilterType.speaker,
               initialSpeaker: speaker.fullName,
+              headerImageUrl: speaker.photoUrl,
+              headerDescription: speaker.bio,
             ),
           ),
         );
