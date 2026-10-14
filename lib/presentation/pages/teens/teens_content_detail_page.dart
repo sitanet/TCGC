@@ -174,8 +174,8 @@ Download Citygate Mobile: https://play.google.com/store/apps/details?id=com.tcgc
         ),
       );
 
-      // Save PDF file
-      final directory = await getApplicationDocumentsDirectory();
+      // Save temporary PDF file for sharing
+      final directory = await getTemporaryDirectory();
       final fileName = '${_sanitizeFileName(content.title)}_transcript.pdf';
       final file = File('${directory.path}/$fileName');
       await file.writeAsBytes(await pdf.save());

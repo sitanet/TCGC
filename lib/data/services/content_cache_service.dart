@@ -41,14 +41,23 @@ class ContentCacheService {
     }
     
     try {
-      final appDir = await getApplicationDocumentsDirectory();
-      _audioCacheDir = Directory('${appDir.path}/audio_3min_cache');
+      final tempDir = await getTemporaryDirectory();
+      _audioCacheDir = Directory('${tempDir.path}/audio_3min_cache');
       if (!await _audioCacheDir!.exists()) {
         await _audioCacheDir!.create(recursive: true);
       }
-      
+
+      // Clean up legacy cache directory from Documents if it exists
+      try {
+        final appDir = await getApplicationDocumentsDirectory();
+        final legacyCache = Directory('${appDir.path}/audio_3min_cache');
+        if (await legacyCache.exists()) {
+          await legacyCache.delete(recursive: true);
+        }
+      } catch (_) {}
+
       _initialized = true;
-      debugPrint('ContentCacheService initialized');
+      debugPrint('ContentCacheService initialized: ${_audioCacheDir!.path}');
       
       // Disabled to prevent ANR
       // _resumeIncompleteDownloads();

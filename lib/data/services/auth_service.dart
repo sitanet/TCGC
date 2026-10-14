@@ -6,6 +6,8 @@ import '../../core/constants/api_constants.dart';
 import '../../domain/entities/user.dart';
 import '../models/contact_message.dart';
 import 'api_service.dart';
+import 'audio_cache_service.dart';
+import 'local_database_service.dart';
 
 class AuthService {
   final ApiService _api = ApiService();
@@ -250,6 +252,12 @@ class AuthService {
       await _api.clearTokens();
       await clearCachedProfile();
       await clearPendingVerificationEmail();
+      try {
+        await AudioCacheService().clearAllCache();
+        await LocalDatabaseService().clearAllData();
+      } catch (e) {
+        debugPrint('Cache clear on account deletion error: $e');
+      }
       return AuthResult(success: true, message: 'Account deleted successfully');
     }
 

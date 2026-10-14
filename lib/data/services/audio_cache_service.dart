@@ -34,12 +34,21 @@ class AudioCacheService {
     }
     
     try {
-      final appDir = await getApplicationDocumentsDirectory();
-      _cacheDir = Directory('${appDir.path}/audio_buffer_cache');
+      final tempDir = await getTemporaryDirectory();
+      _cacheDir = Directory('${tempDir.path}/audio_buffer_cache');
       if (!await _cacheDir!.exists()) {
         await _cacheDir!.create(recursive: true);
       }
       debugPrint('AudioCacheService initialized: ${_cacheDir!.path}');
+
+      // Clean up legacy cache directory from Documents if it exists
+      try {
+        final appDir = await getApplicationDocumentsDirectory();
+        final legacyCache = Directory('${appDir.path}/audio_buffer_cache');
+        if (await legacyCache.exists()) {
+          await legacyCache.delete(recursive: true);
+        }
+      } catch (_) {}
     } catch (e) {
       debugPrint('AudioCacheService init error: $e');
     }

@@ -341,11 +341,20 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   
   Future<void> _initCacheDir() async {
     try {
-      final appDir = await getApplicationDocumentsDirectory();
-      _cacheDir = Directory('${appDir.path}/audio_cache');
+      final tempDir = await getTemporaryDirectory();
+      _cacheDir = Directory('${tempDir.path}/audio_cache');
       if (!await _cacheDir!.exists()) {
         await _cacheDir!.create(recursive: true);
       }
+
+      // Clean up legacy cache directory from Documents if it exists
+      try {
+        final appDir = await getApplicationDocumentsDirectory();
+        final legacyCache = Directory('${appDir.path}/audio_cache');
+        if (await legacyCache.exists()) {
+          await legacyCache.delete(recursive: true);
+        }
+      } catch (_) {}
     } catch (e) {
       debugPrint('Failed to create cache directory: $e');
     }
