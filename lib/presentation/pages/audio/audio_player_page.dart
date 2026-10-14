@@ -51,6 +51,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   List<Sermon> _otherMessages = [];
   List<Sermon> _relatedCategoryMessages = [];
   bool _isLoadingRelatedCategory = true;
+  bool _showRemainingTime = true;
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
@@ -491,15 +492,17 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
         body: Builder(
           builder: (context) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Column(
                 children: [
-                  _buildAlbumArt(isDark),
-                  const SizedBox(height: 32),
-                  _buildSongInfo(context),
-                  const SizedBox(height: 32),
-                  _buildProgressBar(isDark, audioProvider),
+                  _buildAlbumArt(isDark, audioProvider.isPlaying),
                   const SizedBox(height: 24),
+                  _buildSongInfo(context),
+                  const SizedBox(height: 20),
+                  _buildQuickActionsRow(isDark, audioProvider),
+                  const SizedBox(height: 24),
+                  _buildProgressBar(isDark, audioProvider),
+                  const SizedBox(height: 20),
                   _buildControlsWithSpeed(isDark, audioProvider),
                   const SizedBox(height: 16),
                   if (errorMessage != null)
@@ -917,6 +920,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   }
 
   void _showSpeakerBioDialog(bool isDark) {
+    if (_speaker == null) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1284,39 +1288,49 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     );
   }
 
-  Widget _buildAlbumArt(bool isDark) {
-    return Container(
-      width: 280,
-      height: 280,
+  Widget _buildAlbumArt(bool isDark, bool isPlaying) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final artSize = (screenWidth * 0.72).clamp(210.0, 310.0);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      width: artSize,
+      height: artSize,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         color: isDark ? AppColors.cardDark : AppColors.dividerLight,
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryGold.withOpacity(0.3),
-            blurRadius: 30,
-            offset: const Offset(0, 10),
+            color: isPlaying
+                ? AppColors.primaryGold.withOpacity(isDark ? 0.35 : 0.28)
+                : (isDark
+                    ? Colors.black.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.08)),
+            blurRadius: isPlaying ? 32 : 16,
+            spreadRadius: isPlaying ? 2 : 0,
+            offset: Offset(0, isPlaying ? 12 : 6),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: _buildAlbumImage(isDark),
+        borderRadius: BorderRadius.circular(24),
+        child: _buildAlbumImage(isDark, artSize),
       ),
     );
   }
 
-  Widget _buildAlbumImage(bool isDark) {
+  Widget _buildAlbumImage(bool isDark, double size) {
     if (widget.sermon.imageUrl == null || widget.sermon.imageUrl!.isEmpty) {
       return _buildPlaceholderArt(isDark);
     }
     return CachedNetworkImage(
       imageUrl: widget.sermon.imageUrl!,
-      width: 280,
-      height: 280,
+      width: size,
+      height: size,
       fit: BoxFit.cover,
-      memCacheWidth: 560,
-      memCacheHeight: 560,
+      memCacheWidth: 600,
+      memCacheHeight: 600,
       placeholder: (_, __) => _buildPlaceholderArt(isDark),
       errorWidget: (_, __, ___) => _buildPlaceholderArt(isDark),
     );
@@ -1351,50 +1365,286 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   Widget _buildSongInfo(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final speakerName = widget.sermon.speaker;
-    debugPrint('Building song info - speaker: $speakerName');
+    final categoryText = widget.sermon.categoryName.isNotEmpty
+        ? widget.sermon.categoryName
+        : widget.sermon.category;
 
     return Column(
       children: [
         Text(
           widget.sermon.title,
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          _formatDate(widget.sermon.date),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: isDark
-                ? AppColors.textSecondaryDark
-                : AppColors.textSecondaryLight,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.3,
+            height: 1.25,
           ),
           textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
+        const SizedBox(height: 10),
         if (speakerName != null && speakerName.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            speakerName,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: AppColors.primaryGold,
-              fontWeight: FontWeight.w500,
+          InkWell(
+            onTap: _speaker != null
+                ? () {
+                    HapticFeedback.lightImpact();
+                    _showSpeakerBioDialog(isDark);
+                  }
+                : null,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? AppColors.primaryGold.withOpacity(0.12)
+                    : AppColors.primaryGold.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppColors.primaryGold.withOpacity(0.25),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.person_outline_rounded,
+                    size: 16,
+                    color: AppColors.primaryGold,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      speakerName,
+                      style: TextStyle(
+                        color: AppColors.primaryGold,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (_speaker != null) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 14,
+                      color: AppColors.primaryGold.withOpacity(0.8),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            textAlign: TextAlign.center,
           ),
+          const SizedBox(height: 8),
         ],
-        const SizedBox(height: 4),
-        Text(
-          widget.sermon.categoryName.isNotEmpty
-              ? widget.sermon.categoryName
-              : widget.sermon.category,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: isDark
-                ? AppColors.textSecondaryDark
-                : AppColors.textSecondaryLight,
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (categoryText.isNotEmpty) ...[
+              Text(
+                categoryText,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                '  •  ',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.textSecondaryDark.withOpacity(0.5)
+                      : AppColors.textSecondaryLight.withOpacity(0.5),
+                  fontSize: 10,
+                ),
+              ),
+            ],
+            Text(
+              _formatDate(widget.sermon.date),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+            ),
+          ],
         ),
       ],
+    );
+  }
+
+  Widget _buildQuickActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+    Color? iconColor,
+    Color? textColor,
+    Widget? customIcon,
+    bool isActive = false,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final defaultColor = isDark ? Colors.white70 : Colors.black87;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              customIcon ??
+                  Icon(
+                    icon,
+                    size: 24,
+                    color: iconColor ?? defaultColor,
+                  ),
+              const SizedBox(height: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                  color: textColor ??
+                      (isActive
+                          ? AppColors.primaryGold
+                          : (isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionsRow(bool isDark, AudioPlayerProvider audioProvider) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_favoritesService, _downloadService]),
+      builder: (context, _) {
+        final isFavorite = _favoritesService.isFavorite(widget.sermon.id);
+        final isDownloaded = _downloadService.isDownloaded(widget.sermon.id);
+        final isDownloading = _downloadService.isDownloading(widget.sermon.id);
+        final downloadProgress = _downloadService.getProgress(widget.sermon.id);
+        final isTimerActive = audioProvider.isSleepTimerActive;
+        final timerRemaining = audioProvider.sleepTimerRemaining;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            color: isDark
+                ? AppColors.cardDark.withOpacity(0.5)
+                : AppColors.surfaceLight.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildQuickActionButton(
+                icon: isFavorite
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_border_rounded,
+                iconColor: isFavorite ? Colors.redAccent : null,
+                label: isFavorite ? 'Favorited' : 'Favorite',
+                isActive: isFavorite,
+                onTap: () async {
+                  HapticFeedback.lightImpact();
+                  await _favoritesService.toggleFavorite(widget.sermon);
+                  _trackMessageStat('favorite', !isFavorite);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isFavorite
+                              ? 'Removed from favorites'
+                              : 'Added to favorites',
+                        ),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+              ),
+              _buildQuickActionButton(
+                icon: isDownloaded
+                    ? Icons.download_done_rounded
+                    : (isDownloading
+                        ? Icons.downloading_rounded
+                        : Icons.download_outlined),
+                iconColor: isDownloaded
+                    ? Colors.green
+                    : (isDownloading ? AppColors.primaryGold : null),
+                customIcon: isDownloading
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          value: downloadProgress > 0 ? downloadProgress : null,
+                          strokeWidth: 2.5,
+                          color: AppColors.primaryGold,
+                        ),
+                      )
+                    : null,
+                label: isDownloaded
+                    ? 'Saved'
+                    : (isDownloading
+                        ? '${(downloadProgress * 100).toInt()}%'
+                        : 'Download'),
+                isActive: isDownloaded || isDownloading,
+                onTap: isDownloading
+                    ? null
+                    : () {
+                        HapticFeedback.lightImpact();
+                        if (isDownloaded) {
+                          _showDeleteDownloadDialog(context, isDark);
+                        } else {
+                          _showDownloadProgressDialog(context, isDark);
+                        }
+                      },
+              ),
+              _buildQuickActionButton(
+                icon: Icons.playlist_add_rounded,
+                label: 'Playlist',
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _showPlaylistBottomSheet(context, isDark);
+                },
+              ),
+              _buildQuickActionButton(
+                icon: isTimerActive
+                    ? Icons.bedtime_rounded
+                    : Icons.bedtime_outlined,
+                iconColor: isTimerActive ? AppColors.primaryGold : null,
+                label: isTimerActive
+                    ? (timerRemaining != null && timerRemaining.inMinutes > 0
+                        ? '${timerRemaining.inMinutes}m left'
+                        : '<1m')
+                    : 'Sleep Timer',
+                isActive: isTimerActive,
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _showSleepTimerBottomSheet(isDark, audioProvider);
+                },
+              ),
+              _buildQuickActionButton(
+                icon: Icons.share_outlined,
+                label: 'Share',
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _shareSermon();
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1407,19 +1657,26 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
         ? (positionMs / durationMs).clamp(0.0, 1.0)
         : 0.0;
 
+    final remainingDuration = duration > position
+        ? duration - position
+        : Duration.zero;
+
     return Column(
       children: [
         SliderTheme(
           data: SliderThemeData(
-            trackHeight: 4,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+            trackHeight: 4.5,
+            thumbShape: const RoundSliderThumbShape(
+              enabledThumbRadius: 7,
+              elevation: 3,
+            ),
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 15),
             activeTrackColor: AppColors.primaryGold,
             inactiveTrackColor: isDark
                 ? AppColors.dividerDark
                 : AppColors.dividerLight,
             thumbColor: AppColors.primaryGold,
-            overlayColor: AppColors.primaryGold.withOpacity(0.2),
+            overlayColor: AppColors.primaryGold.withOpacity(0.18),
           ),
           child: Slider(
             value: sliderValue,
@@ -1443,15 +1700,31 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                       ? AppColors.textSecondaryDark
                       : AppColors.textSecondaryLight,
                   fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              Text(
-                _formatDuration(duration),
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                  fontSize: 12,
+              InkWell(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _showRemainingTime = !_showRemainingTime;
+                  });
+                },
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Text(
+                    _showRemainingTime
+                        ? '-${_formatDuration(remainingDuration)}'
+                        : _formatDuration(duration),
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1476,11 +1749,12 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            // Skip to Previous
             IconButton(
+              tooltip: 'Previous',
               onPressed: isLoading || !hasPrevious
                   ? null
                   : () async {
+                      HapticFeedback.lightImpact();
                       await audioProvider.skipToPrevious();
                       if (mounted &&
                           audioProvider.currentSermon != null &&
@@ -1496,22 +1770,28 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                       }
                     },
               icon: Icon(
-                Icons.skip_previous,
-                size: 32,
+                Icons.skip_previous_rounded,
+                size: 34,
                 color: hasPrevious
                     ? (isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimaryLight)
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight)
                     : (isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight),
+                        ? AppColors.textSecondaryDark.withOpacity(0.4)
+                        : AppColors.textSecondaryLight.withOpacity(0.4)),
               ),
             ),
             IconButton(
-              onPressed: isLoading ? null : () => audioProvider.seekBackward(),
+              tooltip: '10s Back',
+              onPressed: isLoading
+                  ? null
+                  : () {
+                      HapticFeedback.lightImpact();
+                      audioProvider.seekBackward();
+                    },
               icon: Icon(
-                Icons.replay_10,
-                size: 28,
+                Icons.replay_10_rounded,
+                size: 30,
                 color: isDark
                     ? AppColors.textPrimaryDark
                     : AppColors.textPrimaryLight,
@@ -1520,8 +1800,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
             AnimatedPlayButton(
               isPlaying: isPlaying,
               isLoading: isLoading,
-              size: 64,
+              size: 68,
               onTap: () {
+                HapticFeedback.mediumImpact();
                 if (isPlaying) {
                   audioProvider.pause();
                 } else {
@@ -1530,20 +1811,27 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               },
             ),
             IconButton(
-              onPressed: isLoading ? null : () => audioProvider.seekForward(),
+              tooltip: '10s Forward',
+              onPressed: isLoading
+                  ? null
+                  : () {
+                      HapticFeedback.lightImpact();
+                      audioProvider.seekForward();
+                    },
               icon: Icon(
-                Icons.forward_10,
-                size: 28,
+                Icons.forward_10_rounded,
+                size: 30,
                 color: isDark
                     ? AppColors.textPrimaryDark
                     : AppColors.textPrimaryLight,
               ),
             ),
-            // Skip to Next
             IconButton(
+              tooltip: 'Next',
               onPressed: isLoading || !hasNext
                   ? null
                   : () async {
+                      HapticFeedback.lightImpact();
                       await audioProvider.skipToNext();
                       if (mounted && audioProvider.currentSermon != null) {
                         Navigator.pushReplacement(
@@ -1557,44 +1845,55 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                       }
                     },
               icon: Icon(
-                Icons.skip_next,
-                size: 32,
+                Icons.skip_next_rounded,
+                size: 34,
                 color: hasNext
                     ? (isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimaryLight)
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight)
                     : (isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight),
+                        ? AppColors.textSecondaryDark.withOpacity(0.4)
+                        : AppColors.textSecondaryLight.withOpacity(0.4)),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        // Speed control row
+        const SizedBox(height: 14),
         InkWell(
-          onTap: () => _showSpeedBottomSheet(isDark, audioProvider),
-          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _showSpeedBottomSheet(isDark, audioProvider);
+          },
+          borderRadius: BorderRadius.circular(20),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
             decoration: BoxDecoration(
               color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                color: audioProvider.playbackSpeed != 1.0
+                    ? AppColors.primaryGold
+                    : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
+                width: audioProvider.playbackSpeed != 1.0 ? 1.5 : 1.0,
               ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.speed, size: 16, color: AppColors.primaryGold),
+                Icon(
+                  Icons.speed_rounded,
+                  size: 16,
+                  color: AppColors.primaryGold,
+                ),
                 const SizedBox(width: 6),
                 Text(
-                  '${audioProvider.playbackSpeed}x',
+                  '${audioProvider.playbackSpeed}x Speed',
                   style: TextStyle(
-                    color: AppColors.primaryGold,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
                     fontWeight: FontWeight.w600,
-                    fontSize: 13,
+                    fontSize: 12,
                   ),
                 ),
               ],
@@ -1602,6 +1901,154 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showSleepTimerBottomSheet(
+    bool isDark,
+    AudioPlayerProvider audioProvider,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final bottomPadding = MediaQuery.of(context).padding.bottom;
+        final isTimerActive = audioProvider.isSleepTimerActive;
+        final remaining = audioProvider.sleepTimerRemaining;
+
+        final options = <Map<String, dynamic>>[
+          {'label': '15 minutes', 'duration': const Duration(minutes: 15)},
+          {'label': '30 minutes', 'duration': const Duration(minutes: 30)},
+          {'label': '45 minutes', 'duration': const Duration(minutes: 45)},
+          {'label': '1 hour', 'duration': const Duration(hours: 1)},
+          {
+            'label': 'End of sermon',
+            'duration': audioProvider.duration > audioProvider.position
+                ? audioProvider.duration - audioProvider.position
+                : const Duration(minutes: 5),
+          },
+        ];
+
+        return Container(
+          padding: EdgeInsets.only(top: 16, bottom: 20 + bottomPadding),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.bedtime_rounded,
+                      color: AppColors.primaryGold,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Sleep Timer',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (isTimerActive && remaining != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGold.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${remaining.inMinutes}m left',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primaryGold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const Divider(height: 24),
+              ...options.map((opt) {
+                final Duration duration = opt['duration'] as Duration;
+                final String label = opt['label'] as String;
+                return ListTile(
+                  leading: Icon(
+                    Icons.timer_outlined,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                  title: Text(
+                    label,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    audioProvider.setSleepTimer(duration);
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Sleep timer set for $label'),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                    setState(() {});
+                  },
+                );
+              }),
+              if (isTimerActive) ...[
+                const Divider(),
+                ListTile(
+                  leading: const Icon(
+                    Icons.timer_off_outlined,
+                    color: Colors.redAccent,
+                  ),
+                  title: const Text(
+                    'Turn off timer',
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    audioProvider.cancelSleepTimer();
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Sleep timer turned off'),
+                        behavior: SnackBarBehavior.floating,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                    setState(() {});
+                  },
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1733,6 +2180,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
           final downloadProgress = _downloadService.getProgress(
             widget.sermon.id,
           );
+          final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
 
           final bottomPadding = MediaQuery.of(context).padding.bottom;
 
@@ -1838,6 +2286,22 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                             _showDownloadProgressDialog(context, isDark);
                           }
                         },
+                ),
+                // Sleep Timer
+                ListTile(
+                  leading: Icon(
+                    Icons.bedtime_outlined,
+                    color: audioProvider.isSleepTimerActive ? AppColors.primaryGold : null,
+                  ),
+                  title: Text(
+                    audioProvider.isSleepTimerActive
+                        ? 'Sleep Timer (${audioProvider.sleepTimerRemaining != null && audioProvider.sleepTimerRemaining!.inMinutes > 0 ? "${audioProvider.sleepTimerRemaining!.inMinutes}m left" : "<1m left"})'
+                        : 'Sleep Timer',
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showSleepTimerBottomSheet(isDark, audioProvider);
+                  },
                 ),
                 // Share
                 ListTile(

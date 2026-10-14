@@ -1,4 +1,4 @@
-import 'dart:async' show Future, StreamSubscription, TimeoutException;
+import 'dart:async' show Future, StreamSubscription, TimeoutException, Timer;
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
@@ -112,6 +112,37 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   int get currentIndex => _currentIndex;
   bool get hasNext => _currentIndex < _queue.length - 1;
   bool get hasPrevious => _currentIndex > 0;
+
+  Timer? _sleepTimer;
+  DateTime? _sleepTimerEndTime;
+
+  bool get isSleepTimerActive => _sleepTimer != null && _sleepTimer!.isActive;
+  Duration? get sleepTimerRemaining {
+    if (_sleepTimerEndTime == null) return null;
+    final diff = _sleepTimerEndTime!.difference(DateTime.now());
+    return diff.isNegative ? Duration.zero : diff;
+  }
+
+  void setSleepTimer(Duration? duration) {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepTimerEndTime = null;
+
+    if (duration != null && duration > Duration.zero) {
+      _sleepTimerEndTime = DateTime.now().add(duration);
+      _sleepTimer = Timer(duration, () {
+        pause();
+        _sleepTimer = null;
+        _sleepTimerEndTime = null;
+        notifyListeners();
+      });
+    }
+    notifyListeners();
+  }
+
+  void cancelSleepTimer() {
+    setSleepTimer(null);
+  }
 
   AudioPlayerProvider() {
     WidgetsBinding.instance.addObserver(this);
@@ -910,6 +941,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
       sub.cancel();
     }
     _subscriptions.clear();
+    _sleepTimer?.cancel();
     _fallbackPlayer?.dispose();
     super.dispose();
   }
