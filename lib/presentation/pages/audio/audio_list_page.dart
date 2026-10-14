@@ -258,7 +258,27 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
         } else if (_selectedSpeaker == 'Others') {
           matchesFilter = !_isMainSpeaker(audio.speaker);
         } else {
-          matchesFilter = audio.speaker?.toLowerCase() == _selectedSpeaker?.toLowerCase();
+          final selSpk = _selectedSpeaker!.toLowerCase().trim();
+          final audioSpk = (audio.speaker ?? '').toLowerCase().trim();
+          if (audioSpk == selSpk) {
+            matchesFilter = true;
+          } else {
+            final matchedModel = _speakerModels.where((s) =>
+                s.fullName.toLowerCase().trim() == selSpk ||
+                s.name.toLowerCase().trim() == selSpk).firstOrNull;
+            if (matchedModel != null) {
+              final mName = matchedModel.name.toLowerCase().trim();
+              final mFull = matchedModel.fullName.toLowerCase().trim();
+              matchesFilter = audioSpk == mName ||
+                  audioSpk == mFull ||
+                  (mName.isNotEmpty && audioSpk.contains(mName)) ||
+                  (mFull.isNotEmpty && audioSpk.contains(mFull)) ||
+                  (audioSpk.isNotEmpty && mFull.contains(audioSpk));
+            } else {
+              matchesFilter = (audioSpk.isNotEmpty && selSpk.contains(audioSpk)) ||
+                  (selSpk.isNotEmpty && audioSpk.contains(selSpk));
+            }
+          }
         }
       } else {
         // Direct collection / Beginner Category mode
@@ -414,6 +434,9 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                 : _buildSpeakerFilterList(isDark),
           ),
           const SizedBox(height: 16),
+          // Selected Minister Spotlight Banner
+          if (_filterType == FilterType.speaker && _selectedSpeaker != null && _selectedSpeaker != 'All')
+            _buildSelectedMinisterSpotlight(isDark),
           Expanded(
             child: RefreshIndicator(
               onRefresh: _onRefresh,
@@ -585,14 +608,259 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
     );
   }
 
+  Widget _buildSelectedMinisterSpotlight(bool isDark) {
+    if (_selectedSpeaker == null || _selectedSpeaker == 'All') return const SizedBox.shrink();
+
+    // Find speaker model if available
+    final selSpk = _selectedSpeaker!.toLowerCase().trim();
+    final model = _speakerModels.where((s) =>
+        s.fullName.toLowerCase().trim() == selSpk ||
+        s.name.toLowerCase().trim() == selSpk ||
+        selSpk.contains(s.fullName.toLowerCase().trim()) ||
+        s.fullName.toLowerCase().trim().contains(selSpk)).firstOrNull;
+
+    final isExternal = model?.isExternalMinister ?? false;
+    final isSong = model?.isSongMinister ?? false;
+    final isSenior = model?.seniorPastor ?? false;
+    final isMain = model?.isMainSpeaker ?? false;
+
+    String roleLabel = 'MINISTER';
+    Color roleBadgeColor = AppColors.primaryGold;
+    IconData roleIcon = Icons.person;
+
+    if (isExternal && isSong) {
+      roleLabel = 'GUEST WORSHIP MINISTER';
+      roleBadgeColor = Colors.cyanAccent.shade700;
+      roleIcon = Icons.public;
+    } else if (isExternal) {
+      roleLabel = 'GUEST MINISTER';
+      roleBadgeColor = Colors.cyanAccent.shade700;
+      roleIcon = Icons.public;
+    } else if (isSong) {
+      roleLabel = 'SONGS MINISTER';
+      roleBadgeColor = AppColors.primaryGold;
+      roleIcon = Icons.music_note;
+    } else if (isSenior) {
+      roleLabel = 'SENIOR PASTOR';
+      roleBadgeColor = AppColors.primaryGold;
+      roleIcon = Icons.church;
+    } else if (isMain) {
+      roleLabel = 'RESIDENT PASTOR';
+      roleBadgeColor = AppColors.primaryGold;
+      roleIcon = Icons.church;
+    }
+
+    String? photoUrl = model?.photoUrl;
+    if (photoUrl == null || photoUrl.isEmpty) {
+      for (final sermon in _filteredItems) {
+        if (sermon.imageUrl != null && sermon.imageUrl!.isNotEmpty) {
+          photoUrl = sermon.imageUrl;
+          break;
+        }
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isExternal
+                ? (isDark ? Colors.cyanAccent.withValues(alpha: 0.35) : Colors.cyan.shade200)
+                : (isDark ? AppColors.dividerDark : Colors.grey[200]!),
+            width: isExternal ? 1.2 : 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Avatar
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isExternal ? Colors.cyanAccent.shade700 : AppColors.primaryGold,
+                  width: 2.0,
+                ),
+              ),
+              child: ClipOval(
+                child: photoUrl != null && photoUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: photoUrl,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 104,
+                        memCacheHeight: 104,
+                        placeholder: (_, __) => Container(
+                          color: isDark ? Colors.white12 : Colors.grey[200],
+                          child: const Icon(Icons.person, size: 24, color: AppColors.primaryGold),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          color: isDark ? Colors.white12 : Colors.grey[200],
+                          child: const Icon(Icons.person, size: 24, color: AppColors.primaryGold),
+                        ),
+                      )
+                    : Container(
+                        color: isDark ? Colors.white12 : Colors.grey[200],
+                        child: Center(
+                          child: Text(
+                            _selectedSpeaker!.isNotEmpty ? _selectedSpeaker![0].toUpperCase() : '?',
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryGold,
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Minister Name & Role Pill
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: roleBadgeColor.withValues(alpha: isDark ? 0.2 : 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: roleBadgeColor.withValues(alpha: 0.5),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(roleIcon, size: 10, color: roleBadgeColor),
+                            const SizedBox(width: 3),
+                            Text(
+                              roleLabel,
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: roleBadgeColor,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _formatSpeakerName(_selectedSpeaker!).replaceAll('\n', ' '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${_filteredItems.length} ${_filteredItems.length == 1 ? 'Message' : 'Messages'}',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: AppColors.primaryGold,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Play All Action Button
+            if (_filteredItems.isNotEmpty)
+              GestureDetector(
+                onTap: () {
+                  final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
+                  audioProvider.setQueue(_filteredItems, 0);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AudioPlayerPage(sermon: _filteredItems.first),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.play_arrow_rounded, size: 16, color: Colors.white),
+                      SizedBox(width: 2),
+                      Text(
+                        'Play All',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // Clear Filter Button
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () => _selectSpeaker('All'),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 20,
+                  color: isDark ? Colors.white60 : Colors.black45,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSpeakerFilterList(bool isDark) {
-    // Get main speakers only
-    final mainSpeakers = _speakerModels.where((s) => s.isMainSpeaker).toList();
-    
-    // Check if there are any non-main speakers in the content
-    final hasOtherSpeakers = _speakers.any((speakerName) => !_isMainSpeaker(speakerName));
-    
-    if (mainSpeakers.isEmpty && !hasOtherSpeakers) {
+    // Show active speakers from models (ordered: main/senior speakers first, then external ministers, then song ministers, then others)
+    final activeSpeakers = List<SpeakerModel>.from(_speakerModels.where((s) => s.isActive))
+      ..sort((a, b) {
+        if (a.isMainSpeaker && !b.isMainSpeaker) return -1;
+        if (!a.isMainSpeaker && b.isMainSpeaker) return 1;
+        if (a.isExternalMinister && !b.isExternalMinister) return -1;
+        if (!a.isExternalMinister && b.isExternalMinister) return 1;
+        if (a.isSongMinister && !b.isSongMinister) return -1;
+        if (!a.isSongMinister && b.isSongMinister) return 1;
+        return a.fullName.compareTo(b.fullName);
+      });
+
+    // Check if there are speakers from messages not present in models
+    final knownNames = activeSpeakers.map((s) => s.fullName.toLowerCase()).toSet();
+    final otherSpeakers = _speakers.where((spk) => !knownNames.contains(spk.toLowerCase())).toList();
+
+    if (activeSpeakers.isEmpty && otherSpeakers.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Text(
@@ -605,13 +873,14 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
       );
     }
 
-    // Total count: All + main speakers + Others (if exists)
-    final itemCount = 1 + mainSpeakers.length + (hasOtherSpeakers ? 1 : 0);
+    // Total count: "All" + activeSpeakers + otherSpeakers
+    final itemCount = 1 + activeSpeakers.length + otherSpeakers.length;
 
     return SizedBox(
       height: 105,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: itemCount,
         itemBuilder: (context, index) {
@@ -625,10 +894,9 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
               onTap: () => _selectSpeaker('All'),
             );
           }
-          
-          // Main speakers
-          if (index <= mainSpeakers.length) {
-            final speaker = mainSpeakers[index - 1];
+
+          if (index <= activeSpeakers.length) {
+            final speaker = activeSpeakers[index - 1];
             final isSelected = speaker.fullName == _selectedSpeaker;
             return _buildSpeakerChip(
               name: speaker.fullName,
@@ -637,24 +905,26 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
               isDark: isDark,
               onTap: () => _selectSpeaker(speaker.fullName),
               isFullName: true,
+              isExternal: speaker.isExternalMinister,
+              isSong: speaker.isSongMinister,
             );
           }
-          
-          // "Others" option (last item if hasOtherSpeakers)
-          final isSelected = _selectedSpeaker == 'Others';
+
+          final otherName = otherSpeakers[index - 1 - activeSpeakers.length];
+          final isSelected = otherName == _selectedSpeaker;
           return _buildSpeakerChip(
-            name: 'Others',
+            name: otherName,
             photoUrl: null,
             isSelected: isSelected,
             isDark: isDark,
-            onTap: () => _selectSpeaker('Others'),
-            isOthers: true,
+            onTap: () => _selectSpeaker(otherName),
+            isFullName: true,
           );
         },
       ),
     );
   }
-  
+
   Widget _buildSpeakerChip({
     required String name,
     String? photoUrl,
@@ -663,7 +933,18 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
     required VoidCallback onTap,
     bool isFullName = false,
     bool isOthers = false,
+    bool isExternal = false,
+    bool isSong = false,
   }) {
+    Color borderColor = Colors.transparent;
+    if (isSelected) {
+      borderColor = isExternal ? Colors.cyanAccent.shade700 : AppColors.primaryGold;
+    } else if (isExternal) {
+      borderColor = isDark ? Colors.cyanAccent.withValues(alpha: 0.5) : Colors.cyan.shade300;
+    } else if (isSong) {
+      borderColor = isDark ? AppColors.primaryGold.withValues(alpha: 0.5) : AppColors.primaryGold.withValues(alpha: 0.3);
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -672,91 +953,131 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? AppColors.primaryGold : Colors.transparent,
-                  width: 3,
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: AppColors.primaryGold.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          spreadRadius: 1,
-                        )
-                      ]
-                    : null,
-              ),
-              child: ClipOval(
-                child: name == 'All'
-                    ? Container(
-                        color: isSelected
-                            ? AppColors.primaryGold
-                            : (isDark ? AppColors.cardDark : AppColors.dividerLight),
-                        child: Icon(
-                          Icons.people,
-                          size: 28,
-                          color: isSelected
-                              ? Colors.white
-                              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                        ),
-                      )
-                    : isOthers
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: borderColor,
+                      width: isSelected ? 3 : (isExternal || isSong ? 1.5 : 0),
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: (isExternal ? Colors.cyanAccent.shade700 : AppColors.primaryGold).withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            )
+                          ]
+                        : null,
+                  ),
+                  child: ClipOval(
+                    child: name == 'All'
                         ? Container(
                             color: isSelected
                                 ? AppColors.primaryGold
                                 : (isDark ? AppColors.cardDark : AppColors.dividerLight),
                             child: Icon(
-                              Icons.more_horiz,
+                              Icons.people,
                               size: 28,
                               color: isSelected
                                   ? Colors.white
                                   : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
                             ),
                           )
-                        : photoUrl != null && photoUrl.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: photoUrl,
-                                fit: BoxFit.cover,
-                                memCacheWidth: 112,
-                                memCacheHeight: 112,
-                                placeholder: (_, __) => Container(
-                                  color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-                                  child: Icon(
-                                    Icons.person,
-                                    size: 28,
-                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                  ),
-                                ),
-                                errorWidget: (_, __, ___) => Container(
-                                  color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-                                  child: Icon(
-                                    Icons.person,
-                                    size: 28,
-                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                  ),
+                        : isOthers
+                            ? Container(
+                                color: isSelected
+                                    ? AppColors.primaryGold
+                                    : (isDark ? AppColors.cardDark : AppColors.dividerLight),
+                                child: Icon(
+                                  Icons.more_horiz,
+                                  size: 28,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
                                 ),
                               )
-                            : Container(
-                                color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-                                child: Center(
-                                  child: Text(
-                                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: isSelected
-                                          ? AppColors.primaryGold
-                                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                            : photoUrl != null && photoUrl.isNotEmpty
+                                ? CachedNetworkImage(
+                                    imageUrl: photoUrl,
+                                    fit: BoxFit.cover,
+                                    memCacheWidth: 112,
+                                    memCacheHeight: 112,
+                                    placeholder: (_, __) => Container(
+                                      color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                      child: Icon(
+                                        Icons.person,
+                                        size: 28,
+                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                      ),
+                                    ),
+                                    errorWidget: (_, __, ___) => Container(
+                                      color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                      child: Icon(
+                                        Icons.person,
+                                        size: 28,
+                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+                                    child: Center(
+                                      child: Text(
+                                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                        style: TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSelected
+                                              ? AppColors.primaryGold
+                                              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ),
-              ),
+                  ),
+                ),
+                // Mini badge indicator for External & Songs ministers
+                if (isExternal)
+                  Positioned(
+                    bottom: -1,
+                    right: -1,
+                    child: Container(
+                      padding: const EdgeInsets.all(2.5),
+                      decoration: BoxDecoration(
+                        color: Colors.cyanAccent.shade700,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isDark ? AppColors.cardDark : Colors.white,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: const Icon(Icons.public, size: 9, color: Colors.white),
+                    ),
+                  )
+                else if (isSong)
+                  Positioned(
+                    bottom: -1,
+                    right: -1,
+                    child: Container(
+                      padding: const EdgeInsets.all(2.5),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGold,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isDark ? AppColors.cardDark : Colors.white,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: const Icon(Icons.music_note, size: 9, color: Colors.white),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 6),
             Text(
@@ -765,7 +1086,7 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 color: isSelected
-                    ? AppColors.primaryGold
+                    ? (isExternal ? Colors.cyanAccent.shade700 : AppColors.primaryGold)
                     : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
               ),
               maxLines: 2,

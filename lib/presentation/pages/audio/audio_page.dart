@@ -22,6 +22,7 @@ import 'transcript_list_page.dart';
 import 'ebook_list_page.dart';
 
 enum AudioBrowseFilter { series, category, minister }
+enum MinisterCategoryFilter { all, resident, external, songs }
 
 String _stripHtmlTags(String htmlText) {
   return htmlText
@@ -50,6 +51,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   AudioBrowseFilter _selectedBrowseFilter = AudioBrowseFilter.series;
+  MinisterCategoryFilter _selectedMinisterCategory = MinisterCategoryFilter.all;
 
   static List<MessageCategory> _staticCategories = [];
   static List<Sermon> _staticSermons = [];
@@ -1417,8 +1419,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
   }
 
   Widget _buildMinisterSection(BuildContext context, bool isDark, double padding) {
-    final speakers = _getAvailableSpeakers();
-    if (speakers.isEmpty) {
+    final allSpeakers = _getAvailableSpeakers();
+    if (allSpeakers.isEmpty) {
       return Padding(
         padding: EdgeInsets.symmetric(horizontal: padding, vertical: 30),
         child: Center(
@@ -1434,11 +1436,33 @@ class _AudioPageState extends ConsumerState<AudioPage>
       );
     }
 
+    // Filter into groups
+    final residentMinisters = allSpeakers.where((s) => !s.isExternalMinister && !s.isSongMinister).toList();
+    final externalMinisters = allSpeakers.where((s) => s.isExternalMinister).toList();
+    final songMinisters = allSpeakers.where((s) => s.isSongMinister).toList();
+
+    List<SpeakerModel> displayedSpeakers;
+    switch (_selectedMinisterCategory) {
+      case MinisterCategoryFilter.all:
+        displayedSpeakers = allSpeakers;
+        break;
+      case MinisterCategoryFilter.resident:
+        displayedSpeakers = residentMinisters;
+        break;
+      case MinisterCategoryFilter.external:
+        displayedSpeakers = externalMinisters;
+        break;
+      case MinisterCategoryFilter.songs:
+        displayedSpeakers = songMinisters;
+        break;
+    }
+
     final crossAxisCount = Responsive.value(context, mobile: 2, tablet: 3, desktop: 4);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 1. Header Row
         Padding(
           padding: EdgeInsets.symmetric(horizontal: padding),
           child: Row(
@@ -1453,7 +1477,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
                     ),
               ),
               Text(
-                '${speakers.length} Ministers',
+                '${displayedSpeakers.length} of ${allSpeakers.length}',
                 style: const TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
@@ -1463,23 +1487,208 @@ class _AudioPageState extends ConsumerState<AudioPage>
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.symmetric(horizontal: padding),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 18,
-            childAspectRatio: 0.73,
+        const SizedBox(height: 10),
+
+        // 2. Sub-filter category chips: All, Resident, External, Songs
+        SizedBox(
+          height: 38,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: padding),
+            children: [
+              _buildMinisterSubChip(
+                label: 'All Ministers',
+                icon: Icons.people_outline_rounded,
+                count: allSpeakers.length,
+                isSelected: _selectedMinisterCategory == MinisterCategoryFilter.all,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedMinisterCategory = MinisterCategoryFilter.all);
+                },
+                isDark: isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildMinisterSubChip(
+                label: 'Resident',
+                icon: Icons.church_outlined,
+                count: residentMinisters.length,
+                isSelected: _selectedMinisterCategory == MinisterCategoryFilter.resident,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedMinisterCategory = MinisterCategoryFilter.resident);
+                },
+                isDark: isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildMinisterSubChip(
+                label: 'Guest Ministers',
+                icon: Icons.public_outlined,
+                count: externalMinisters.length,
+                isSelected: _selectedMinisterCategory == MinisterCategoryFilter.external,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedMinisterCategory = MinisterCategoryFilter.external);
+                },
+                isDark: isDark,
+                accentColor: Colors.cyanAccent.shade700,
+              ),
+              const SizedBox(width: 8),
+              _buildMinisterSubChip(
+                label: 'Songs Ministers',
+                icon: Icons.music_note_outlined,
+                count: songMinisters.length,
+                isSelected: _selectedMinisterCategory == MinisterCategoryFilter.songs,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedMinisterCategory = MinisterCategoryFilter.songs);
+                },
+                isDark: isDark,
+              ),
+            ],
           ),
-          itemCount: speakers.length,
-          itemBuilder: (context, index) {
-            return _buildSpeakerCard(context, isDark, speakers[index]);
-          },
         ),
+        const SizedBox(height: 14),
+
+        // 3. Ministers Grid or Empty State
+        if (displayedSpeakers.isEmpty)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: padding, vertical: 36),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(
+                    _selectedMinisterCategory == MinisterCategoryFilter.external
+                        ? Icons.public_off_outlined
+                        : (_selectedMinisterCategory == MinisterCategoryFilter.songs
+                            ? Icons.music_off_outlined
+                            : Icons.person_search_outlined),
+                    size: 48,
+                    color: isDark ? Colors.white38 : Colors.grey[400],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _selectedMinisterCategory == MinisterCategoryFilter.external
+                        ? 'No external / guest ministers yet'
+                        : (_selectedMinisterCategory == MinisterCategoryFilter.songs
+                            ? 'No songs ministers registered yet'
+                            : 'No ministers in this category'),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() => _selectedMinisterCategory = MinisterCategoryFilter.all);
+                    },
+                    icon: const Icon(Icons.refresh_rounded, size: 16, color: AppColors.primaryGold),
+                    label: const Text('Show All Ministers', style: TextStyle(color: AppColors.primaryGold)),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: padding),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 18,
+              childAspectRatio: 0.70,
+            ),
+            itemCount: displayedSpeakers.length,
+            itemBuilder: (context, index) {
+              return _buildSpeakerCard(context, isDark, displayedSpeakers[index]);
+            },
+          ),
       ],
+    );
+  }
+
+  Widget _buildMinisterSubChip({
+    required String label,
+    required IconData icon,
+    required int count,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required bool isDark,
+    Color? accentColor,
+  }) {
+    final activeBgColor = accentColor != null && isSelected
+        ? accentColor
+        : (isSelected ? AppColors.primaryGold : (isDark ? AppColors.cardDark : Colors.white));
+    final activeTextColor = isSelected
+        ? Colors.white
+        : (isDark ? Colors.white70 : AppColors.textPrimaryLight);
+    final borderColor = isSelected
+        ? (accentColor ?? AppColors.primaryGold)
+        : (isDark ? AppColors.dividerDark : Colors.grey[300]!);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: activeBgColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor, width: isSelected ? 1.4 : 1.0),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: (accentColor ?? AppColors.primaryGold).withValues(alpha: 0.28),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: isSelected ? Colors.white : (accentColor ?? (isDark ? Colors.white70 : AppColors.primaryGold)),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: activeTextColor,
+              ),
+            ),
+            const SizedBox(width: 5),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : (isDark ? Colors.white12 : Colors.grey[200]),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? Colors.white70 : AppColors.textSecondaryLight),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1761,7 +1970,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
           // 2. Minister Name directly below artwork card
           Text(
             formattedName,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontWeight: FontWeight.w600,
@@ -1770,7 +1979,27 @@ class _AudioPageState extends ConsumerState<AudioPage>
               color: isDark ? Colors.white : AppColors.textPrimaryLight,
             ),
           ),
+          const SizedBox(height: 2),
 
+          // Role Tag
+          Text(
+            speaker.isExternalMinister
+                ? (speaker.isSongMinister ? 'Guest Worship Minister' : 'Guest Minister')
+                : (speaker.isSongMinister
+                    ? 'Songs Minister'
+                    : (speaker.seniorPastor ? 'Senior Pastor' : 'Resident Minister')),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+              color: speaker.isExternalMinister
+                  ? (isDark ? Colors.cyanAccent : Colors.teal.shade700)
+                  : (speaker.isSongMinister
+                      ? AppColors.primaryGold
+                      : (isDark ? Colors.white54 : AppColors.textSecondaryLight)),
+            ),
+          ),
           const SizedBox(height: 2),
 
           // 3. Message Count
