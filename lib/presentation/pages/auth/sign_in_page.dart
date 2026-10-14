@@ -6,13 +6,21 @@ import '../../../core/utils/responsive.dart';
 import '../../../core/utils/error_handler.dart';
 import '../../../main.dart';
 import '../../../data/services/credential_storage_service.dart';
+import 'signup_success_page.dart';
 
 class SignInPage extends ConsumerStatefulWidget {
   final VoidCallback onSignIn;
   final VoidCallback onBack;
   final VoidCallback? onGoToSignUp;
+  final String? initialEmail;
 
-  const SignInPage({super.key, required this.onSignIn, required this.onBack, this.onGoToSignUp});
+  const SignInPage({
+    super.key,
+    required this.onSignIn,
+    required this.onBack,
+    this.onGoToSignUp,
+    this.initialEmail,
+  });
 
   @override
   ConsumerState<SignInPage> createState() => _SignInPageState();
@@ -31,11 +39,39 @@ class _SignInPageState extends ConsumerState<SignInPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialEmail != null && widget.initialEmail!.isNotEmpty) {
+      _emailController.text = widget.initialEmail!;
+      _validateEmail();
+    }
     _emailController.addListener(_validateEmail);
     // Delay biometric initialization to let UI render first
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) _initBiometric();
     });
+  }
+
+  void _navigateToVerificationPage(String email) {
+    final authProvider = ref.read(authChangeNotifierProvider);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => SignupSuccessPage(
+          email: email,
+          onGoToLogin: () {
+            Navigator.of(context).pop();
+          },
+          onResendEmail: () async {
+            return await authProvider.resendConfirmationEmail(email);
+          },
+          onCheckVerification: () async {
+            return await authProvider.checkEmailVerification(email);
+          },
+          onChangeEmail: () {
+            authProvider.clearPendingVerificationEmail();
+            Navigator.of(context).pop();
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _initBiometric() async {
@@ -87,7 +123,12 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       widget.onSignIn();
     } else {
       if (mounted) {
-        ErrorHandler.showError(context, authProvider.error ?? 'Login failed. Please try again.');
+        if (authProvider.requiresEmailConfirmation || authProvider.pendingVerificationEmail != null) {
+          final pendingEmail = authProvider.pendingVerificationEmail ?? credentials['email']!;
+          _navigateToVerificationPage(pendingEmail);
+        } else {
+          ErrorHandler.showError(context, authProvider.error ?? 'Login failed. Please try again.');
+        }
       }
     }
   }
@@ -192,7 +233,12 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       widget.onSignIn();
     } else {
       if (mounted) {
-        ErrorHandler.showError(context, authProvider.error ?? 'Login failed. Please try again.');
+        if (authProvider.requiresEmailConfirmation || authProvider.pendingVerificationEmail != null) {
+          final pendingEmail = authProvider.pendingVerificationEmail ?? _emailController.text.trim();
+          _navigateToVerificationPage(pendingEmail);
+        } else {
+          ErrorHandler.showError(context, authProvider.error ?? 'Login failed. Please try again.');
+        }
       }
     }
   }

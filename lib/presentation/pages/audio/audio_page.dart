@@ -324,6 +324,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 

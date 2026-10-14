@@ -131,6 +131,13 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
           onResendEmail: () async {
             return await authProvider.resendConfirmationEmail(email);
           },
+          onCheckVerification: () async {
+            return await authProvider.checkEmailVerification(email);
+          },
+          onChangeEmail: () {
+            authProvider.clearPendingVerificationEmail();
+            Navigator.of(context).pop();
+          },
         ),
       ),
     );

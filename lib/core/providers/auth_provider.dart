@@ -14,6 +14,7 @@ class AuthProvider extends ChangeNotifier {
   String? _message;
   bool _isInitialized = false;
   bool _requiresEmailConfirmation = false;
+  String? _pendingVerificationEmail;
 
   AppUser? get user => _user;
   bool get isLoading => _isLoading;
@@ -22,6 +23,29 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _user != null;
   bool get isInitialized => _isInitialized;
   bool get requiresEmailConfirmation => _requiresEmailConfirmation;
+  String? get pendingVerificationEmail => _pendingVerificationEmail;
+
+  Future<void> setPendingVerificationEmail(String email) async {
+    _pendingVerificationEmail = email.trim().toLowerCase();
+    await _authService.savePendingVerificationEmail(_pendingVerificationEmail!);
+    notifyListeners();
+  }
+
+  Future<void> clearPendingVerificationEmail() async {
+    _pendingVerificationEmail = null;
+    await _authService.clearPendingVerificationEmail();
+    notifyListeners();
+  }
+
+  Future<bool> checkEmailVerification(String email) async {
+    final isVerified = await _authService.checkEmailVerification(email);
+    if (isVerified) {
+      _pendingVerificationEmail = null;
+      _requiresEmailConfirmation = false;
+      notifyListeners();
+    }
+    return isVerified;
+  }
 
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -32,6 +56,9 @@ class AuthProvider extends ChangeNotifier {
     await _authService.loadSession();
 
     if (_authService.isAuthenticated) {
+      _pendingVerificationEmail = null;
+      await _authService.clearPendingVerificationEmail();
+
       // Load cached profile immediately (no network needed - instant login)
       _user = await _authService.getCachedProfile();
       if (_user != null) {
@@ -46,11 +73,30 @@ class AuthProvider extends ChangeNotifier {
 
       // No cached profile - must fetch from network (first login or cache cleared)
       _user = await _authService.getProfile();
+    } else {
+      // User is not authenticated; check if there is an unverified email pending confirmation
+      _pendingVerificationEmail = await _authService.getPendingVerificationEmail();
+      if (_pendingVerificationEmail != null && _pendingVerificationEmail!.isNotEmpty) {
+        _checkVerificationInBackground(_pendingVerificationEmail!);
+      }
     }
 
     _isLoading = false;
     _isInitialized = true;
     notifyListeners();
+  }
+
+  Future<void> _checkVerificationInBackground(String email) async {
+    try {
+      final isVerified = await _authService.checkEmailVerification(email);
+      if (isVerified && _pendingVerificationEmail == email) {
+        _pendingVerificationEmail = null;
+        _requiresEmailConfirmation = false;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Background email verification check error: $e');
+    }
   }
 
   /// Silently refresh profile from network without blocking the UI
@@ -75,11 +121,13 @@ class AuthProvider extends ChangeNotifier {
     final result = await _authService.login(email, password);
 
     print(
-      '[AUTH] Login result: success=${result.success}, error=${result.error}',
+      '[AUTH] Login result: success=${result.success}, error=${result.error}, requiresEmailConfirmation=${result.requiresEmailConfirmation}',
     );
 
     if (result.success) {
       print('[AUTH] Login successful, fetching profile...');
+      _pendingVerificationEmail = null;
+      _requiresEmailConfirmation = false;
       _user = await _authService.getProfile();
       _isLoading = false;
 
@@ -97,6 +145,10 @@ class AuthProvider extends ChangeNotifier {
 
     print('[AUTH] Login failed: ${result.error}');
     _error = result.error;
+    _requiresEmailConfirmation = result.requiresEmailConfirmation;
+    if (result.requiresEmailConfirmation) {
+      _pendingVerificationEmail = result.email ?? email.trim().toLowerCase();
+    }
     _isLoading = false;
     notifyListeners();
     return false;
@@ -137,10 +189,13 @@ class AuthProvider extends ChangeNotifier {
 
     if (result.success) {
       _requiresEmailConfirmation = result.requiresEmailConfirmation;
+      if (result.requiresEmailConfirmation) {
+        _pendingVerificationEmail = result.email ?? email.trim().toLowerCase();
+      }
       _message = result.message;
       _isLoading = false;
       print(
-        'AuthProvider: Setting _requiresEmailConfirmation=$_requiresEmailConfirmation, returning true',
+        'AuthProvider: Setting _requiresEmailConfirmation=$_requiresEmailConfirmation, _pendingVerificationEmail=$_pendingVerificationEmail, returning true',
       );
       notifyListeners();
       return true;
@@ -163,6 +218,10 @@ class AuthProvider extends ChangeNotifier {
     _isLoading = false;
     if (result.success) {
       _message = result.message;
+      if (result.message?.toLowerCase().contains('already verified') ?? false) {
+        _pendingVerificationEmail = null;
+        _requiresEmailConfirmation = false;
+      }
     } else {
       _error = result.error;
     }
@@ -173,12 +232,16 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     await _authService.logout();
     _user = null;
+    _pendingVerificationEmail = null;
+    _requiresEmailConfirmation = false;
     notifyListeners();
   }
 
   /// Clear all user-related data on logout
   void clearAllUserData() {
     _user = null;
+    _pendingVerificationEmail = null;
+    _requiresEmailConfirmation = false;
     _error = null;
     _message = null;
     notifyListeners();
@@ -193,6 +256,8 @@ class AuthProvider extends ChangeNotifier {
 
     if (result.success) {
       _user = null;
+      _pendingVerificationEmail = null;
+      _requiresEmailConfirmation = false;
       _isLoading = false;
       notifyListeners();
       return true;

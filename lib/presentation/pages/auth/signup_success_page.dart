@@ -6,12 +6,16 @@ class SignupSuccessPage extends StatefulWidget {
   final String email;
   final VoidCallback onGoToLogin;
   final Future<bool> Function() onResendEmail;
+  final Future<bool> Function()? onCheckVerification;
+  final VoidCallback? onChangeEmail;
 
   const SignupSuccessPage({
     super.key,
     required this.email,
     required this.onGoToLogin,
     required this.onResendEmail,
+    this.onCheckVerification,
+    this.onChangeEmail,
   });
 
   @override
@@ -25,6 +29,7 @@ class _SignupSuccessPageState extends State<SignupSuccessPage>
   late Animation<double> _circleAnimation;
   late Animation<double> _checkAnimation;
   bool _isResending = false;
+  bool _isChecking = false;
 
   @override
   void initState() {
@@ -70,126 +75,216 @@ class _SignupSuccessPageState extends State<SignupSuccessPage>
     }
   }
 
+  Future<void> _handleProceedToLogin() async {
+    if (widget.onCheckVerification != null) {
+      setState(() => _isChecking = true);
+      final isVerified = await widget.onCheckVerification!();
+      setState(() => _isChecking = false);
+      if (!mounted) return;
+      if (isVerified) {
+        ErrorHandler.showSuccess(context, 'Email confirmed! You can now log in.');
+        widget.onGoToLogin();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Your email is not confirmed yet. Please check your inbox and tap the link, or tap Resend Email.',
+            ),
+            action: SnackBarAction(
+              label: 'Log In Anyway',
+              textColor: AppColors.primaryGold,
+              onPressed: widget.onGoToLogin,
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } else {
+      widget.onGoToLogin();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            children: [
-              const Spacer(flex: 2),
-              AnimatedBuilder(
-                animation: _circleAnimation,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _circleAnimation.value,
-                    child: Container(
-                      width: 140,
-                      height: 140,
-                      decoration: BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.success.withValues(alpha: 0.3),
-                            blurRadius: 20,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: AnimatedBuilder(
-                        animation: _checkAnimation,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      const Spacer(flex: 2),
+                      AnimatedBuilder(
+                        animation: _circleAnimation,
                         builder: (context, child) {
-                          return CustomPaint(
-                            painter: CheckmarkPainter(
-                              progress: _checkAnimation.value,
-                              color: Colors.white,
-                              strokeWidth: 8,
+                          return Transform.scale(
+                            scale: _circleAnimation.value,
+                            child: Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                color: AppColors.success,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.success.withValues(alpha: 0.3),
+                                    blurRadius: 20,
+                                    spreadRadius: 5,
+                                  ),
+                                ],
+                              ),
+                              child: AnimatedBuilder(
+                                animation: _checkAnimation,
+                                builder: (context, child) {
+                                  return CustomPaint(
+                                    painter: CheckmarkPainter(
+                                      progress: _checkAnimation.value,
+                                      color: Colors.white,
+                                      strokeWidth: 7,
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
                           );
                         },
                       ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 48),
-              const Text(
-                'Account Created\nSuccessfully!',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                  height: 1.3,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'A confirmation link has been sent to:',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                widget.email,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Please check your email and click the confirmation link to activate your account.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  height: 1.5,
-                ),
-              ),
-              const Spacer(flex: 2),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isResending ? null : _handleResend,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGold,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: _isResending
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
+                      const SizedBox(height: 36),
+                      const Text(
+                        'Account Created\nSuccessfully!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'A confirmation link has been sent to:',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.email,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Please check your email and click the confirmation link to activate your account before logging in.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          height: 1.4,
+                        ),
+                      ),
+                      const Spacer(flex: 3),
+                      // I've Confirmed / Proceed to Log In
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton(
+                          onPressed: (_isChecking || _isResending) ? null : _handleProceedToLogin,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryGold,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(26),
+                            ),
+                            elevation: 0,
                           ),
-                        )
-                      : const Text(
-                          'Resend Email',
+                          child: _isChecking
+                              ? const SizedBox(
+                                  height: 22,
+                                  width: 22,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  "I've Confirmed / Proceed to Log In",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Resend Email
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: OutlinedButton(
+                          onPressed: (_isResending || _isChecking) ? null : _handleResend,
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.primaryGold, width: 1.5),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(26),
+                            ),
+                          ),
+                          child: _isResending
+                              ? const SizedBox(
+                                  height: 22,
+                                  width: 22,
+                                  child: CircularProgressIndicator(
+                                    color: AppColors.primaryGold,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'Resend Confirmation Email',
+                                  style: TextStyle(
+                                    color: AppColors.primaryGold,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Use a different email / Change account
+                      TextButton(
+                        onPressed: () {
+                          if (widget.onChangeEmail != null) {
+                            widget.onChangeEmail!();
+                          } else {
+                            widget.onGoToLogin();
+                          }
+                        },
+                        child: Text(
+                          'Use a different email / Log in with another account',
                           style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 48),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

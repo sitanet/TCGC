@@ -19,6 +19,7 @@ class ApiConstants {
   static const String resendOtp = '/auth/resend-otp/';
   static const String refreshToken = '/auth/refresh/';
   static const String resendConfirmation = '/auth/resend-confirmation/';
+  static const String checkEmailVerification = '/auth/check-verification/';
   static const String forgotPassword = '/auth/forgot-password/';
   static const String resetPassword = '/auth/reset-password/';
 

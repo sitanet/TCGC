@@ -28,6 +28,7 @@ import 'presentation/pages/teens/teens_page.dart';
 import 'presentation/pages/get_started/get_started_page.dart';
 import 'presentation/pages/auth/sign_in_page.dart';
 import 'presentation/pages/auth/sign_up_page.dart';
+import 'presentation/pages/auth/signup_success_page.dart';
 import 'data/services/interests_service.dart';
 import 'presentation/widgets/bottom_nav_bar.dart';
 import 'presentation/widgets/mini_player.dart';
@@ -158,6 +159,7 @@ class MyApp extends ConsumerStatefulWidget {
 class _MyAppState extends ConsumerState<MyApp> {
   bool _showGetStarted = true;
   bool _showSignUp = false;
+  String? _prefilledLoginEmail;
   bool _initialized = false;
   final InterestsService _interestsService = InterestsService();
   final DataService _dataService = DataService();
@@ -650,6 +652,7 @@ class _MyAppState extends ConsumerState<MyApp> {
 
   void _onAuthenticated() {
     setState(() {
+      _prefilledLoginEmail = null;
       _showGetStarted = false;
       _showSignUp = false;
     });
@@ -692,9 +695,44 @@ class _MyAppState extends ConsumerState<MyApp> {
 
     Widget homeWidget;
 
-    // Always show main app interface (removed offline page check)
+    // 1. If authenticated, show main app
     if (authProvider.isAuthenticated) {
       homeWidget = const NetworkAwareWidget(child: MainScreen());
+    }
+    // 2. If user registered or attempted login but email is unverified,
+    // persist state and open confirmation/resend page directly (even after app close & restart)
+    else if (authProvider.pendingVerificationEmail != null &&
+        authProvider.pendingVerificationEmail!.isNotEmpty) {
+      homeWidget = SignupSuccessPage(
+        email: authProvider.pendingVerificationEmail!,
+        onGoToLogin: () {
+          final email = authProvider.pendingVerificationEmail;
+          authProvider.clearPendingVerificationEmail();
+          setState(() {
+            _prefilledLoginEmail = email;
+            _showGetStarted = false;
+            _showSignUp = false;
+          });
+        },
+        onResendEmail: () async {
+          return await authProvider.resendConfirmationEmail(
+            authProvider.pendingVerificationEmail!,
+          );
+        },
+        onCheckVerification: () async {
+          return await authProvider.checkEmailVerification(
+            authProvider.pendingVerificationEmail!,
+          );
+        },
+        onChangeEmail: () {
+          authProvider.clearPendingVerificationEmail();
+          setState(() {
+            _prefilledLoginEmail = null;
+            _showGetStarted = false;
+            _showSignUp = true;
+          });
+        },
+      );
     } else if (_showGetStarted) {
       homeWidget = GetStartedPage(
         onSignIn: () {
@@ -726,6 +764,7 @@ class _MyAppState extends ConsumerState<MyApp> {
       );
     } else {
       homeWidget = SignInPage(
+        initialEmail: _prefilledLoginEmail,
         onSignIn: _onAuthenticated,
         onBack: () {
           setState(() {

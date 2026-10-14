@@ -9,9 +9,61 @@ import 'api_service.dart';
 
 class AuthService {
   final ApiService _api = ApiService();
+  static const String _pendingVerificationEmailKey = 'pending_verification_email';
+
+  Future<void> savePendingVerificationEmail(String email) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_pendingVerificationEmailKey, email.trim().toLowerCase());
+    } catch (e) {
+      debugPrint('Failed to save pending verification email: $e');
+    }
+  }
+
+  Future<String?> getPendingVerificationEmail() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final email = prefs.getString(_pendingVerificationEmailKey);
+      if (email != null && email.trim().isNotEmpty) {
+        return email.trim().toLowerCase();
+      }
+    } catch (e) {
+      debugPrint('Failed to get pending verification email: $e');
+    }
+    return null;
+  }
+
+  Future<void> clearPendingVerificationEmail() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_pendingVerificationEmailKey);
+    } catch (e) {
+      debugPrint('Failed to clear pending verification email: $e');
+    }
+  }
+
+  Future<bool> checkEmailVerification(String email) async {
+    final normalizedEmail = email.toLowerCase().trim();
+    try {
+      final response = await _api.postPublic(ApiConstants.checkEmailVerification, {
+        'email': normalizedEmail,
+      });
+
+      if (response.isSuccess && response.data is Map) {
+        final isVerified = response.data['email_verified'] == true;
+        if (isVerified) {
+          await clearPendingVerificationEmail();
+        }
+        return isVerified;
+      }
+    } catch (e) {
+      debugPrint('Check email verification error: $e');
+    }
+    return false;
+  }
 
   Future<AuthResult> login(String email, String password) async {
-    final normalizedEmail = email.toLowerCase();
+    final normalizedEmail = email.toLowerCase().trim();
     // Use postPublic to avoid sending expired tokens with login request
     final response = await _api.postPublic(ApiConstants.login, {
       'email': normalizedEmail,
@@ -24,7 +76,23 @@ class AuthService {
     if (response.isSuccess) {
       final data = response.data;
       await _api.saveTokens(data['access'], data['refresh']);
-      return AuthResult(success: true);
+      await clearPendingVerificationEmail();
+      return AuthResult(success: true, email: normalizedEmail);
+    }
+
+    // Check if email is not verified (status 403 or email_not_verified flag)
+    if (response.statusCode == 403 ||
+        (response.data is Map && response.data['email_not_verified'] == true)) {
+      await savePendingVerificationEmail(normalizedEmail);
+      final detail = response.data is Map && response.data['detail'] != null
+          ? response.data['detail'].toString()
+          : 'Please confirm your email address before logging in.';
+      return AuthResult(
+        success: false,
+        requiresEmailConfirmation: true,
+        email: normalizedEmail,
+        error: detail,
+      );
     }
 
     String errorMessage = _parseErrorMessage(response);
@@ -37,7 +105,7 @@ class AuthService {
           'Unable to connect to server. Please check your internet connection.';
     }
 
-    return AuthResult(success: false, error: errorMessage);
+    return AuthResult(success: false, error: errorMessage, email: normalizedEmail);
   }
 
   Future<AuthResult> register({
@@ -50,7 +118,7 @@ class AuthService {
     String? phoneNumber,
     String? countryCode,
   }) async {
-    final normalizedEmail = email.toLowerCase();
+    final normalizedEmail = email.toLowerCase().trim();
     print('Register API: Starting registration for $normalizedEmail');
 
     // Use postPublic for registration (public endpoint)
@@ -70,11 +138,13 @@ class AuthService {
 
     if (response.isSuccess) {
       print(
-        'Register API: Success, returning with requiresEmailConfirmation=true',
+        'Register API: Success, saving pending email and returning with requiresEmailConfirmation=true',
       );
+      await savePendingVerificationEmail(normalizedEmail);
       return AuthResult(
         success: true,
         requiresEmailConfirmation: true,
+        email: normalizedEmail,
         message:
             response.data['message'] ??
             'Please check your email to confirm your account.',
@@ -83,11 +153,11 @@ class AuthService {
 
     String errorMessage = _parseErrorMessage(response);
     print('Register API: Failed with error: $errorMessage');
-    return AuthResult(success: false, error: errorMessage);
+    return AuthResult(success: false, error: errorMessage, email: normalizedEmail);
   }
 
   Future<AuthResult> resendConfirmationEmail(String email) async {
-    final normalizedEmail = email.toLowerCase();
+    final normalizedEmail = email.toLowerCase().trim();
     // Use postPublic for public endpoint
     final response = await _api.postPublic(ApiConstants.resendConfirmation, {
       'email': normalizedEmail,
@@ -96,12 +166,21 @@ class AuthService {
     if (response.isSuccess) {
       return AuthResult(
         success: true,
+        email: normalizedEmail,
         message: 'Confirmation email sent successfully',
       );
     }
 
     String errorMessage = _parseErrorMessage(response);
-    return AuthResult(success: false, error: errorMessage);
+    if (errorMessage.toLowerCase().contains('already verified')) {
+      await clearPendingVerificationEmail();
+      return AuthResult(
+        success: true,
+        email: normalizedEmail,
+        message: 'Your email is already verified! You can now log in.',
+      );
+    }
+    return AuthResult(success: false, error: errorMessage, email: normalizedEmail);
   }
 
   String _parseErrorMessage(ApiResponse response) {
@@ -161,6 +240,7 @@ class AuthService {
   Future<void> logout() async {
     await _api.clearTokens();
     await clearCachedProfile();
+    await clearPendingVerificationEmail();
   }
 
   Future<AuthResult> deleteAccount() async {
@@ -169,6 +249,7 @@ class AuthService {
     if (response.isSuccess) {
       await _api.clearTokens();
       await clearCachedProfile();
+      await clearPendingVerificationEmail();
       return AuthResult(success: true, message: 'Account deleted successfully');
     }
 
@@ -469,12 +550,14 @@ class AuthResult {
   final String? error;
   final String? message;
   final bool requiresEmailConfirmation;
+  final String? email;
 
   AuthResult({
     required this.success,
     this.error,
     this.message,
     this.requiresEmailConfirmation = false,
+    this.email,
   });
 }
 
