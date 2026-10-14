@@ -791,7 +791,22 @@ class _MainScreenState extends ConsumerState<MainScreen>
   static const String _lastTabKey = 'last_tab_index';
 
   // Pages are built lazily to prevent ANR from heavy pages like LiveStreamPage
-  Widget _buildPage(int index) {
+  Widget _buildPage(int index, bool showWallet) {
+    if (!showWallet) {
+      switch (index) {
+        case 0:
+          return const HomePage();
+        case 1:
+          return const AudioPage();
+        case 2:
+          return const LiveStreamPage();
+        case 3:
+          return const TeensPage();
+        default:
+          return const HomePage();
+      }
+    }
+
     switch (index) {
       case 0:
         return const HomePage();
@@ -1067,8 +1082,11 @@ class _MainScreenState extends ConsumerState<MainScreen>
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastIndex = prefs.getInt(_lastTabKey) ?? 0;
-      if (lastIndex >= 0 && lastIndex < 5 && mounted) {
-        ref.read(mainTabIndexProvider.notifier).state = lastIndex;
+      final showWallet = !ref.read(appConfigChangeNotifierProvider).config.walletPageDisabled;
+      final maxIndex = showWallet ? 4 : 3;
+      final safeIndex = (lastIndex >= 0 && lastIndex <= maxIndex) ? lastIndex : 0;
+      if (mounted) {
+        ref.read(mainTabIndexProvider.notifier).state = safeIndex;
       }
     } catch (e) {
       debugPrint('Error restoring last tab: $e');
@@ -1184,6 +1202,10 @@ class _MainScreenState extends ConsumerState<MainScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final appConfig = ref.watch(appConfigChangeNotifierProvider);
+    final showWallet = !appConfig.config.walletPageDisabled;
+    final maxIndex = showWallet ? 4 : 3;
+    final safeIndex = _currentIndex > maxIndex ? 0 : _currentIndex;
 
     if (_showPromotion && _activePromotions.isNotEmpty) {
       return PromotionPopup(
@@ -1198,15 +1220,16 @@ class _MainScreenState extends ConsumerState<MainScreen>
         child: Stack(
           children: [
             Scaffold(
-              body: _buildPage(_currentIndex),
+              body: _buildPage(safeIndex, showWallet),
               bottomNavigationBar: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const MiniPlayer(),
                   BottomNavBar(
-                    currentIndex: _currentIndex,
+                    currentIndex: safeIndex,
+                    showWallet: showWallet,
                     onTap: (index) {
-                      if (index == 3) {
+                      if (showWallet && index == 3) {
                         _handleWalletTap();
                       } else {
                         _setCurrentIndex(index);
@@ -1225,15 +1248,16 @@ class _MainScreenState extends ConsumerState<MainScreen>
     return BlocProvider<AskWingAICubit>(
       create: (context) => _askWingAICubit,
       child: Scaffold(
-        body: _buildPage(_currentIndex),
+        body: _buildPage(safeIndex, showWallet),
         bottomNavigationBar: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const MiniPlayer(),
             BottomNavBar(
-              currentIndex: _currentIndex,
+              currentIndex: safeIndex,
+              showWallet: showWallet,
               onTap: (index) {
-                if (index == 3) {
+                if (showWallet && index == 3) {
                   _handleWalletTap();
                 } else {
                   _setCurrentIndex(index);

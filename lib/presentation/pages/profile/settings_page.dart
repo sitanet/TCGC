@@ -226,34 +226,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   'Change Password',
                   Icons.lock_outline,
                 ),
-                Divider(
-                  height: 1,
-                  indent: 16,
-                  endIndent: 16,
-                  color: isDark
-                      ? Colors.white.withAlpha(25)
-                      : Colors.black.withAlpha(13),
-                ),
-                _buildNavigationTile(
-                  context,
-                  isDark,
-                  'Change Transaction PIN',
-                  Icons.pin_outlined,
-                ),
-                Divider(
-                  height: 1,
-                  indent: 16,
-                  endIndent: 16,
-                  color: isDark
-                      ? Colors.white.withAlpha(25)
-                      : Colors.black.withAlpha(13),
-                ),
-                _buildNavigationTile(
-                  context,
-                  isDark,
-                  'Reset Transaction PIN',
-                  Icons.lock_reset_outlined,
-                ),
+                if (!ref.watch(appConfigChangeNotifierProvider).config.walletPageDisabled) ...[
+                  Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: isDark
+                        ? Colors.white.withAlpha(25)
+                        : Colors.black.withAlpha(13),
+                  ),
+                  _buildNavigationTile(
+                    context,
+                    isDark,
+                    'Change Transaction PIN',
+                    Icons.pin_outlined,
+                  ),
+                  Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: isDark
+                        ? Colors.white.withAlpha(25)
+                        : Colors.black.withAlpha(13),
+                  ),
+                  _buildNavigationTile(
+                    context,
+                    isDark,
+                    'Reset Transaction PIN',
+                    Icons.lock_reset_outlined,
+                  ),
+                ],
               ]),
               const SizedBox(height: 100),
             ],
@@ -275,6 +277,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       color: isDark ? Colors.white.withAlpha(25) : Colors.black.withAlpha(13),
     );
 
+    final showWallet = !ref.watch(appConfigChangeNotifierProvider).config.walletPageDisabled;
     final tiles = <Widget>[];
 
     // ── Fingerprint options (only if device has fingerprint) ─────────────────
@@ -289,17 +292,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           (v) => _handleBiometricLoginToggle(v),
         ),
       );
-      tiles.add(divider);
-      tiles.add(
-        _buildSwitchTileWithSubtitle(
-          context,
-          isDark,
-          'Fingerprint for Transactions',
-          'Use fingerprint instead of PIN for transactions',
-          _biometricTransactions,
-          (v) => _handleBiometricTransactionToggle(v),
-        ),
-      );
+      if (showWallet) {
+        tiles.add(divider);
+        tiles.add(
+          _buildSwitchTileWithSubtitle(
+            context,
+            isDark,
+            'Fingerprint for Transactions',
+            'Use fingerprint instead of PIN for transactions',
+            _biometricTransactions,
+            (v) => _handleBiometricTransactionToggle(v),
+          ),
+        );
+      }
     }
 
     // ── Face recognition options (only if device has face recognition) ────────
@@ -315,17 +320,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           (v) => _handleFaceLoginToggle(v),
         ),
       );
-      tiles.add(divider);
-      tiles.add(
-        _buildSwitchTileWithSubtitle(
-          context,
-          isDark,
-          'Face ID for Transactions',
-          'Use face recognition instead of PIN for transactions',
-          _faceTransactions,
-          (v) => _handleFaceTransactionToggle(v),
-        ),
-      );
+      if (showWallet) {
+        tiles.add(divider);
+        tiles.add(
+          _buildSwitchTileWithSubtitle(
+            context,
+            isDark,
+            'Face ID for Transactions',
+            'Use face recognition instead of PIN for transactions',
+            _faceTransactions,
+            (v) => _handleFaceTransactionToggle(v),
+          ),
+        );
+      }
     }
 
     // ── No biometrics available ───────────────────────────────────────────────

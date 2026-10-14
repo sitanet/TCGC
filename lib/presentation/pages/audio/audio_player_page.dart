@@ -472,14 +472,15 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               : widget.sermon.category,
           lightBackground: true,
           actions: [
-            IconButton(
-              onPressed: () => _showGivingBottomSheet(context, isDark),
-              icon: Icon(
-                Icons.volunteer_activism,
-                color: AppColors.primaryGold,
+            if (!ref.watch(appConfigChangeNotifierProvider).config.walletPageDisabled)
+              IconButton(
+                onPressed: () => _showGivingBottomSheet(context, isDark),
+                icon: Icon(
+                  Icons.volunteer_activism,
+                  color: AppColors.primaryGold,
+                ),
+                tooltip: 'Give an Offering',
               ),
-              tooltip: 'Give an Offering',
-            ),
             IconButton(
               onPressed: () => _showActionsBottomSheet(context, isDark),
               icon: const Icon(Icons.more_vert),

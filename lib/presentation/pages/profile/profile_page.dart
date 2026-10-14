@@ -142,6 +142,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final authProvider = ref.watch(authChangeNotifierProvider);
     final spacing = Responsive.verticalSpacing(context);
     final maxWidth = Responsive.maxContentWidth(context);
 
@@ -157,10 +158,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 _buildMenuItems(context, isDark),
                 SizedBox(height: spacing * 1.5),
                 _buildPrivacyPolicyLink(context, isDark),
-                SizedBox(height: spacing * 1.5),
-                _buildDeleteAccountButton(context, isDark),
-                SizedBox(height: spacing),
-                _buildLogoutButton(context, isDark),
+                if (authProvider.isAuthenticated) ...[
+                  SizedBox(height: spacing * 1.5),
+                  _buildDeleteAccountButton(context, isDark),
+                  SizedBox(height: spacing),
+                  _buildLogoutButton(context, isDark),
+                ],
                 SizedBox(height: spacing * 6),
               ],
             ),
@@ -315,6 +318,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   Widget _buildMenuItems(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final borderRadius = Responsive.borderRadius(context);
+    final appConfig = ref.watch(appConfigChangeNotifierProvider);
+    final showWallet = !appConfig.config.walletPageDisabled;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
@@ -339,19 +344,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               'Edit your Profile',
               () => _authenticateAndNavigateToEditProfile(context, isDark),
             ),
-            _buildDivider(isDark),
-            _buildMenuItem(
-              context,
-              isDark,
-              Icons.account_balance_wallet_outlined,
-              'Wallet',
-              () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const WalletPage()),
-                );
-              },
-            ),
+            if (showWallet) ...[
+              _buildDivider(isDark),
+              _buildMenuItem(
+                context,
+                isDark,
+                Icons.account_balance_wallet_outlined,
+                'Wallet',
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const WalletPage()),
+                  );
+                },
+              ),
+            ],
             _buildDivider(isDark),
             _buildMenuItem(
               context,
@@ -515,10 +522,80 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
+
+              // Show loading dialog
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (loadingContext) => AlertDialog(
+                  backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  content: Row(
+                    children: [
+                      const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: AppColors.error,
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Text(
+                        'Deleting account...',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+
               final authProvider = ref.read(authChangeNotifierProvider);
-              await authProvider.deleteAccount();
+              final walletProvider = ref.read(walletChangeNotifierProvider);
+              final biometricProvider = ref.read(biometricChangeNotifierProvider);
+
+              final success = await authProvider.deleteAccount();
+
+              // Dismiss loading dialog
               if (context.mounted) {
-                Navigator.of(context).popUntil((route) => route.isFirst);
+                Navigator.of(context, rootNavigator: true).pop();
+              }
+
+              if (success) {
+                walletProvider.reset();
+                await biometricProvider.clearOnLogout();
+                ref.read(mainTabIndexProvider.notifier).state = 0;
+
+                if (context.mounted) {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Your account has been deleted permanently.',
+                      ),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 4),
+                    ),
+                  );
+                }
+              } else {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        authProvider.error ??
+                            'Failed to delete account. Please try again.',
+                      ),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 4),
+                    ),
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(

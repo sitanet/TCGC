@@ -9,6 +9,7 @@ import '../../../core/utils/image_cache_manager.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/audio_cache_service.dart';
 import '../../../data/services/played_audio_service.dart';
+import '../../../domain/entities/beginner_category.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/transcript.dart';
 import '../../../main.dart';
@@ -20,6 +21,8 @@ import 'playlists_page.dart';
 import 'downloads_page.dart';
 import 'transcript_list_page.dart';
 import 'ebook_list_page.dart';
+
+enum AudioBrowseFilter { series, category, minister }
 
 String _stripHtmlTags(String htmlText) {
   return htmlText
@@ -45,16 +48,21 @@ class _AudioPageState extends ConsumerState<AudioPage>
   late TabController _tabController;
   final DataService _dataService = DataService();
   final AudioCacheService _audioCacheService = AudioCacheService();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  AudioBrowseFilter _selectedBrowseFilter = AudioBrowseFilter.series;
 
   static List<MessageCategory> _staticCategories = [];
   static List<Sermon> _staticSermons = [];
   static List<Transcript> _staticTranscripts = [];
   static List<SpeakerModel> _staticSpeakers = [];
+  static List<BeginnerCategory> _staticBeginnerCategories = [];
 
   List<MessageCategory> _categories = [];
   List<Sermon> _sermons = [];
   List<Transcript> _transcripts = [];
   List<SpeakerModel> _speakerModels = [];
+  List<BeginnerCategory> _beginnerCategories = [];
   bool _isLoading = true;
   bool _initialLoadDone = false;
 
@@ -70,6 +78,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
       _sermons = _staticSermons;
       _transcripts = _staticTranscripts;
       _speakerModels = _staticSpeakers;
+      _beginnerCategories = _staticBeginnerCategories;
       _isLoading = false;
       _initialLoadDone = true;
     }

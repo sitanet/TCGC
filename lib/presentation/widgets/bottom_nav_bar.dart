@@ -5,11 +5,13 @@ import '../../core/utils/responsive.dart';
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
+  final bool showWallet;
 
   const BottomNavBar({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.showWallet = true,
   });
 
   @override
@@ -51,13 +53,20 @@ class BottomNavBar extends StatelessWidget {
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildNavItem(0, Icons.home_outlined, Icons.home, iconSize),
-            _buildNavItem(1, Icons.music_note_outlined, Icons.music_note, iconSize),
-            _buildNavItem(2, Icons.play_circle_outline, Icons.play_circle, iconSize),
-            _buildNavItem(3, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, iconSize),
-            _buildNavItem(4, Icons.groups_outlined, Icons.groups, iconSize),
-          ],
+          children: showWallet
+              ? [
+                  _buildNavItem(0, Icons.home_outlined, Icons.home, iconSize),
+                  _buildNavItem(1, Icons.music_note_outlined, Icons.music_note, iconSize),
+                  _buildNavItem(2, Icons.play_circle_outline, Icons.play_circle, iconSize),
+                  _buildNavItem(3, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, iconSize),
+                  _buildNavItem(4, Icons.groups_outlined, Icons.groups, iconSize),
+                ]
+              : [
+                  _buildNavItem(0, Icons.home_outlined, Icons.home, iconSize),
+                  _buildNavItem(1, Icons.music_note_outlined, Icons.music_note, iconSize),
+                  _buildNavItem(2, Icons.play_circle_outline, Icons.play_circle, iconSize),
+                  _buildNavItem(3, Icons.groups_outlined, Icons.groups, iconSize),
+                ],
         ),
       ),
     );
