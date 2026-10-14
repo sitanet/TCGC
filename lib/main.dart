@@ -434,7 +434,7 @@ class _MyAppState extends ConsumerState<MyApp> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Icon(
-                                  Icons.auto_awesome_rounded,
+                                  Icons.new_releases_rounded,
                                   size: 18,
                                   color: AppColors.primaryGold,
                                 ),

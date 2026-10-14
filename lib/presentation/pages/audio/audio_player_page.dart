@@ -1424,14 +1424,6 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (_speaker != null) ...[
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.info_outline_rounded,
-                      size: 14,
-                      color: AppColors.primaryGold.withOpacity(0.8),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -1619,8 +1611,8 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               ),
               _buildQuickActionButton(
                 icon: isTimerActive
-                    ? Icons.bedtime_rounded
-                    : Icons.bedtime_outlined,
+                    ? Icons.timer_rounded
+                    : Icons.timer_outlined,
                 iconColor: isTimerActive ? AppColors.primaryGold : null,
                 label: isTimerActive
                     ? (timerRemaining != null && timerRemaining.inMinutes > 0
@@ -1952,7 +1944,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                 child: Row(
                   children: [
                     Icon(
-                      Icons.bedtime_rounded,
+                      Icons.timer_rounded,
                       color: AppColors.primaryGold,
                       size: 22,
                     ),
@@ -2290,7 +2282,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                 // Sleep Timer
                 ListTile(
                   leading: Icon(
-                    Icons.bedtime_outlined,
+                    Icons.timer_outlined,
                     color: audioProvider.isSleepTimerActive ? AppColors.primaryGold : null,
                   ),
                   title: Text(

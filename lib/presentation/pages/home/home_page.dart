@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
@@ -18,8 +17,6 @@ import '../audio/audio_player_page.dart';
 import '../audio/audio_list_page.dart';
 import '../profile/profile_page.dart';
 import '../notifications/notifications_page.dart';
-import '../ask_wing_ai/ask_wing_ai_chat_page.dart';
-import '../../bloc/ask_wing_ai/ask_wing_ai_cubit.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -308,42 +305,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 _buildRecentActivities(context, isDark),
                 SizedBox(height: spacing * 6),
               ],
-            ),
-          ),
-        ),
-        floatingActionButton: GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => BlocProvider.value(
-                  value: context.read<AskWingAICubit>(),
-                  child: const AskWingAIChatPage(),
-                ),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.primaryGold,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primaryGold.withValues(alpha: 0.35),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: const Text(
-              'Ask Wing AI',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.2,
-              ),
             ),
           ),
         ),
@@ -914,7 +875,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               Row(
                 children: [
                   const Icon(
-                    Icons.auto_awesome,
+                    Icons.explore_outlined,
                     color: AppColors.primaryGold,
                     size: 20,
                   ),
