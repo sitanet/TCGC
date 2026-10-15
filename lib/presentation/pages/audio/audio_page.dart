@@ -1119,11 +1119,15 @@ class _AudioPageState extends ConsumerState<AudioPage>
     if (imageUrl.startsWith('http')) {
       return CachedNetworkImage(
         imageUrl: imageUrl,
+        cacheManager: CustomImageCacheManager.instance,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
         memCacheWidth: 400,
         memCacheHeight: 400,
+        useOldImageOnUrlChange: true,
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
         placeholder: (context, url) => placeholder,
         errorWidget: (context, url, error) => placeholder,
       );

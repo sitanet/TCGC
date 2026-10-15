@@ -766,11 +766,15 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                       message.imageUrl != null && message.imageUrl!.isNotEmpty
                       ? CachedNetworkImage(
                           imageUrl: message.imageUrl!,
+                          cacheManager: CustomImageCacheManager.instance,
                           width: 150,
                           height: 95,
                           fit: BoxFit.cover,
                           memCacheWidth: 300,
                           memCacheHeight: 190,
+                          useOldImageOnUrlChange: true,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
                           placeholder: (_, __) => Container(
                             width: 150,
                             height: 95,
@@ -951,9 +955,13 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                   _speaker!.photoUrl != null && _speaker!.photoUrl!.isNotEmpty
                   ? CachedNetworkImage(
                       imageUrl: _speaker!.photoUrl!,
+                      cacheManager: CustomImageCacheManager.instance,
                       width: 100,
                       height: 100,
                       fit: BoxFit.cover,
+                      useOldImageOnUrlChange: true,
+                      fadeInDuration: Duration.zero,
+                      fadeOutDuration: Duration.zero,
                       placeholder: (_, __) => Container(
                         width: 100,
                         height: 100,
@@ -1080,7 +1088,11 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                         _speaker!.photoUrl!.isNotEmpty)
                       CachedNetworkImage(
                         imageUrl: _speaker!.photoUrl!,
+                        cacheManager: CustomImageCacheManager.instance,
                         fit: BoxFit.cover,
+                        useOldImageOnUrlChange: true,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
                         placeholder: (_, __) => Container(
                           color: Colors.black,
                           child: const Center(
@@ -1326,11 +1338,15 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     }
     return CachedNetworkImage(
       imageUrl: widget.sermon.imageUrl!,
+      cacheManager: CustomImageCacheManager.instance,
       width: size,
       height: size,
       fit: BoxFit.cover,
       memCacheWidth: 600,
       memCacheHeight: 600,
+      useOldImageOnUrlChange: true,
+      fadeInDuration: Duration.zero,
+      fadeOutDuration: Duration.zero,
       placeholder: (_, __) => _buildPlaceholderArt(isDark),
       errorWidget: (_, __, ___) => _buildPlaceholderArt(isDark),
     );

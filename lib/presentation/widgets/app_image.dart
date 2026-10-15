@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/image_cache_manager.dart';
 
 class AppImage extends StatelessWidget {
   final String? imagePath;
@@ -58,6 +59,7 @@ class AppImage extends StatelessWidget {
       
       image = CachedNetworkImage(
         imageUrl: imagePath!,
+        cacheManager: CustomImageCacheManager.instance,
         width: width,
         height: height,
         fit: fit,

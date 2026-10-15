@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/utils/image_cache_manager.dart';
 import '../../domain/entities/sermon.dart';
 
 class ImageCacheService {
@@ -21,7 +22,10 @@ class ImageCacheService {
   void preCacheUrl(String url) {
     if (url.isEmpty) return;
     try {
-      CachedNetworkImageProvider(url).resolve(ImageConfiguration.empty);
+      CachedNetworkImageProvider(
+        url,
+        cacheManager: CustomImageCacheManager.instance,
+      ).resolve(ImageConfiguration.empty);
     } catch (e) {
       debugPrint('ImageCacheService: Failed to cache $url');
     }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_cache_manager.dart';
 import '../../../data/services/download_service.dart';
 import '../../../data/services/playback_position_service.dart';
 import '../../../main.dart';
@@ -191,7 +192,11 @@ class _DownloadsPageState extends ConsumerState<DownloadsPage> {
                 child: sermon.imageUrl != null && sermon.imageUrl!.startsWith('http')
                     ? CachedNetworkImage(
                         imageUrl: sermon.imageUrl!,
+                        cacheManager: CustomImageCacheManager.instance,
                         fit: BoxFit.cover,
+                        useOldImageOnUrlChange: true,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
                         placeholder: (_, __) => _buildPlaceholder(isDark),
                         errorWidget: (_, __, ___) => _buildPlaceholder(isDark),
                       )

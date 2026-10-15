@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_cache_manager.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/beginner_category.dart';
 import '../../../data/services/data_service.dart';
@@ -739,9 +740,13 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                   child: imageUrl != null && imageUrl.isNotEmpty
                       ? CachedNetworkImage(
                           imageUrl: imageUrl,
+                          cacheManager: CustomImageCacheManager.instance,
                           fit: BoxFit.cover,
                           memCacheWidth: 152,
                           memCacheHeight: 152,
+                          useOldImageOnUrlChange: true,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
                           placeholder: (_, __) => Icon(
                             isMinister ? Icons.person_rounded : Icons.music_note_rounded,
                             size: 32,
@@ -1212,9 +1217,13 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                             : photoUrl != null && photoUrl.isNotEmpty
                                 ? CachedNetworkImage(
                                     imageUrl: photoUrl,
+                                    cacheManager: CustomImageCacheManager.instance,
                                     fit: BoxFit.cover,
                                     memCacheWidth: 112,
                                     memCacheHeight: 112,
+                                    useOldImageOnUrlChange: true,
+                                    fadeInDuration: Duration.zero,
+                                    fadeOutDuration: Duration.zero,
                                     placeholder: (_, __) => Container(
                                       color: isDark ? AppColors.cardDark : AppColors.dividerLight,
                                       child: Icon(
@@ -1438,9 +1447,13 @@ class _AudioListItem extends StatelessWidget {
                           child: sermon.imageUrl != null && sermon.imageUrl!.isNotEmpty
                               ? CachedNetworkImage(
                                   imageUrl: sermon.imageUrl!,
+                                  cacheManager: CustomImageCacheManager.instance,
                                   fit: BoxFit.cover,
                                   memCacheWidth: 116,
                                   memCacheHeight: 116,
+                                  useOldImageOnUrlChange: true,
+                                  fadeInDuration: Duration.zero,
+                                  fadeOutDuration: Duration.zero,
                                   placeholder: (_, __) => Container(
                                     color: isDark ? Colors.white10 : Colors.grey.shade200,
                                     child: const Icon(Icons.music_note_rounded, size: 24, color: AppColors.primaryGold),

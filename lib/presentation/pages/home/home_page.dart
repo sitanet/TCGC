@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/utils/image_cache_manager.dart';
 import '../../../main.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/interests_service.dart';
@@ -34,6 +35,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
   }
 
+  // Persistent in-memory cache for instant display across tab switches / navigation
+  static List<Sermon> _staticSermons = [];
+  static List<Event> _staticEvents = [];
+  static List<BeginnerCategory> _staticBeginnerCategories = [];
+  static List<Sermon> _staticRecommendedSermons = [];
+
   List<Sermon> _sermons = [];
   List<Event> _events = [];
   List<BeginnerCategory> _beginnerCategories = [];
@@ -47,6 +54,15 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   void initState() {
     super.initState();
+    // 1. Immediately show cached data from memory if previously loaded (instant 0ms)
+    if (_staticSermons.isNotEmpty) {
+      _sermons = _staticSermons;
+      _events = _staticEvents;
+      _beginnerCategories = _staticBeginnerCategories;
+      _recommendedSermons = _staticRecommendedSermons;
+      _isLoading = false;
+    }
+
     _homeScrollController = ScrollController();
     _homeScrollController.addListener(_onHomeScroll);
     _eventsPageController = PageController(
@@ -88,7 +104,10 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<void> _loadData({bool forceRefresh = false}) async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    // Only show full loading spinner if we have NO cached data at all
+    if (_sermons.isEmpty && _staticSermons.isEmpty) {
+      setState(() => _isLoading = true);
+    }
 
     try {
       // Get user permissions for filtering
@@ -106,7 +125,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         return true;
       }
 
-      // Load sermons and beginner categories
+      // Load sermons and beginner categories from local database / disk cache
       final allSermons = await _dataService.getMessages(
         forceRefresh: forceRefresh,
       );
@@ -137,11 +156,13 @@ class _HomePageState extends ConsumerState<HomePage> {
         setState(() {
           _sermons = sermons;
           _beginnerCategories = resolvedCategories;
-          _isLoading = false; // Show content after loading
+          _isLoading = false; // Show content immediately from database
         });
+        _staticSermons = sermons;
+        _staticBeginnerCategories = resolvedCategories;
       }
 
-      // Load events and recommended in parallel
+      // Load events and recommended in parallel (offline-first)
       _loadEventsAsync(forceRefresh);
       _loadRecommendedAsync(forceRefresh, canAccessSermon);
 
@@ -211,6 +232,8 @@ class _HomePageState extends ConsumerState<HomePage> {
           _sermons = sermons;
           _beginnerCategories = resolvedCategories;
         });
+        _staticSermons = sermons;
+        _staticBeginnerCategories = resolvedCategories;
       }
 
       // Also refresh events and recommended
@@ -225,7 +248,10 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _loadEventsAsync(bool forceRefresh) async {
     try {
       final events = await _dataService.getEvents(forceRefresh: forceRefresh);
-      if (mounted) setState(() => _events = events);
+      if (mounted) {
+        setState(() => _events = events);
+      }
+      _staticEvents = events;
     } catch (e) {
       debugPrint('Events load error: $e');
     }
@@ -240,7 +266,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         forceRefresh: forceRefresh,
       );
       final recommended = allRecommended.where(canAccessSermon).toList();
-      if (mounted) setState(() => _recommendedSermons = recommended);
+      if (mounted) {
+        setState(() => _recommendedSermons = recommended);
+      }
+      _staticRecommendedSermons = recommended;
     } catch (e) {
       debugPrint('Recommended load error: $e');
     }
@@ -517,6 +546,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                                         user.photoUrl!,
                                         maxWidth: 200,
                                         maxHeight: 200,
+                                        cacheManager: CustomImageCacheManager.instance,
                                       )
                                     : null,
                                 child:
@@ -830,11 +860,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (imageUrl.startsWith('http')) {
       return CachedNetworkImage(
         imageUrl: imageUrl,
+        cacheManager: CustomImageCacheManager.instance,
         fit: BoxFit.cover,
         memCacheWidth: 400,
         memCacheHeight: 400,
-        fadeInDuration: const Duration(milliseconds: 200),
-        fadeOutDuration: const Duration(milliseconds: 200),
+        useOldImageOnUrlChange: true,
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
         placeholder: (context, url) => Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -1126,11 +1158,15 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (imageUrl.startsWith('http')) {
       return CachedNetworkImage(
         imageUrl: imageUrl,
+        cacheManager: CustomImageCacheManager.instance,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
         memCacheWidth: 300,
         memCacheHeight: 300,
+        useOldImageOnUrlChange: true,
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
         placeholder: (context, url) => placeholder,
         errorWidget: (context, url, error) => placeholder,
       );
@@ -1485,11 +1521,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (sermon.imageUrl!.startsWith('http')) {
       return CachedNetworkImage(
         imageUrl: sermon.imageUrl!,
+        cacheManager: CustomImageCacheManager.instance,
         fit: BoxFit.cover,
         memCacheWidth: 150,
         memCacheHeight: 150,
-        fadeInDuration: const Duration(milliseconds: 100),
-        fadeOutDuration: const Duration(milliseconds: 100),
+        useOldImageOnUrlChange: true,
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
         placeholder: (context, url) =>
             Container(color: AppColors.primaryGold.withValues(alpha: 0.15)),
         errorWidget: (context, url, error) => placeholder,
@@ -1817,7 +1855,11 @@ class _EventImageZoomDialogState extends State<_EventImageZoomDialog> {
                       widget.event.imageUrl!.isNotEmpty
                   ? CachedNetworkImage(
                       imageUrl: widget.event.imageUrl!,
+                      cacheManager: CustomImageCacheManager.instance,
                       fit: BoxFit.contain,
+                      useOldImageOnUrlChange: true,
+                      fadeInDuration: Duration.zero,
+                      fadeOutDuration: Duration.zero,
                       placeholder: (context, url) => Container(
                         height: 300,
                         color: Colors.grey[900],

@@ -38,10 +38,42 @@ class DataService {
     return [];
   }
 
-  // Beginner Categories
+  static List<BeginnerCategory>? _cachedBeginnerCategories;
+  static const String _beginnerCategoriesCacheKey = 'cached_beginner_categories_json';
+
+  // Beginner Categories - Offline-first caching with background refresh
   Future<List<BeginnerCategory>> getBeginnerCategories({
     bool forceRefresh = false,
   }) async {
+    // 1. Memory Cache (instant)
+    if (_cachedBeginnerCategories != null &&
+        _cachedBeginnerCategories!.isNotEmpty &&
+        !forceRefresh) {
+      return _cachedBeginnerCategories!;
+    }
+
+    // 2. Disk Cache (SharedPreferences)
+    if (!forceRefresh) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedJsonStr = prefs.getString(_beginnerCategoriesCacheKey);
+        if (cachedJsonStr != null && cachedJsonStr.isNotEmpty) {
+          final List<dynamic> decoded = jsonDecode(cachedJsonStr);
+          _cachedBeginnerCategories = decoded
+              .map((json) => BeginnerCategory.fromJson(json as Map<String, dynamic>))
+              .toList();
+          if (_cachedBeginnerCategories!.isNotEmpty) {
+            // Background refresh from server without blocking UI
+            _refreshInBackground(() => getBeginnerCategories(forceRefresh: true));
+            return _cachedBeginnerCategories!;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error reading cached beginner categories from disk: $e');
+      }
+    }
+
+    // 3. Fetch from Server
     try {
       final response = await _api.get(ApiConstants.beginnerCategories);
       if (response.isSuccess) {
@@ -49,12 +81,29 @@ class DataService {
         final List<dynamic> data = decoded is List
             ? decoded
             : (decoded is Map ? (decoded['results'] ?? decoded['data'] ?? []) : []);
-        return data.map((json) => BeginnerCategory.fromJson(json as Map<String, dynamic>)).toList();
+        final list = data
+            .map((json) => BeginnerCategory.fromJson(json as Map<String, dynamic>))
+            .toList();
+        if (list.isNotEmpty) {
+          _cachedBeginnerCategories = list;
+          // Persist to disk
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(
+              _beginnerCategoriesCacheKey,
+              jsonEncode(list.map((c) => c.toJson()).toList()),
+            );
+          } catch (e) {
+            debugPrint('Error caching beginner categories to disk: $e');
+          }
+          return _cachedBeginnerCategories!;
+        }
       }
     } catch (e) {
       debugPrint('Error fetching beginner categories: $e');
     }
-    return [];
+
+    return _cachedBeginnerCategories ?? [];
   }
 
   // Messages/Sermons - Now uses cache-first strategy

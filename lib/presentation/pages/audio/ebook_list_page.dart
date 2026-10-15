@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_cache_manager.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../data/services/api_service.dart';
 import '../../../domain/entities/ebook.dart';
@@ -221,7 +222,11 @@ class _EbookListPageState extends State<EbookListPage> {
                 child: category.coverUrl != null
                     ? CachedNetworkImage(
                         imageUrl: category.coverUrl!,
+                        cacheManager: CustomImageCacheManager.instance,
                         fit: BoxFit.cover,
+                        useOldImageOnUrlChange: true,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
                         placeholder: (_, __) => _placeholder(isDark),
                         errorWidget: (_, __, ___) => _placeholder(isDark),
                       )
@@ -388,7 +393,11 @@ class EbookCategoryPage extends StatelessWidget {
                 child: ebook.coverImageUrl != null
                     ? CachedNetworkImage(
                         imageUrl: ebook.coverImageUrl!,
+                        cacheManager: CustomImageCacheManager.instance,
                         fit: BoxFit.cover,
+                        useOldImageOnUrlChange: true,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
                         placeholder: (_, __) => _coverPlaceholder(isDark),
                         errorWidget: (_, __, ___) => _coverPlaceholder(isDark),
                       )
