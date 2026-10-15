@@ -8,7 +8,6 @@ import '../../../core/utils/image_cache_manager.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/audio_cache_service.dart';
 import '../../../data/services/played_audio_service.dart';
-import '../../../domain/entities/beginner_category.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/transcript.dart';
 import '../../../main.dart';
@@ -21,7 +20,7 @@ import 'downloads_page.dart';
 import 'transcript_list_page.dart';
 import 'ebook_list_page.dart';
 
-enum AudioBrowseFilter { series, category, minister }
+enum AudioBrowseFilter { category, minister }
 enum MinisterCategoryFilter { all, resident, external, songs }
 
 String _stripHtmlTags(String htmlText) {
@@ -50,20 +49,18 @@ class _AudioPageState extends ConsumerState<AudioPage>
   final AudioCacheService _audioCacheService = AudioCacheService();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  AudioBrowseFilter _selectedBrowseFilter = AudioBrowseFilter.series;
+  AudioBrowseFilter _selectedBrowseFilter = AudioBrowseFilter.category;
   MinisterCategoryFilter _selectedMinisterCategory = MinisterCategoryFilter.all;
 
   static List<MessageCategory> _staticCategories = [];
   static List<Sermon> _staticSermons = [];
   static List<Transcript> _staticTranscripts = [];
   static List<SpeakerModel> _staticSpeakers = [];
-  static List<BeginnerCategory> _staticBeginnerCategories = [];
 
   List<MessageCategory> _categories = [];
   List<Sermon> _sermons = [];
   List<Transcript> _transcripts = [];
   List<SpeakerModel> _speakerModels = [];
-  List<BeginnerCategory> _beginnerCategories = [];
   bool _isLoading = true;
 
   @override
@@ -78,36 +75,11 @@ class _AudioPageState extends ConsumerState<AudioPage>
       _sermons = _staticSermons;
       _transcripts = _staticTranscripts;
       _speakerModels = _staticSpeakers;
-      _beginnerCategories = _staticBeginnerCategories;
       _isLoading = false;
     }
     // Load cached data immediately, then refresh in background
     _audioCacheService.initialize();
     _loadCachedDataFirst();
-  }
-
-  List<BeginnerCategory> _resolveBeginnerSeries(
-    List<BeginnerCategory> series,
-    List<Sermon> sermons,
-  ) {
-    if (series.isNotEmpty) return series;
-    if (sermons.isEmpty) return [];
-
-    final Map<String, List<Sermon>> grouped = {};
-    for (final s in sermons) {
-      final catName = s.categoryName.isNotEmpty ? s.categoryName : 'Spiritual Growth';
-      grouped.putIfAbsent(catName, () => []).add(s);
-    }
-    return grouped.entries.map((e) {
-      return BeginnerCategory(
-        id: e.value.first.category.isNotEmpty ? e.value.first.category : e.key,
-        name: e.key,
-        description: 'Foundational teachings on ${e.key}',
-        imageUrl: e.value.first.imageUrl,
-        sermonCount: e.value.length,
-        sermons: e.value,
-      );
-    }).toList();
   }
 
   /// Load cached data first for instant display, then refresh from server
@@ -120,20 +92,18 @@ class _AudioPageState extends ConsumerState<AudioPage>
       final isGeneralMarried = user?.isGeneralMarried ?? false;
       final isInHouseMarried = user?.isInHouseMarried ?? false;
 
-      // Load categories, sermons, transcripts, speakers AND series from cache FIRST (instant)
+      // Load categories, sermons, transcripts, and speakers from cache FIRST (instant)
       final results = await Future.wait([
         _dataService.getMessageCategories(), // Uses cache-first
         _dataService.getMessages(), // Uses cache-first
         _dataService.getTranscripts(), // Uses cache-first (instant display)
         _dataService.getSpeakers(), // Uses cache-first
-        _dataService.getBeginnerCategories(), // Uses cache-first
       ]);
 
       final categories = results[0] as List<MessageCategory>;
       final allSermons = results[1] as List<Sermon>;
       final transcripts = results[2] as List<Transcript>;
       final speakers = results[3] as List<SpeakerModel>;
-      final rawSeries = results[4] as List<BeginnerCategory>;
 
       // Filter based on permissions
       final filteredCategories = categories.where((category) {
@@ -154,22 +124,18 @@ class _AudioPageState extends ConsumerState<AudioPage>
         sermons,
       );
 
-      final resolvedSeries = _resolveBeginnerSeries(rawSeries, sermons);
-
       if (mounted) {
         setState(() {
           _categories = processedCategories;
           _sermons = sermons;
           _transcripts = transcripts;
           _speakerModels = speakers;
-          _beginnerCategories = resolvedSeries;
           _isLoading = false;
         });
         _staticCategories = processedCategories;
         _staticSermons = sermons;
         _staticTranscripts = transcripts;
         _staticSpeakers = speakers;
-        _staticBeginnerCategories = resolvedSeries;
 
         // Pre-buffer in background
         _audioCacheService.preBufferCategory(sermons, count: 3);
@@ -200,14 +166,12 @@ class _AudioPageState extends ConsumerState<AudioPage>
         _dataService.getMessages(forceRefresh: true),
         _dataService.getTranscripts(forceRefresh: true),
         _dataService.getSpeakers(forceRefresh: true),
-        _dataService.getBeginnerCategories(forceRefresh: true),
       ]);
 
       final categories = results[0] as List<MessageCategory>;
       final allSermons = results[1] as List<Sermon>;
       final transcripts = results[2] as List<Transcript>;
       final speakers = results[3] as List<SpeakerModel>;
-      final rawSeries = results[4] as List<BeginnerCategory>;
 
       // Filter based on permissions
       final filteredCategories = categories.where((category) {
@@ -227,21 +191,17 @@ class _AudioPageState extends ConsumerState<AudioPage>
         sermons,
       );
 
-      final resolvedSeries = _resolveBeginnerSeries(rawSeries, sermons);
-
       if (mounted) {
         setState(() {
           _categories = processedCategories;
           _sermons = sermons;
           _transcripts = transcripts;
           _speakerModels = speakers;
-          _beginnerCategories = resolvedSeries;
         });
         _staticCategories = processedCategories;
         _staticSermons = sermons;
         _staticTranscripts = transcripts;
         _staticSpeakers = speakers;
-        _staticBeginnerCategories = resolvedSeries;
       }
 
       debugPrint('Background refresh completed - ${transcripts.length} transcripts loaded');
@@ -317,14 +277,12 @@ class _AudioPageState extends ConsumerState<AudioPage>
         _dataService.getMessages(forceRefresh: true),
         _dataService.getTranscripts(forceRefresh: true),
         _dataService.getSpeakers(forceRefresh: true),
-        _dataService.getBeginnerCategories(forceRefresh: true),
       ]);
 
       final categories = results[0] as List<MessageCategory>;
       final allSermons = results[1] as List<Sermon>;
       final transcripts = results[2] as List<Transcript>;
       final speakers = results[3] as List<SpeakerModel>;
-      final rawSeries = results[4] as List<BeginnerCategory>;
 
       final filteredCategories = categories.where((category) {
         if (category.isServiceTeamOnly && !isServiceTeamMember) return false;
@@ -350,15 +308,12 @@ class _AudioPageState extends ConsumerState<AudioPage>
         sermons,
       );
 
-      final resolvedSeries = _resolveBeginnerSeries(rawSeries, sermons);
-
       if (mounted) {
         setState(() {
           _categories = processedCategories;
           _sermons = sermons;
           _transcripts = transcripts;
           _speakerModels = speakers;
-          _beginnerCategories = resolvedSeries;
         });
         _audioCacheService.preBufferCategory(sermons, count: 3);
       }
@@ -517,14 +472,12 @@ class _AudioPageState extends ConsumerState<AudioPage>
           if (_searchQuery.isNotEmpty)
             _buildSearchResults(context, isDark, padding)
           else ...[
-            // 3. Simple Browse Filter Pill Bar: By Series, By Category, By Minister
+            // 3. Simple Browse Filter Pill Bar: By Category, By Minister
             _buildBrowseFilterBar(isDark),
             const SizedBox(height: 10),
 
             // 4. Filter Content View
-            if (_selectedBrowseFilter == AudioBrowseFilter.series)
-              _buildSeriesSection(context, isDark, padding)
-            else if (_selectedBrowseFilter == AudioBrowseFilter.category)
+            if (_selectedBrowseFilter == AudioBrowseFilter.category)
               _buildCategorySection(context, isDark, padding, categoriesWithSermons)
             else
               _buildMinisterSection(context, isDark, padding),
@@ -620,14 +573,6 @@ class _AudioPageState extends ConsumerState<AudioPage>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Row(
         children: [
-          _buildBrowseFilterPill(
-            label: 'By Series',
-            filter: AudioBrowseFilter.series,
-            icon: Icons.auto_stories_outlined,
-            count: _beginnerCategories.length,
-            isDark: isDark,
-          ),
-          const SizedBox(width: 8),
           _buildBrowseFilterPill(
             label: 'By Category',
             filter: AudioBrowseFilter.category,
@@ -924,221 +869,6 @@ class _AudioPageState extends ConsumerState<AudioPage>
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildSeriesSection(BuildContext context, bool isDark, double padding) {
-    if (_beginnerCategories.isEmpty) {
-      return Padding(
-        padding: EdgeInsets.symmetric(horizontal: padding, vertical: 30),
-        child: Center(
-          child: Text(
-            'No series available',
-            style: TextStyle(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-            ),
-          ),
-        ),
-      );
-    }
-
-    final crossAxisCount = Responsive.value(context, mobile: 2, tablet: 3, desktop: 4);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: padding),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Teaching Series',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                    ),
-              ),
-              Text(
-                '${_beginnerCategories.length} Series',
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryGold,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.symmetric(horizontal: padding),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 18,
-            childAspectRatio: 0.73,
-          ),
-          itemCount: _beginnerCategories.length,
-          itemBuilder: (context, index) {
-            return _buildSeriesCard(context, isDark, _beginnerCategories[index]);
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSeriesCard(
-    BuildContext context,
-    bool isDark,
-    BeginnerCategory series,
-  ) {
-    final count = series.sermonCount > 0 ? series.sermonCount : series.sermons.length;
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AudioListPage(
-              category: series.name,
-              audioItems: series.sermons.isNotEmpty ? series.sermons : _sermons,
-              categories: _beginnerCategories.map((c) => c.name).toList(),
-              beginnerCategories: _beginnerCategories,
-              isDirectCollection: true,
-              headerImageUrl: series.imageUrl,
-              headerDescription: series.description,
-            ),
-          ),
-        );
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Square Artwork Card
-          AspectRatio(
-            aspectRatio: 1.0,
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: _buildSeriesImage(series.imageUrl, isDark),
-                    ),
-                    // Series Pill Badge (Top Left)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.65),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.primaryGold.withValues(alpha: 0.5),
-                            width: 0.7,
-                          ),
-                        ),
-                        child: const Text(
-                          'SERIES',
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primaryGold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // 2. Series Title
-          Text(
-            _stripHtmlTags(series.name),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 13.5,
-              height: 1.2,
-              color: isDark ? Colors.white : AppColors.textPrimaryLight,
-            ),
-          ),
-
-          const SizedBox(height: 2),
-
-          // 3. Message Count
-          Text(
-            '$count messages',
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.primaryGold,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSeriesImage(String? imageUrl, bool isDark) {
-    Widget placeholder = Container(
-      color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-      child: Center(
-        child: Icon(
-          Icons.auto_stories,
-          size: 38,
-          color: AppColors.primaryGold.withValues(alpha: 0.6),
-        ),
-      ),
-    );
-
-    if (imageUrl == null || imageUrl.isEmpty) {
-      return placeholder;
-    }
-
-    if (imageUrl.startsWith('http')) {
-      return CachedNetworkImage(
-        imageUrl: imageUrl,
-        cacheManager: CustomImageCacheManager.instance,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-        memCacheWidth: 400,
-        memCacheHeight: 400,
-        useOldImageOnUrlChange: true,
-        fadeInDuration: Duration.zero,
-        fadeOutDuration: Duration.zero,
-        placeholder: (context, url) => placeholder,
-        errorWidget: (context, url, error) => placeholder,
-      );
-    }
-
-    return Image.asset(
-      imageUrl,
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-      errorBuilder: (context, error, stackTrace) => placeholder,
     );
   }
 
