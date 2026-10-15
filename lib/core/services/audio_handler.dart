@@ -9,7 +9,7 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
       androidLoadControl: AndroidLoadControl(
         minBufferDuration: Duration(seconds: 15),
         maxBufferDuration: Duration(seconds: 60),
-        bufferForPlaybackDuration: Duration(milliseconds: 500),
+        bufferForPlaybackDuration: Duration(milliseconds: 100),
         bufferForPlaybackAfterRebufferDuration: Duration(seconds: 2),
         prioritizeTimeOverSizeThresholds: true,
       ),

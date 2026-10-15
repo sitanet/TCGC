@@ -61,7 +61,20 @@ Future<void> initAudioService() async {
     debugPrint('AudioService init failed: $e');
     debugPrint('Using fallback audio player');
     try {
-      _fallbackPlayer = AudioPlayer();
+      _fallbackPlayer = AudioPlayer(
+        audioLoadConfiguration: const AudioLoadConfiguration(
+          androidLoadControl: AndroidLoadControl(
+            minBufferDuration: Duration(seconds: 15),
+            maxBufferDuration: Duration(seconds: 60),
+            bufferForPlaybackDuration: Duration(milliseconds: 100),
+            bufferForPlaybackAfterRebufferDuration: Duration(seconds: 2),
+            prioritizeTimeOverSizeThresholds: true,
+          ),
+          darwinLoadControl: DarwinLoadControl(
+            automaticallyWaitsToMinimizeStalling: false,
+          ),
+        ),
+      );
       _useAudioService = false;
     } catch (e2) {
       debugPrint('Fallback player init also failed: $e2');
