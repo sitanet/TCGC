@@ -1401,7 +1401,8 @@ class _AudioListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = _stripHtml(sermon.title);
-    final speaker = sermon.speaker?.trim() ?? '';
+    final rawSpeaker = sermon.speaker?.trim() ?? '';
+    final speaker = rawSpeaker.isNotEmpty ? rawSpeaker : 'The City Gate Church';
     final categoryName = sermon.categoryName.isNotEmpty ? sermon.categoryName : sermon.category;
     final durationStr = _formatDuration(sermon.duration);
 
@@ -1432,6 +1433,7 @@ class _AudioListItem extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // 1. Artwork Thumbnail
                 GestureDetector(
@@ -1548,11 +1550,12 @@ class _AudioListItem extends StatelessWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       // Title
                       Text(
                         title,
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13.5,
@@ -1563,59 +1566,37 @@ class _AudioListItem extends StatelessWidget {
                               : (isDark ? Colors.white : AppColors.textPrimaryLight),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3.5),
 
-                      // Speaker Row
-                      if (speaker.isNotEmpty)
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.person_outline_rounded,
-                              size: 13,
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                            ),
-                            const SizedBox(width: 3),
-                            Expanded(
-                              child: Text(
-                                speaker,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w500,
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                      const SizedBox(height: 4),
-
-                      // Metadata Row (Category pill, date, duration)
+                      // Speaker Row (always present for uniform alignment)
                       Row(
                         children: [
-                          if (categoryName.isNotEmpty) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: isDark ? Colors.white10 : Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                categoryName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                  color: isDark ? Colors.white70 : Colors.black87,
-                                ),
+                          Icon(
+                            Icons.person_outline_rounded,
+                            size: 13,
+                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              speaker,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                          ],
+                          ),
+                        ],
+                      ),
 
+                      const SizedBox(height: 3.5),
+
+                      // Metadata Row (Date • Duration • Category pill • NEW badge)
+                      Row(
+                        children: [
                           Text(
                             _formatDate(sermon.date),
                             style: TextStyle(
@@ -1625,7 +1606,7 @@ class _AudioListItem extends StatelessWidget {
                           ),
 
                           if (durationStr.isNotEmpty) ...[
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 5),
                             Text(
                               '• $durationStr',
                               style: const TextStyle(
@@ -1636,19 +1617,42 @@ class _AudioListItem extends StatelessWidget {
                             ),
                           ],
 
-                          if (isNew) ...[
+                          if (categoryName.isNotEmpty) ...[
                             const SizedBox(width: 6),
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.white10 : Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  categoryName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: isDark ? Colors.white70 : Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+
+                          if (isNew) ...[
+                            const SizedBox(width: 5),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                               decoration: BoxDecoration(
                                 color: Colors.redAccent,
-                                borderRadius: BorderRadius.circular(4),
+                                borderRadius: BorderRadius.circular(3),
                               ),
                               child: const Text(
                                 'NEW',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 8.5,
+                                  fontSize: 8,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
