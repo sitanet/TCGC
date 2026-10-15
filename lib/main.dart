@@ -598,26 +598,34 @@ class _MyAppState extends ConsumerState<MyApp> {
   }
 
   Future<void> _initializeApp() async {
-    // Show UI immediately without connectivity check
-    if (mounted) {
-      setState(() {
-        _initialized = true;
-      });
-      _checkForAppUpdate();
+    try {
+      final authProvider = ref.read(authChangeNotifierProvider);
+
+      // Restore session from local storage cache (< 5ms, non-network)
+      await authProvider.initialize().timeout(
+        const Duration(seconds: 4),
+        onTimeout: () {
+          debugPrint('Auth initialization timed out');
+        },
+      );
+
+      if (authProvider.isAuthenticated) {
+        _showGetStarted = false;
+      }
+    } catch (e) {
+      debugPrint('Auth initialization error: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _initialized = true;
+        });
+        _checkForAppUpdate();
+      }
     }
 
-    // Initialize auth in background
+    // Initialize non-critical services in background
     Future.microtask(() async {
       try {
-        final authProvider = ref.read(authChangeNotifierProvider);
-
-        await authProvider.initialize().timeout(
-          const Duration(seconds: 5),
-          onTimeout: () {
-            debugPrint('Auth initialization timed out');
-          },
-        );
-
         await _interestsService.initialize().timeout(
           const Duration(seconds: 3),
           onTimeout: () {
@@ -625,16 +633,9 @@ class _MyAppState extends ConsumerState<MyApp> {
           },
         );
 
-        if (mounted && authProvider.isAuthenticated) {
-          setState(() {
-            _showGetStarted = false;
-          });
-          _startBackgroundPreBuffering();
-        }
-
         _initializeNotifications();
       } catch (e) {
-        debugPrint('Initialization error: $e');
+        debugPrint('Background initialization error: $e');
       }
     });
   }
@@ -671,13 +672,29 @@ class _MyAppState extends ConsumerState<MyApp> {
     final themeProvider = ref.watch(themeChangeNotifierProvider);
     final authProvider = ref.watch(authChangeNotifierProvider);
 
-    if (!_initialized) {
+    if (!_initialized || !authProvider.isInitialized) {
+      final isDark = themeProvider.themeMode == ThemeMode.dark ||
+          (themeProvider.themeMode == ThemeMode.system &&
+              WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+                  Brightness.dark);
       return MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: themeProvider.themeMode,
-        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
+        home: Scaffold(
+          backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
+          body: Center(
+            child: Image.asset(
+              'assets/images/tcgc_logo.png',
+              width: 110,
+              height: 110,
+              errorBuilder: (_, __, ___) => const CircularProgressIndicator(
+                color: AppColors.primaryGold,
+              ),
+            ),
+          ),
+        ),
       );
     }
 
