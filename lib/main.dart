@@ -1251,8 +1251,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
               body: _buildPage(safeIndex, showWallet),
               bottomNavigationBar: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  const MiniPlayer(),
+                  if (safeIndex != 2) const MiniPlayer(),
                   BottomNavBar(
                     currentIndex: safeIndex,
                     showWallet: showWallet,
@@ -1280,7 +1279,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
         bottomNavigationBar: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const MiniPlayer(),
+            if (safeIndex != 2) const MiniPlayer(),
             BottomNavBar(
               currentIndex: safeIndex,
               showWallet: showWallet,

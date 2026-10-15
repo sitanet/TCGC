@@ -8,7 +8,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 
@@ -221,15 +220,16 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
       ),
       body: SafeArea(
         top: false,
+        bottom: false,
         child: Column(
           children: [
             // Segmented Mode Switcher (Audio vs Video)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: _buildSegmentedSwitcher(isDark),
             ),
 
-            // 2. Main Broadcast Stage (TabBarView)
+            // 2. Main Broadcast Stage (TabBarView) - Expands fully down
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -240,18 +240,12 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
                     isDark: isDark,
                     controller: _webViewController,
                     isLoading: _isStreamLiveLoading,
-                    streamTitle: 'Audio Live Stream',
-                    streamSubtitle: 'Mixlr High-Quality Audio Broadcast (Low Data)',
-                    icon: Icons.headphones_rounded,
                   ),
                   _buildStageView(
                     context: context,
                     isDark: isDark,
                     controller: _watchLiveController,
                     isLoading: _isWatchLiveLoading,
-                    streamTitle: 'Watch Video Live',
-                    streamSubtitle: 'Sanctuary High-Definition Video Broadcast',
-                    icon: Icons.live_tv_rounded,
                   ),
                 ],
               ),
@@ -265,8 +259,8 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   /// Modern Segmented Pill Switcher (Audio vs Video)
   Widget _buildSegmentedSwitcher(bool isDark) {
     return Container(
-      height: 48,
-      padding: const EdgeInsets.all(4),
+      height: 44,
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : Colors.grey[200],
         borderRadius: BorderRadius.circular(28),
@@ -331,175 +325,98 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     );
   }
 
-  /// Unified Stage View for both Audio and Video
+  /// Unified Stage View for both Audio and Video - Expanded to full height
   Widget _buildStageView({
     required BuildContext context,
     required bool isDark,
     required WebViewController? controller,
     required bool isLoading,
-    required String streamTitle,
-    required String streamSubtitle,
-    required IconData icon,
   }) {
-    final horizontalPadding = Responsive.horizontalPadding(context);
-    final borderRadius = Responsive.borderRadius(context);
-
     return Padding(
-      padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Broadcast Header Pill
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
-              children: [
-                Icon(icon, size: 18, color: AppColors.primaryGold),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        streamTitle,
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                        ),
-                      ),
-                      Text(
-                        streamSubtitle,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Fast Refresh Icon
-                InkWell(
-                  onTap: _handleRefresh,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryGold.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: AppColors.primaryGold.withValues(alpha: 0.3),
-                        width: 0.8,
-                      ),
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          border: Border.all(
+            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.35 : 0.2),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.15),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+          child: Stack(
+            children: [
+              // Active WebView with EagerGestureRecognizer for instant platform responsiveness
+              if (controller != null)
+                WebViewWidget(
+                  controller: controller,
+                  gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                    Factory<EagerGestureRecognizer>(
+                      () => EagerGestureRecognizer(),
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
+                  },
+                ),
+
+              // Modern Shimmer / Loading State
+              if (isLoading || controller == null)
+                Container(
+                  color: const Color(0xFF0F1115),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.refresh_rounded, size: 13, color: AppColors.primaryGold),
-                        SizedBox(width: 4),
-                        Text(
-                          'Reload',
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.primaryGold.withValues(alpha: 0.12),
+                            border: Border.all(
+                              color: AppColors.primaryGold.withValues(alpha: 0.4),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: AppColors.primaryGold,
+                              strokeWidth: 2.6,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Connecting to Live Stream...',
                           style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primaryGold,
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'The City Gate Church Live Feed',
+                          style: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 12,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
-
-          // 2. High-Tech Theater Player Stage (Expanded to fill remaining view)
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(borderRadius * 1.2),
-                border: Border.all(
-                  color: AppColors.primaryGold.withValues(alpha: isDark ? 0.35 : 0.2),
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.15),
-                    blurRadius: 18,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(borderRadius * 1.2),
-                child: Stack(
-                  children: [
-                    // Active WebView
-                    if (controller != null)
-                      WebViewWidget(
-                        controller: controller,
-                        gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                          Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
-                          Factory<HorizontalDragGestureRecognizer>(() => HorizontalDragGestureRecognizer()),
-                        },
-                      ),
-
-                    // Modern Shimmer / Loading State
-                    if (isLoading || controller == null)
-                      Container(
-                        color: const Color(0xFF0F1115),
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 56,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppColors.primaryGold.withValues(alpha: 0.12),
-                                  border: Border.all(
-                                    color: AppColors.primaryGold.withValues(alpha: 0.4),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    color: AppColors.primaryGold,
-                                    strokeWidth: 2.6,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Connecting to Live Stream...',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'The City Gate Church Live Feed',
-                                style: TextStyle(
-                                  color: Colors.grey[400],
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
