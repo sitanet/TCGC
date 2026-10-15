@@ -105,9 +105,28 @@ void main() async {
       // Initialize image cache with conservative memory limits first
       ImageCacheService.initialize();
 
-      // Start the app IMMEDIATELY - don't block on any initialization
-      // This prevents ANR on low-end devices
-      runApp(const ProviderScope(child: MyApp()));
+      // Fast restore cached session before running app so first frame renders the actual target page
+      final initialAuthProvider = AuthProvider();
+      try {
+        await initialAuthProvider.initialize().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () {
+            debugPrint('Fast auth initialization timed out');
+          },
+        );
+      } catch (e) {
+        debugPrint('Fast auth initialization error: $e');
+      }
+
+      // Start the app with the pre-restored session
+      runApp(
+        ProviderScope(
+          overrides: [
+            authChangeNotifierProvider.overrideWith((ref) => initialAuthProvider),
+          ],
+          child: const MyApp(),
+        ),
+      );
 
       // Initialize Firebase in background (non-blocking)
       Future.microtask(() async {
@@ -160,7 +179,6 @@ class _MyAppState extends ConsumerState<MyApp> {
   bool _showGetStarted = true;
   bool _showSignUp = false;
   String? _prefilledLoginEmail;
-  bool _initialized = false;
   final InterestsService _interestsService = InterestsService();
   final DataService _dataService = DataService();
   AppUpdateInfo? _updateInfo;
@@ -616,9 +634,6 @@ class _MyAppState extends ConsumerState<MyApp> {
       debugPrint('Auth initialization error: $e');
     } finally {
       if (mounted) {
-        setState(() {
-          _initialized = true;
-        });
         _checkForAppUpdate();
       }
     }
@@ -672,31 +687,6 @@ class _MyAppState extends ConsumerState<MyApp> {
     final themeProvider = ref.watch(themeChangeNotifierProvider);
     final authProvider = ref.watch(authChangeNotifierProvider);
 
-    if (!_initialized || !authProvider.isInitialized) {
-      final isDark = themeProvider.themeMode == ThemeMode.dark ||
-          (themeProvider.themeMode == ThemeMode.system &&
-              WidgetsBinding.instance.platformDispatcher.platformBrightness ==
-                  Brightness.dark);
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: themeProvider.themeMode,
-        home: Scaffold(
-          backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
-          body: Center(
-            child: Image.asset(
-              'assets/images/tcgc_logo.png',
-              width: 110,
-              height: 110,
-              errorBuilder: (_, __, ___) => const CircularProgressIndicator(
-                color: AppColors.primaryGold,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
 
     if (_showUpdateDialog && _updateInfo != null) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
