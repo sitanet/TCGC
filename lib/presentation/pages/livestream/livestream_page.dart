@@ -1,13 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../wallet/give_page.dart';
 
 class LiveStreamPage extends ConsumerStatefulWidget {
   const LiveStreamPage({super.key});
@@ -17,8 +21,11 @@ class LiveStreamPage extends ConsumerStatefulWidget {
 }
 
 class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
   WebViewController? _webViewController;
   WebViewController? _watchLiveController;
 
@@ -37,6 +44,17 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WakelockPlus.enable();
+
+    // Pulse animation for the glowing live badge
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(begin: 0.35, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
     final initialSubIndex = ref.read(liveStreamSubTabIndexProvider);
     _tabController = TabController(
       length: 2,
@@ -44,6 +62,7 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
       initialIndex: initialSubIndex,
     );
     _tabController.addListener(_onTabChanged);
+
     // Lazy load: initialize corresponding tab's WebView after frame renders
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (initialSubIndex == 1) {
@@ -56,7 +75,9 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
 
   void _onTabChanged() {
     if (!_tabController.indexIsChanging) return;
+    HapticFeedback.selectionClick();
     ref.read(liveStreamSubTabIndexProvider.notifier).state = _tabController.index;
+
     // Lazy load WebView when tab is selected
     if (_tabController.index == 0 && !_streamLiveInitialized) {
       _initializeStreamLiveWebView();
@@ -111,6 +132,41 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     if (mounted) setState(() {});
   }
 
+  Future<void> _handleRefresh() async {
+    HapticFeedback.mediumImpact();
+    if (_tabController.index == 0) {
+      setState(() => _isStreamLiveLoading = true);
+      await _webViewController?.reload();
+    } else {
+      setState(() => _isWatchLiveLoading = true);
+      await _watchLiveController?.reload();
+    }
+  }
+
+  Future<void> _handleShare() async {
+    HapticFeedback.lightImpact();
+    final isVideo = _tabController.index == 1;
+    final streamType = isVideo ? 'Video' : 'Audio';
+    final shareUrl = isVideo ? _watchLiveUrl : 'https://dcitygatechurch.mixlr.com';
+
+    await Share.share(
+      'Join us live for an impactful service with The City Gate Church ($streamType broadcast)!\n\n'
+      'Watch/Listen here: $shareUrl\n\n'
+      'Experience worship, God\'s Word, and divine transformation.',
+      subject: 'TCGC Live Broadcast',
+    );
+  }
+
+  Future<void> _handleOpenInBrowser() async {
+    HapticFeedback.lightImpact();
+    final isVideo = _tabController.index == 1;
+    final targetUrl = isVideo ? _watchLiveUrl : 'https://dcitygatechurch.mixlr.com';
+    final uri = Uri.parse(targetUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -125,8 +181,10 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     WakelockPlus.disable();
+    _pulseController.dispose();
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
+
     // Clear WebView resources to free memory
     _webViewController?.clearCache();
     _watchLiveController?.clearCache();
@@ -139,6 +197,8 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final targetSubIndex = ref.watch(liveStreamSubTabIndexProvider);
+    final appConfig = ref.watch(appConfigChangeNotifierProvider);
+    final showGiving = !appConfig.config.walletPageDisabled;
 
     if (_tabController.index != targetSubIndex) {
       _tabController.animateTo(targetSubIndex);
@@ -150,21 +210,264 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     }
 
     return Scaffold(
+      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF7F8FA),
       appBar: CustomAppBar(
-        title: '',
+        title: 'Live Broadcast',
         showBackButton: true,
-        lightBackground: true,
+        lightBackground: !isDark,
         onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+        actions: [
+          IconButton(
+            tooltip: 'Share Live Broadcast',
+            icon: const Icon(Icons.share_outlined, size: 21),
+            onPressed: _handleShare,
+          ),
+          IconButton(
+            tooltip: 'Open in Browser',
+            icon: const Icon(Icons.open_in_new_rounded, size: 20),
+            onPressed: _handleOpenInBrowser,
+          ),
+          IconButton(
+            tooltip: 'Refresh Stream',
+            icon: const Icon(Icons.refresh_rounded, size: 22),
+            onPressed: _handleRefresh,
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
-      body: Column(
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // 1. Live status banner & Segmented Mode Switcher
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+              child: Column(
+                children: [
+                  _buildLiveStatusRow(isDark),
+                  const SizedBox(height: 12),
+                  _buildSegmentedSwitcher(isDark),
+                ],
+              ),
+            ),
+
+            // 2. Main Broadcast Stage (TabBarView)
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _buildStageView(
+                    context: context,
+                    isDark: isDark,
+                    controller: _webViewController,
+                    isLoading: _isStreamLiveLoading,
+                    streamTitle: 'Audio Live Stream',
+                    streamSubtitle: 'Mixlr High-Quality Audio Broadcast (Low Data)',
+                    icon: Icons.headphones_rounded,
+                    showGiving: showGiving,
+                  ),
+                  _buildStageView(
+                    context: context,
+                    isDark: isDark,
+                    controller: _watchLiveController,
+                    isLoading: _isWatchLiveLoading,
+                    streamTitle: 'Watch Video Live',
+                    streamSubtitle: 'Sanctuary High-Definition Video Broadcast',
+                    icon: Icons.live_tv_rounded,
+                    showGiving: showGiving,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Glowing live broadcast indicator + viewer guidance
+  Widget _buildLiveStatusRow(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : Colors.grey[200]!,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
         children: [
-          _buildTabBar(isDark),
+          // Animated Pulsing Red Live Badge
+          AnimatedBuilder(
+            animation: _pulseAnimation,
+            builder: (context, child) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.red.withValues(alpha: _pulseAnimation.value),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.withValues(alpha: _pulseAnimation.value * 0.35),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withValues(alpha: 0.8),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'LIVE ON AIR',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 12),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _buildStreamLive(context, isDark),
-                _buildWatchLive(context, isDark),
+                Text(
+                  'The City Gate Church',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  'Sunday & Midweek Services',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          // Sound wave / broadcast icon
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: AppColors.primaryGold.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.sensors_rounded,
+              size: 16,
+              color: AppColors.primaryGold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Modern Segmented Pill Switcher (Audio vs Video)
+  Widget _buildSegmentedSwitcher(bool isDark) {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.grey[200],
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : Colors.grey[300]!,
+          width: 0.8,
+        ),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicator: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          color: AppColors.primaryGold,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryGold.withValues(alpha: 0.35),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelColor: Colors.white,
+        unselectedLabelColor: isDark
+            ? AppColors.textSecondaryDark
+            : AppColors.textSecondaryLight,
+        labelStyle: const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+          letterSpacing: 0.2,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+        tabs: const [
+          Tab(
+            iconMargin: EdgeInsets.zero,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.headphones_rounded, size: 16),
+                SizedBox(width: 8),
+                Text('Audio Stream'),
+              ],
+            ),
+          ),
+          Tab(
+            iconMargin: EdgeInsets.zero,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.live_tv_rounded, size: 16),
+                SizedBox(width: 8),
+                Text('Watch Video'),
               ],
             ),
           ),
@@ -173,176 +476,368 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     );
   }
 
-  Widget _buildTabBar(bool isDark) {
+  /// Unified Stage View for both Audio and Video
+  Widget _buildStageView({
+    required BuildContext context,
+    required bool isDark,
+    required WebViewController? controller,
+    required bool isLoading,
+    required String streamTitle,
+    required String streamSubtitle,
+    required IconData icon,
+    required bool showGiving,
+  }) {
     final horizontalPadding = Responsive.horizontalPadding(context);
-    final spacing = Responsive.verticalSpacing(context);
-    final borderRadius = Responsive.largeBorderRadius(context);
-    final bodyFontSize = Responsive.bodyFontSize(context);
-
-    return Container(
-      margin: EdgeInsets.symmetric(
-        horizontal: horizontalPadding,
-        vertical: spacing * 0.625,
-      ),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(
-          color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-        ),
-      ),
-      child: TabBar(
-        controller: _tabController,
-        indicator: BoxDecoration(
-          borderRadius: BorderRadius.circular(borderRadius),
-          color: Colors.transparent,
-        ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        dividerColor: Colors.transparent,
-        labelColor: AppColors.primaryGold,
-        unselectedLabelColor: isDark
-            ? AppColors.textSecondaryDark
-            : AppColors.textSecondaryLight,
-        labelStyle: TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: bodyFontSize,
-        ),
-        tabs: const [
-          Tab(text: 'Stream Live'),
-          Tab(text: 'Watch Live'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWatchLive(BuildContext context, bool isDark) {
-    final horizontalPadding = Responsive.horizontalPadding(context);
-    final spacing = Responsive.verticalSpacing(context);
     final borderRadius = Responsive.borderRadius(context);
-    final iconSize = Responsive.iconSize(context);
-    final bodyFontSize = Responsive.bodyFontSize(context);
 
-    return Column(
-      children: [
-        // Compact header
-        Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: horizontalPadding,
-            vertical: spacing * 0.5,
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.live_tv_rounded,
-                color: AppColors.primaryGold,
-                size: iconSize * 0.83,
-              ),
-              SizedBox(width: spacing * 0.5),
-              Text(
-                'Watch Live Service',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: bodyFontSize,
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Broadcast Header Pill
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: AppColors.primaryGold),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        streamTitle,
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        ),
+                      ),
+                      Text(
+                        streamSubtitle,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Spacer(),
-              _buildLiveIndicator(),
-            ],
+                // Fast Refresh Icon
+                InkWell(
+                  onTap: _handleRefresh,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGold.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.primaryGold.withValues(alpha: 0.3),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.refresh_rounded, size: 13, color: AppColors.primaryGold),
+                        SizedBox(width: 4),
+                        Text(
+                          'Reload',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryGold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        // WebView takes most of the space
-        Expanded(
-          child: Container(
-            margin: EdgeInsets.symmetric(horizontal: horizontalPadding),
+
+          // 2. High-Tech Theater Player Stage
+          Container(
+            height: Responsive.value(context, mobile: 270.0, tablet: 420.0, desktop: 500.0),
+            width: double.infinity,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(borderRadius),
-              color: isDark
-                  ? AppColors.backgroundDark
-                  : AppColors.backgroundLight,
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(borderRadius * 1.2),
+              border: Border.all(
+                color: AppColors.primaryGold.withValues(alpha: isDark ? 0.35 : 0.2),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.15),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(borderRadius),
+              borderRadius: BorderRadius.circular(borderRadius * 1.2),
               child: Stack(
                 children: [
-                  if (_watchLiveController != null)
+                  // Active WebView
+                  if (controller != null)
                     WebViewWidget(
-                      controller: _watchLiveController!,
-                      gestureRecognizers:
-                          <Factory<OneSequenceGestureRecognizer>>{
-                            Factory<VerticalDragGestureRecognizer>(
-                              () => VerticalDragGestureRecognizer(),
-                            ),
-                            Factory<HorizontalDragGestureRecognizer>(
-                              () => HorizontalDragGestureRecognizer(),
-                            ),
-                          },
+                      controller: controller,
+                      gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                        Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
+                        Factory<HorizontalDragGestureRecognizer>(() => HorizontalDragGestureRecognizer()),
+                      },
                     ),
-                  if (_isWatchLiveLoading || _watchLiveController == null)
-                    const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.primaryGold,
-                        strokeWidth: 3,
+
+                  // Modern Shimmer / Loading State
+                  if (isLoading || controller == null)
+                    Container(
+                      color: const Color(0xFF0F1115),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.primaryGold.withValues(alpha: 0.12),
+                                border: Border.all(
+                                  color: AppColors.primaryGold.withValues(alpha: 0.4),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  color: AppColors.primaryGold,
+                                  strokeWidth: 2.6,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Connecting to Live Stream...',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'The City Gate Church Live Feed',
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                 ],
               ),
             ),
           ),
-        ),
-        // Compact refresh button
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-            horizontalPadding,
-            spacing * 0.5,
-            horizontalPadding,
-            spacing * 0.75,
-          ),
-          child: SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _watchLiveController?.reload(),
-              icon: Icon(Icons.refresh_rounded, size: iconSize * 0.75),
-              label: Text('Refresh', style: TextStyle(fontSize: bodyFontSize)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primaryGold,
-                side: const BorderSide(color: AppColors.primaryGold, width: 1),
-                padding: EdgeInsets.symmetric(vertical: spacing * 0.625),
+
+          const SizedBox(height: 16),
+
+          // 3. Quick Engagement Action Bar (Give, Share, Open in Browser)
+          _buildQuickActionsBar(context, isDark, showGiving),
+
+          const SizedBox(height: 16),
+
+          // 4. Church Service Timetable & Information Card
+          _buildServiceInfoCard(isDark),
+
+          const SizedBox(height: 28),
+        ],
+      ),
+    );
+  }
+
+  /// Interactive Quick Actions during live service
+  Widget _buildQuickActionsBar(BuildContext context, bool isDark, bool showGiving) {
+    return Row(
+      children: [
+        if (showGiving) ...[
+          // Give / Offering Button (Gold Accent)
+          Expanded(
+            flex: 3,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const GivePage()),
+                );
+              },
+              icon: const Icon(Icons.volunteer_activism_rounded, size: 17),
+              label: const Text(
+                'Give / Offering',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGold,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                elevation: 2,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(borderRadius * 0.83),
+                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
             ),
+          ),
+          const SizedBox(width: 10),
+        ],
+
+        // Share Button
+        Expanded(
+          flex: 2,
+          child: OutlinedButton.icon(
+            onPressed: _handleShare,
+            icon: const Icon(Icons.share_rounded, size: 16),
+            label: const Text('Invite', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: isDark ? Colors.white : AppColors.textPrimaryLight,
+              side: BorderSide(
+                color: isDark ? AppColors.dividerDark : Colors.grey[300]!,
+                width: 1,
+              ),
+              backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 10),
+
+        // External Browser Button
+        Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isDark ? AppColors.dividerDark : Colors.grey[300]!,
+              width: 1,
+            ),
+          ),
+          child: IconButton(
+            tooltip: 'Open in Fullscreen Browser',
+            icon: const Icon(Icons.open_in_browser_rounded, size: 20, color: AppColors.primaryGold),
+            onPressed: _handleOpenInBrowser,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildLiveIndicator() {
+  /// Weekly Timetable & Broadcast Info Card
+  Widget _buildServiceInfoCard(bool isDark) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.red,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            margin: const EdgeInsets.only(right: 6),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : Colors.grey[200]!,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
-          const Text(
-            'LIVE',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.calendar_month_rounded,
+                  color: AppColors.primaryGold,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Broadcast Schedule',
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _buildScheduleItem(
+            icon: Icons.wb_sunny_rounded,
+            title: 'Sunday Celebration Service',
+            time: 'Sundays • 8:00 AM & 10:00 AM (WAT)',
+            isDark: isDark,
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1, thickness: 0.6),
+          ),
+          _buildScheduleItem(
+            icon: Icons.local_fire_department_rounded,
+            title: 'Midweek Communion Service',
+            time: 'Wednesdays • 6:00 PM (WAT)',
+            isDark: isDark,
+          ),
+          const SizedBox(height: 14),
+
+          // Data-saving advice banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: AppColors.primaryGold.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.primaryGold.withValues(alpha: 0.2),
+                width: 0.8,
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.signal_cellular_alt_rounded,
+                  size: 16,
+                  color: AppColors.primaryGold,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Low on data or on the go? Switch to Audio Stream for crystal-clear playback with minimal data consumption.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: isDark ? Colors.grey[300] : const Color(0xFF555555),
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -350,103 +845,38 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     );
   }
 
-  Widget _buildStreamLive(BuildContext context, bool isDark) {
-    final horizontalPadding = Responsive.horizontalPadding(context);
-    final spacing = Responsive.verticalSpacing(context);
-    final borderRadius = Responsive.borderRadius(context);
-    final iconSize = Responsive.iconSize(context);
-    final bodyFontSize = Responsive.bodyFontSize(context);
-
-    return Column(
+  Widget _buildScheduleItem({
+    required IconData icon,
+    required String title,
+    required String time,
+    required bool isDark,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Compact header
-        Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: horizontalPadding,
-            vertical: spacing * 0.5,
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.headphones_rounded,
-                color: AppColors.primaryGold,
-                size: iconSize * 0.83,
-              ),
-              SizedBox(width: spacing * 0.5),
-              Text(
-                'Stream Live Service',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: bodyFontSize,
-                ),
-              ),
-              const Spacer(),
-              _buildLiveIndicator(),
-            ],
-          ),
-        ),
-        // WebView takes most of the space
+        Icon(icon, size: 16, color: AppColors.primaryGold),
+        const SizedBox(width: 10),
         Expanded(
-          child: Container(
-            margin: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(borderRadius),
-              color: isDark
-                  ? AppColors.backgroundDark
-                  : AppColors.backgroundLight,
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(borderRadius),
-              child: Stack(
-                children: [
-                  if (_webViewController != null)
-                    WebViewWidget(
-                      controller: _webViewController!,
-                      gestureRecognizers:
-                          <Factory<OneSequenceGestureRecognizer>>{
-                            Factory<VerticalDragGestureRecognizer>(
-                              () => VerticalDragGestureRecognizer(),
-                            ),
-                            Factory<HorizontalDragGestureRecognizer>(
-                              () => HorizontalDragGestureRecognizer(),
-                            ),
-                          },
-                    ),
-                  if (_isStreamLiveLoading || _webViewController == null)
-                    const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.primaryGold,
-                        strokeWidth: 3,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        // Compact refresh button
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-            horizontalPadding,
-            spacing * 0.5,
-            horizontalPadding,
-            spacing * 0.75,
-          ),
-          child: SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _webViewController?.reload(),
-              icon: Icon(Icons.refresh_rounded, size: iconSize * 0.75),
-              label: Text('Refresh', style: TextStyle(fontSize: bodyFontSize)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primaryGold,
-                side: const BorderSide(color: AppColors.primaryGold, width: 1),
-                padding: EdgeInsets.symmetric(vertical: spacing * 0.625),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(borderRadius * 0.83),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
                 ),
               ),
-            ),
+              const SizedBox(height: 2),
+              Text(
+                time,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+            ],
           ),
         ),
       ],
