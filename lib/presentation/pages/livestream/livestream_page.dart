@@ -20,10 +20,8 @@ class LiveStreamPage extends ConsumerStatefulWidget {
 }
 
 class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
 
   WebViewController? _webViewController;
   WebViewController? _watchLiveController;
@@ -43,16 +41,6 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WakelockPlus.enable();
-
-    // Pulse animation for the glowing live badge
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat(reverse: true);
-
-    _pulseAnimation = Tween<double>(begin: 0.35, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
 
     final initialSubIndex = ref.read(liveStreamSubTabIndexProvider);
     _tabController = TabController(
@@ -180,7 +168,6 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     WakelockPlus.disable();
-    _pulseController.dispose();
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
 
@@ -236,16 +223,10 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
         top: false,
         child: Column(
           children: [
-            // 1. Live status banner & Segmented Mode Switcher
+            // Segmented Mode Switcher (Audio vs Video)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-              child: Column(
-                children: [
-                  _buildLiveStatusRow(isDark),
-                  const SizedBox(height: 12),
-                  _buildSegmentedSwitcher(isDark),
-                ],
-              ),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: _buildSegmentedSwitcher(isDark),
             ),
 
             // 2. Main Broadcast Stage (TabBarView)
@@ -277,127 +258,6 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  /// Glowing live broadcast indicator + viewer guidance
-  Widget _buildLiveStatusRow(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? AppColors.dividerDark : Colors.grey[200]!,
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Animated Pulsing Red Live Badge
-          AnimatedBuilder(
-            animation: _pulseAnimation,
-            builder: (context, child) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.red.withValues(alpha: _pulseAnimation.value),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.red.withValues(alpha: _pulseAnimation.value * 0.35),
-                      blurRadius: 8,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.red.withValues(alpha: 0.8),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'LIVE ON AIR',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'The City Gate Church',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  'Sunday & Midweek Services',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          // Sound wave / broadcast icon
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: AppColors.primaryGold.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.sensors_rounded,
-              size: 16,
-              color: AppColors.primaryGold,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -484,9 +344,8 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     final horizontalPadding = Responsive.horizontalPadding(context);
     final borderRadius = Responsive.borderRadius(context);
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -554,294 +413,94 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
             ),
           ),
 
-          // 2. High-Tech Theater Player Stage
-          Container(
-            height: Responsive.value(context, mobile: 270.0, tablet: 420.0, desktop: 500.0),
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.circular(borderRadius * 1.2),
-              border: Border.all(
-                color: AppColors.primaryGold.withValues(alpha: isDark ? 0.35 : 0.2),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.15),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
+          // 2. High-Tech Theater Player Stage (Expanded to fill remaining view)
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(borderRadius * 1.2),
+                border: Border.all(
+                  color: AppColors.primaryGold.withValues(alpha: isDark ? 0.35 : 0.2),
+                  width: 1.2,
                 ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(borderRadius * 1.2),
-              child: Stack(
-                children: [
-                  // Active WebView
-                  if (controller != null)
-                    WebViewWidget(
-                      controller: controller,
-                      gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                        Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
-                        Factory<HorizontalDragGestureRecognizer>(() => HorizontalDragGestureRecognizer()),
-                      },
-                    ),
-
-                  // Modern Shimmer / Loading State
-                  if (isLoading || controller == null)
-                    Container(
-                      color: const Color(0xFF0F1115),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.primaryGold.withValues(alpha: 0.12),
-                                border: Border.all(
-                                  color: AppColors.primaryGold.withValues(alpha: 0.4),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: const Center(
-                                child: CircularProgressIndicator(
-                                  color: AppColors.primaryGold,
-                                  strokeWidth: 2.6,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Connecting to Live Stream...',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'The City Gate Church Live Feed',
-                              style: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.15),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
                 ],
               ),
-            ),
-          ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(borderRadius * 1.2),
+                child: Stack(
+                  children: [
+                    // Active WebView
+                    if (controller != null)
+                      WebViewWidget(
+                        controller: controller,
+                        gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                          Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
+                          Factory<HorizontalDragGestureRecognizer>(() => HorizontalDragGestureRecognizer()),
+                        },
+                      ),
 
-          const SizedBox(height: 16),
-
-          // 3. Quick Engagement Action Bar (Share, Open in Browser)
-          _buildQuickActionsBar(context, isDark),
-
-          const SizedBox(height: 16),
-
-          // 4. Church Service Timetable & Information Card
-          _buildServiceInfoCard(isDark),
-
-          const SizedBox(height: 28),
-        ],
-      ),
-    );
-  }
-
-  /// Interactive Quick Actions during live service
-  Widget _buildQuickActionsBar(BuildContext context, bool isDark) {
-    return Row(
-      children: [
-        // Share & Invite Button (Primary Gold Accent)
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: _handleShare,
-            icon: const Icon(Icons.share_rounded, size: 17),
-            label: const Text(
-              'Invite & Share Broadcast',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryGold,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(width: 10),
-
-        // External Browser Button
-        Container(
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.cardDark : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isDark ? AppColors.dividerDark : Colors.grey[300]!,
-              width: 1,
-            ),
-          ),
-          child: IconButton(
-            tooltip: 'Open in Fullscreen Browser',
-            icon: const Icon(Icons.open_in_browser_rounded, size: 20, color: AppColors.primaryGold),
-            onPressed: _handleOpenInBrowser,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Weekly Timetable & Broadcast Info Card
-  Widget _buildServiceInfoCard(bool isDark) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? AppColors.dividerDark : Colors.grey[200]!,
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGold.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.calendar_month_rounded,
-                  color: AppColors.primaryGold,
-                  size: 18,
+                    // Modern Shimmer / Loading State
+                    if (isLoading || controller == null)
+                      Container(
+                        color: const Color(0xFF0F1115),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.primaryGold.withValues(alpha: 0.12),
+                                  border: Border.all(
+                                    color: AppColors.primaryGold.withValues(alpha: 0.4),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    color: AppColors.primaryGold,
+                                    strokeWidth: 2.6,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Connecting to Live Stream...',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'The City Gate Church Live Feed',
+                                style: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 10),
-              Text(
-                'Broadcast Schedule',
-                style: TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _buildScheduleItem(
-            icon: Icons.wb_sunny_rounded,
-            title: 'Sunday Celebration Service',
-            time: 'Sundays • 8:00 AM & 10:00 AM (WAT)',
-            isDark: isDark,
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Divider(height: 1, thickness: 0.6),
-          ),
-          _buildScheduleItem(
-            icon: Icons.local_fire_department_rounded,
-            title: 'Midweek Communion Service',
-            time: 'Wednesdays • 6:00 PM (WAT)',
-            isDark: isDark,
-          ),
-          const SizedBox(height: 14),
-
-          // Data-saving advice banner
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            decoration: BoxDecoration(
-              color: AppColors.primaryGold.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.primaryGold.withValues(alpha: 0.2),
-                width: 0.8,
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.signal_cellular_alt_rounded,
-                  size: 16,
-                  color: AppColors.primaryGold,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Low on data or on the go? Switch to Audio Stream for crystal-clear playback with minimal data consumption.',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: isDark ? Colors.grey[300] : const Color(0xFF555555),
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-              ],
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildScheduleItem({
-    required IconData icon,
-    required String title,
-    required String time,
-    required bool isDark,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: AppColors.primaryGold),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                time,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
