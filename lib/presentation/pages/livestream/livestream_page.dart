@@ -11,7 +11,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
-import '../wallet/give_page.dart';
 
 class LiveStreamPage extends ConsumerStatefulWidget {
   const LiveStreamPage({super.key});
@@ -197,8 +196,6 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final targetSubIndex = ref.watch(liveStreamSubTabIndexProvider);
-    final appConfig = ref.watch(appConfigChangeNotifierProvider);
-    final showGiving = !appConfig.config.walletPageDisabled;
 
     if (_tabController.index != targetSubIndex) {
       _tabController.animateTo(targetSubIndex);
@@ -265,7 +262,6 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
                     streamTitle: 'Audio Live Stream',
                     streamSubtitle: 'Mixlr High-Quality Audio Broadcast (Low Data)',
                     icon: Icons.headphones_rounded,
-                    showGiving: showGiving,
                   ),
                   _buildStageView(
                     context: context,
@@ -275,7 +271,6 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
                     streamTitle: 'Watch Video Live',
                     streamSubtitle: 'Sanctuary High-Definition Video Broadcast',
                     icon: Icons.live_tv_rounded,
-                    showGiving: showGiving,
                   ),
                 ],
               ),
@@ -485,7 +480,6 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     required String streamTitle,
     required String streamSubtitle,
     required IconData icon,
-    required bool showGiving,
   }) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final borderRadius = Responsive.borderRadius(context);
@@ -648,8 +642,8 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
 
           const SizedBox(height: 16),
 
-          // 3. Quick Engagement Action Bar (Give, Share, Open in Browser)
-          _buildQuickActionsBar(context, isDark, showGiving),
+          // 3. Quick Engagement Action Bar (Share, Open in Browser)
+          _buildQuickActionsBar(context, isDark),
 
           const SizedBox(height: 16),
 
@@ -663,55 +657,23 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   }
 
   /// Interactive Quick Actions during live service
-  Widget _buildQuickActionsBar(BuildContext context, bool isDark, bool showGiving) {
+  Widget _buildQuickActionsBar(BuildContext context, bool isDark) {
     return Row(
       children: [
-        if (showGiving) ...[
-          // Give / Offering Button (Gold Accent)
-          Expanded(
-            flex: 3,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const GivePage()),
-                );
-              },
-              icon: const Icon(Icons.volunteer_activism_rounded, size: 17),
-              label: const Text(
-                'Give / Offering',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGold,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-        ],
-
-        // Share Button
+        // Share & Invite Button (Primary Gold Accent)
         Expanded(
-          flex: 2,
-          child: OutlinedButton.icon(
+          child: ElevatedButton.icon(
             onPressed: _handleShare,
-            icon: const Icon(Icons.share_rounded, size: 16),
-            label: const Text('Invite', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: isDark ? Colors.white : AppColors.textPrimaryLight,
-              side: BorderSide(
-                color: isDark ? AppColors.dividerDark : Colors.grey[300]!,
-                width: 1,
-              ),
-              backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+            icon: const Icon(Icons.share_rounded, size: 17),
+            label: const Text(
+              'Invite & Share Broadcast',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGold,
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 13),
+              elevation: 2,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),

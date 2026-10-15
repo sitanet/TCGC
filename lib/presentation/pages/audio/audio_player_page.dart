@@ -16,8 +16,6 @@ import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/password_input_field.dart';
 import '../../widgets/animated_play_button.dart';
-import '../wallet/give_page.dart';
-import '../wallet/wallet_page.dart';
 
 class AudioPlayerPage extends ConsumerStatefulWidget {
   final Sermon sermon;
@@ -473,15 +471,6 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               : widget.sermon.category,
           lightBackground: true,
           actions: [
-            if (!ref.watch(appConfigChangeNotifierProvider).config.walletPageDisabled)
-              IconButton(
-                onPressed: () => _showGivingBottomSheet(context, isDark),
-                icon: Icon(
-                  Icons.volunteer_activism,
-                  color: AppColors.primaryGold,
-                ),
-                tooltip: 'Give an Offering',
-              ),
             IconButton(
               onPressed: () => _showActionsBottomSheet(context, isDark),
               icon: const Icon(Icons.more_vert),
@@ -950,54 +939,57 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            ClipOval(
-              child:
-                  _speaker!.photoUrl != null && _speaker!.photoUrl!.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: _speaker!.photoUrl!,
-                      cacheManager: CustomImageCacheManager.instance,
-                      width: 100,
-                      height: 100,
-                      fit: BoxFit.cover,
-                      useOldImageOnUrlChange: true,
-                      fadeInDuration: Duration.zero,
-                      fadeOutDuration: Duration.zero,
-                      placeholder: (_, __) => Container(
+            GestureDetector(
+              onTap: () => _showFullMinisterPhoto(isDark),
+              child: ClipOval(
+                child:
+                    _speaker!.photoUrl != null && _speaker!.photoUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: _speaker!.photoUrl!,
+                        cacheManager: CustomImageCacheManager.instance,
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.cover,
+                        useOldImageOnUrlChange: true,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
+                        placeholder: (_, __) => Container(
+                          width: 100,
+                          height: 100,
+                          color: isDark
+                              ? AppColors.dividerDark
+                              : AppColors.dividerLight,
+                          child: const Icon(Icons.person, size: 50),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          width: 100,
+                          height: 100,
+                          color: isDark
+                              ? AppColors.dividerDark
+                              : AppColors.dividerLight,
+                          child: const Icon(Icons.person, size: 50),
+                        ),
+                      )
+                    : Container(
                         width: 100,
                         height: 100,
                         color: isDark
                             ? AppColors.dividerDark
                             : AppColors.dividerLight,
-                        child: const Icon(Icons.person, size: 50),
-                      ),
-                      errorWidget: (_, __, ___) => Container(
-                        width: 100,
-                        height: 100,
-                        color: isDark
-                            ? AppColors.dividerDark
-                            : AppColors.dividerLight,
-                        child: const Icon(Icons.person, size: 50),
-                      ),
-                    )
-                  : Container(
-                      width: 100,
-                      height: 100,
-                      color: isDark
-                          ? AppColors.dividerDark
-                          : AppColors.dividerLight,
-                      child: Center(
-                        child: Text(
-                          _speaker!.fullName.isNotEmpty
-                              ? _speaker!.fullName[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(
-                            fontSize: 40,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primaryGold,
+                        child: Center(
+                          child: Text(
+                            _speaker!.fullName.isNotEmpty
+                                ? _speaker!.fullName[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(
+                              fontSize: 40,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryGold,
+                            ),
                           ),
                         ),
                       ),
-                    ),
+              ),
             ),
             const SizedBox(height: 16),
             Text(
@@ -2775,323 +2767,5 @@ Listen now: $shareUrl''';
     );
   }
 
-  void _showGivingBottomSheet(BuildContext context, bool isDark) {
-    final walletProvider = ref.read(walletChangeNotifierProvider);
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.cardDark : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 24),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Icon(
-              Icons.volunteer_activism,
-              size: 64,
-              color: AppColors.primaryGold,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Are you blessed by this ministration?',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Give an offering by clicking below',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  await _authenticateAndNavigateToGive(
-                    walletProvider.hasWallet,
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryGold,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.favorite, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Give Special Offering',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Maybe Later',
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _authenticateAndNavigateToGive(bool hasWallet) async {
-    if (!mounted) return;
-
-    final walletProvider = ref.read(walletChangeNotifierProvider);
-
-    // If no wallet, just navigate to wallet page (no auth needed yet)
-    if (!hasWallet) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const WalletPage()),
-      );
-      return;
-    }
-
-    // Check if PIN is set
-    final hasPin = await walletProvider.checkHasPin();
-    if (!hasPin) {
-      // No PIN set, just navigate to give page
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const GivePage()),
-        );
-      }
-      return;
-    }
-
-    // Try biometric authentication first
-    final biometricProvider = ref.read(biometricChangeNotifierProvider);
-    await biometricProvider.initialize();
-
-    if (biometricProvider.biometricTransactionEnabled &&
-        biometricProvider.isAvailable) {
-      final authenticated = await biometricProvider
-          .authenticateForTransaction();
-      if (authenticated && mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const GivePage()),
-        );
-        return;
-      }
-    }
-
-    // Fall back to PIN dialog
-    if (mounted) {
-      _showGivePinDialog();
-    }
-  }
-
-  void _showGivePinDialog() {
-    final pinController = TextEditingController();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    bool isVerifying = false;
-
-    showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.lock_outline, color: AppColors.primaryGold, size: 24),
-              const SizedBox(width: 8),
-              const Text('Enter Transaction PIN'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Enter your PIN to continue',
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: pinController,
-                keyboardType: TextInputType.number,
-                maxLength: 4,
-                obscureText: true,
-                autofocus: true,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 24,
-                  letterSpacing: 8,
-                  fontWeight: FontWeight.bold,
-                ),
-                decoration: InputDecoration(
-                  hintText: '••••',
-                  hintStyle: TextStyle(
-                    color: Colors.grey[400],
-                    letterSpacing: 8,
-                  ),
-                  counterText: '',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: AppColors.primaryGold,
-                      width: 2,
-                    ),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    vertical: 16,
-                    horizontal: 16,
-                  ),
-                ),
-                onSubmitted: (_) async {
-                  if (pinController.text.isEmpty || isVerifying) return;
-                  setDialogState(() => isVerifying = true);
-
-                  final walletProvider = ref.read(walletChangeNotifierProvider);
-                  final isValid = await walletProvider.verifyPin(
-                    pinController.text,
-                  );
-
-                  if (!mounted) return;
-
-                  if (isValid) {
-                    Navigator.pop(dialogContext, true);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const GivePage()),
-                    );
-                  } else {
-                    setDialogState(() => isVerifying = false);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Invalid PIN. Please try again.'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    pinController.clear();
-                  }
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: isVerifying
-                  ? null
-                  : () async {
-                      if (pinController.text.isEmpty) return;
-                      setDialogState(() => isVerifying = true);
-
-                      final walletProvider = ref.read(
-                        walletChangeNotifierProvider,
-                      );
-                      final isValid = await walletProvider.verifyPin(
-                        pinController.text,
-                      );
-
-                      if (!mounted) return;
-
-                      if (isValid) {
-                        Navigator.pop(dialogContext, true);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const GivePage()),
-                        );
-                      } else {
-                        setDialogState(() => isVerifying = false);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Invalid PIN. Please try again.'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        pinController.clear();
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGold,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: isVerifying
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text('Verify'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
+
