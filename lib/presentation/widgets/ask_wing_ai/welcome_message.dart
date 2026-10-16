@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 
 /// Beautiful welcome page shown when chat history is empty
 class WelcomeMessage extends StatelessWidget {
@@ -21,147 +23,190 @@ class WelcomeMessage extends StatelessWidget {
     final primaryColor = Theme.of(context).primaryColor;
     final remaining = dailyRemaining ?? 15;
     final limit = dailyLimit ?? 15;
+    final isTablet = Responsive.isTablet(context);
+
+    final firstName = userName != null && userName!.trim().isNotEmpty
+        ? userName!.trim().split(' ').first
+        : null;
 
     return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const SizedBox(height: 8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: isTablet ? 32 : 20,
+            vertical: isTablet ? 28 : 16,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(height: 10),
 
-            // ── Golden Wing Emblem ──
-            Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFFE5A93C),
-                    primaryColor,
+              // ── Golden Wing AI Emblem ──
+              Container(
+                width: isTablet ? 96 : 84,
+                height: isTablet ? 96 : 84,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFFFFD54F),
+                      AppColors.primaryGold,
+                      Color(0xFFB8860B),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryGold.withValues(alpha: 0.38),
+                      blurRadius: 24,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 4),
+                    ),
                   ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFE5A93C).withValues(alpha: 0.4),
-                    blurRadius: 22,
-                    spreadRadius: 4,
+                padding: const EdgeInsets.all(3),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/wing_ai_eagle.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: const Color(0xFF1E232F),
+                      child: const Center(
+                        child: Icon(Icons.auto_awesome_rounded, color: AppColors.primaryGold, size: 36),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ── Title & Greeting ──
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Wing AI',
+                    style: TextStyle(
+                      fontSize: isTablet ? 26 : 22,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.4,
+                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGold.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.5), width: 0.8),
+                    ),
+                    child: const Text(
+                      'ASSISTANT',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryGold,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
                   ),
                 ],
-                border: Border.all(
-                  color: const Color(0xFFE5A93C),
-                  width: 2.5,
-                ),
               ),
-              child: const Center(
-                child: Icon(
-                  Icons.flutter_dash,
-                  size: 52,
-                  color: Colors.white,
+              const SizedBox(height: 6),
+
+              Text(
+                firstName != null ? 'Welcome, $firstName! How can I guide you today?' : 'Welcome! How can I guide you today?',
+                style: TextStyle(
+                  fontSize: isTablet ? 15 : 13.5,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? Colors.white70 : Colors.black87,
                 ),
+                textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 4),
 
-            // ── Title ──
-            Text(
-              'Wing AI',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: primaryColor,
-                    letterSpacing: 0.5,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-
-            // ── Greeting ──
-            Text(
-              userName != null && userName!.isNotEmpty
-                  ? 'Hello, $userName! 👋'
-                  : 'Hello! 👋',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: primaryColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-
-            // ── Tagline ──
-            Text(
-              'Your Spiritual Companion & Study Guide',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                    height: 1.4,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-
-            // ── Prompt Counter Chip ──
-            _buildPromptChip(remaining, limit, isDark),
-            const SizedBox(height: 24),
-
-            // ── Suggestion Grid ──
-            GridView.count(
-              crossAxisCount: 2,
-              childAspectRatio: 1.5,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _SuggestionCard(
-                  icon: Icons.menu_book_outlined,
-                  iconColor: Colors.deepPurple,
-                  title: 'Apostolic Teachings',
-                  question: 'What is the eternal purpose of God?',
-                  isDark: isDark,
-                  onTap: onQuestionTap,
+              Text(
+                'Explore sermon teachings, scriptural insights, and answers to your spiritual questions.',
+                style: TextStyle(
+                  fontSize: isTablet ? 13 : 12,
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  height: 1.35,
                 ),
-                _SuggestionCard(
-                  icon: Icons.spa_outlined,
-                  iconColor: Colors.teal,
-                  title: 'Spiritual Growth',
-                  question: 'How do I grow into the fullness of Christ?',
-                  isDark: isDark,
-                  onTap: onQuestionTap,
-                ),
-                _SuggestionCard(
-                  icon: Icons.church_outlined,
-                  iconColor: Colors.indigo,
-                  title: 'Church & Pastors',
-                  question: 'Who are the pastors of The CityGate Church?',
-                  isDark: isDark,
-                  onTap: onQuestionTap,
-                ),
-                _SuggestionCard(
-                  icon: Icons.celebration_outlined,
-                  iconColor: Colors.orange,
-                  title: 'Conferences & Events',
-                  question: 'What conferences does TCGC host?',
-                  isDark: isDark,
-                  onTap: onQuestionTap,
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
 
-            // ── Bottom encouragement ──
-            Text(
-              'Tap any topic or type your own question below 🙏',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: primaryColor,
-                    fontStyle: FontStyle.italic,
+              // ── Prompt Counter Chip ──
+              _buildPromptChip(remaining, limit, isDark),
+              const SizedBox(height: 24),
+
+              // ── Suggestion Grid (Responsive) ──
+              GridView.count(
+                crossAxisCount: isTablet ? 2 : 2,
+                childAspectRatio: isTablet ? 2.0 : 1.45,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _SuggestionCard(
+                    icon: Icons.menu_book_rounded,
+                    iconColor: const Color(0xFF7E57C2),
+                    category: 'TEACHING',
+                    question: 'What is the eternal purpose of God?',
+                    isDark: isDark,
+                    onTap: onQuestionTap,
                   ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-          ],
+                  _SuggestionCard(
+                    icon: Icons.spa_rounded,
+                    iconColor: const Color(0xFF26A69A),
+                    category: 'GROWTH',
+                    question: 'How do I grow into the fullness of Christ?',
+                    isDark: isDark,
+                    onTap: onQuestionTap,
+                  ),
+                  _SuggestionCard(
+                    icon: Icons.church_rounded,
+                    iconColor: const Color(0xFF3F51B5),
+                    category: 'CHURCH',
+                    question: 'Who are the ministers of The CityGate Church?',
+                    isDark: isDark,
+                    onTap: onQuestionTap,
+                  ),
+                  _SuggestionCard(
+                    icon: Icons.search_rounded,
+                    iconColor: const Color(0xFFE5A93C),
+                    category: 'SERMONS',
+                    question: 'Find messages about faith and victory',
+                    isDark: isDark,
+                    onTap: onQuestionTap,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // ── Bottom encouragement ──
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.mic_none_rounded, size: 14, color: isDark ? AppColors.primaryGold : primaryColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Tap a topic above or speak your question below',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: isDark ? Colors.white60 : Colors.black54,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -174,29 +219,29 @@ class WelcomeMessage extends StatelessWidget {
     } else if (remaining <= 5) {
       chipColor = const Color(0xFFFB8C00);
     } else {
-      chipColor = const Color(0xFFD48B00);
+      chipColor = AppColors.primaryGold;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-        color: chipColor.withValues(alpha: isDark ? 0.18 : 0.10),
+        color: chipColor.withValues(alpha: isDark ? 0.16 : 0.08),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: chipColor.withValues(alpha: 0.4),
-          width: 1,
+          color: chipColor.withValues(alpha: 0.35),
+          width: 0.9,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.auto_awesome, size: 16, color: chipColor),
-          const SizedBox(width: 6),
+          Icon(Icons.bolt_rounded, size: 14, color: chipColor),
+          const SizedBox(width: 5),
           Text(
-            '$remaining of $limit prompts available today',
+            '$remaining of $limit daily questions available',
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
               color: chipColor,
               letterSpacing: 0.2,
             ),
@@ -211,7 +256,7 @@ class WelcomeMessage extends StatelessWidget {
 class _SuggestionCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
-  final String title;
+  final String category;
   final String question;
   final bool isDark;
   final Function(String)? onTap;
@@ -219,7 +264,7 @@ class _SuggestionCard extends StatelessWidget {
   const _SuggestionCard({
     required this.icon,
     required this.iconColor,
-    required this.title,
+    required this.category,
     required this.question,
     required this.isDark,
     this.onTap,
@@ -233,16 +278,17 @@ class _SuggestionCard extends StatelessWidget {
         onTap: () => onTap?.call(question),
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E222A) : Colors.white,
+            color: isDark ? AppColors.cardDark : Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+              color: isDark ? AppColors.dividerDark : Colors.grey.shade200,
+              width: 0.9,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.05),
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -250,40 +296,42 @@ class _SuggestionCard extends StatelessWidget {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Icon badge
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, size: 18, color: iconColor),
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: iconColor.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, size: 16, color: iconColor),
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    category,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      color: iconColor,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              // Title
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 3),
-              // Question preview
+              const SizedBox(height: 6),
               Expanded(
                 child: Text(
                   question,
                   style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                    height: 1.3,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    height: 1.25,
+                    color: isDark ? Colors.white.withValues(alpha: 0.9) : AppColors.textPrimaryLight,
                   ),
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

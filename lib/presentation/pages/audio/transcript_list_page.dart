@@ -9,7 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/providers/audio_player_provider.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/image_cache_manager.dart';
 import '../../../core/utils/error_handler.dart';
@@ -18,6 +17,18 @@ import '../../../data/services/data_service.dart';
 import '../../../data/services/transcript_cache_service.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
+
+String _stripHtml(String text) {
+  return text
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .trim();
+}
 
 enum TranscriptFilterType { category, speaker }
 
@@ -28,6 +39,8 @@ class TranscriptListPage extends ConsumerStatefulWidget {
   final Map<String, String>? categoryNameToId;
   final TranscriptFilterType initialFilterType;
   final String? initialSpeaker;
+  final String? categoryImageUrl;
+  final String? categoryDescription;
 
   const TranscriptListPage({
     super.key,
@@ -37,6 +50,8 @@ class TranscriptListPage extends ConsumerStatefulWidget {
     this.categoryNameToId,
     this.initialFilterType = TranscriptFilterType.category,
     this.initialSpeaker,
+    this.categoryImageUrl,
+    this.categoryDescription,
   });
 
   @override
@@ -278,116 +293,120 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isSpeakerMode = _filterType == TranscriptFilterType.speaker && _selectedSpeaker != null && _selectedSpeaker != 'All';
+
+    String pageTitle = 'Transcripts';
+    if (isSpeakerMode) {
+      pageTitle = _formatSpeakerName(_selectedSpeaker!).replaceAll('\n', ' ');
+    } else if (_selectedCategory != 'All') {
+      pageTitle = _selectedCategory;
+    }
+
+    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+    final hasMiniPlayer = audioProvider.currentSermon != null;
+    final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
+      value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        appBar: const CustomAppBar(title: '', lightBackground: true),
+        appBar: CustomAppBar(
+          title: pageTitle,
+          showBackButton: Navigator.canPop(context),
+          lightBackground: !isDark,
+        ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGold))
-            : Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.cardDark : Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                  ),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search by title or speaker...',
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  _buildFilterToggle('Category', TranscriptFilterType.category, isDark),
-                  const SizedBox(width: 12),
-                  _buildFilterToggle('Minister', TranscriptFilterType.speaker, isDark),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: _filterType == TranscriptFilterType.speaker ? 105 : 32,
-              child: _filterType == TranscriptFilterType.category
-                  ? _buildCategoryFilterList(isDark)
-                  : _buildSpeakerFilterList(isDark),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _onRefresh,
-                color: AppColors.primaryGold,
-                child: _filteredItems.isEmpty
-                    ? ListView(
-                        children: [
-                          SizedBox(
-                            height: MediaQuery.of(context).size.height * 0.4,
-                            child: Center(
-                              child: Text(
-                                'No transcripts found',
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: isDark
-                                          ? AppColors.textSecondaryDark
-                                          : AppColors.textSecondaryLight,
-                                    ),
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: RefreshIndicator(
+                    onRefresh: _onRefresh,
+                    color: AppColors.primaryGold,
+                    child: CustomScrollView(
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        // 1. Hero Header
+                        SliverToBoxAdapter(
+                          child: _buildHeroHeader(isDark),
+                        ),
+
+                        // 2. Search Bar
+                        SliverToBoxAdapter(
+                          child: _buildSearchBar(isDark),
+                        ),
+
+                        // 3. Filter Section (Categories / Ministers)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _buildFilterSection(isDark),
+                          ),
+                        ),
+
+                        // 4. Section Header with count
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Transcripts',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                                  ),
+                                ),
+                                Text(
+                                  '${_filteredItems.length} available',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primaryGold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // 5. Transcripts List or Empty State
+                        if (_filteredItems.isEmpty)
+                          SliverToBoxAdapter(
+                            child: _buildEmptyState(isDark),
+                          )
+                        else
+                          SliverPadding(
+                            padding: EdgeInsets.only(
+                              left: 16,
+                              right: 16,
+                              bottom: bottomInset,
+                            ),
+                            sliver: SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final item = _filteredItems[index];
+                                  return _TranscriptListItem(
+                                    transcript: item,
+                                    isDark: isDark,
+                                    onTap: () => _openTranscript(context, item),
+                                  );
+                                },
+                                childCount: _filteredItems.length,
                               ),
                             ),
                           ),
-                        ],
-                      )
-                    : Builder(
-                        builder: (context) {
-                          final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
-                          final hasMiniPlayer = audioProvider.currentSermon != null;
-                          final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
-                          return ListView.builder(
-                            controller: _scrollController,
-                            padding: EdgeInsets.only(
-                              left: 20,
-                              right: 20,
-                              top: 8,
-                              bottom: bottomInset,
-                            ),
-                            itemCount: _filteredItems.length,
-                            itemBuilder: (context, index) {
-                              final item = _filteredItems[index];
-                              return _TranscriptListItem(
-                                transcript: item,
-                                isDark: isDark,
-                                onTap: () => _openTranscript(context, item),
-                              );
-                            },
-                          );
-                        },
-                      ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -398,6 +417,324 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
       MaterialPageRoute(
         builder: (_) => TranscriptViewPage(transcript: transcript),
       ),
+    );
+  }
+
+  Widget _buildHeroHeader(bool isDark) {
+    final isSpeakerMode = _filterType == TranscriptFilterType.speaker &&
+        _selectedSpeaker != null &&
+        _selectedSpeaker != 'All';
+
+    String headerTypePill = 'TRANSCRIPT ARCHIVE';
+    Color pillColor = AppColors.primaryGold;
+    IconData pillIcon = Icons.menu_book_rounded;
+    String displayTitle = _selectedCategory != 'All' ? _selectedCategory : 'All Transcripts';
+    String subtitle = '${_filteredItems.length} Transcripts • Study & Sermon Notes';
+    String? imageUrl = widget.categoryImageUrl;
+    String? description = widget.categoryDescription;
+
+    if (isSpeakerMode) {
+      final selSpk = _selectedSpeaker!.toLowerCase().trim();
+      final model = _speakerModels.where((s) =>
+          s.fullName.toLowerCase().trim() == selSpk ||
+          s.name.toLowerCase().trim() == selSpk ||
+          selSpk.contains(s.fullName.toLowerCase().trim()) ||
+          s.fullName.toLowerCase().trim().contains(selSpk)).firstOrNull;
+
+      final isExternal = model?.isExternalMinister ?? false;
+      final isSenior = model?.seniorPastor ?? false;
+      final isMain = model?.isMainSpeaker ?? false;
+
+      if (isExternal) {
+        headerTypePill = 'GUEST MINISTER';
+        pillColor = Colors.cyanAccent.shade700;
+        pillIcon = Icons.public_rounded;
+      } else if (isSenior) {
+        headerTypePill = 'SENIOR PASTOR';
+        pillColor = AppColors.primaryGold;
+        pillIcon = Icons.church_rounded;
+      } else if (isMain) {
+        headerTypePill = 'RESIDENT PASTOR';
+        pillColor = AppColors.primaryGold;
+        pillIcon = Icons.church_rounded;
+      } else {
+        headerTypePill = 'MINISTER';
+        pillColor = AppColors.primaryGold;
+        pillIcon = Icons.person_rounded;
+      }
+
+      displayTitle = _formatSpeakerName(_selectedSpeaker!).replaceAll('\n', ' ');
+      imageUrl = model?.photoUrl ?? imageUrl;
+      description ??= model?.bio;
+    } else if (_selectedCategory != 'All') {
+      headerTypePill = 'STUDY ARCHIVE';
+      pillColor = AppColors.primaryGold;
+      pillIcon = Icons.auto_stories_rounded;
+      displayTitle = _selectedCategory;
+    }
+
+    // Fallback image from first available item in filtered list if not already resolved
+    if ((imageUrl == null || imageUrl.isEmpty) && _filteredItems.isNotEmpty) {
+      for (final t in _filteredItems) {
+        if (t.imageUrl != null && t.imageUrl!.isNotEmpty) {
+          imageUrl = t.imageUrl;
+          break;
+        }
+      }
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isSpeakerMode && (pillColor == Colors.cyanAccent.shade700)
+              ? (isDark ? Colors.cyanAccent.withValues(alpha: 0.35) : Colors.cyan.shade200)
+              : (isDark ? AppColors.dividerDark : Colors.grey.shade200),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Artwork / Avatar
+              ClipRRect(
+                borderRadius: BorderRadius.circular(isSpeakerMode ? 38 : 14),
+                child: Container(
+                  width: 76,
+                  height: 76,
+                  color: isDark ? Colors.white10 : Colors.grey.shade100,
+                  child: imageUrl != null && imageUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          cacheManager: CustomImageCacheManager.instance,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 152,
+                          memCacheHeight: 152,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                          placeholder: (_, __) => _buildHeroPlaceholder(isSpeakerMode, isDark),
+                          errorWidget: (_, __, ___) => _buildHeroPlaceholder(isSpeakerMode, isDark),
+                        )
+                      : _buildHeroPlaceholder(isSpeakerMode, isDark),
+                ),
+              ),
+              const SizedBox(width: 14),
+
+              // Title & Badges
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Pill Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: pillColor.withValues(alpha: isDark ? 0.2 : 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: pillColor.withValues(alpha: 0.35),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(pillIcon, size: 10, color: pillColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            headerTypePill,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                              color: pillColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Display Title
+                    Text(
+                      displayTitle,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        height: 1.2,
+                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+
+                    // Subtitle / Count
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white60 : AppColors.textSecondaryLight,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          if (description != null && description.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.35,
+                color: isDark ? Colors.white70 : AppColors.textSecondaryLight,
+              ),
+            ),
+          ],
+
+          if (_filteredItems.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _openTranscript(context, _filteredItems.first),
+                    icon: const Icon(Icons.menu_book_rounded, size: 16),
+                    label: const Text('Start Reading Latest'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGold,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeroPlaceholder(bool isSpeaker, bool isDark) {
+    return Container(
+      color: isDark ? AppColors.cardDark : Colors.grey.shade100,
+      child: Center(
+        child: Icon(
+          isSpeaker ? Icons.person_rounded : Icons.auto_stories_rounded,
+          size: 34,
+          color: AppColors.primaryGold.withValues(alpha: 0.8),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isDark ? AppColors.dividerDark : Colors.grey.shade200,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: TextField(
+          controller: _searchController,
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Search transcripts by title or speaker...',
+            hintStyle: TextStyle(
+              fontSize: 13.5,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            ),
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              color: AppColors.primaryGold,
+              size: 20,
+            ),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+                    icon: Icon(
+                      Icons.clear_rounded,
+                      size: 18,
+                      color: isDark ? Colors.white60 : Colors.grey,
+                    ),
+                    onPressed: () {
+                      _searchController.clear();
+                      _filterTranscripts();
+                    },
+                  )
+                : null,
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterSection(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              _buildFilterToggle('Category', TranscriptFilterType.category, isDark),
+              const SizedBox(width: 8),
+              _buildFilterToggle('Minister', TranscriptFilterType.speaker, isDark),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: _filterType == TranscriptFilterType.speaker ? 100 : 36,
+          child: _filterType == TranscriptFilterType.category
+              ? _buildCategoryFilterList(isDark)
+              : _buildSpeakerFilterList(isDark),
+        ),
+      ],
     );
   }
 
@@ -419,27 +756,43 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
         }
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: isSelected 
               ? AppColors.primaryGold 
-              : (isDark ? AppColors.cardDark : Colors.white),
-          borderRadius: BorderRadius.circular(20),
+              : (isDark ? AppColors.cardDark : Colors.grey.shade100),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected 
                 ? AppColors.primaryGold 
-                : (isDark ? AppColors.dividerDark : AppColors.dividerLight),
+                : (isDark ? AppColors.dividerDark : Colors.grey.shade300),
+            width: 1,
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-            color: isSelected 
-                ? Colors.white 
-                : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              type == TranscriptFilterType.category
+                  ? Icons.folder_open_rounded
+                  : Icons.person_rounded,
+              size: 14,
+              color: isSelected 
+                  ? Colors.white 
+                  : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected 
+                    ? Colors.white 
+                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -448,22 +801,38 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
   Widget _buildCategoryFilterList(bool isDark) {
     return ListView.separated(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: _displayCategories.length,
-      separatorBuilder: (_, __) => const SizedBox(width: 16),
+      separatorBuilder: (_, __) => const SizedBox(width: 8),
       itemBuilder: (context, index) {
         final category = _displayCategories[index];
         final isSelected = category == _selectedCategory && _filterType == TranscriptFilterType.category;
         return GestureDetector(
           onTap: () => _selectCategory(category),
-          child: Text(
-            category,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
               color: isSelected
-                  ? AppColors.maroon
-                  : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                  ? AppColors.primaryGold.withValues(alpha: isDark ? 0.35 : 0.15)
+                  : (isDark ? AppColors.cardDark : Colors.white),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isSelected
+                    ? AppColors.primaryGold
+                    : (isDark ? AppColors.dividerDark : Colors.grey.shade300),
+                width: isSelected ? 1.5 : 1.0,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              category,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected
+                    ? AppColors.primaryGold
+                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+              ),
             ),
           ),
         );
@@ -472,37 +841,32 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
   }
 
   Widget _buildSpeakerFilterList(bool isDark) {
-    // Get main speakers only
     final mainSpeakers = _speakerModels.where((s) => s.isMainSpeaker).toList();
-    
-    // Check if there are any non-main speakers in the content
     final hasOtherSpeakers = _speakers.any((speakerName) => !_isMainSpeaker(speakerName));
     
     if (mainSpeakers.isEmpty && !hasOtherSpeakers) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Text(
           'No speakers available',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 13,
             color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
           ),
         ),
       );
     }
 
-    // Total count: All + main speakers + Others (if exists)
     final itemCount = 1 + mainSpeakers.length + (hasOtherSpeakers ? 1 : 0);
 
     return SizedBox(
-      height: 105,
+      height: 100,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: itemCount,
         itemBuilder: (context, index) {
           if (index == 0) {
-            // "All" option
             final isSelected = _selectedSpeaker == null || _selectedSpeaker == 'All';
             return _buildSpeakerChip(
               name: 'All',
@@ -513,7 +877,6 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
             );
           }
           
-          // Main speakers
           if (index <= mainSpeakers.length) {
             final speaker = mainSpeakers[index - 1];
             final isSelected = speaker.fullName == _selectedSpeaker;
@@ -527,7 +890,6 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
             );
           }
           
-          // "Others" option (last item if hasOtherSpeakers)
           final isSelected = _selectedSpeaker == 'Others';
           return _buildSpeakerChip(
             name: 'Others',
@@ -554,24 +916,24 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 88,
-        margin: const EdgeInsets.only(right: 12),
+        width: 82,
+        margin: const EdgeInsets.only(right: 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 54,
+              height: 54,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isSelected ? AppColors.primaryGold : Colors.transparent,
-                  width: 3,
+                  width: 2.5,
                 ),
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: AppColors.primaryGold.withValues(alpha: 0.3),
+                          color: AppColors.primaryGold.withValues(alpha: 0.35),
                           blurRadius: 8,
                           spreadRadius: 1,
                         )
@@ -586,7 +948,7 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
                             : (isDark ? AppColors.cardDark : AppColors.dividerLight),
                         child: Icon(
                           Icons.people,
-                          size: 28,
+                          size: 26,
                           color: isSelected
                               ? Colors.white
                               : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
@@ -599,7 +961,7 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
                                 : (isDark ? AppColors.cardDark : AppColors.dividerLight),
                             child: Icon(
                               Icons.more_horiz,
-                              size: 28,
+                              size: 26,
                               color: isSelected
                                   ? Colors.white
                                   : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
@@ -610,15 +972,15 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
                                 imageUrl: photoUrl,
                                 cacheManager: CustomImageCacheManager.instance,
                                 fit: BoxFit.cover,
-                                memCacheWidth: 112,
-                                memCacheHeight: 112,
+                                memCacheWidth: 108,
+                                memCacheHeight: 108,
                                 fadeInDuration: const Duration(milliseconds: 0),
                                 fadeOutDuration: const Duration(milliseconds: 0),
                                 placeholder: (_, __) => Container(
                                   color: isDark ? AppColors.cardDark : AppColors.dividerLight,
                                   child: Icon(
                                     Icons.person,
-                                    size: 28,
+                                    size: 26,
                                     color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                                   ),
                                 ),
@@ -626,7 +988,7 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
                                   color: isDark ? AppColors.cardDark : AppColors.dividerLight,
                                   child: Icon(
                                     Icons.person,
-                                    size: 28,
+                                    size: 26,
                                     color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                                   ),
                                 ),
@@ -637,7 +999,7 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
                                   child: Text(
                                     name.isNotEmpty ? name[0].toUpperCase() : '?',
                                     style: TextStyle(
-                                      fontSize: 22,
+                                      fontSize: 20,
                                       fontWeight: FontWeight.bold,
                                       color: isSelected
                                           ? AppColors.primaryGold
@@ -671,7 +1033,6 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
   String _formatSpeakerName(String fullName) {
     if (fullName.isEmpty) return fullName;
 
-    // Abbreviate common religious titles to save horizontal space and reveal full names
     String formatted = fullName
         .replaceAll(RegExp(r'\bPastor\b', caseSensitive: false), 'Pst.')
         .replaceAll(RegExp(r'\bApostle\b', caseSensitive: false), 'Apst.')
@@ -692,12 +1053,63 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
       return '${parts[0]}\n${parts[1]}';
     }
 
-    // 3 or more parts e.g. ["Pst.", "John", "Doe"] -> "Pst. John\nDoe"
     final firstLine = parts.sublist(0, parts.length - 1).join(' ');
     final secondLine = parts.last;
     return '$firstLine\n$secondLine';
   }
 
+  Widget _buildEmptyState(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.menu_book_outlined,
+              size: 56,
+              color: isDark ? Colors.white24 : Colors.grey[400],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              _searchController.text.isNotEmpty
+                  ? 'No transcripts match "${_searchController.text}"'
+                  : 'No transcripts found in this collection',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white70 : AppColors.textSecondaryLight,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Transcripts are published as sermon notes become available.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: isDark ? Colors.white38 : Colors.grey[500],
+              ),
+            ),
+            if (_searchController.text.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: () {
+                  _searchController.clear();
+                  _filterTranscripts();
+                },
+                icon: const Icon(Icons.clear_rounded, size: 16),
+                label: const Text('Clear search'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primaryGold,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _TranscriptListItem extends StatelessWidget {
@@ -711,19 +1123,24 @@ class _TranscriptListItem extends StatelessWidget {
     this.onTap,
   });
 
-  String _formatTimeAgo(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
+  static String _formatDate(DateTime date) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
 
-    if (difference.inDays > 0) {
-      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
-    } else {
-      return 'Just now';
-    }
+  static String _calculateReadTime(Transcript transcript) {
+    final text = transcript.content.isNotEmpty 
+        ? transcript.content 
+        : (transcript.description ?? '');
+    if (text.isEmpty) return '3 min read';
+    
+    final wordCount = text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+    final minutes = (wordCount / 200).ceil();
+    final readMinutes = minutes < 1 ? 1 : minutes;
+    return '$readMinutes min read';
   }
 
   String _getCategoryName() {
@@ -735,121 +1152,253 @@ class _TranscriptListItem extends StatelessWidget {
     return '';
   }
 
-  String _getSpeakerAndTime() {
-    final parts = <String>[];
-    if (transcript.speaker != null && transcript.speaker!.isNotEmpty) {
-      parts.add(transcript.speaker!);
-    }
-    parts.add(_formatTimeAgo(transcript.date));
-    return parts.join(' - ');
-  }
-
-  Widget _buildImage(bool isDark) {
-    if (transcript.imageUrl == null || transcript.imageUrl!.isEmpty) {
-      return Container(
-        color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+  Widget _buildThumbnail(bool isDark) {
+    Widget fallback = Container(
+      color: isDark ? AppColors.cardDark : AppColors.dividerLight,
+      child: Center(
         child: Icon(
-          Icons.article,
-          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          Icons.menu_book_rounded,
+          size: 26,
+          color: AppColors.primaryGold.withValues(alpha: 0.8),
         ),
-      );
+      ),
+    );
+
+    if (transcript.imageUrl == null || transcript.imageUrl!.isEmpty) {
+      return fallback;
     }
+
     if (transcript.imageUrl!.startsWith('http')) {
       return CachedNetworkImage(
         imageUrl: transcript.imageUrl!,
         cacheManager: CustomImageCacheManager.instance,
         fit: BoxFit.cover,
-        fadeInDuration: const Duration(milliseconds: 0),
-        fadeOutDuration: const Duration(milliseconds: 0),
-        placeholder: (context, url) => Container(
-          color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-        ),
-        errorWidget: (context, url, error) => Container(
-          color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-        ),
+        memCacheWidth: 120,
+        memCacheHeight: 120,
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
+        placeholder: (_, __) => fallback,
+        errorWidget: (_, __, ___) => fallback,
       );
     }
+
     return Image.asset(
       transcript.imageUrl!,
       fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => Container(
-        color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-      ),
+      errorBuilder: (_, __, ___) => fallback,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                width: 50,
-                height: 50,
-                color: isDark ? AppColors.cardDark : AppColors.dividerLight,
-                child: _buildImage(isDark),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RichText(
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    text: TextSpan(
-                      children: [
-                        if (_getCategoryName().isNotEmpty) ...[
-                          TextSpan(
-                            text: _getCategoryName(),
+    final title = _stripHtml(transcript.title);
+    final rawSpeaker = transcript.speaker?.trim() ?? '';
+    final speaker = rawSpeaker.isNotEmpty ? rawSpeaker : 'The CityGate Church';
+    final categoryName = _getCategoryName();
+    final readTime = _calculateReadTime(transcript);
+    final formattedDate = _formatDate(transcript.date);
+    final hasPdf = transcript.pdfUrl != null && transcript.pdfUrl!.isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : Colors.grey.shade200,
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // 1. Artwork Thumbnail
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        width: 58,
+                        height: 58,
+                        color: isDark ? Colors.white10 : Colors.grey.shade100,
+                        child: _buildThumbnail(isDark),
+                      ),
+                    ),
+                    if (hasPdf)
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGold,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'PDF',
                             style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black87,
+                              fontSize: 8,
                               fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                              color: Colors.white,
                             ),
                           ),
-                          TextSpan(
-                            text: ' - ',
-                            style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black87,
-                              fontWeight: FontWeight.normal,
-                              fontSize: 14,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+
+                // 2. Transcript Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Title
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          height: 1.25,
+                          color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        ),
+                      ),
+                      const SizedBox(height: 3.5),
+
+                      // Speaker Row
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person_outline_rounded,
+                            size: 13,
+                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              speaker,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              ),
                             ),
                           ),
                         ],
-                        TextSpan(
-                          text: transcript.title,
-                          style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black87,
-                            fontWeight: FontWeight.normal,
-                            fontSize: 14,
+                      ),
+                      const SizedBox(height: 3.5),
+
+                      // Metadata Row (Date • Reading time • Category)
+                      Row(
+                        children: [
+                          Text(
+                            formattedDate,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            ),
                           ),
-                        ),
-                      ],
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                            child: Text(
+                              '•',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            readTime,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.primaryGold,
+                            ),
+                          ),
+                          if (categoryName.isNotEmpty) ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 5),
+                              child: Text(
+                                '•',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                ),
+                              ),
+                            ),
+                            Flexible(
+                              child: Text(
+                                categoryName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // 3. Read Pill Button
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withValues(alpha: isDark ? 0.2 : 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.primaryGold.withValues(alpha: 0.4),
+                      width: 1,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _getSpeakerAndTime(),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isDark
-                              ? AppColors.textSecondaryDark.withValues(alpha: 0.7)
-                              : AppColors.textSecondaryLight.withValues(alpha: 0.7),
-                          fontSize: 12,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Text(
+                        'Read',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryGold,
                         ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(width: 3),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 13,
+                        color: AppColors.primaryGold,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

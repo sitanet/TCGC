@@ -1992,6 +1992,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
               categoryId: category.id,
               categories: allCategories.map((c) => c.name).toList(),
               categoryNameToId: categoryNameToId,
+              categoryImageUrl: category.imageUrl,
             ),
           ),
         );
