@@ -696,7 +696,7 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
       displayTitle = _selectedCategory;
     }
 
-    if ((imageUrl == null || imageUrl.isEmpty) && _filteredItems.isNotEmpty) {
+    if (!isMinister && (imageUrl == null || imageUrl.isEmpty) && _filteredItems.isNotEmpty) {
       for (final s in _filteredItems) {
         if (s.imageUrl != null && s.imageUrl!.isNotEmpty) {
           imageUrl = s.imageUrl;
@@ -747,22 +747,28 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                           useOldImageOnUrlChange: true,
                           fadeInDuration: Duration.zero,
                           fadeOutDuration: Duration.zero,
-                          placeholder: (_, __) => Icon(
-                            isMinister ? Icons.person_rounded : Icons.music_note_rounded,
-                            size: 32,
-                            color: pillColor,
-                          ),
-                          errorWidget: (_, __, ___) => Icon(
-                            isMinister ? Icons.person_rounded : Icons.music_note_rounded,
-                            size: 32,
-                            color: pillColor,
-                          ),
+                          placeholder: (_, __) => isMinister
+                              ? const SizedBox.shrink()
+                              : Icon(
+                                  Icons.music_note_rounded,
+                                  size: 32,
+                                  color: pillColor,
+                                ),
+                          errorWidget: (_, __, ___) => isMinister
+                              ? const SizedBox.shrink()
+                              : Icon(
+                                  Icons.music_note_rounded,
+                                  size: 32,
+                                  color: pillColor,
+                                ),
                         )
-                      : Icon(
-                          isMinister ? Icons.person_rounded : Icons.music_note_rounded,
-                          size: 32,
-                          color: pillColor,
-                        ),
+                      : (isMinister
+                          ? null
+                          : Icon(
+                              Icons.music_note_rounded,
+                              size: 32,
+                              color: pillColor,
+                            )),
                 ),
               ),
               const SizedBox(width: 14),

@@ -1566,21 +1566,6 @@ class _AudioPageState extends ConsumerState<AudioPage>
 
     final formattedName = _formatSpeakerName(speaker.fullName);
 
-    // Check for sample sermon image if speaker photo is missing
-    String? sampleSermonImage;
-    if (speaker.photoUrl == null || speaker.photoUrl!.isEmpty) {
-      for (var s in _sermons) {
-        if (s.speaker != null &&
-            (s.speaker!.toLowerCase().contains(speaker.name.toLowerCase()) ||
-             speaker.fullName.toLowerCase().contains(s.speaker!.toLowerCase())) &&
-            s.imageUrl != null &&
-            s.imageUrl!.isNotEmpty) {
-          sampleSermonImage = s.imageUrl;
-          break;
-        }
-      }
-    }
-
     return GestureDetector(
       onTap: () async {
         final categoryNameToId = {for (var c in _categories) c.name: c.id};
@@ -1634,11 +1619,13 @@ class _AudioPageState extends ConsumerState<AudioPage>
                           useOldImageOnUrlChange: true,
                           fadeInDuration: Duration.zero,
                           fadeOutDuration: Duration.zero,
-                          errorWidget: (_, __, ___) => _buildSpeakerFallbackImage(speaker, sampleSermonImage, isDark),
+                          errorWidget: (_, __, ___) => _buildSpeakerFallbackImage(isDark),
                         ),
                       )
                     else
-                      _buildSpeakerFallbackImage(speaker, sampleSermonImage, isDark),
+                      Positioned.fill(
+                        child: _buildSpeakerFallbackImage(isDark),
+                      ),
 
                     // External Minister Badge
                     if (speaker.isExternalMinister)
@@ -1756,58 +1743,9 @@ class _AudioPageState extends ConsumerState<AudioPage>
     );
   }
 
-  Widget _buildSpeakerFallbackImage(SpeakerModel speaker, String? sampleSermonImage, bool isDark) {
-    if (sampleSermonImage != null && sampleSermonImage.isNotEmpty) {
-      return Stack(
-        children: [
-          Positioned.fill(
-            child: CachedNetworkImage(
-              imageUrl: sampleSermonImage,
-              cacheManager: CustomImageCacheManager.instance,
-              fit: BoxFit.cover,
-              memCacheWidth: 400,
-              memCacheHeight: 400,
-              fadeInDuration: Duration.zero,
-              fadeOutDuration: Duration.zero,
-            ),
-          ),
-          Positioned.fill(
-            child: Container(
-              color: Colors.black.withValues(alpha: 0.35),
-            ),
-          ),
-        ],
-      );
-    }
-
+  Widget _buildSpeakerFallbackImage(bool isDark) {
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primaryGold.withValues(alpha: 0.7),
-            isDark ? AppColors.cardDark : const Color(0xFF1E293B),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.person, size: 36, color: Colors.white),
-            const SizedBox(height: 4),
-            Text(
-              speaker.name.isNotEmpty ? speaker.name[0].toUpperCase() : 'M',
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
+      color: isDark ? AppColors.cardDark : AppColors.dividerLight,
     );
   }
 

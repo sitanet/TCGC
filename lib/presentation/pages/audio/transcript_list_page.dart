@@ -474,7 +474,7 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
     }
 
     // Fallback image from first available item in filtered list if not already resolved
-    if ((imageUrl == null || imageUrl.isEmpty) && _filteredItems.isNotEmpty) {
+    if (!isSpeakerMode && (imageUrl == null || imageUrl.isEmpty) && _filteredItems.isNotEmpty) {
       for (final t in _filteredItems) {
         if (t.imageUrl != null && t.imageUrl!.isNotEmpty) {
           imageUrl = t.imageUrl;
@@ -645,11 +645,16 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
   }
 
   Widget _buildHeroPlaceholder(bool isSpeaker, bool isDark) {
+    if (isSpeaker) {
+      return Container(
+        color: isDark ? AppColors.cardDark : Colors.grey.shade100,
+      );
+    }
     return Container(
       color: isDark ? AppColors.cardDark : Colors.grey.shade100,
       child: Center(
         child: Icon(
-          isSpeaker ? Icons.person_rounded : Icons.auto_stories_rounded,
+          Icons.auto_stories_rounded,
           size: 34,
           color: AppColors.primaryGold.withValues(alpha: 0.8),
         ),
