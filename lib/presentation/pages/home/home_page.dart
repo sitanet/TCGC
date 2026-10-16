@@ -18,6 +18,9 @@ import '../audio/audio_player_page.dart';
 import '../audio/audio_list_page.dart';
 import '../profile/profile_page.dart';
 import '../notifications/notifications_page.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../ask_wing_ai/ask_wing_ai_chat_page.dart';
+import '../../bloc/ask_wing_ai/ask_wing_ai_cubit.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -333,6 +336,53 @@ class _HomePageState extends ConsumerState<HomePage> {
                 SizedBox(height: spacing * 1.5),
                 _buildRecentActivities(context, isDark),
                 SizedBox(height: spacing * 6),
+              ],
+            ),
+          ),
+        ),
+        floatingActionButton: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => BlocProvider.value(
+                  value: context.read<AskWingAICubit>(),
+                  child: const AskWingAIChatPage(),
+                ),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.primaryGold,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryGold.withValues(alpha: 0.4),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+                SizedBox(width: 7),
+                Text(
+                  'Ask Wing AI',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2,
+                  ),
+                ),
               ],
             ),
           ),
