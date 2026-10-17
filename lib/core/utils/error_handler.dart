@@ -1,8 +1,23 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 
+/// Global ScaffoldMessenger key to guarantee reliable snackbar operations across the app
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 /// Global error handler that converts technical errors to user-friendly messages
 class ErrorHandler {
+  static ScaffoldMessengerState? _getMessenger(BuildContext? context) {
+    if (context != null && context.mounted) {
+      try {
+        return ScaffoldMessenger.maybeOf(context) ?? rootScaffoldMessengerKey.currentState;
+      } catch (_) {
+        return rootScaffoldMessengerKey.currentState;
+      }
+    }
+    return rootScaffoldMessengerKey.currentState;
+  }
+
   /// Convert exception to user-friendly message
   static String getErrorMessage(dynamic error) {
     if (error == null) return 'Something went wrong. Please try again.';
@@ -137,8 +152,13 @@ class ErrorHandler {
   /// Show error snackbar with user-friendly message
   static void showError(BuildContext context, dynamic error, {Duration? duration}) {
     final message = getErrorMessage(error);
+    final messenger = _getMessenger(context);
+    if (messenger == null) return;
     
-    ScaffoldMessenger.of(context).showSnackBar(
+    // Clear any previous or queued snackbars so they do not stack up
+    messenger.clearSnackBars();
+    
+    messenger.showSnackBar(
       SnackBar(
         content: Row(
           children: [
@@ -147,7 +167,7 @@ class ErrorHandler {
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(fontSize: 14),
+                style: const TextStyle(fontSize: 14, color: Colors.white),
               ),
             ),
           ],
@@ -155,11 +175,13 @@ class ErrorHandler {
         backgroundColor: Colors.red.shade700,
         behavior: SnackBarBehavior.floating,
         duration: duration ?? const Duration(seconds: 4),
+        dismissDirection: DismissDirection.horizontal,
         action: SnackBarAction(
           label: 'Dismiss',
           textColor: Colors.white,
           onPressed: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            // Instantly clear all snackbars without waiting for animations
+            messenger.clearSnackBars();
           },
         ),
       ),
@@ -168,7 +190,12 @@ class ErrorHandler {
   
   /// Show success snackbar
   static void showSuccess(BuildContext context, String message, {Duration? duration}) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = _getMessenger(context);
+    if (messenger == null) return;
+
+    messenger.clearSnackBars();
+
+    messenger.showSnackBar(
       SnackBar(
         content: Row(
           children: [
@@ -177,7 +204,7 @@ class ErrorHandler {
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(fontSize: 14),
+                style: const TextStyle(fontSize: 14, color: Colors.white),
               ),
             ),
           ],
@@ -185,13 +212,19 @@ class ErrorHandler {
         backgroundColor: Colors.green.shade700,
         behavior: SnackBarBehavior.floating,
         duration: duration ?? const Duration(seconds: 3),
+        dismissDirection: DismissDirection.horizontal,
       ),
     );
   }
   
   /// Show warning snackbar
   static void showWarning(BuildContext context, String message, {Duration? duration}) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = _getMessenger(context);
+    if (messenger == null) return;
+
+    messenger.clearSnackBars();
+
+    messenger.showSnackBar(
       SnackBar(
         content: Row(
           children: [
@@ -200,7 +233,7 @@ class ErrorHandler {
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(fontSize: 14),
+                style: const TextStyle(fontSize: 14, color: Colors.white),
               ),
             ),
           ],
@@ -208,13 +241,19 @@ class ErrorHandler {
         backgroundColor: Colors.orange.shade700,
         behavior: SnackBarBehavior.floating,
         duration: duration ?? const Duration(seconds: 3),
+        dismissDirection: DismissDirection.horizontal,
       ),
     );
   }
   
   /// Show info snackbar
   static void showInfo(BuildContext context, String message, {Duration? duration}) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = _getMessenger(context);
+    if (messenger == null) return;
+
+    messenger.clearSnackBars();
+
+    messenger.showSnackBar(
       SnackBar(
         content: Row(
           children: [
@@ -223,7 +262,7 @@ class ErrorHandler {
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(fontSize: 14),
+                style: const TextStyle(fontSize: 14, color: Colors.white),
               ),
             ),
           ],
@@ -231,6 +270,7 @@ class ErrorHandler {
         backgroundColor: Colors.blue.shade700,
         behavior: SnackBarBehavior.floating,
         duration: duration ?? const Duration(seconds: 3),
+        dismissDirection: DismissDirection.horizontal,
       ),
     );
   }

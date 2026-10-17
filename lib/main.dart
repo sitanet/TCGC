@@ -1,5 +1,5 @@
 import 'dart:async'
-    show Future, StreamSubscription, TimeoutException, runZonedGuarded;
+    show Future, StreamSubscription, runZonedGuarded;
 import 'dart:io';
 import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -47,6 +47,7 @@ import 'core/services/image_cache_service.dart';
 import 'presentation/bloc/ask_wing_ai/ask_wing_ai_cubit.dart';
 import 'data/services/ask_wing_ai_service.dart';
 import 'core/services/token_service.dart';
+import 'core/utils/error_handler.dart';
 
 final communityChangeNotifierProvider =
     ChangeNotifierProvider<CommunityProvider>((ref) => CommunityProvider());
@@ -691,6 +692,7 @@ class _MyAppState extends ConsumerState<MyApp> {
     if (_showUpdateDialog && _updateInfo != null) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
       return MaterialApp(
+        scaffoldMessengerKey: rootScaffoldMessengerKey,
         title: 'TCGC',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
@@ -787,6 +789,7 @@ class _MyAppState extends ConsumerState<MyApp> {
     }
 
     return MaterialApp(
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       title: 'TCGC',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
@@ -807,12 +810,10 @@ class MainScreen extends ConsumerStatefulWidget {
 class _MainScreenState extends ConsumerState<MainScreen>
     with WidgetsBindingObserver {
   bool _showPromotion = false;
-  bool _showUpdateDialog = false;
   bool _showReadyToPlayPopup = false;
   bool _walletAuthenticated = false;
   List<Promotion> _activePromotions = [];
   final DataService _dataService = DataService();
-  AppUpdateInfo? _updateInfo;
   StreamSubscription? _deepLinkSub;
   late AskWingAICubit _askWingAICubit;
 
@@ -1229,7 +1230,6 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final appConfig = ref.watch(appConfigChangeNotifierProvider);
     final showWallet = !appConfig.config.walletPageDisabled;
     final maxIndex = showWallet ? 4 : 3;

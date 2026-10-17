@@ -32,7 +32,9 @@ class _NetworkAwareWidgetState extends State<NetworkAwareWidget> {
 
   void _showNoConnectionToast() {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
       SnackBar(
         content: const Row(
           children: [
@@ -47,8 +49,9 @@ class _NetworkAwareWidgetState extends State<NetworkAwareWidget> {
           ],
         ),
         backgroundColor: Colors.red.shade700,
-        duration: const Duration(seconds: 5),
+        duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
+        dismissDirection: DismissDirection.horizontal,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
@@ -57,7 +60,9 @@ class _NetworkAwareWidgetState extends State<NetworkAwareWidget> {
 
   void _showConnectionRestoredToast() {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
       SnackBar(
         content: const Row(
           children: [
@@ -74,6 +79,7 @@ class _NetworkAwareWidgetState extends State<NetworkAwareWidget> {
         backgroundColor: Colors.green.shade700,
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
+        dismissDirection: DismissDirection.horizontal,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),

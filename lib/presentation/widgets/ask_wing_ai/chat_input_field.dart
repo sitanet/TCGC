@@ -212,7 +212,7 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
   }
 
   void _showNoNetworkToast(BuildContext context) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(

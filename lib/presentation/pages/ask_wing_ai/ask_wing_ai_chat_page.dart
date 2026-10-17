@@ -633,7 +633,7 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
 
     final isConnected = ConnectivityService().isConnected;
     if (!isConnected) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
