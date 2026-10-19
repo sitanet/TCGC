@@ -28,7 +28,9 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   static const String _liveStreamUrl =
       'https://dcitygatechurch.mixlr.com/embed';
   static const String _watchLiveUrl =
-      'https://thecitygatechurch.org/tcgc/watchlive_mobile/';
+      'https://thecitygatechurch.org/watch-live/?app=1';
+  static const String _watchLiveWebUrl =
+      'https://thecitygatechurch.org/watch-live/';
 
   bool _isStreamLiveLoading = true;
   bool _isWatchLiveLoading = true;
@@ -133,7 +135,7 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     HapticFeedback.lightImpact();
     final isVideo = _tabController.index == 1;
     final streamType = isVideo ? 'Video' : 'Audio';
-    final shareUrl = isVideo ? _watchLiveUrl : 'https://dcitygatechurch.mixlr.com';
+    final shareUrl = isVideo ? _watchLiveWebUrl : 'https://dcitygatechurch.mixlr.com';
 
     await Share.share(
       'Join us live for an impactful service with The City Gate Church ($streamType broadcast)!\n\n'
@@ -146,7 +148,7 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   Future<void> _handleOpenInBrowser() async {
     HapticFeedback.lightImpact();
     final isVideo = _tabController.index == 1;
-    final targetUrl = isVideo ? _watchLiveUrl : 'https://dcitygatechurch.mixlr.com';
+    final targetUrl = isVideo ? _watchLiveWebUrl : 'https://dcitygatechurch.mixlr.com';
     final uri = Uri.parse(targetUrl);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
