@@ -14,6 +14,7 @@ import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_list_page.dart';
 import 'audio_player_page.dart';
+import '../../widgets/resume_playback_sheet.dart';
 import 'favorites_page.dart';
 import 'playlists_page.dart';
 import 'downloads_page.dart';
@@ -746,12 +747,12 @@ class _AudioPageState extends ConsumerState<AudioPage>
     return GestureDetector(
       onTap: () {
         final index = searchResults.indexOf(sermon);
-        audioProvider.setQueue(searchResults, index >= 0 ? index : 0);
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AudioPlayerPage(sermon: sermon),
-          ),
+        ResumePlaybackHelper.handleMessageTap(
+          context: context,
+          ref: ref,
+          sermon: sermon,
+          queue: searchResults,
+          queueIndex: index >= 0 ? index : 0,
         );
       },
       child: Container(
@@ -1036,13 +1037,12 @@ class _AudioPageState extends ConsumerState<AudioPage>
     return GestureDetector(
       onTap: () {
         final index = queue.indexOf(sermon);
-        audioProvider.setQueue(queue, index >= 0 ? index : 0);
-        // AudioPlayerPage starts playback itself (avoids double-start race)
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AudioPlayerPage(sermon: sermon),
-          ),
+        ResumePlaybackHelper.handleMessageTap(
+          context: context,
+          ref: ref,
+          sermon: sermon,
+          queue: queue,
+          queueIndex: index >= 0 ? index : 0,
         );
       },
       child: Container(

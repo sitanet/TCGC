@@ -15,6 +15,7 @@ import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/event.dart';
 import '../../../domain/entities/beginner_category.dart';
 import '../audio/audio_player_page.dart';
+import '../../widgets/resume_playback_sheet.dart';
 import '../audio/audio_list_page.dart';
 import '../profile/profile_page.dart';
 import '../notifications/notifications_page.dart';
@@ -1319,9 +1320,10 @@ class _HomePageState extends ConsumerState<HomePage> {
           _showLockedMessage(context, isDark);
           return;
         }
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: sermon)),
+        ResumePlaybackHelper.handleMessageTap(
+          context: context,
+          ref: ref,
+          sermon: sermon,
         );
       },
       child: Container(
@@ -1640,9 +1642,10 @@ class _HomePageState extends ConsumerState<HomePage> {
           _showLockedMessage(context, isDark);
           return;
         }
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: sermon)),
+        ResumePlaybackHelper.handleMessageTap(
+          context: context,
+          ref: ref,
+          sermon: sermon,
         );
       },
       child: Container(

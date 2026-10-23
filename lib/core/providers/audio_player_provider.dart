@@ -109,6 +109,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   // Throttle position updates to reduce UI rebuilds (every 500ms instead of every frame)
   DateTime _lastPositionNotify = DateTime.now();
   static const _positionThrottleMs = 500;
+  DateTime _lastPositionSave = DateTime.now();
 
   Sermon? get currentSermon => _currentSermon;
   Duration get duration => _duration;
@@ -283,6 +284,12 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
           _lastPositionNotify = now;
           notifyListeners();
         }
+        if (_isPlaying && _currentSermon != null && _duration.inMilliseconds > 0 && _position.inMilliseconds > 5000) {
+          if (now.difference(_lastPositionSave).inSeconds >= 5) {
+            _lastPositionSave = now;
+            _positionService.savePosition(_currentSermon!.id, _position, _duration);
+          }
+        }
       }, onError: (error) {
         debugPrint('Position stream error: $error');
       }),
@@ -347,6 +354,12 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
         if (now.difference(_lastPositionNotify).inMilliseconds >= _positionThrottleMs) {
           _lastPositionNotify = now;
           notifyListeners();
+        }
+        if (_isPlaying && _currentSermon != null && _duration.inMilliseconds > 0 && _position.inMilliseconds > 5000) {
+          if (now.difference(_lastPositionSave).inSeconds >= 5) {
+            _lastPositionSave = now;
+            _positionService.savePosition(_currentSermon!.id, _position, _duration);
+          }
         }
       }, onError: (error) {
         debugPrint('Fallback position stream error: $error');

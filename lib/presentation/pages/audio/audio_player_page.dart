@@ -16,11 +16,19 @@ import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/password_input_field.dart';
 import '../../widgets/animated_play_button.dart';
+import '../../widgets/resume_playback_sheet.dart';
 
 class AudioPlayerPage extends ConsumerStatefulWidget {
   final Sermon sermon;
+  final Duration? initialPosition;
+  final bool? startFromBeginning;
 
-  const AudioPlayerPage({super.key, required this.sermon});
+  const AudioPlayerPage({
+    super.key,
+    required this.sermon,
+    this.initialPosition,
+    this.startFromBeginning,
+  });
 
   @override
   ConsumerState<AudioPlayerPage> createState() => _AudioPlayerPageState();
@@ -324,111 +332,41 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
       return;
     }
 
+    // If explicit position or startFromBeginning was requested
+    if (widget.initialPosition != null) {
+      if (widget.startFromBeginning == true || widget.initialPosition == Duration.zero) {
+        await audioProvider.clearSavedPosition(widget.sermon.id);
+        await audioProvider.playSermon(widget.sermon);
+      } else {
+        await audioProvider.playSermonFromPosition(
+          widget.sermon,
+          widget.initialPosition!,
+        );
+      }
+      return;
+    }
+
     final savedPosition = audioProvider.getSavedPosition(widget.sermon.id);
 
     if (savedPosition != null && savedPosition.isSignificant) {
-      // Start playing immediately from where the user left off
-      audioProvider.playSermonFromPosition(
-        widget.sermon,
-        savedPosition.position,
+      ResumePlaybackHelper.showResumeSheet(
+        context: context,
+        sermon: widget.sermon,
+        position: savedPosition,
+        onContinue: () {
+          audioProvider.playSermonFromPosition(
+            widget.sermon,
+            savedPosition.position,
+          );
+        },
+        onStartOver: () {
+          audioProvider.clearSavedPosition(widget.sermon.id);
+          audioProvider.playSermon(widget.sermon);
+        },
       );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Resumed from ${savedPosition.formattedPosition}'),
-            duration: const Duration(seconds: 4),
-            behavior: SnackBarBehavior.floating,
-            action: SnackBarAction(
-              label: 'Start over',
-              textColor: AppColors.primaryGold,
-              onPressed: () {
-                audioProvider.clearSavedPosition(widget.sermon.id);
-                audioProvider.seek(Duration.zero);
-              },
-            ),
-          ),
-        );
-      }
     } else {
       await audioProvider.playSermon(widget.sermon);
     }
-  }
-
-  // ignore: unused_element
-  void _showResumeDialog(PlaybackPosition savedPosition) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Resume Playback'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.play_circle_outline,
-              size: 48,
-              color: AppColors.primaryGold,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'You were at ${savedPosition.formattedPosition} of ${savedPosition.formattedDuration}',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Would you like to continue where you left off?',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
-              audioProvider.clearSavedPosition(widget.sermon.id);
-              audioProvider.playSermon(widget.sermon);
-            },
-            child: Text(
-              'Start Over',
-              style: TextStyle(
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
-              audioProvider.playSermonFromPosition(
-                widget.sermon,
-                savedPosition.position,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryGold,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('Resume'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _initializeServices() async {

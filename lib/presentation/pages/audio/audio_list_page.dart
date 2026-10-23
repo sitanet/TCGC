@@ -13,6 +13,7 @@ import '../../../main.dart';
 import 'package:flutter/services.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_player_page.dart';
+import '../../widgets/resume_playback_sheet.dart';
 
 enum FilterType { category, speaker, date }
 
@@ -592,8 +593,13 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                                 if (isCurrentlyPlaying) {
                                   audioProvider.pause();
                                 } else {
-                                  audioProvider.setQueue(_filteredItems, index);
-                                  audioProvider.playSermon(audio);
+                                  ResumePlaybackHelper.handleMessageTap(
+                                    context: context,
+                                    ref: ref,
+                                    sermon: audio,
+                                    queue: _filteredItems,
+                                    queueIndex: index,
+                                  );
                                 }
                               },
                               onCardTap: () {
@@ -601,12 +607,12 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                                   _showLockedMessage(context, isDark);
                                   return;
                                 }
-                                audioProvider.setQueue(_filteredItems, index);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => AudioPlayerPage(sermon: audio),
-                                  ),
+                                ResumePlaybackHelper.handleMessageTap(
+                                  context: context,
+                                  ref: ref,
+                                  sermon: audio,
+                                  queue: _filteredItems,
+                                  queueIndex: index,
                                 );
                               },
                             );

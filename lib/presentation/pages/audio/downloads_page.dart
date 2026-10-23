@@ -8,6 +8,7 @@ import '../../../data/services/playback_position_service.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_player_page.dart';
+import '../../widgets/resume_playback_sheet.dart';
 
 class DownloadsPage extends ConsumerStatefulWidget {
   const DownloadsPage({super.key});
@@ -263,7 +264,13 @@ class _DownloadsPageState extends ConsumerState<DownloadsPage> {
             if (hasResume)
               IconButton(
                 icon: Icon(Icons.play_circle_filled, color: AppColors.primaryGold, size: 28),
-                onPressed: () => _playWithResume(sermon, savedPosition),
+                onPressed: () {
+                  ResumePlaybackHelper.handleMessageTap(
+                    context: context,
+                    ref: ref,
+                    sermon: sermon,
+                  );
+                },
                 tooltip: 'Resume',
               )
             else
@@ -275,65 +282,16 @@ class _DownloadsPageState extends ConsumerState<DownloadsPage> {
           ],
         ),
         onTap: () {
-          if (hasResume) {
-            _showResumeDialog(context, sermon, savedPosition, isDark);
-          } else {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: sermon)),
-            );
-          }
+          ResumePlaybackHelper.handleMessageTap(
+            context: context,
+            ref: ref,
+            sermon: sermon,
+          );
         },
       ),
     );
   }
   
-  void _playWithResume(sermon, PlaybackPosition position) {
-    final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
-    audioProvider.playSermonFromPosition(sermon, position.position);
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: sermon)),
-    );
-  }
-  
-  void _showResumeDialog(BuildContext context, sermon, PlaybackPosition position, bool isDark) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Resume Playback?'),
-        content: Text(
-          'You were at ${position.formattedPosition} of ${position.formattedDuration}.\n\nWould you like to resume or start from the beginning?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: sermon)),
-              );
-            },
-            child: const Text('Start Over'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _playWithResume(sermon, position);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryGold,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Resume'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPlaceholder(bool isDark) {
     return Icon(
       Icons.music_note,
