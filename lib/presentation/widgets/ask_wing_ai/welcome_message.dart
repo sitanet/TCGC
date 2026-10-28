@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import 'ai_consent_dialog.dart';
 
 /// Beautiful welcome page shown when chat history is empty
 class WelcomeMessage extends StatelessWidget {
@@ -141,6 +142,39 @@ class WelcomeMessage extends StatelessWidget {
 
               // ── Prompt Counter Chip ──
               _buildPromptChip(remaining, limit, isDark),
+              const SizedBox(height: 10),
+
+              // AI Privacy & Data Disclosure Notice
+              GestureDetector(
+                onTap: () {
+                  AIConsentDialog.showConsentDialog(context, isInformationalOnly: true);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.08),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.shield_outlined, size: 14, color: AppColors.primaryGold),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Powered by OpenAI • Data Privacy Notice',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? Colors.grey[300] : Colors.grey[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 24),
 
               // ── Suggestion Grid (Responsive) ──

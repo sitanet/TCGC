@@ -7,6 +7,8 @@ import '../../widgets/ask_wing_ai/chat_input_field.dart';
 import '../../widgets/ask_wing_ai/welcome_message.dart';
 import '../../widgets/ask_wing_ai/rate_limit_indicator.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
+import '../../widgets/ask_wing_ai/ai_consent_dialog.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../domain/entities/user.dart';
 import '../../../core/utils/error_handler.dart';
@@ -58,6 +60,19 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
     final cubit = context.read<AskWingAICubit>();
     if (cubit.state is AskWingAIInitial) {
       cubit.initialize();
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _verifyAIConsent();
+    });
+  }
+
+  Future<void> _verifyAIConsent() async {
+    final hasConsent = await AIConsentDialog.hasConsented();
+    if (!hasConsent && mounted) {
+      final granted = await AIConsentDialog.showConsentDialog(context);
+      if (!granted && mounted) {
+        Navigator.of(context).pop();
+      }
     }
   }
 
@@ -242,10 +257,25 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
               return const SizedBox.shrink();
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.privacy_tip_outlined, color: AppColors.primaryGold),
+            tooltip: 'AI Privacy & Data Notice',
+            onPressed: () => AIConsentDialog.showConsentDialog(context, isInformationalOnly: true),
+          ),
           // More menu
           PopupMenuButton<String>(
             onSelected: (value) => _handleMenuAction(value, context),
             itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'privacy',
+                child: Row(
+                  children: [
+                    Icon(Icons.privacy_tip_outlined, color: AppColors.primaryGold),
+                    SizedBox(width: 8),
+                    Text('AI Privacy & Data Notice'),
+                  ],
+                ),
+              ),
               const PopupMenuItem(
                 value: 'clear',
                 child: Row(
@@ -628,7 +658,12 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
     return true;
   }
 
-  void _submitQuestion(String question, AskWingAIState state) {
+  void _submitQuestion(String question, AskWingAIState state) async {
+    final hasConsent = await AIConsentDialog.hasConsented();
+    if (!hasConsent && mounted) {
+      final granted = await AIConsentDialog.showConsentDialog(context);
+      if (!granted) return;
+    }
     if (question.trim().isEmpty) return;
 
     final isConnected = ConnectivityService().isConnected;
@@ -676,6 +711,9 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
 
   void _handleMenuAction(String action, BuildContext context) {
     switch (action) {
+      case 'privacy':
+        AIConsentDialog.showConsentDialog(context, isInformationalOnly: true);
+        break;
       case 'clear':
         _showClearHistoryDialog(context);
         break;

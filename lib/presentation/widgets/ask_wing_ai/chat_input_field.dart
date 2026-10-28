@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import '../../../core/services/connectivity_service.dart';
+import '../../../core/services/connectivity_service.dart';
+import 'ai_consent_dialog.dart';
+import '../../../core/theme/app_colors.dart';
 
 /// Elegant chat input field with network awareness, voice input (speech-to-text), and animated send button
 class ChatInputField extends StatefulWidget {
@@ -281,9 +283,12 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: SafeArea(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
             // ── Text field ──
             Expanded(
               child: AnimatedContainer(
@@ -429,8 +434,37 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
             ),
           ],
         ),
-      ),
-    );
+        Padding(
+          padding: const EdgeInsets.only(top: 5, bottom: 1),
+          child: GestureDetector(
+            onTap: () {
+              AIConsentDialog.showConsentDialog(context, isInformationalOnly: true);
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.shield_outlined,
+                  size: 11,
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Queries processed securely via OpenAI • Tap for Privacy Notice',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    letterSpacing: 0.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  ),
+);
   }
 
   void _handleSubmit() {

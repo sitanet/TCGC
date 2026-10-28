@@ -60,6 +60,18 @@ class PrivacyPolicyPage extends StatelessWidget {
               _buildSection(
                 context,
                 isDark,
+                'Third-Party Artificial Intelligence Services (Ask Wing AI)',
+                'Our app features Ask Wing AI, an intelligent assistant designed to help users search, explore, and understand church sermon transcripts, biblical teachings, and ministry devotionals.\n\n'
+                    '• What Data is Sent: When you interact with Ask Wing AI, only the specific questions, prompts, and biblical search queries you enter into the chat are transmitted to process your request.\n\n'
+                    '• Third-Party Service Provider: Queries are processed securely by OpenAI, LLC (a third-party artificial intelligence provider) via encrypted API and our secure cloud backend server.\n\n'
+                    '• No Personal Identifiers Shared: We do NOT share your name, email address, password, phone number, financial details, or personal device identifiers with OpenAI. The data sent is strictly limited to the text of your biblical query.\n\n'
+                    '• Equal Data Protection: OpenAI provides industry-standard security and confidentiality protections. In accordance with OpenAI API policies, user data submitted through the API is not used to train or improve AI models.\n\n'
+                    '• User Consent & Permission: You are required to provide explicit in-app consent before any queries are sent to Ask Wing AI. You may decline to use the AI assistant at any time and continue using all sermon audio and devotional features without restriction.\n\n'
+                    '• User Control & Data Deletion: You can clear your entire Ask Wing AI conversation history at any time directly within the chat screen.',
+              ),
+              _buildSection(
+                context,
+                isDark,
                 'Your Rights',
                 'You have the right to:\n\n'
                     '• Access your personal data\n'
@@ -209,7 +221,7 @@ class PrivacyPolicyPage extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Text(
-            'Last Updated: December 2025',
+            'Last Updated: October 2026',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: isDark
                       ? AppColors.textSecondaryDark

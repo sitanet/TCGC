@@ -22,6 +22,7 @@ import '../notifications/notifications_page.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../ask_wing_ai/ask_wing_ai_chat_page.dart';
 import '../../bloc/ask_wing_ai/ask_wing_ai_cubit.dart';
+import '../../widgets/ask_wing_ai/ai_consent_dialog.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -342,7 +343,13 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
         floatingActionButton: GestureDetector(
-          onTap: () {
+          onTap: () async {
+            final hasConsent = await AIConsentDialog.hasConsented();
+            if (!context.mounted) return;
+            if (!hasConsent) {
+              final granted = await AIConsentDialog.showConsentDialog(context);
+              if (!granted || !context.mounted) return;
+            }
             Navigator.push(
               context,
               MaterialPageRoute(

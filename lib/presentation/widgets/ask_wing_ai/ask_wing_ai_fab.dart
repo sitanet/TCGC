@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../bloc/ask_wing_ai/ask_wing_ai_cubit.dart';
 import '../../bloc/ask_wing_ai/ask_wing_ai_state.dart';
 import '../../pages/ask_wing_ai/ask_wing_ai_chat_page.dart';
+import 'ai_consent_dialog.dart';
 
 /// Floating Action Button for Ask Wing AI
 /// Shows in bottom-right corner of home page
@@ -33,7 +34,7 @@ class AskWingAIFAB extends StatelessWidget {
     );
   }
 
-  void _onPressed(BuildContext context, AskWingAIState state) {
+  void _onPressed(BuildContext context, AskWingAIState state) async {
     // Check authentication
     // TODO: Add your authentication check here
     // final isAuthenticated = context.read<AuthCubit>().state is AuthAuthenticated;
@@ -51,6 +52,14 @@ class AskWingAIFAB extends StatelessWidget {
         ),
       );
       return;
+    }
+
+    // Check AI consent
+    final hasConsent = await AIConsentDialog.hasConsented();
+    if (!context.mounted) return;
+    if (!hasConsent) {
+      final granted = await AIConsentDialog.showConsentDialog(context);
+      if (!granted || !context.mounted) return;
     }
 
     // Navigate to chat page
