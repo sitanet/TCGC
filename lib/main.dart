@@ -1235,12 +1235,8 @@ class _MainScreenState extends ConsumerState<MainScreen>
     final maxIndex = showWallet ? 4 : 3;
     final safeIndex = _currentIndex > maxIndex ? 0 : _currentIndex;
 
-    if (_showPromotion && _activePromotions.isNotEmpty) {
-      return PromotionPopup(
-        promotions: _activePromotions,
-        onClose: _closePromotion,
-      );
-    }
+    // Church promotions and announcements are now displayed directly
+    // as an interactive modal dialog on the Home dashboard.
 
     if (_showReadyToPlayPopup) {
       return BlocProvider<AskWingAICubit>(

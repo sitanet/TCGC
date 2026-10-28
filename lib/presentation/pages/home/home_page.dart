@@ -14,7 +14,7 @@ import '../../../data/services/played_audio_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/event.dart';
 import '../../../domain/entities/beginner_category.dart';
-import '../audio/audio_player_page.dart';
+
 import '../../widgets/resume_playback_sheet.dart';
 import '../audio/audio_list_page.dart';
 import '../profile/profile_page.dart';
@@ -23,6 +23,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../ask_wing_ai/ask_wing_ai_chat_page.dart';
 import '../../bloc/ask_wing_ai/ask_wing_ai_cubit.dart';
 import '../../widgets/ask_wing_ai/ai_consent_dialog.dart';
+import '../../../data/services/church_announcement_service.dart';
+import '../../widgets/church_announcement_dialog.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -86,6 +88,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       _initServices();
       _loadData();
       _startEventAutoSlide();
+      _checkChurchAnnouncement();
     });
   }
 
@@ -107,6 +110,21 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
   }
 
+  Future<void> _checkChurchAnnouncement() async {
+    try {
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (!mounted) return;
+
+      final announcement =
+          await ChurchAnnouncementService().getLatestAnnouncement();
+      if (announcement != null && mounted) {
+        await ChurchAnnouncementDialog.show(context, announcement);
+      }
+    } catch (e) {
+      debugPrint('Error checking church announcement: ');
+    }
+  }
+
   Future<void> _loadData({bool forceRefresh = false}) async {
     if (!mounted) return;
     // Only show full loading spinner if we have NO cached data at all

@@ -12,7 +12,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../domain/entities/user.dart';
 import '../../../core/utils/error_handler.dart';
-import '../../../core/services/connectivity_service.dart';
+
 
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -665,33 +665,7 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
       if (!granted) return;
     }
     if (question.trim().isEmpty) return;
-
-    final isConnected = ConnectivityService().isConnected;
-    if (!isConnected) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: const [
-              Icon(Icons.wifi_off_rounded, color: Colors.white, size: 20),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'No internet connection. Please check your network and try again.',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: const Color(0xFFD32F2F),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-      );
-      return;
-    }
+    if (!mounted) return;
 
     context.read<AskWingAICubit>().submitQuestion(question);
     _textController.clear();

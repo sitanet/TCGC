@@ -4,8 +4,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../pages/legal/privacy_policy_page.dart';
 
 /// Modal dialog providing explicit disclosure and requesting user permission
-/// before sharing user queries with OpenAI, fully compliant with Apple
-/// App Store Review Guidelines 5.1.1(i) and 5.1.2(i).
+/// before sharing user queries with OpenAI, fully compliant with global
+/// data protection laws and privacy regulations.
 class AIConsentDialog extends StatelessWidget {
   final bool isInformationalOnly;
 
@@ -126,7 +126,7 @@ class AIConsentDialog extends StatelessWidget {
 
               // Explanatory Note
               Text(
-                'Before you use Ask Wing AI, please review how your data is handled in accordance with Apple Privacy Guidelines 5.1.1(i) & 5.1.2(i):',
+                'Before you use Ask Wing AI, please review how your data is handled in accordance with data protection policy and privacy regulations:',
                 style: TextStyle(
                   fontSize: 12.5,
                   height: 1.4,

@@ -12,7 +12,7 @@ class ConnectivityService {
   final StreamController<bool> _connectionStatusController = StreamController<bool>.broadcast();
   
   Stream<bool> get connectionStream => _connectionStatusController.stream;
-  bool _isConnected = false; // Default to false - assume offline until verified
+  bool _isConnected = true; // Default to true so users are never blocked unnecessarily
   bool _initialized = false;
   bool get isConnected => _isConnected;
 
@@ -69,23 +69,22 @@ class ConnectivityService {
   /// Actually try to reach the internet to verify connectivity
   Future<bool> _hasActualInternet() async {
     if (kIsWeb) {
-      // On web, trust the connectivity check
       return true;
     }
     
     try {
-      // Try to lookup a reliable DNS (using multiple fallbacks)
-      // We only check if DNS resolves - no data is sent to these servers
-      final result = await InternetAddress.lookup('example.com')
-          .timeout(const Duration(seconds: 3));
+      final result = await InternetAddress.lookup('google.com')
+          .timeout(const Duration(seconds: 4));
       return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
-    } on SocketException catch (_) {
-      return false;
-    } on TimeoutException catch (_) {
-      return false;
-    } catch (e) {
-      debugPrint('Internet check error: $e');
-      return false;
+    } catch (_) {
+      try {
+        final fallback = await InternetAddress.lookup('thecitygatechurch.org')
+            .timeout(const Duration(seconds: 4));
+        return fallback.isNotEmpty && fallback[0].rawAddress.isNotEmpty;
+      } catch (e) {
+        debugPrint('DNS lookup failed, assuming connected to allow network requests: $e');
+        return true; // Don't block requests preemptively; let HTTP client execute
+      }
     }
   }
   

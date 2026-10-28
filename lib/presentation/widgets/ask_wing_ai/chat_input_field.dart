@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import '../../../core/services/connectivity_service.dart';
-import 'ai_consent_dialog.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/services/connectivity_service.dart';
+
+import 'ai_consent_dialog.dart';
+
+
 
 /// Elegant chat input field with network awareness, voice input (speech-to-text), and animated send button
 class ChatInputField extends StatefulWidget {
@@ -242,9 +244,7 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
     if (_isListening) {
       return 'Listening to your voice...';
     }
-    if (!_isConnected) {
-      return 'No internet connection • Connect to network';
-    }
+
     if (!widget.enabled) {
       return 'Daily limit reached (15/15) • Please wait until tomorrow';
     }
@@ -468,10 +468,6 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
   }
 
   void _handleSubmit() {
-    if (!_isConnected) {
-      _showNoNetworkToast(context);
-      return;
-    }
     final text = widget.controller.text.trim();
     if (text.isNotEmpty && widget.enabled) {
       widget.onSubmit(text);
