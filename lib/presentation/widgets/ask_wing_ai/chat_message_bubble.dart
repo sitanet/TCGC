@@ -163,6 +163,7 @@ class ChatMessageBubble extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(bottom: 6, left: 4),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
                 width: 22,
@@ -180,7 +181,7 @@ class ChatMessageBubble extends StatelessWidget {
                 ),
                 child: const Center(
                   child: Icon(
-                    Icons.flutter_dash,
+                    Icons.auto_awesome_rounded,
                     size: 13,
                     color: Colors.white,
                   ),

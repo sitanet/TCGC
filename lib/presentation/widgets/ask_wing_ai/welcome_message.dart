@@ -45,8 +45,8 @@ class WelcomeMessage extends StatelessWidget {
 
               // ── Golden Wing AI Emblem ──
               Container(
-                width: isTablet ? 96 : 84,
-                height: isTablet ? 96 : 84,
+                width: isTablet ? 84 : 72,
+                height: isTablet ? 84 : 72,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
@@ -60,24 +60,18 @@ class WelcomeMessage extends StatelessWidget {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primaryGold.withValues(alpha: 0.38),
-                      blurRadius: 24,
-                      spreadRadius: 2,
+                      color: AppColors.primaryGold.withValues(alpha: 0.35),
+                      blurRadius: 20,
+                      spreadRadius: 1,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.all(3),
-                child: ClipOval(
-                  child: Image.asset(
-                    'assets/images/wing_ai_eagle.jpg',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: const Color(0xFF1E232F),
-                      child: const Center(
-                        child: Icon(Icons.auto_awesome_rounded, color: AppColors.primaryGold, size: 36),
-                      ),
-                    ),
+                child: Center(
+                  child: Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Colors.white,
+                    size: isTablet ? 42 : 36,
                   ),
                 ),
               ),
@@ -86,6 +80,7 @@ class WelcomeMessage extends StatelessWidget {
               // ── Title & Greeting ──
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Text(
                     'Wing AI',
@@ -98,7 +93,7 @@ class WelcomeMessage extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: AppColors.primaryGold.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
@@ -164,7 +159,7 @@ class WelcomeMessage extends StatelessWidget {
                       const Icon(Icons.shield_outlined, size: 14, color: AppColors.primaryGold),
                       const SizedBox(width: 6),
                       Text(
-                        'Powered by OpenAI • Data Privacy Notice',
+                        'AI Data Privacy Notice',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,

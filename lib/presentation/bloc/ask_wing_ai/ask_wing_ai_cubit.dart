@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../data/services/ask_wing_ai_service.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
@@ -193,27 +194,27 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
 
   /// Clear chat history
   Future<void> clearHistory() async {
+    final previousSessionId = _currentSessionId;
+
+    // Clear local messages immediately so UI is cleared without hesitation
+    _messages.clear();
+    _currentSessionId = null;
+
+    emit(AskWingAIClearingHistory());
+
     try {
-      emit(AskWingAIClearingHistory());
-
-      await _service.clearChatHistory(sessionId: _currentSessionId);
-
-      _messages.clear();
-      _currentSessionId = null;
-
-      emit(AskWingAIHistoryCleared());
-
-      // Return to ready state
-      emit(AskWingAIReady(
-        messages: [],
-        rateLimitStatus: _rateLimitStatus,
-      ));
+      await _service.clearChatHistory(sessionId: previousSessionId);
     } catch (e) {
-      emit(AskWingAIError(
-        message: ErrorHandler.getErrorMessage(e),
-        previousMessages: _messages,
-      ));
+      debugPrint('clearHistory error from backend service: $e');
     }
+
+    emit(AskWingAIHistoryCleared());
+
+    // Return to ready state with clean message list
+    emit(AskWingAIReady(
+      messages: const [],
+      rateLimitStatus: _rateLimitStatus,
+    ));
   }
 
   /// Refresh rate limit status

@@ -450,7 +450,7 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  'Queries processed securely via OpenAI • Tap for Privacy Notice',
+                  'AI Data Privacy & Protection • Tap for Notice',
                   style: TextStyle(
                     fontSize: 10,
                     color: isDark ? Colors.grey[400] : Colors.grey[600],

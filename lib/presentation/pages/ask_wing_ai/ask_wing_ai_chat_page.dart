@@ -212,13 +212,15 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 0,
+        titleSpacing: 8,
+        centerTitle: false,
         title: Row(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 32,
-              height: 32,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
@@ -232,13 +234,13 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
               ),
               child: const Center(
                 child: Icon(
-                  Icons.flutter_dash,
+                  Icons.auto_awesome_rounded,
                   color: Colors.white,
                   size: 18,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             const Text(
               'Wing AI',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
@@ -315,6 +317,14 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
           // Handle feature disabled
           if (state is AskWingAIFeatureDisabled) {
             _showFeatureDisabledDialog(context, state.message);
+          }
+
+          // Handle history cleared
+          if (state is AskWingAIHistoryCleared) {
+            setState(() {
+              _matchedSermons = [];
+            });
+            _textController.clear();
           }
 
           // Scroll to bottom on load, question submission, or response success
@@ -638,6 +648,9 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
   }
 
   List<ChatMessageModel> _getMessages(AskWingAIState state) {
+    if (state is AskWingAIClearingHistory || state is AskWingAIHistoryCleared) {
+      return const [];
+    }
     if (state is AskWingAIReady) return state.messages;
     if (state is AskWingAIQuestionSubmitting) return state.previousMessages;
     if (state is AskWingAIQuestionSuccess) return state.messages;
@@ -645,7 +658,7 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
     if (state is AskWingAIError && state.previousMessages != null) {
       return state.previousMessages!;
     }
-    return [];
+    return const [];
   }
 
   bool _canSubmitQuestion(AskWingAIState state) {
@@ -713,10 +726,22 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
+              setState(() {
+                _matchedSermons = [];
+              });
+              _textController.clear();
               context.read<AskWingAICubit>().clearHistory();
+              ScaffoldMessenger.of(context).clearSnackBars();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Chat history cleared'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
             ),
             child: const Text('Clear'),
           ),

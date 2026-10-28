@@ -177,10 +177,11 @@ class AskWingAIService {
     try {
       final token = await _tokenService.getToken();
       if (token == null) {
-        throw Exception('No authentication token found');
+        // No token (unauthenticated/guest) - nothing to clear on backend
+        return;
       }
 
-      final body = sessionId != null ? {'session_id': sessionId} : null;
+      final body = sessionId != null ? {'session_id': sessionId} : <String, dynamic>{};
 
       final response = await http.post(
         Uri.parse('$_baseUrl/ask-wing-ai/clear/'),
@@ -188,17 +189,35 @@ class AskWingAIService {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: json.encode(body ?? {}),
-      );
+        body: json.encode(body),
+      ).timeout(const Duration(seconds: 8));
 
-      if (response.statusCode != 200) {
-        throw Exception(ErrorHandler.getErrorMessage(Exception('Failed to clear chat history')));
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return;
       }
+
+      // If POST /clear/ returned 404 or 405, also attempt DELETE /history/
+      if (response.statusCode == 404 || response.statusCode == 405) {
+        final deleteUri = Uri.parse('$_baseUrl/ask-wing-ai/history/').replace(
+          queryParameters: sessionId != null ? {'session_id': sessionId} : null,
+        );
+        final delResponse = await http.delete(
+          deleteUri,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ).timeout(const Duration(seconds: 8));
+        if (delResponse.statusCode >= 200 && delResponse.statusCode < 300) {
+          return;
+        }
+      }
+
+      debugPrint('clearChatHistory server responded with status: ${response.statusCode}');
     } catch (e) {
-      throw Exception(ErrorHandler.getErrorMessage(e));
+      debugPrint('clearChatHistory network/backend error: $e');
     }
   }
-
   /// Get rate limit status
   Future<RateLimitModel> getRateLimitStatus() async {
     try {

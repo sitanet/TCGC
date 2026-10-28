@@ -22,7 +22,7 @@ class AskWingAIFAB extends StatelessWidget {
         return FloatingActionButton.extended(
           onPressed: () => _onPressed(context, state),
           icon: const Icon(
-            Icons.flutter_dash,
+            Icons.auto_awesome_rounded,
             color: Colors.white,
             size: 22,
           ),

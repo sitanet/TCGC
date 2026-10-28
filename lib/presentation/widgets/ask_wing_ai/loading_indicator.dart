@@ -129,7 +129,7 @@ class _LoadingIndicatorState extends State<LoadingIndicator>
                         ..scale(_wingScaleX.value, _wingScaleY.value),
                       child: const Center(
                         child: Icon(
-                          Icons.flutter_dash,
+                          Icons.auto_awesome_rounded,
                           color: Colors.white,
                           size: 26,
                         ),
