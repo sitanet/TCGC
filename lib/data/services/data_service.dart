@@ -273,6 +273,28 @@ class DataService {
     );
   }
 
+  // Get trending / most listened messages across all users
+  Future<List<Sermon>> getTrendingMessages({
+    bool forceRefresh = false,
+  }) async {
+    try {
+      final response = await _api.get(ApiConstants.topFavorites);
+      if (response.isSuccess) {
+        final List<dynamic> data = response.dataList;
+        if (data.isNotEmpty) {
+          return data.map((json) => Sermon.fromJson(json)).toList();
+        }
+      }
+    } catch (_) {}
+
+    final recommended = await getRecommendedMessages(forceRefresh: forceRefresh);
+    if (recommended.isNotEmpty) {
+      return recommended;
+    }
+
+    return await getMessages(forceRefresh: forceRefresh);
+  }
+
   // Get speaker names only (for filtering)
   Future<List<String>> getSpeakerNames() async {
     final speakers = await getSpeakers();

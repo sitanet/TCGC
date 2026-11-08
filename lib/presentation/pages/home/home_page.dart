@@ -12,7 +12,6 @@ import '../../../data/services/interests_service.dart';
 import '../../../data/services/download_service.dart';
 import '../../../data/services/played_audio_service.dart';
 import '../../../domain/entities/sermon.dart';
-import '../../../domain/entities/event.dart';
 import '../../../domain/entities/beginner_category.dart';
 
 import '../../widgets/resume_playback_sheet.dart';
@@ -36,7 +35,6 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   final DataService _dataService = DataService();
   final InterestsService _interestsService = InterestsService();
-  late final PageController _eventsPageController;
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
@@ -44,17 +42,15 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   // Persistent in-memory cache for instant display across tab switches / navigation
   static List<Sermon> _staticSermons = [];
-  static List<Event> _staticEvents = [];
   static List<BeginnerCategory> _staticBeginnerCategories = [];
   static List<Sermon> _staticRecommendedSermons = [];
+  static List<Sermon> _staticTrendingSermons = [];
 
   List<Sermon> _sermons = [];
-  List<Event> _events = [];
   List<BeginnerCategory> _beginnerCategories = [];
   List<Sermon> _recommendedSermons = [];
+  List<Sermon> _trendingSermons = [];
   bool _isLoading = true;
-  int _currentEventIndex = 0;
-  double _currentPage = 0;
   late final ScrollController _homeScrollController;
   bool _isScrolledPastHeader = false;
 
@@ -64,30 +60,18 @@ class _HomePageState extends ConsumerState<HomePage> {
     // 1. Immediately show cached data from memory if previously loaded (instant 0ms)
     if (_staticSermons.isNotEmpty) {
       _sermons = _staticSermons;
-      _events = _staticEvents;
       _beginnerCategories = _staticBeginnerCategories;
       _recommendedSermons = _staticRecommendedSermons;
+      _trendingSermons = _staticTrendingSermons;
       _isLoading = false;
     }
 
     _homeScrollController = ScrollController();
     _homeScrollController.addListener(_onHomeScroll);
-    _eventsPageController = PageController(
-      viewportFraction: 0.52,
-      initialPage: 0,
-    );
-    _eventsPageController.addListener(() {
-      if (mounted) {
-        setState(() {
-          _currentPage = _eventsPageController.page ?? 0;
-        });
-      }
-    });
     // Load data after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initServices();
       _loadData();
-      _startEventAutoSlide();
       _checkChurchAnnouncement();
     });
   }
@@ -96,35 +80,38 @@ class _HomePageState extends ConsumerState<HomePage> {
     await _interestsService.initialize();
   }
 
-  void _startEventAutoSlide() {
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && _events.isNotEmpty && _eventsPageController.hasClients) {
-        final nextIndex = (_currentEventIndex + 1) % _events.length;
-        _eventsPageController.animateToPage(
-          nextIndex,
-          duration: const Duration(milliseconds: 600),
-          curve: Curves.easeInOut,
-        );
-        _startEventAutoSlide();
+
+
+  Future<void> _checkChurchAnnouncement() async {
+
+    try {
+
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      if (!mounted) return;
+
+
+
+      final announcement =
+
+          await ChurchAnnouncementService().getLatestAnnouncement();
+
+      if (announcement != null && mounted) {
+
+        await ChurchAnnouncementDialog.show(context, announcement);
+
       }
-    });
+
+    } catch (e) {
+
+      debugPrint('Error checking church announcement: ');
+
+    }
+
   }
 
-  Future<void> _checkChurchAnnouncement() async {
-    try {
-      await Future.delayed(const Duration(milliseconds: 800));
-      if (!mounted) return;
-
-      final announcement =
-          await ChurchAnnouncementService().getLatestAnnouncement();
-      if (announcement != null && mounted) {
-        await ChurchAnnouncementDialog.show(context, announcement);
-      }
-    } catch (e) {
-      debugPrint('Error checking church announcement: ');
-    }
-  }
-
+
+
   Future<void> _loadData({bool forceRefresh = false}) async {
     if (!mounted) return;
     // Only show full loading spinner if we have NO cached data at all
@@ -186,8 +173,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       }
 
       // Load events and recommended in parallel (offline-first)
-      _loadEventsAsync(forceRefresh);
       _loadRecommendedAsync(forceRefresh, canAccessSermon);
+      _loadTrendingAsync(forceRefresh, canAccessSermon);
 
       // Automatically refresh latest messages and data from server in background on app launch
       // so user does not need to swipe down to see the latest messages!
@@ -260,25 +247,15 @@ class _HomePageState extends ConsumerState<HomePage> {
       }
 
       // Also refresh events and recommended
-      _loadEventsAsync(true);
       _loadRecommendedAsync(true, canAccessSermon);
+      _loadTrendingAsync(true, canAccessSermon);
     } catch (e) {
       debugPrint('Background home refresh error: $e');
     }
   }
 
   // Async loaders that don't block UI
-  Future<void> _loadEventsAsync(bool forceRefresh) async {
-    try {
-      final events = await _dataService.getEvents(forceRefresh: forceRefresh);
-      if (mounted) {
-        setState(() => _events = events);
-      }
-      _staticEvents = events;
-    } catch (e) {
-      debugPrint('Events load error: $e');
-    }
-  }
+
 
   Future<void> _loadRecommendedAsync(
     bool forceRefresh,
@@ -298,6 +275,24 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  Future<void> _loadTrendingAsync(
+    bool forceRefresh,
+    bool Function(Sermon) canAccessSermon,
+  ) async {
+    try {
+      final allTrending = await _dataService.getTrendingMessages(
+        forceRefresh: forceRefresh,
+      );
+      final trending = allTrending.where(canAccessSermon).toList();
+      if (mounted) {
+        setState(() => _trendingSermons = trending);
+      }
+      _staticTrendingSermons = trending;
+    } catch (e) {
+      debugPrint('Trending load error: $e');
+    }
+  }
+
   void _onHomeScroll() {
     if (!mounted) return;
     final isScrolledPast = _homeScrollController.offset > 120;
@@ -312,7 +307,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   void dispose() {
     _homeScrollController.removeListener(_onHomeScroll);
     _homeScrollController.dispose();
-    _eventsPageController.dispose();
     super.dispose();
   }
 
@@ -346,13 +340,9 @@ class _HomePageState extends ConsumerState<HomePage> {
               children: [
                 _buildHeaderBanner(context, isDark),
                 SizedBox(height: spacing * 1.5),
-                _buildUpcomingEvents(context, isDark),
-                SizedBox(height: spacing * 1.5),
                 _buildBeginnerCategories(context, isDark),
-                if (_recommendedSermons.isNotEmpty) ...[
-                  SizedBox(height: spacing * 1.5),
-                  _buildRecommendedMessages(context, isDark),
-                ],
+                SizedBox(height: spacing * 1.5),
+                _buildTrendingMessages(context, isDark),
                 SizedBox(height: spacing * 1.5),
                 _buildRecentActivities(context, isDark),
                 SizedBox(height: spacing * 6),
@@ -723,254 +713,15 @@ class _HomePageState extends ConsumerState<HomePage> {
   );
 }
 
-  Widget _buildUpcomingEvents(BuildContext context, bool isDark) {
-    final horizontalPadding = Responsive.horizontalPadding(context);
-    final spacing = Responsive.verticalSpacing(context);
-    final subtitleFontSize = Responsive.subtitleFontSize(context);
-    final bodyFontSize = Responsive.bodyFontSize(context);
-
-    // Responsive dimensions: larger card on tablets/iPads
-    final cardSize = Responsive.value(context, mobile: 184.0, tablet: 260.0, desktop: 300.0);
-    final containerHeight = cardSize + (Responsive.isMobile(context) ? 40.0 : 50.0);
-    final isTabletOrLarger = !Responsive.isMobile(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: Text(
-            'Upcoming Events',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: AppColors.primaryGold,
-              fontWeight: FontWeight.w600,
-              fontSize: subtitleFontSize,
-            ),
-          ),
-        ),
-        SizedBox(height: spacing),
-        if (_isLoading)
-          SizedBox(
-            height: cardSize,
-            child: const Center(child: CircularProgressIndicator()),
-          )
-        else if (_events.isEmpty)
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Container(
-              height: cardSize,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.cardDark : Colors.grey[100],
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.event_busy,
-                      size: Responsive.iconSize(context) * 2,
-                      color: isDark ? Colors.grey[600] : Colors.grey[400],
-                    ),
-                    SizedBox(height: spacing * 0.75),
-                    Text(
-                      'No upcoming events',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                        fontSize: bodyFontSize,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          )
-        else if (isTabletOrLarger)
-          // Smooth horizontal list for tablets/iPads (showing multiple full-size cards cleanly)
-          SizedBox(
-            height: cardSize + 16,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              itemCount: _events.length,
-              itemBuilder: (context, index) {
-                final event = _events[index];
-                return Padding(
-                  padding: const EdgeInsets.only(right: 18.0),
-                  child: _buildEventCard(context, isDark, event, cardSize),
-                );
-              },
-            ),
-          )
-        else
-          // Carousel view with center-magnification for phones
-          SizedBox(
-            height: containerHeight,
-            child: PageView.builder(
-              controller: _eventsPageController,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentEventIndex = index;
-                });
-              },
-              itemCount: _events.length,
-              itemBuilder: (context, index) {
-                final event = _events[index];
-                final double distance = (_currentPage - index).abs();
-                final double scale = (1 - (distance * 0.2)).clamp(0.8, 1.0);
-                final double opacity = (1 - (distance * 0.3)).clamp(0.6, 1.0);
-
-                return Center(
-                  child: Transform.scale(
-                    scale: scale,
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 200),
-                      opacity: opacity,
-                      child: _buildEventCard(context, isDark, event, cardSize),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildEventCard(BuildContext context, bool isDark, Event event, double cardSize) {
-    final cornerRadius = Responsive.value(context, mobile: 12.0, tablet: 16.0);
-    final titleFontSize = Responsive.value(context, mobile: 12.0, tablet: 14.5);
-
-    return GestureDetector(
-      onTap: () => _showEventImageZoom(context, event),
-      child: Container(
-        width: cardSize,
-        height: cardSize,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(cornerRadius),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(cornerRadius),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _buildEventImage(event.imageUrl),
-              // Gradient overlay at bottom for text
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: EdgeInsets.all(Responsive.value(context, mobile: 10.0, tablet: 14.0)),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.8),
-                      ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                  ),
-                  child: Text(
-                    event.title,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: titleFontSize,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showEventImageZoom(BuildContext context, Event event) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black87,
-      builder: (context) => _EventImageZoomDialog(event: event),
-    );
-  }
-
-  Widget _buildEventImage(String? imageUrl) {
-    Widget placeholder = Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF1A2744), Color(0xFF0D1522)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Center(
-        child: Icon(
-          Icons.event,
-          size: 48,
-          color: Colors.white.withValues(alpha: 0.3),
-        ),
-      ),
-    );
-
-    if (imageUrl == null || imageUrl.isEmpty) {
-      return placeholder;
-    }
-
-    if (imageUrl.startsWith('http')) {
-      return CachedNetworkImage(
-        imageUrl: imageUrl,
-        cacheManager: CustomImageCacheManager.instance,
-        fit: BoxFit.cover,
-        memCacheWidth: 400,
-        memCacheHeight: 400,
-        useOldImageOnUrlChange: true,
-        fadeInDuration: Duration.zero,
-        fadeOutDuration: Duration.zero,
-        placeholder: (context, url) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF1A2744), Color(0xFF0D1522)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        errorWidget: (context, url, error) => placeholder,
-      );
-    }
-
-    return Image.asset(
-      imageUrl,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => placeholder,
-    );
-  }
+  // [REMOVED] Upcoming Events section removed from Home Page
 
   Widget _buildBeginnerCategories(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
     final subtitleFontSize = Responsive.subtitleFontSize(context);
 
-    // Responsive card dimensions for mobile vs tablet/iPad
-    final cardWidth = Responsive.value(context, mobile: 135.0, tablet: 185.0, desktop: 210.0);
-    final sectionHeight = Responsive.value(context, mobile: 160.0, tablet: 210.0, desktop: 230.0);
+    // 3 rows x 3 columns = 9 compact cards
+    final displayedCategories = _beginnerCategories.take(9).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1017,14 +768,18 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         SizedBox(height: spacing * 0.8),
         if (_beginnerCategories.isEmpty && _isLoading)
-          SizedBox(
-            height: sectionHeight,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              itemCount: 4,
-              itemBuilder: (context, index) => _buildCategoryShimmerColumn(context, isDark),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: Responsive.value(context, mobile: 8.0, tablet: 12.0),
+              mainAxisSpacing: Responsive.value(context, mobile: 8.0, tablet: 12.0),
+              childAspectRatio: Responsive.value(context, mobile: 0.85, tablet: 0.90, desktop: 0.95),
             ),
+            itemCount: 9,
+            itemBuilder: (context, index) => _buildCategoryShimmerCard(context, isDark),
           )
         else if (_beginnerCategories.isEmpty)
           Padding(
@@ -1063,21 +818,21 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           )
         else
-          SizedBox(
-            height: sectionHeight,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              itemCount: _beginnerCategories.length,
-              itemBuilder: (context, index) {
-                final cat = _beginnerCategories[index];
-                return Padding(
-                  padding: const EdgeInsets.only(right: 14.0),
-                  child: _buildBeginnerCategoryCard(context, isDark, cat, cardWidth),
-                );
-              },
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: Responsive.value(context, mobile: 8.0, tablet: 12.0),
+              mainAxisSpacing: Responsive.value(context, mobile: 8.0, tablet: 12.0),
+              childAspectRatio: Responsive.value(context, mobile: 0.85, tablet: 0.90, desktop: 0.95),
             ),
+            itemCount: displayedCategories.length,
+            itemBuilder: (context, index) {
+              final cat = displayedCategories[index];
+              return _buildBeginnerCategoryCard(context, isDark, cat);
+            },
           ),
       ],
     );
@@ -1087,10 +842,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     BuildContext context,
     bool isDark,
     BeginnerCategory category,
-    double cardWidth,
   ) {
-    final titleFontSize = Responsive.value(context, mobile: 13.0, tablet: 15.0);
-    final badgeFontSize = Responsive.value(context, mobile: 10.0, tablet: 11.5);
+    final titleFontSize = Responsive.value(context, mobile: 10.5, tablet: 12.5);
+    final badgeFontSize = Responsive.value(context, mobile: 8.5, tablet: 10.0);
 
     return GestureDetector(
       onTap: () {
@@ -1110,19 +864,22 @@ class _HomePageState extends ConsumerState<HomePage> {
         );
       },
       child: Container(
-        width: cardWidth,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.3 : 0.15),
+            width: 0.8,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(11),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -1142,27 +899,27 @@ class _HomePageState extends ConsumerState<HomePage> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withValues(alpha: 0.15),
-                      Colors.black.withValues(alpha: 0.4),
-                      Colors.black.withValues(alpha: 0.88),
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.45),
+                      Colors.black.withValues(alpha: 0.94),
                     ],
-                    stops: const [0.0, 0.5, 1.0],
+                    stops: const [0.2, 0.6, 1.0],
                   ),
                 ),
               ),
 
               // Top Badge: Message Count
               Positioned(
-                top: 8,
-                right: 8,
+                top: 5,
+                right: 5,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.65),
-                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.black.withValues(alpha: 0.75),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: AppColors.primaryGold.withValues(alpha: 0.6),
-                      width: 0.8,
+                      width: 0.6,
                     ),
                   ),
                   child: Text(
@@ -1176,11 +933,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
 
-              // Bottom Title
+              // Bottom Title (compact)
               Positioned(
-                bottom: 12,
-                left: 12,
-                right: 12,
+                bottom: 6,
+                left: 6,
+                right: 6,
                 child: Text(
                   category.name,
                   maxLines: 2,
@@ -1189,8 +946,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                     fontSize: titleFontSize,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
-                    letterSpacing: 0.2,
-                    height: 1.2,
+                    height: 1.15,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black.withValues(alpha: 0.8),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1201,14 +964,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildCategoryShimmerColumn(BuildContext context, bool isDark) {
-    final cardWidth = Responsive.value(context, mobile: 135.0, tablet: 185.0, desktop: 210.0);
+  Widget _buildCategoryShimmerCard(BuildContext context, bool isDark) {
     return Container(
-      width: cardWidth,
-      margin: const EdgeInsets.only(right: 14),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : Colors.grey[200],
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
     );
   }
@@ -1257,17 +1017,24 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildRecommendedMessages(BuildContext context, bool isDark) {
+  Widget _buildTrendingMessages(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
     final subtitleFontSize = Responsive.subtitleFontSize(context);
 
-    // Limit to exactly 3 recommended messages
-    final recommendedPicks = _recommendedSermons.take(3).toList();
-    if (recommendedPicks.isEmpty) return const SizedBox.shrink();
+    // Pick 3 most listened / trending messages across all users
+    List<Sermon> displayList = _trendingSermons;
+    if (displayList.isEmpty) {
+      displayList = _recommendedSermons;
+    }
+    if (displayList.isEmpty) {
+      displayList = _sermons;
+    }
 
-    // Responsive square card size for tablet/iPad vs mobile
-    final squareCardSize = Responsive.value(context, mobile: 150.0, tablet: 210.0, desktop: 230.0);
+    final trendingPicks = displayList.take(3).toList();
+    if (trendingPicks.isEmpty) return const SizedBox.shrink();
+
+    final squareCardSize = Responsive.value(context, mobile: 155.0, tablet: 210.0, desktop: 230.0);
     final containerHeight = squareCardSize + 16.0;
 
     return Column(
@@ -1278,18 +1045,49 @@ class _HomePageState extends ConsumerState<HomePage> {
           child: Row(
             children: [
               const Icon(
-                Icons.thumb_up_alt_outlined,
+                Icons.local_fire_department_rounded,
                 color: AppColors.primaryGold,
-                size: 20,
+                size: 22,
               ),
               const SizedBox(width: 8),
               Text(
-                'Recommended for You',
+                'Trending Messages',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: AppColors.primaryGold,
                       fontWeight: FontWeight.bold,
                       fontSize: subtitleFontSize,
                     ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.primaryGold.withValues(alpha: 0.35),
+                    width: 0.8,
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.headphones_rounded,
+                      size: 11,
+                      color: AppColors.primaryGold,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'Most Listened',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryGold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1301,12 +1099,18 @@ class _HomePageState extends ConsumerState<HomePage> {
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            itemCount: recommendedPicks.length,
+            itemCount: trendingPicks.length,
             itemBuilder: (context, index) {
-              final sermon = recommendedPicks[index];
+              final sermon = trendingPicks[index];
               return Padding(
                 padding: const EdgeInsets.only(right: 14.0),
-                child: _buildSquareRecommendedCard(context, isDark, sermon, squareCardSize),
+                child: _buildTrendingCard(
+                  context,
+                  isDark,
+                  sermon,
+                  squareCardSize,
+                  rank: index + 1,
+                ),
               );
             },
           ),
@@ -1315,12 +1119,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildSquareRecommendedCard(
+  Widget _buildTrendingCard(
     BuildContext context,
     bool isDark,
     Sermon sermon,
-    double cardSize,
-  ) {
+    double cardSize, {
+    required int rank,
+  }) {
     final authProvider = ref.read(authChangeNotifierProvider);
     final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
     final user = authProvider.user;
@@ -1358,7 +1163,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
+              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -1369,37 +1174,80 @@ class _HomePageState extends ConsumerState<HomePage> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // 1. Square Thumbnail Artwork
+              // 1. Artwork Thumbnail
               _buildSermonImage(sermon, isDark),
 
-              // 2. Multi-stop Dark Gradient Scrim
+              // 2. Scrim Overlay
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withValues(alpha: 0.1),
-                      Colors.black.withValues(alpha: 0.4),
-                      Colors.black.withValues(alpha: 0.92),
+                      Colors.black.withValues(alpha: 0.18),
+                      Colors.black.withValues(alpha: 0.45),
+                      Colors.black.withValues(alpha: 0.94),
                     ],
                     stops: const [0.0, 0.45, 1.0],
                   ),
                 ),
               ),
 
-              // 3. Category Tag Chip (Top Left)
+              // 3. Top Rank Badge (#1, #2, #3 Trending)
+              Positioned(
+                top: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFF3C05A), Color(0xFFC78F28)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.local_fire_department_rounded,
+                        size: 11,
+                        color: Colors.black,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '#$rank',
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Category Badge (Top Right)
               if (sermon.categoryName.isNotEmpty)
                 Positioned(
                   top: 8,
-                  left: 8,
+                  right: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.65),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.black.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: AppColors.primaryGold.withValues(alpha: 0.5),
+                        color: AppColors.primaryGold.withValues(alpha: 0.4),
                         width: 0.7,
                       ),
                     ),
@@ -1408,7 +1256,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: Responsive.value(context, mobile: 9.5, tablet: 11.0),
+                        fontSize: Responsive.value(context, mobile: 9.0, tablet: 10.5),
                         fontWeight: FontWeight.w600,
                         color: AppColors.primaryGold,
                       ),
@@ -1470,7 +1318,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: speakerFontSize,
-                        color: Colors.white.withValues(alpha: 0.75),
+                        color: Colors.white.withValues(alpha: 0.8),
                       ),
                     ),
                   ],
@@ -1871,167 +1719,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
             ),
             child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EventImageZoomDialog extends StatefulWidget {
-  final Event event;
-
-  const _EventImageZoomDialog({required this.event});
-
-  @override
-  State<_EventImageZoomDialog> createState() => _EventImageZoomDialogState();
-}
-
-class _EventImageZoomDialogState extends State<_EventImageZoomDialog> {
-  final TransformationController _transformationController =
-      TransformationController();
-
-  @override
-  void dispose() {
-    _transformationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Close button
-          Align(
-            alignment: Alignment.topRight,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(Icons.close, color: Colors.white, size: 24),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Zoomable image
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: InteractiveViewer(
-              transformationController: _transformationController,
-              minScale: 1.0,
-              maxScale: 4.0,
-              child:
-                  widget.event.imageUrl != null &&
-                      widget.event.imageUrl!.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: widget.event.imageUrl!,
-                      cacheManager: CustomImageCacheManager.instance,
-                      fit: BoxFit.contain,
-                      useOldImageOnUrlChange: true,
-                      fadeInDuration: Duration.zero,
-                      fadeOutDuration: Duration.zero,
-                      placeholder: (context, url) => Container(
-                        height: 300,
-                        color: Colors.grey[900],
-                        child: const Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.primaryGold,
-                          ),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        height: 300,
-                        color: Colors.grey[900],
-                        child: const Icon(
-                          Icons.event,
-                          size: 64,
-                          color: Colors.white30,
-                        ),
-                      ),
-                    )
-                  : Container(
-                      height: 300,
-                      color: Colors.grey[900],
-                      child: const Icon(
-                        Icons.event,
-                        size: 64,
-                        color: Colors.white30,
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Event details
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.black87,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.event.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.schedule,
-                      color: AppColors.primaryGold,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        widget.event.schedule,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (widget.event.location != null &&
-                    widget.event.location!.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on,
-                        color: AppColors.primaryGold,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          widget.event.location!,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
           ),
         ],
       ),
