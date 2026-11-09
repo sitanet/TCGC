@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/services/connectivity_service.dart';
 
 /// Elegant chat input field with network awareness, voice input (speech-to-text), and animated send button
@@ -32,7 +33,6 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
   // Speech-to-text
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
-  bool _speechAvailable = false;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -42,7 +42,7 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
     widget.controller.addListener(_onTextChanged);
     _focusNode.addListener(_onFocusChanged);
     _initConnectivity();
-    _initSpeech();
+    _preInitSpeechIfPermitted();
 
     _pulseController = AnimationController(
       vsync: this,
@@ -54,32 +54,31 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
     );
   }
 
-  Future<void> _initSpeech() async {
+  Future<void> _preInitSpeechIfPermitted() async {
     try {
-      final available = await _speech.initialize(
-        onStatus: (status) {
-          if (!mounted) return;
-          if (status == 'done' || status == 'notListening') {
+      final status = await Permission.microphone.status;
+      if (status.isGranted) {
+        await _speech.initialize(
+          onStatus: (status) {
+            if (!mounted) return;
+            if (status == 'done' || status == 'notListening') {
+              setState(() {
+                _isListening = false;
+              });
+            }
+          },
+          onError: (errorNotification) {
+            if (!mounted) return;
             setState(() {
               _isListening = false;
             });
-          }
-        },
-        onError: (errorNotification) {
-          if (!mounted) return;
-          setState(() {
-            _isListening = false;
-          });
-          debugPrint('Speech recognition error: ${errorNotification.errorMsg}');
-        },
-      );
-      if (mounted) {
-        setState(() {
-          _speechAvailable = available;
-        });
+            debugPrint('Speech recognition pre-init error: ${errorNotification.errorMsg}');
+          },
+          options: [stt.SpeechToText.androidNoBluetooth],
+        );
       }
     } catch (e) {
-      debugPrint('Speech recognition init error: $e');
+      debugPrint('Speech pre-init check: $e');
     }
   }
 
@@ -103,8 +102,40 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
       return;
     }
 
-    if (!_speechAvailable) {
-      final reinit = await _speech.initialize(
+    // 1. Explicitly check and request microphone permission
+    var permissionStatus = await Permission.microphone.status;
+    if (!permissionStatus.isGranted) {
+      permissionStatus = await Permission.microphone.request();
+      if (!permissionStatus.isGranted) {
+        if (mounted) {
+          if (permissionStatus.isPermanentlyDenied) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Microphone permission is needed. Tap Settings to allow.'),
+                duration: const Duration(seconds: 4),
+                action: SnackBarAction(
+                  label: 'Settings',
+                  textColor: const Color(0xFFFFD54F),
+                  onPressed: () => openAppSettings(),
+                ),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Microphone permission is required to speak your question.'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+        return;
+      }
+    }
+
+    // 2. Initialize speech-to-text engine if not already available
+    if (!_speech.isAvailable) {
+      final ready = await _speech.initialize(
         onStatus: (status) {
           if (!mounted) return;
           if (status == 'done' || status == 'notListening') {
@@ -118,22 +149,34 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
           setState(() {
             _isListening = false;
           });
+          debugPrint('Speech recognition error: ${errorNotification.errorMsg}');
+          if (errorNotification.errorMsg != 'error_no_match' &&
+              errorNotification.errorMsg != 'error_speech_timeout') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Speech error: ${errorNotification.errorMsg}'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
         },
+        options: [stt.SpeechToText.androidNoBluetooth],
       );
-      if (!reinit) {
+
+      if (!ready) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Voice recognition is not available or microphone permission was denied.'),
+              content: Text('Voice recognition is not available or ready on this device.'),
               duration: Duration(seconds: 3),
             ),
           );
         }
         return;
       }
-      _speechAvailable = true;
     }
 
+    // 3. Start listening
     setState(() {
       _isListening = true;
     });
@@ -154,9 +197,10 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
         },
         listenOptions: stt.SpeechListenOptions(
           listenMode: stt.ListenMode.dictation,
-          pauseFor: const Duration(seconds: 3),
+          pauseFor: const Duration(seconds: 4),
+          listenFor: const Duration(seconds: 60),
           partialResults: true,
-          cancelOnError: true,
+          cancelOnError: false,
         ),
       );
     } catch (e) {
@@ -165,6 +209,12 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
         setState(() {
           _isListening = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Voice input error: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
     }
   }
