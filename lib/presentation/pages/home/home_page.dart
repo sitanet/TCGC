@@ -366,8 +366,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 _buildTrendingMessages(context, isDark),
                 SizedBox(height: spacing * 1.5),
                 _buildYouMightAlsoLike(context, isDark),
-                SizedBox(height: spacing * 1.5),
-                _buildRecentActivities(context, isDark),
                 SizedBox(height: spacing * 6),
               ],
             ),
@@ -1105,7 +1103,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final spacing = Responsive.verticalSpacing(context);
     final subtitleFontSize = Responsive.subtitleFontSize(context);
 
-    // Pick 3 most listened / trending messages across all users
+    // Pick strictly at most 4 most listened / trending messages (deduplicated)
     List<Sermon> displayList = _trendingSermons;
     if (displayList.isEmpty) {
       displayList = _recommendedSermons;
@@ -1114,7 +1112,15 @@ class _HomePageState extends ConsumerState<HomePage> {
       displayList = _sermons;
     }
 
-    final trendingPicks = displayList.take(3).toList();
+    final seenIds = <String>{};
+    final List<Sermon> uniquePicks = [];
+    for (final s in displayList) {
+      if (seenIds.add(s.id)) {
+        uniquePicks.add(s);
+      }
+      if (uniquePicks.length == 4) break;
+    }
+    final trendingPicks = uniquePicks;
     if (trendingPicks.isEmpty) return const SizedBox.shrink();
 
     return Column(
