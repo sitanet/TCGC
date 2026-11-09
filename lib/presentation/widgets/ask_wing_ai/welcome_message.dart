@@ -9,6 +9,10 @@ class WelcomeMessage extends StatelessWidget {
   final String? userName;
   final int? dailyRemaining;
   final int? dailyLimit;
+  final bool hasPreviousChat;
+  final String? lastQuestion;
+  final int messageCount;
+  final VoidCallback? onContinuePreviousChat;
 
   const WelcomeMessage({
     super.key,
@@ -16,6 +20,10 @@ class WelcomeMessage extends StatelessWidget {
     this.userName,
     this.dailyRemaining,
     this.dailyLimit,
+    this.hasPreviousChat = false,
+    this.lastQuestion,
+    this.messageCount = 0,
+    this.onContinuePreviousChat,
   });
 
   @override
@@ -259,6 +267,12 @@ class WelcomeMessage extends StatelessWidget {
               ),
               const SizedBox(height: 22),
 
+              // ── Option to Continue Previous Question (if exists) ──
+              if (hasPreviousChat) ...[
+                _buildContinuePreviousCard(context, isDark, primaryColor),
+                const SizedBox(height: 18),
+              ],
+
               // ── Suggestion Grid (Responsive & Beautiful) ──
               GridView.count(
                 crossAxisCount: isTablet ? 2 : 2,
@@ -326,6 +340,167 @@ class WelcomeMessage extends StatelessWidget {
               ),
               const SizedBox(height: 6),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContinuePreviousCard(BuildContext context, bool isDark, Color primaryColor) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [
+                  const Color(0xFF262115),
+                  const Color(0xFF1B1914),
+                ]
+              : [
+                  const Color(0xFFFFF9E8),
+                  const Color(0xFFFFFDF8),
+                ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppColors.primaryGold.withValues(alpha: isDark ? 0.55 : 0.45),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.16 : 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onContinuePreviousChat,
+          borderRadius: BorderRadius.circular(18),
+          splashColor: AppColors.primaryGold.withValues(alpha: 0.15),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                // Icon avatar
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFD54F), Color(0xFFD4AF37)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryGold.withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.forum_rounded, color: Colors.white, size: 22),
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // Question details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Continue Previous Question',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFFFFD54F) : const Color(0xFFB8860B),
+                            ),
+                          ),
+                          if (messageCount > 0) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryGold.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '$messageCount messages',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFFFFE082) : const Color(0xFF996515),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        lastQuestion != null && lastQuestion!.trim().isNotEmpty
+                            ? '"${lastQuestion!.trim()}"'
+                            : 'Resume your previous discussion',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontStyle: lastQuestion != null ? FontStyle.italic : FontStyle.normal,
+                          color: isDark ? Colors.grey[300] : Colors.grey[700],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(width: 10),
+
+                // Action pill
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFD54F), Color(0xFFD4AF37)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryGold.withValues(alpha: 0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Resume',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(width: 3),
+                      Icon(Icons.arrow_forward_rounded, size: 13, color: Colors.white),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -36,6 +36,7 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
   
   AppUser? _currentUser;
   bool _showScrollDownButton = false;
+  bool _showDashboard = true; // Always start on the AI Dashboard
 
   List<Sermon> _allSermons = [];
   List<Sermon> _matchedSermons = [];
@@ -210,6 +211,10 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cubitState = context.watch<AskWingAICubit>().state;
+    final currentMessages = _getMessages(cubitState);
+    final hasMessages = currentMessages.isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 8,
@@ -276,6 +281,41 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
           ],
         ),
         actions: [
+          if (_showDashboard && hasMessages)
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _showDashboard = false;
+                });
+                _scrollToBottom();
+              },
+              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.primaryGold),
+              label: const Text(
+                'Previous Chat',
+                style: TextStyle(
+                  color: AppColors.primaryGold,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            )
+          else if (!_showDashboard)
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _showDashboard = true;
+                });
+              },
+              icon: const Icon(Icons.dashboard_outlined, size: 16, color: AppColors.primaryGold),
+              label: const Text(
+                'Dashboard',
+                style: TextStyle(
+                  color: AppColors.primaryGold,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.privacy_tip_outlined, color: AppColors.primaryGold),
             tooltip: 'AI Privacy & Data Notice',
@@ -285,6 +325,28 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
           PopupMenuButton<String>(
             onSelected: (value) => _handleMenuAction(value, context),
             itemBuilder: (context) => [
+              if (!_showDashboard)
+                const PopupMenuItem(
+                  value: 'dashboard',
+                  child: Row(
+                    children: [
+                      Icon(Icons.dashboard_outlined),
+                      SizedBox(width: 8),
+                      Text('Return to Dashboard'),
+                    ],
+                  ),
+                ),
+              if (_showDashboard && hasMessages)
+                const PopupMenuItem(
+                  value: 'continue_chat',
+                  child: Row(
+                    children: [
+                      Icon(Icons.chat_outlined),
+                      SizedBox(width: 8),
+                      Text('Continue Previous Chat'),
+                    ],
+                  ),
+                ),
               const PopupMenuItem(
                 value: 'privacy',
                 child: Row(
@@ -636,20 +698,28 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
     // Get messages from state
     final messages = _getMessages(state);
 
-    if (messages.isEmpty) {
-      // Extract rate limit data for the welcome page prompt counter
-      int? remaining;
-      int? limit;
-      if (state is AskWingAIReady && state.rateLimitStatus != null) {
-        remaining = state.rateLimitStatus!.dailyRemaining;
-        limit = state.rateLimitStatus!.dailyLimit;
+    if (_showDashboard || messages.isEmpty) {
+      // Find the last user question if any
+      String? lastQuestion;
+      for (int i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].isUserMessage) {
+          lastQuestion = messages[i].content;
+          break;
+        }
       }
 
       return WelcomeMessage(
         onQuestionTap: (question) => _submitQuestion(question, state),
         userName: _currentUser?.firstName,
-        dailyRemaining: remaining,
-        dailyLimit: limit,
+        hasPreviousChat: messages.isNotEmpty,
+        lastQuestion: lastQuestion,
+        messageCount: messages.length,
+        onContinuePreviousChat: () {
+          setState(() {
+            _showDashboard = false;
+          });
+          _scrollToBottom();
+        },
       );
     }
 
@@ -693,11 +763,13 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
     final selectedMode = await ResponseModeSheet.show(context, question: question);
     if (selectedMode == null || !mounted) return;
 
-    context.read<AskWingAICubit>().submitQuestion(question, responseStyle: selectedMode.id);
-    _textController.clear();
     setState(() {
+      _showDashboard = false; // Transition directly to active chat
       _matchedSermons = [];
     });
+
+    context.read<AskWingAICubit>().submitQuestion(question, responseStyle: selectedMode.id);
+    _textController.clear();
   }
 
   void _scrollToBottom() {
@@ -714,6 +786,17 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
 
   void _handleMenuAction(String action, BuildContext context) {
     switch (action) {
+      case 'dashboard':
+        setState(() {
+          _showDashboard = true;
+        });
+        break;
+      case 'continue_chat':
+        setState(() {
+          _showDashboard = false;
+        });
+        _scrollToBottom();
+        break;
       case 'privacy':
         AIConsentDialog.showConsentDialog(context, isInformationalOnly: true);
         break;
@@ -744,6 +827,7 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
               Navigator.pop(context);
               setState(() {
                 _matchedSermons = [];
+                _showDashboard = true;
               });
               _textController.clear();
               context.read<AskWingAICubit>().clearHistory();
