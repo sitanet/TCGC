@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
 import 'response_mode_sheet.dart';
 
@@ -137,49 +138,13 @@ class ChatMessageBubble extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.only(top: 4, right: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (message.responseStyle != null) ...[
-                Builder(
-                  builder: (context) {
-                    final mode = WingAIResponseMode.fromId(message.responseStyle);
-                    return Container(
-                      margin: const EdgeInsets.only(right: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: mode.color.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: mode.color.withValues(alpha: 0.35), width: 0.6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(mode.icon, size: 9, color: mode.color),
-                          const SizedBox(width: 3),
-                          Text(
-                            mode.title,
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w600,
-                              color: mode.color,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
-              Text(
-                _formatTimestamp(message.createdAt),
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey[500],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+          child: Text(
+            _formatTimestamp(message.createdAt),
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey[500],
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],
@@ -300,18 +265,49 @@ class ChatMessageBubble extends StatelessWidget {
                 isNewMessage: DateTime.now().difference(message.createdAt).inSeconds < 15,
                 styleSheet: MarkdownStyleSheet(
                   p: TextStyle(
-                    fontSize: 15, 
-                    color: isDark ? Colors.white.withValues(alpha: 0.9) : Colors.black.withValues(alpha: 0.8),
-                    height: 1.45,
+                    fontSize: 14.5,
+                    color: isDark ? Colors.white.withValues(alpha: 0.9) : Colors.black.withValues(alpha: 0.85),
+                    height: 1.5,
+                  ),
+                  h1: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                    height: 1.4,
+                  ),
+                  h2: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFFFFD54F) : const Color(0xFFB8860B),
+                    height: 1.35,
+                  ),
+                  h3: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? const Color(0xFFFFD54F) : const Color(0xFFB8860B),
+                    height: 1.3,
                   ),
                   strong: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : Colors.black87,
                   ),
                   em: const TextStyle(fontStyle: FontStyle.italic),
+                  blockquote: TextStyle(
+                    fontSize: 13.5,
+                    fontStyle: FontStyle.italic,
+                    color: isDark ? Colors.grey[300] : Colors.grey[800],
+                    height: 1.4,
+                  ),
+                  blockquoteDecoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: isDark ? 0.12 : 0.06),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border(
+                      left: BorderSide(color: primaryColor, width: 3),
+                    ),
+                  ),
                   listBullet: TextStyle(
                     color: primaryColor,
-                    fontSize: 15,
+                    fontSize: 14.5,
                   ),
                 ),
               ),
@@ -335,10 +331,7 @@ class ChatMessageBubble extends StatelessWidget {
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
-                                '${(message.processingTimeMs! / 1000).toStringAsFixed(1)}s' +
-                                (message.creditsCost != null
-                                    ? ' • ${message.creditsCost} ${message.creditsCost == 1 ? 'prompt' : 'prompts'}'
-                                    : ''),
+                                '${(message.processingTimeMs! / 1000).toStringAsFixed(1)}s',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(

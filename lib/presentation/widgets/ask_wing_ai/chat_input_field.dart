@@ -3,10 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../core/services/connectivity_service.dart';
 
-import 'ai_consent_dialog.dart';
-
-
-
 /// Elegant chat input field with network awareness, voice input (speech-to-text), and animated send button
 class ChatInputField extends StatefulWidget {
   final TextEditingController controller;
@@ -426,33 +422,7 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
             ),
           ],
         ),
-        Padding(
-          padding: const EdgeInsets.only(top: 5, bottom: 1),
-          child: GestureDetector(
-            onTap: () {
-              AIConsentDialog.showConsentDialog(context, isInformationalOnly: true);
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.shield_outlined,
-                  size: 11,
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'AI Data Privacy & Protection • Tap for Notice',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                    letterSpacing: 0.1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+
       ],
     ),
   ),

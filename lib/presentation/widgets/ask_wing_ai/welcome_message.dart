@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
-import 'ai_consent_dialog.dart';
 
-/// Beautiful, attractive welcome page shown when chat history is empty
+/// Clean, elegant Wing AI dashboard
 class WelcomeMessage extends StatelessWidget {
   final Function(String)? onQuestionTap;
   final String? userName;
@@ -29,7 +28,6 @@ class WelcomeMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = Theme.of(context).primaryColor;
     final isTablet = Responsive.isTablet(context);
 
     final firstName = userName != null && userName!.trim().isNotEmpty
@@ -38,247 +36,123 @@ class WelcomeMessage extends StatelessWidget {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
+        constraints: const BoxConstraints(maxWidth: 600),
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(
-            horizontal: isTablet ? 32 : 20,
-            vertical: isTablet ? 28 : 16,
+            horizontal: isTablet ? 28 : 18,
+            vertical: isTablet ? 20 : 12,
           ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
 
-              // ── Glowing Golden Wing AI Emblem ──
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Ambient glow
-                  Container(
-                    width: isTablet ? 100 : 88,
-                    height: isTablet ? 100 : 88,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          AppColors.primaryGold.withValues(alpha: isDark ? 0.35 : 0.25),
-                          AppColors.primaryGold.withValues(alpha: 0.0),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Outer ring
-                  Container(
-                    width: isTablet ? 86 : 74,
-                    height: isTablet ? 86 : 74,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.primaryGold.withValues(alpha: 0.4),
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                  // Inner Core Emblem
-                  Container(
-                    width: isTablet ? 74 : 64,
-                    height: isTablet ? 74 : 64,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFFFFE082),
-                          Color(0xFFE5A93C),
-                          Color(0xFFB8860B),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primaryGold.withValues(alpha: 0.4),
-                          blurRadius: 18,
-                          spreadRadius: 1,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Icon(
-                        Icons.auto_awesome_rounded,
-                        color: Colors.white,
-                        size: isTablet ? 38 : 32,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-
-              // ── Title & Assistant Badge ──
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(
-                    'Wing AI',
-                    style: TextStyle(
-                      fontSize: isTablet ? 26 : 23,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
-                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.primaryGold.withValues(alpha: 0.2),
-                          const Color(0xFFE5A93C).withValues(alpha: 0.1),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppColors.primaryGold.withValues(alpha: 0.5),
-                        width: 0.9,
-                      ),
-                    ),
-                    child: const Text(
-                      'ASSISTANT',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primaryGold,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              Text(
-                firstName != null
-                    ? 'Welcome, $firstName! How can I guide you today?'
-                    : 'Welcome! How can I guide you today?',
-                style: TextStyle(
-                  fontSize: isTablet ? 15.5 : 14,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white.withValues(alpha: 0.9) : Colors.black87,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 6),
-
-              Text(
-                'Explore sermon teachings, scriptural insights, and answers to your spiritual questions.',
-                style: TextStyle(
-                  fontSize: isTablet ? 13 : 12,
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
-                  height: 1.4,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-
-              // ── Unlimited Access Status Pill ──
+              // ── Wing AI Glowing Emblem ──
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
                     colors: [
-                      AppColors.primaryGold.withValues(alpha: isDark ? 0.22 : 0.10),
-                      const Color(0xFFE5A93C).withValues(alpha: isDark ? 0.12 : 0.05),
+                      Color(0xFFFFE082),
+                      Color(0xFFE5A93C),
+                      Color(0xFFB8860B),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AppColors.primaryGold.withValues(alpha: isDark ? 0.45 : 0.3),
-                    width: 0.9,
-                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primaryGold.withValues(alpha: isDark ? 0.12 : 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
+                      color: AppColors.primaryGold.withValues(alpha: 0.35),
+                      blurRadius: 16,
+                      offset: const Offset(0, 3),
                     ),
                   ],
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Welcome Title ──
+              Text(
+                firstName != null ? 'Welcome, $firstName' : 'Welcome to Wing AI',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.2,
+                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+
+              Text(
+                'Spiritual guidance, scriptural insights & church teachings',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+
+              // ── Unlimited Guidance Pill ──
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.primaryGold.withValues(alpha: 0.15)
+                      : AppColors.primaryGold.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.primaryGold.withValues(alpha: 0.3),
+                    width: 0.8,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 7,
-                      height: 7,
+                      width: 6,
+                      height: 6,
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Color(0xFF4CAF50),
+                        color: Color(0xFF10B981),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Text(
-                      'Unlimited AI Spiritual Guidance',
+                      'Unlimited Spiritual Guidance',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: isDark ? const Color(0xFFFFD54F) : const Color(0xFFB8860B),
-                        letterSpacing: 0.2,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
-              // AI Privacy & Data Disclosure Notice
-              GestureDetector(
-                onTap: () {
-                  AIConsentDialog.showConsentDialog(context, isInformationalOnly: true);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.shield_outlined, size: 13, color: AppColors.primaryGold),
-                      const SizedBox(width: 5),
-                      Text(
-                        'AI Data Privacy Notice',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w500,
-                          color: isDark ? Colors.grey[400] : Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 22),
-
-              // ── Option to Continue Previous Question (if exists) ──
+              // ── Option to Continue Previous Question ──
               if (hasPreviousChat) ...[
-                _buildContinuePreviousCard(context, isDark, primaryColor),
-                const SizedBox(height: 18),
+                _buildContinuePreviousCard(isDark),
+                const SizedBox(height: 14),
               ],
 
-              // ── Suggestion Grid (Responsive & Beautiful) ──
+              // ── Clean Suggestion Grid (2x2) ──
               GridView.count(
-                crossAxisCount: isTablet ? 2 : 2,
-                childAspectRatio: isTablet ? 2.1 : 1.42,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
+                crossAxisCount: 2,
+                childAspectRatio: isTablet ? 2.2 : 1.55,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
@@ -294,7 +168,7 @@ class WelcomeMessage extends StatelessWidget {
                     icon: Icons.spa_rounded,
                     accentColor: const Color(0xFF10B981),
                     category: 'GROWTH',
-                    question: 'How do I grow into the fullness of Christ?',
+                    question: 'How do I grow spiritually in Christ?',
                     isDark: isDark,
                     onTap: onQuestionTap,
                   ),
@@ -302,7 +176,7 @@ class WelcomeMessage extends StatelessWidget {
                     icon: Icons.church_rounded,
                     accentColor: const Color(0xFF3B82F6),
                     category: 'CHURCH',
-                    question: 'Who are the ministers of The CityGate Church?',
+                    question: 'Who are the ministers of TCGC?',
                     isDark: isDark,
                     onTap: onQuestionTap,
                   ),
@@ -310,35 +184,13 @@ class WelcomeMessage extends StatelessWidget {
                     icon: Icons.headphones_rounded,
                     accentColor: const Color(0xFFF59E0B),
                     category: 'SERMONS',
-                    question: 'Find messages about faith and victory',
+                    question: 'Find messages on faith and victory',
                     isDark: isDark,
                     onTap: onQuestionTap,
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-
-              // ── Bottom encouragement ──
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.mic_none_rounded,
-                    size: 14,
-                    color: isDark ? AppColors.primaryGold : primaryColor,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Tap a topic above or speak your question below',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: isDark ? Colors.white60 : Colors.black54,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
             ],
           ),
         ),
@@ -346,161 +198,87 @@ class WelcomeMessage extends StatelessWidget {
     );
   }
 
-  Widget _buildContinuePreviousCard(BuildContext context, bool isDark, Color primaryColor) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [
-                  const Color(0xFF262115),
-                  const Color(0xFF1B1914),
-                ]
-              : [
-                  const Color(0xFFFFF9E8),
-                  const Color(0xFFFFFDF8),
-                ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: AppColors.primaryGold.withValues(alpha: isDark ? 0.55 : 0.45),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.16 : 0.08),
-            blurRadius: 14,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onContinuePreviousChat,
-          borderRadius: BorderRadius.circular(18),
-          splashColor: AppColors.primaryGold.withValues(alpha: 0.15),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                // Icon avatar
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFFD54F), Color(0xFFD4AF37)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryGold.withValues(alpha: 0.35),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Icon(Icons.forum_rounded, color: Colors.white, size: 22),
-                  ),
-                ),
-                const SizedBox(width: 14),
-
-                // Question details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Continue Previous Question',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? const Color(0xFFFFD54F) : const Color(0xFFB8860B),
-                            ),
-                          ),
-                          if (messageCount > 0) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: AppColors.primaryGold.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                '$messageCount messages',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? const Color(0xFFFFE082) : const Color(0xFF996515),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        lastQuestion != null && lastQuestion!.trim().isNotEmpty
-                            ? '"${lastQuestion!.trim()}"'
-                            : 'Resume your previous discussion',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontStyle: lastQuestion != null ? FontStyle.italic : FontStyle.normal,
-                          color: isDark ? Colors.grey[300] : Colors.grey[700],
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(width: 10),
-
-                // Action pill
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFFD54F), Color(0xFFD4AF37)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryGold.withValues(alpha: 0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Resume',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      SizedBox(width: 3),
-                      Icon(Icons.arrow_forward_rounded, size: 13, color: Colors.white),
-                    ],
-                  ),
-                ),
-              ],
+  Widget _buildContinuePreviousCard(bool isDark) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onContinuePreviousChat,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF221E14) : const Color(0xFFFFF9E6),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.primaryGold.withValues(alpha: isDark ? 0.45 : 0.4),
+              width: 1,
             ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primaryGold,
+                ),
+                child: const Icon(Icons.forum_rounded, color: Colors.white, size: 17),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Continue Previous Chat',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFFFFD54F) : const Color(0xFFB8860B),
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      lastQuestion != null && lastQuestion!.trim().isNotEmpty
+                          ? '"${lastQuestion!.trim()}"'
+                          : 'Resume your discussion',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontStyle: FontStyle.italic,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Resume',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(width: 2),
+                    Icon(Icons.arrow_forward_rounded, size: 11, color: Colors.white),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -508,7 +286,7 @@ class WelcomeMessage extends StatelessWidget {
   }
 }
 
-// ── Beautiful Suggestion Card with Gradient Tint & Glow ──
+// ── Compact Suggestion Card ──
 class _SuggestionCard extends StatelessWidget {
   final IconData icon;
   final Color accentColor;
@@ -531,75 +309,33 @@ class _SuggestionCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => onTap?.call(question),
-        borderRadius: BorderRadius.circular(18),
-        splashColor: accentColor.withValues(alpha: 0.12),
-        highlightColor: accentColor.withValues(alpha: 0.06),
+        onTap: onTap != null ? () => onTap!(question) : null,
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.all(11),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isDark
-                  ? [
-                      accentColor.withValues(alpha: 0.10),
-                      AppColors.cardDark,
-                    ]
-                  : [
-                      accentColor.withValues(alpha: 0.05),
-                      Colors.white,
-                    ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(18),
+            color: isDark ? const Color(0xFF1E222A) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isDark
-                  ? accentColor.withValues(alpha: 0.25)
-                  : accentColor.withValues(alpha: 0.20),
-              width: 1.0,
+              color: isDark ? Colors.white10 : Colors.grey.shade200,
+              width: 0.8,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: accentColor.withValues(alpha: isDark ? 0.08 : 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 26,
-                        height: 26,
-                        decoration: BoxDecoration(
-                          color: accentColor.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(7),
-                        ),
-                        child: Icon(icon, size: 14.5, color: accentColor),
-                      ),
-                      const SizedBox(width: 7),
-                      Text(
-                        category,
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.6,
-                          color: accentColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Icon(
-                    Icons.arrow_outward_rounded,
-                    size: 13,
-                    color: accentColor.withValues(alpha: 0.6),
+                  Icon(icon, size: 14, color: accentColor),
+                  const SizedBox(width: 5),
+                  Text(
+                    category,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.6,
+                      color: accentColor,
+                    ),
                   ),
                 ],
               ),
@@ -608,14 +344,12 @@ class _SuggestionCard extends StatelessWidget {
                 child: Text(
                   question,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w600,
-                    height: 1.3,
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.92)
-                        : AppColors.textPrimaryLight,
+                    height: 1.25,
+                    color: isDark ? Colors.white.withValues(alpha: 0.9) : AppColors.textPrimaryLight,
                   ),
-                  maxLines: 3,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

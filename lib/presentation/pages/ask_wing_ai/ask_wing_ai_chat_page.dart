@@ -224,8 +224,8 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
@@ -249,72 +249,64 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
                 child: Icon(
                   Icons.auto_awesome_rounded,
                   color: Colors.white,
-                  size: 19,
+                  size: 18,
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Wing AI',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 17,
-                    letterSpacing: 0.2,
+            const SizedBox(width: 8),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Wing AI',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      letterSpacing: 0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Text(
-                  'Spiritual Guidance',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.grey[400]
-                        : Colors.grey[600],
-                    fontWeight: FontWeight.w400,
+                  Text(
+                    'Spiritual Guidance',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey[400]
+                          : Colors.grey[600],
+                      fontWeight: FontWeight.w400,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
         actions: [
           if (_showDashboard && hasMessages)
-            TextButton.icon(
+            IconButton(
+              icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primaryGold),
+              tooltip: 'Resume Chat',
               onPressed: () {
                 setState(() {
                   _showDashboard = false;
                 });
                 _scrollToBottom();
               },
-              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.primaryGold),
-              label: const Text(
-                'Previous Chat',
-                style: TextStyle(
-                  color: AppColors.primaryGold,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
             )
           else if (!_showDashboard)
-            TextButton.icon(
+            IconButton(
+              icon: const Icon(Icons.dashboard_outlined, color: AppColors.primaryGold),
+              tooltip: 'Dashboard',
               onPressed: () {
                 setState(() {
                   _showDashboard = true;
                 });
               },
-              icon: const Icon(Icons.dashboard_outlined, size: 16, color: AppColors.primaryGold),
-              label: const Text(
-                'Dashboard',
-                style: TextStyle(
-                  color: AppColors.primaryGold,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
             ),
           IconButton(
             icon: const Icon(Icons.privacy_tip_outlined, color: AppColors.primaryGold),
