@@ -762,6 +762,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     required String title,
     String? subtitle,
     Widget? trailing,
+    Color? titleColor,
   }) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final titleFontSize = Responsive.value(context, mobile: 16.0, tablet: 18.0, desktop: 20.0);
@@ -789,7 +790,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                    color: titleColor ?? (isDark ? Colors.white : AppColors.textPrimaryLight),
                     fontWeight: FontWeight.bold,
                     fontSize: titleFontSize,
                     letterSpacing: -0.2,
@@ -1184,32 +1185,35 @@ class _HomePageState extends ConsumerState<HomePage> {
           context,
           isDark,
           icon: Icons.local_fire_department_rounded,
-          title: 'Most Listened Messages',
+          title: 'Trending Messages',
+          titleColor: AppColors.primaryGold,
           trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
             decoration: BoxDecoration(
               color: isDark
                   ? AppColors.primaryGold.withValues(alpha: 0.15)
-                  : const Color(0xFFFDF8EB),
-              borderRadius: BorderRadius.circular(14),
+                  : const Color(0xFFFEF9EB),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: AppColors.primaryGold.withValues(alpha: 0.4),
-                width: 0.9,
+                color: isDark
+                    ? AppColors.primaryGold.withValues(alpha: 0.35)
+                    : const Color(0xFFE8D5A3),
+                width: 1.0,
               ),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  Icons.headphones_rounded,
-                  size: 12,
+                  Icons.headphones_outlined,
+                  size: 13.5,
                   color: AppColors.primaryGold,
                 ),
-                SizedBox(width: 4),
+                SizedBox(width: 4.5),
                 Text(
-                  'Top Audio',
+                  'Most Listened',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w600,
                     color: AppColors.primaryGold,
                   ),
@@ -1245,26 +1249,28 @@ class _HomePageState extends ConsumerState<HomePage> {
     final isCurrentlyPlaying =
         audioProvider.currentSermon?.id == sermon.id && audioProvider.isPlaying;
 
-    final imageWidth = Responsive.value(context, mobile: 90.0, tablet: 110.0, desktop: 120.0);
-    final imageHeight = Responsive.value(context, mobile: 72.0, tablet: 82.0, desktop: 88.0);
-    final titleFontSize = Responsive.value(context, mobile: 13.0, tablet: 14.5);
-    final speakerFontSize = Responsive.value(context, mobile: 11.5, tablet: 12.5);
-    final playBtnSize = Responsive.value(context, mobile: 40.0, tablet: 44.0);
+    final imageWidth = Responsive.value(context, mobile: 98.0, tablet: 114.0, desktop: 122.0);
+    final imageHeight = Responsive.value(context, mobile: 58.0, tablet: 66.0, desktop: 72.0);
+    final titleFontSize = Responsive.value(context, mobile: 14.0, tablet: 15.5);
+    final speakerFontSize = Responsive.value(context, mobile: 12.0, tablet: 13.0);
+    final playBtnSize = Responsive.value(context, mobile: 42.0, tablet: 46.0);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 11.0),
+      margin: const EdgeInsets.only(bottom: 12.0),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1D2A) : Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : const Color(0xFFEEEEEE),
           width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -1284,18 +1290,19 @@ class _HomePageState extends ConsumerState<HomePage> {
             );
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.5),
             child: Row(
               children: [
-                // 1. Thumbnail Image
+                // 1. Thumbnail Image (Wide 16:9 Landscape)
                 Container(
                   width: imageWidth,
                   height: imageHeight,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
+                    color: isDark ? AppColors.cardDark : Colors.grey[200],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                     child: _buildSermonImage(sermon, isDark),
                   ),
                 ),
@@ -1315,19 +1322,23 @@ class _HomePageState extends ConsumerState<HomePage> {
                           fontSize: titleFontSize,
                           fontWeight: FontWeight.bold,
                           color: isDark ? Colors.white : const Color(0xFF151515),
-                          height: 1.2,
+                          height: 1.18,
                         ),
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        sermon.speaker?.isNotEmpty == true ? sermon.speaker! : 'The CityGate Church',
-                        maxLines: 2,
+                        sermon.speaker?.isNotEmpty == true
+                            ? sermon.speaker!
+                            : 'The CityGate Church',
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: speakerFontSize,
                           fontWeight: FontWeight.w500,
-                          color: isDark ? const Color(0xFFB0AFC7) : const Color(0xFF535176),
-                          height: 1.2,
+                          color: isDark
+                              ? const Color(0xFF9D9BC8)
+                              : const Color(0xFF585782),
+                          height: 1.18,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1336,7 +1347,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                         children: [
                           const Icon(
                             Icons.access_time_rounded,
-                            size: 13.5,
+                            size: 13.0,
                             color: Color(0xFF1B873F),
                           ),
                           const SizedBox(width: 4),
@@ -1363,7 +1374,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
                 const SizedBox(width: 8),
 
-                // 3. Play Button
+                // 3. Play Button (Golden Circle)
                 GestureDetector(
                   onTap: () {
                     if (isLocked) {
@@ -1395,11 +1406,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                           ? const Icon(Icons.pause_rounded, color: Colors.white, size: 22)
                           : isLocked
                               ? const Icon(Icons.lock_rounded, color: Colors.white, size: 18)
-                              : const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 24),
+                              : const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 26),
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 2),
               ],
             ),
           ),
