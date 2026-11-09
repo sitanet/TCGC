@@ -11,12 +11,12 @@ class WelcomeMessage extends StatelessWidget {
   final int? dailyLimit;
 
   const WelcomeMessage({
-    Key? key,
+    super.key,
     this.onQuestionTap,
     this.userName,
     this.dailyRemaining,
     this.dailyLimit,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

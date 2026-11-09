@@ -25,12 +25,16 @@ class MiniPlayer extends ConsumerWidget {
 
         final durationMs = audioProvider.duration.inMilliseconds.toDouble();
         final positionMs = audioProvider.position.inMilliseconds.toDouble();
-        final progress = durationMs > 0 ? (positionMs / durationMs).clamp(0.0, 1.0) : 0.0;
+        final progress = sermon.id == "livestream" ? 1.0 : (durationMs > 0 ? (positionMs / durationMs).clamp(0.0, 1.0) : 0.0);
         final isPlaying = audioProvider.isPlaying;
         final isLoading = audioProvider.isLoading;
 
         return GestureDetector(
           onTap: () {
+            if (sermon.id == 'livestream') {
+              ref.read(mainTabIndexProvider.notifier).state = 2;
+              return;
+            }
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -85,7 +89,7 @@ class MiniPlayer extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              '${_formatDate(sermon.date)} - ${sermon.title}',
+                              sermon.id == 'livestream' ? sermon.title : '${_formatDate(sermon.date)} - ${sermon.title}',
                               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                     fontWeight: FontWeight.w600,
                                   ),

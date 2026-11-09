@@ -54,7 +54,7 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
   }
 
   /// Submit a question
-  Future<void> submitQuestion(String question) async {
+  Future<void> submitQuestion(String question, {String? responseStyle}) async {
     if (question.trim().isEmpty) {
       emit(const AskWingAIError(message: 'Please enter a question'));
       return;
@@ -67,6 +67,7 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
         sessionId: _currentSessionId ?? '',
         messageType: MessageType.user,
         content: question,
+        responseStyle: responseStyle,
         createdAt: DateTime.now(),
       );
 
@@ -89,6 +90,7 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
       final response = await _service.submitQuestion(
         question: question,
         sessionId: _currentSessionId,
+        responseStyle: responseStyle,
         previousMessageIds: recentIds.isNotEmpty ? recentIds : null,
       );
 
@@ -110,6 +112,7 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
         content: response.response,
         citations: response.citations,
         processingTimeMs: response.processingTimeMs,
+        responseStyle: responseStyle,
         createdAt: response.timestamp,
       );
 

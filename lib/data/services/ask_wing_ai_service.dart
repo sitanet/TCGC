@@ -58,6 +58,7 @@ class AskWingAIService {
     required String question,
     List<int>? previousMessageIds,
     String? sessionId,
+    String? responseStyle,
   }) async {
     try {
       final token = await _tokenService.getToken();
@@ -70,6 +71,7 @@ class AskWingAIService {
         if (previousMessageIds != null && previousMessageIds.isNotEmpty)
           'previous_message_ids': previousMessageIds,
         if (sessionId != null) 'session_id': sessionId,
+        if (responseStyle != null) 'response_style': responseStyle,
       };
 
       final response = await http.post(

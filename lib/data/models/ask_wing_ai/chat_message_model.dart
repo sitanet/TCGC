@@ -10,6 +10,7 @@ class ChatMessageModel extends Equatable {
   final List<CitationModel>? citations; // For AI responses
   final int? processingTimeMs; // For AI responses
   final int? creditsCost;
+  final String? responseStyle; // 'simple', 'short', 'advanced'
 
   const ChatMessageModel({
     required this.id,
@@ -20,6 +21,7 @@ class ChatMessageModel extends Equatable {
     this.citations,
     this.processingTimeMs,
     this.creditsCost,
+    this.responseStyle,
   });
 
   /// Check if message is from user
@@ -38,6 +40,7 @@ class ChatMessageModel extends Equatable {
     List<CitationModel>? citations,
     int? processingTimeMs,
     int? creditsCost,
+    String? responseStyle,
   }) {
     return ChatMessageModel(
       id: id ?? this.id,
@@ -48,6 +51,7 @@ class ChatMessageModel extends Equatable {
       citations: citations ?? this.citations,
       processingTimeMs: processingTimeMs ?? this.processingTimeMs,
       creditsCost: creditsCost ?? this.creditsCost,
+      responseStyle: responseStyle ?? this.responseStyle,
     );
   }
 
@@ -62,6 +66,7 @@ class ChatMessageModel extends Equatable {
       'citations': citations?.map((c) => c.toJson()).toList(),
       'processing_time_ms': processingTimeMs,
       'credits_cost': creditsCost,
+      'response_style': responseStyle,
     };
   }
 
@@ -84,6 +89,7 @@ class ChatMessageModel extends Equatable {
               .toList(),
       processingTimeMs: json['processing_time_ms'],
       creditsCost: costVal,
+      responseStyle: json['response_style'] as String?,
     );
   }
 
@@ -97,6 +103,7 @@ class ChatMessageModel extends Equatable {
         citations,
         processingTimeMs,
         creditsCost,
+        responseStyle,
       ];
 }
 

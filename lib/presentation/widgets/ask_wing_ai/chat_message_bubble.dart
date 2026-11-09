@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
-import 'citation_card.dart';
+import 'response_mode_sheet.dart';
 
 /// Message bubble for chat messages
 class ChatMessageBubble extends StatelessWidget {
@@ -137,13 +137,49 @@ class ChatMessageBubble extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.only(top: 4, right: 4),
-          child: Text(
-            _formatTimestamp(message.createdAt),
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey[500],
-              fontWeight: FontWeight.w500,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (message.responseStyle != null) ...[
+                Builder(
+                  builder: (context) {
+                    final mode = WingAIResponseMode.fromId(message.responseStyle);
+                    return Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: mode.color.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: mode.color.withValues(alpha: 0.35), width: 0.6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(mode.icon, size: 9, color: mode.color),
+                          const SizedBox(width: 3),
+                          Text(
+                            mode.title,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              color: mode.color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+              Text(
+                _formatTimestamp(message.createdAt),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey[500],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -154,7 +190,6 @@ class ChatMessageBubble extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).primaryColor;
     final bubbleBg = isDark ? Colors.grey[900] : Colors.white;
-    final borderBg = isDark ? Colors.grey[850] : Colors.grey[100];
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -197,6 +232,37 @@ class ChatMessageBubble extends StatelessWidget {
                   color: primaryColor,
                 ),
               ),
+              if (message.responseStyle != null) ...[
+                const SizedBox(width: 8),
+                Builder(
+                  builder: (context) {
+                    final mode = WingAIResponseMode.fromId(message.responseStyle);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: mode.color.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: mode.color.withValues(alpha: 0.35), width: 0.8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(mode.icon, size: 10, color: mode.color),
+                          const SizedBox(width: 4),
+                          Text(
+                            mode.title,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: mode.color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
             ],
           ),
         ),

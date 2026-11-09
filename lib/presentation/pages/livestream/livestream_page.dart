@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -67,6 +68,14 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     if (!_tabController.indexIsChanging) return;
     HapticFeedback.selectionClick();
     ref.read(liveStreamSubTabIndexProvider.notifier).state = _tabController.index;
+
+    // Pause native live audio when user switches to video tab
+    if (_tabController.index == 1) {
+      final currentSermon = ref.read(audioPlayerChangeNotifierProvider).currentSermon;
+      if (currentSermon?.id == 'livestream') {
+        ref.read(audioPlayerChangeNotifierProvider).pause();
+      }
+    }
 
     // Lazy load WebView when tab is selected
     if (_tabController.index == 0 && !_streamLiveInitialized) {
@@ -227,20 +236,135 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     ''');
   }
 
+
+  void _injectStreamBridge() {
+    _webViewController?.runJavaScript('''
+      (function() {
+        function attachBridge() {
+          var audioPlayer = document.getElementById('nativeAudioPlayer');
+          if (!audioPlayer) {
+            setTimeout(attachBridge, 300);
+            return;
+          }
+          if (window._flutterStreamBridgeInstalled) return;
+          window._flutterStreamBridgeInstalled = true;
+
+          // Mute HTML5 audio element so sound plays via Flutter's native background AudioService
+          audioPlayer.muted = true;
+
+          audioPlayer.addEventListener('play', function() {
+            var titleEl = document.getElementById('radioProgramTitle');
+            var artEl = document.getElementById('radioArtworkImg');
+            var title = titleEl ? titleEl.textContent.trim() : 'Live Broadcast';
+            var art = artEl ? artEl.src : '';
+            var streamUrl = (typeof currentStreamUrl !== 'undefined' && currentStreamUrl) ? currentStreamUrl : audioPlayer.src;
+
+            if (window.FlutterLiveStream) {
+              window.FlutterLiveStream.postMessage(JSON.stringify({
+                action: 'play',
+                streamUrl: streamUrl,
+                title: title,
+                artworkUrl: art
+              }));
+            }
+          });
+
+          audioPlayer.addEventListener('pause', function() {
+            if (window.FlutterLiveStream) {
+              window.FlutterLiveStream.postMessage(JSON.stringify({
+                action: 'pause'
+              }));
+            }
+          });
+
+          var playBtn = document.getElementById('radioPlayBtn');
+          if (playBtn) {
+            playBtn.addEventListener('click', function() {
+              setTimeout(function() {
+                var isPlayingNow = typeof isPlaying !== 'undefined' ? isPlaying : false;
+                if (isPlayingNow) {
+                  var titleEl = document.getElementById('radioProgramTitle');
+                  var artEl = document.getElementById('radioArtworkImg');
+                  var title = titleEl ? titleEl.textContent.trim() : 'Live Broadcast';
+                  var art = artEl ? artEl.src : '';
+                  var streamUrl = (typeof currentStreamUrl !== 'undefined' && currentStreamUrl) ? currentStreamUrl : (audioPlayer ? audioPlayer.src : '');
+
+                  if (window.FlutterLiveStream) {
+                    window.FlutterLiveStream.postMessage(JSON.stringify({
+                      action: 'play',
+                      streamUrl: streamUrl,
+                      title: title,
+                      artworkUrl: art
+                    }));
+                  }
+                }
+              }, 120);
+            });
+          }
+        }
+        attachBridge();
+      })();
+    ''');
+  }
+
+  void _handleStreamBridgeMessage(String jsonStr) async {
+    try {
+      final data = json.decode(jsonStr) as Map<String, dynamic>;
+      final action = data['action'] as String?;
+
+      if (action == 'play') {
+        final streamUrl = data['streamUrl'] as String?;
+        final title = data['title'] as String? ?? 'Live Broadcast';
+        final artworkUrl = data['artworkUrl'] as String?;
+
+        if (streamUrl != null && streamUrl.isNotEmpty) {
+          try {
+            await ref.read(audioPlayerChangeNotifierProvider).playLiveStream(
+              streamUrl,
+              title: title,
+              artworkUrl: artworkUrl,
+            );
+          } catch (e) {
+            debugPrint('Live stream native play failed: $e, falling back to web audio');
+            // Fallback: unmute web audio player so user still hears audio if native stream fails
+            _webViewController?.runJavaScript(
+              "var a = document.getElementById('nativeAudioPlayer'); if (a) { a.muted = false; a.play(); }"
+            );
+          }
+        }
+      } else if (action == 'pause') {
+        final currentSermon = ref.read(audioPlayerChangeNotifierProvider).currentSermon;
+        if (currentSermon?.id == 'livestream') {
+          await ref.read(audioPlayerChangeNotifierProvider).pause();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error handling stream bridge message: $e');
+    }
+  }
+
   void _initializeStreamLiveWebView() {
     if (_streamLiveInitialized) return;
     _streamLiveInitialized = true;
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.white)
+      ..addJavaScriptChannel(
+        'FlutterLiveStream',
+        onMessageReceived: (JavaScriptMessage message) {
+          _handleStreamBridgeMessage(message.message);
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (url) {
             if (mounted) setState(() => _isStreamLiveLoading = true);
             _injectAudioStyleCleaner();
+            _injectStreamBridge();
           },
           onPageFinished: (url) {
             _injectAudioStyleCleaner();
+            _injectStreamBridge();
             if (mounted) setState(() => _isStreamLiveLoading = false);
           },
           onWebResourceError: (error) {
@@ -351,6 +475,12 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       WakelockPlus.enable();
+      final audioState = ref.read(audioPlayerChangeNotifierProvider);
+      if (audioState.isPlaying && audioState.currentSermon?.id == 'livestream') {
+        _webViewController?.runJavaScript(
+          "if (typeof setPlaybackState === 'function' && typeof isPlaying !== 'undefined' && !isPlaying) setPlaybackState(true);"
+        );
+      }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       WakelockPlus.disable();
@@ -374,6 +504,22 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(audioPlayerChangeNotifierProvider, (previous, next) {
+      if (next.currentSermon?.id == 'livestream') {
+        if (previous?.isPlaying != next.isPlaying) {
+          if (next.isPlaying) {
+            _webViewController?.runJavaScript(
+              "if (typeof setPlaybackState === 'function' && typeof isPlaying !== 'undefined' && !isPlaying) setPlaybackState(true);"
+            );
+          } else {
+            _webViewController?.runJavaScript(
+              "if (typeof setPlaybackState === 'function' && typeof isPlaying !== 'undefined' && isPlaying) setPlaybackState(false);"
+            );
+          }
+        }
+      }
+    });
+
     final targetSubIndex = ref.watch(liveStreamSubTabIndexProvider);
 
     if (_tabController.index != targetSubIndex) {

@@ -590,6 +590,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+
   Future<void> play() async {
     _setupListeners();
     try {
@@ -899,7 +900,12 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool _isLiveStream = false;
   bool get isLiveStream => _isLiveStream;
 
-  Future<void> playLiveStream(String streamUrl, {String title = 'Live Stream', String subtitle = 'TCGC Live'}) async {
+  Future<void> playLiveStream(
+    String streamUrl, {
+    String title = 'Live Broadcast',
+    String subtitle = 'The CityGate Church',
+    String? artworkUrl,
+  }) async {
     _errorMessage = null;
     _isLiveStream = true;
     _isLoading = true;
@@ -907,16 +913,25 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
     _currentIndex = -1;
     notifyListeners();
 
+    if (!_audioServiceInitialized) {
+      await initAudioService();
+    }
+    _setupListeners();
+
+    final fixedUrl = _fixAudioUrl(streamUrl);
+
     // Create a pseudo-sermon for the livestream
     _currentSermon = Sermon(
       id: 'livestream',
       title: title,
       description: subtitle,
-      category: 'Live',
-      categoryName: 'Live Stream',
+      speaker: subtitle,
+      category: 'Live Broadcast',
+      categoryName: 'Citygate Radio',
       date: DateTime.now(),
       duration: Duration.zero,
-      audioUrl: streamUrl,
+      audioUrl: fixedUrl,
+      imageUrl: (artworkUrl != null && artworkUrl.isNotEmpty) ? artworkUrl : null,
     );
 
     try {
@@ -924,18 +939,23 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
         id: 'livestream',
         title: title,
         artist: subtitle,
-        album: 'TCGC Live',
-        artUri: null,
+        album: 'Citygate Radio • Live Broadcast',
+        artUri: (artworkUrl != null && artworkUrl.isNotEmpty) ? Uri.parse(artworkUrl) : null,
+        duration: null,
       );
 
       if (_useAudioService && _audioHandler != null) {
-        _audioHandler!.stop();
-        await _audioHandler!.setAudioSource(streamUrl, mediaItem);
-        _audioHandler!.play();
+        try {
+          await _audioHandler!.stop();
+        } catch (_) {}
+        await _audioHandler!.setLiveAudioSource(fixedUrl, mediaItem);
+        await _audioHandler!.play();
       } else if (_fallbackPlayer != null) {
-        _fallbackPlayer!.stop();
-        await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(streamUrl)));
-        _fallbackPlayer!.play();
+        try {
+          await _fallbackPlayer!.stop();
+        } catch (_) {}
+        await _fallbackPlayer!.setAudioSource(AudioSource.uri(Uri.parse(fixedUrl)));
+        await _fallbackPlayer!.play();
       }
 
       _isPlaying = true;

@@ -150,6 +150,23 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
     await _player.setAudioSource(source, initialPosition: position);
   }
 
+  Future<void> setLiveAudioSource(String url, MediaItem item) async {
+    debugPrint('Setting live audio source: ');
+    _currentUrl = url;
+    _currentMediaItem = item;
+    _lastPosition = Duration.zero;
+    mediaItem.add(item);
+    try {
+      final safeUrl = url.trim().contains(' ') ? Uri.encodeFull(url.trim()) : url.trim();
+      await _player.setAudioSource(AudioSource.uri(Uri.parse(safeUrl)));
+      debugPrint('Live audio source set successfully');
+    } catch (e) {
+      debugPrint('Error setting live audio source: ');
+      debugPrint('Stack: ');
+      rethrow;
+    }
+  }
+
   @override
   Future<void> play() async {
     // If player is in idle state, the source was released by system - reload it

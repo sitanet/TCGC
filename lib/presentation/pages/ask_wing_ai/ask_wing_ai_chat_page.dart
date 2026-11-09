@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../bloc/ask_wing_ai/ask_wing_ai_cubit.dart';
 import '../../bloc/ask_wing_ai/ask_wing_ai_state.dart';
 import '../../widgets/ask_wing_ai/chat_message_list.dart';
+import '../../widgets/ask_wing_ai/response_mode_sheet.dart';
 import '../../widgets/ask_wing_ai/chat_input_field.dart';
 import '../../widgets/ask_wing_ai/welcome_message.dart';
-import '../../widgets/ask_wing_ai/rate_limit_indicator.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
 import '../../widgets/ask_wing_ai/ai_consent_dialog.dart';
 import '../../../core/theme/app_colors.dart';
@@ -690,8 +690,14 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
     if (question.trim().isEmpty) return;
     if (!mounted) return;
 
-    context.read<AskWingAICubit>().submitQuestion(question);
+    final selectedMode = await ResponseModeSheet.show(context, question: question);
+    if (selectedMode == null || !mounted) return;
+
+    context.read<AskWingAICubit>().submitQuestion(question, responseStyle: selectedMode.id);
     _textController.clear();
+    setState(() {
+      _matchedSermons = [];
+    });
   }
 
   void _scrollToBottom() {
@@ -754,98 +760,6 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
               foregroundColor: Colors.white,
             ),
             child: const Text('Clear'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showRateLimitDialog(BuildContext context, AskWingAIRateLimitExceeded state) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: isDark ? const Color(0xFF1E222A) : Colors.white,
-        title: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE53935).withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.hourglass_empty_rounded,
-                color: Color(0xFFE53935),
-                size: 32,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Daily Limit Reached',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'You\'ve used all 15 prompts for today. Please wait until tomorrow (resets at midnight) to ask more questions.',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark ? Colors.grey[300] : Colors.grey[700],
-                height: 1.4,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[900] : const Color(0xFFFFF9EE),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFE5A93C).withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.schedule, size: 18, color: Color(0xFFE5A93C)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Come back tomorrow with 20 fresh prompts!',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? Colors.grey[300] : Colors.grey[700],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              child: const Text('Got it'),
-            ),
           ),
         ],
       ),
