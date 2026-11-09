@@ -40,6 +40,15 @@ class _HomePageState extends ConsumerState<HomePage> {
     return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
   }
 
+  String _formatDateClean(DateTime date) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final monthName = months[date.month - 1];
+    return '${date.day} $monthName ${date.year}';
+  }
+
   // Persistent in-memory cache for instant display across tab switches / navigation
   static List<Sermon> _staticSermons = [];
   static List<BeginnerCategory> _staticBeginnerCategories = [];
@@ -343,6 +352,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                 _buildBeginnerCategories(context, isDark),
                 SizedBox(height: spacing * 1.5),
                 _buildTrendingMessages(context, isDark),
+                SizedBox(height: spacing * 1.5),
+                _buildYouMightAlsoLike(context, isDark),
                 SizedBox(height: spacing * 1.5),
                 _buildRecentActivities(context, isDark),
                 SizedBox(height: spacing * 6),
@@ -1022,7 +1033,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final spacing = Responsive.verticalSpacing(context);
     final subtitleFontSize = Responsive.subtitleFontSize(context);
 
-    // Pick 3 most listened / trending messages across all users
+    // Pick trending / most listened messages across all users
     List<Sermon> displayList = _trendingSermons;
     if (displayList.isEmpty) {
       displayList = _recommendedSermons;
@@ -1031,11 +1042,11 @@ class _HomePageState extends ConsumerState<HomePage> {
       displayList = _sermons;
     }
 
-    final trendingPicks = displayList.take(3).toList();
+    final trendingPicks = displayList.take(12).toList();
     if (trendingPicks.isEmpty) return const SizedBox.shrink();
 
-    final squareCardSize = Responsive.value(context, mobile: 155.0, tablet: 210.0, desktop: 230.0);
-    final containerHeight = squareCardSize + 16.0;
+    final cardWidth = Responsive.value(context, mobile: 140.0, tablet: 180.0, desktop: 200.0);
+    final containerHeight = cardWidth + 72.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1104,12 +1115,11 @@ class _HomePageState extends ConsumerState<HomePage> {
               final sermon = trendingPicks[index];
               return Padding(
                 padding: const EdgeInsets.only(right: 14.0),
-                child: _buildTrendingCard(
+                child: _buildCleanSermonCard(
                   context,
                   isDark,
                   sermon,
-                  squareCardSize,
-                  rank: index + 1,
+                  cardWidth,
                 ),
               );
             },
@@ -1119,15 +1129,70 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildTrendingCard(
+  Widget _buildYouMightAlsoLike(BuildContext context, bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final subtitleFontSize = Responsive.subtitleFontSize(context);
+
+    List<Sermon> displayList = _recommendedSermons;
+    if (displayList.isEmpty) {
+      displayList = _sermons;
+    }
+
+    final recommendedPicks = displayList.take(12).toList();
+    if (recommendedPicks.isEmpty) return const SizedBox.shrink();
+
+    final cardWidth = Responsive.value(context, mobile: 140.0, tablet: 180.0, desktop: 200.0);
+    final containerHeight = cardWidth + 72.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: Text(
+            'You Might Also Like',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                  fontWeight: FontWeight.bold,
+                  fontSize: subtitleFontSize,
+                ),
+          ),
+        ),
+        SizedBox(height: spacing * 0.8),
+        SizedBox(
+          height: containerHeight,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            itemCount: recommendedPicks.length,
+            itemBuilder: (context, index) {
+              final sermon = recommendedPicks[index];
+              return Padding(
+                padding: const EdgeInsets.only(right: 14.0),
+                child: _buildCleanSermonCard(
+                  context,
+                  isDark,
+                  sermon,
+                  cardWidth,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Clean Sermon Card - artwork thumbnail with title and minister name underneath
+  Widget _buildCleanSermonCard(
     BuildContext context,
     bool isDark,
     Sermon sermon,
-    double cardSize, {
-    required int rank,
-  }) {
+    double cardWidth,
+  ) {
     final authProvider = ref.read(authChangeNotifierProvider);
-    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
     final user = authProvider.user;
     final isServiceTeamMember = user?.isServiceTeamMember ?? false;
     final isGeneralMarried = user?.isGeneralMarried ?? false;
@@ -1136,13 +1201,14 @@ class _HomePageState extends ConsumerState<HomePage> {
         (sermon.isServiceTeamOnly && !isServiceTeamMember) ||
         (sermon.isGeneralMarriedOnly && !isGeneralMarried) ||
         (sermon.isInHouseMarriedOnly && !isInHouseMarried);
-    final isCurrentlyPlaying =
-        audioProvider.currentSermon?.id == sermon.id && audioProvider.isPlaying;
 
-    final titleFontSize = Responsive.value(context, mobile: 12.5, tablet: 14.5);
-    final speakerFontSize = Responsive.value(context, mobile: 10.5, tablet: 12.0);
-    final playBtnSize = Responsive.value(context, mobile: 32.0, tablet: 40.0);
-    final playIconSize = Responsive.value(context, mobile: 18.0, tablet: 22.0);
+    final titleFontSize = Responsive.value(context, mobile: 13.0, tablet: 14.5);
+    final speakerFontSize = Responsive.value(context, mobile: 11.5, tablet: 13.0);
+    final metaFontSize = Responsive.value(context, mobile: 10.5, tablet: 11.5);
+
+    final categoryCode = sermon.categoryName.isNotEmpty
+        ? sermon.categoryName
+        : (sermon.category.isNotEmpty ? sermon.category : '');
 
     return GestureDetector(
       onTap: () {
@@ -1156,176 +1222,91 @@ class _HomePageState extends ConsumerState<HomePage> {
           sermon: sermon,
         );
       },
-      child: Container(
-        width: cardSize,
-        height: cardSize,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+      child: SizedBox(
+        width: cardWidth,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 1. Clean Artwork Thumbnail (No overlays on top of the image)
+            Container(
+              width: cardWidth,
+              height: cardWidth,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: _buildSermonImage(sermon, isDark),
+              ),
+            ),
+            const SizedBox(height: 7),
+
+            // 2. Title (under the card)
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    sermon.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: titleFontSize,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                if (isLocked)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Icon(
+                      Icons.lock,
+                      size: 13,
+                      color: isDark ? Colors.white54 : Colors.grey[600],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 2),
+
+            // 3. Minister / Speaker (under the card)
+            Text(
+              sermon.speaker ?? 'TCGC',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: speakerFontSize,
+                fontWeight: FontWeight.normal,
+                color: isDark ? Colors.white70 : AppColors.textSecondaryLight,
+              ),
+            ),
+            const SizedBox(height: 2),
+
+            // 4. Date • Category (under the card)
+            Text(
+              sermon.date != null
+                  ? (categoryCode.isNotEmpty
+                      ? '${_formatDateClean(sermon.date!)} • $categoryCode'
+                      : _formatDateClean(sermon.date!))
+                  : categoryCode,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: metaFontSize,
+                fontWeight: FontWeight.w400,
+                color: isDark ? Colors.white38 : Colors.grey[600],
+              ),
             ),
           ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // 1. Artwork Thumbnail
-              _buildSermonImage(sermon, isDark),
-
-              // 2. Scrim Overlay
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.18),
-                      Colors.black.withValues(alpha: 0.45),
-                      Colors.black.withValues(alpha: 0.94),
-                    ],
-                    stops: const [0.0, 0.45, 1.0],
-                  ),
-                ),
-              ),
-
-              // 3. Top Rank Badge (#1, #2, #3 Trending)
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFF3C05A), Color(0xFFC78F28)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        blurRadius: 4,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.local_fire_department_rounded,
-                        size: 11,
-                        color: Colors.black,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        '#$rank',
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Category Badge (Top Right)
-              if (sermon.categoryName.isNotEmpty)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppColors.primaryGold.withValues(alpha: 0.4),
-                        width: 0.7,
-                      ),
-                    ),
-                    child: Text(
-                      sermon.categoryName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: Responsive.value(context, mobile: 9.0, tablet: 10.5),
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryGold,
-                      ),
-                    ),
-                  ),
-                ),
-
-              // 4. Quick Play Button or Wave Animation (Bottom Right)
-              Positioned(
-                bottom: 8,
-                right: 8,
-                child: Container(
-                  width: playBtnSize,
-                  height: playBtnSize,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryGold,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryGold.withValues(alpha: 0.5),
-                        blurRadius: 6,
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: isCurrentlyPlaying
-                        ? Icon(Icons.pause, color: Colors.white, size: playIconSize * 0.9)
-                        : isLocked
-                            ? Icon(Icons.lock, color: Colors.white, size: playIconSize * 0.8)
-                            : Icon(Icons.play_arrow, color: Colors.white, size: playIconSize),
-                  ),
-                ),
-              ),
-
-              // 5. Title & Speaker (Bottom Left)
-              Positioned(
-                bottom: 8,
-                left: 10,
-                right: playBtnSize + 14,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      sermon.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: titleFontSize,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      sermon.speaker ?? 'TCGC',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: speakerFontSize,
-                        color: Colors.white.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
