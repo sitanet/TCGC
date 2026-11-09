@@ -1235,8 +1235,39 @@ class _MainScreenState extends ConsumerState<MainScreen>
     final maxIndex = showWallet ? 4 : 3;
     final safeIndex = _currentIndex > maxIndex ? 0 : _currentIndex;
 
-    // Church promotions and announcements are now displayed directly
-    // as an interactive modal dialog on the Home dashboard.
+    if (_showPromotion && _activePromotions.isNotEmpty) {
+      return BlocProvider<AskWingAICubit>(
+        create: (context) => _askWingAICubit,
+        child: Stack(
+          children: [
+            Scaffold(
+              body: _buildPage(safeIndex, showWallet),
+              bottomNavigationBar: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (safeIndex != 2) const MiniPlayer(),
+                  BottomNavBar(
+                    currentIndex: safeIndex,
+                    showWallet: showWallet,
+                    onTap: (index) {
+                      if (showWallet && index == 3) {
+                        _handleWalletTap();
+                      } else {
+                        _setCurrentIndex(index);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            PromotionPopup(
+              promotions: _activePromotions,
+              onClose: _closePromotion,
+            ),
+          ],
+        ),
+      );
+    }
 
     if (_showReadyToPlayPopup) {
       return BlocProvider<AskWingAICubit>(

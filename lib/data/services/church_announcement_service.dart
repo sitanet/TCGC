@@ -61,7 +61,7 @@ class ChurchAnnouncementService {
           final topPromo = sortedPromos.first;
           if (topPromo.isActive) {
             candidate = ChurchAnnouncement(
-              id: 'promo_${topPromo.id}',
+              id: 'promo_${topPromo.id}_${topPromo.createdAt.millisecondsSinceEpoch}',
               title: topPromo.title,
               message: topPromo.description ?? '',
               imageUrl: topPromo.imageUrl.isNotEmpty ? topPromo.imageUrl : null,
@@ -90,7 +90,7 @@ class ChurchAnnouncementService {
           if (announcements.isNotEmpty) {
             final topNotif = announcements.first;
             final notifAnnouncement = ChurchAnnouncement(
-              id: 'notif_${topNotif.id}',
+              id: 'notif_${topNotif.id}_${topNotif.createdAt.millisecondsSinceEpoch}',
               title: topNotif.title,
               message: topNotif.body,
               imageUrl: topNotif.imageUrl,
