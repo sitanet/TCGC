@@ -755,10 +755,79 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   // [REMOVED] Upcoming Events section removed from Home Page
 
+  Widget _buildSectionHeader(
+    BuildContext context,
+    bool isDark, {
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+  }) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final titleFontSize = Responsive.value(context, mobile: 16.0, tablet: 18.0, desktop: 20.0);
+    final subtitleFontSize = Responsive.value(context, mobile: 12.0, tablet: 13.5, desktop: 14.0);
+    const iconSize = 20.0;
+    const iconSpacing = 8.0;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: AppColors.primaryGold,
+                size: iconSize,
+              ),
+              const SizedBox(width: iconSpacing),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                    fontWeight: FontWeight.bold,
+                    fontSize: titleFontSize,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: 8),
+                trailing,
+              ],
+            ],
+          ),
+          if (subtitle != null && subtitle.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Padding(
+              padding: const EdgeInsets.only(left: iconSize + iconSpacing),
+              child: Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.textSecondaryDark.withValues(alpha: 0.8)
+                      : AppColors.textSecondaryLight.withValues(alpha: 0.8),
+                  fontSize: subtitleFontSize,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildBeginnerCategories(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
-    final subtitleFontSize = Responsive.subtitleFontSize(context);
 
     final cardWidth = Responsive.value(context, mobile: 94.0, tablet: 115.0, desktop: 125.0);
     final artworkHeight = Responsive.value(context, mobile: 64.0, tablet: 76.0, desktop: 82.0);
@@ -773,45 +842,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.explore_outlined,
-                    color: AppColors.primaryGold,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Are you new to this space',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: AppColors.primaryGold,
-                          fontWeight: FontWeight.bold,
-                          fontSize: subtitleFontSize,
-                        ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Padding(
-                padding: const EdgeInsets.only(left: 28),
-                child: Text(
-                  'Essential series to build your spiritual journey',
-                  style: TextStyle(
-                    color: isDark
-                        ? AppColors.textSecondaryDark.withValues(alpha: 0.8)
-                        : AppColors.textSecondaryLight.withValues(alpha: 0.8),
-                    fontSize: Responsive.value(context, mobile: 12.5, tablet: 14.0),
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        _buildSectionHeader(
+          context,
+          isDark,
+          icon: Icons.explore_outlined,
+          title: 'Are you new to this space',
+          subtitle: 'Essential series to build your spiritual journey',
         ),
         SizedBox(height: spacing * 0.8),
         if (_beginnerCategories.isEmpty && _isLoading)
@@ -1120,7 +1156,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildTrendingMessages(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
-    final subtitleFontSize = Responsive.subtitleFontSize(context);
 
     // Pick strictly at most 4 most listened / trending messages (deduplicated)
     List<Sermon> displayList = _trendingSermons;
@@ -1145,63 +1180,42 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.local_fire_department_rounded,
+        _buildSectionHeader(
+          context,
+          isDark,
+          icon: Icons.local_fire_department_rounded,
+          title: 'Most Listened Messages',
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppColors.primaryGold.withValues(alpha: 0.15)
+                  : const Color(0xFFFDF8EB),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.primaryGold.withValues(alpha: 0.4),
+                width: 0.9,
+              ),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.headphones_rounded,
+                  size: 12,
+                  color: AppColors.primaryGold,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  'Top Audio',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.primaryGold,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Most Listened Messages',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: AppColors.primaryGold,
-                          fontWeight: FontWeight.bold,
-                          fontSize: subtitleFontSize,
-                        ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.primaryGold.withValues(alpha: 0.15)
-                      : const Color(0xFFFDF8EB),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.primaryGold.withValues(alpha: 0.4),
-                    width: 0.9,
                   ),
                 ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.headphones_rounded,
-                      size: 13,
-                      color: AppColors.primaryGold,
-                    ),
-                    SizedBox(width: 5),
-                    Text(
-                      'Top Audio',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryGold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         SizedBox(height: spacing * 0.9),
@@ -1397,7 +1411,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildCitygateSongs(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
-    final subtitleFontSize = Responsive.subtitleFontSize(context);
 
     List<Sermon> songList = _citygateSongs;
     if (songList.isEmpty) {
@@ -1427,63 +1440,42 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.music_note_rounded,
+        _buildSectionHeader(
+          context,
+          isDark,
+          icon: Icons.music_note_rounded,
+          title: 'Citygate Songs',
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppColors.primaryGold.withValues(alpha: 0.15)
+                  : const Color(0xFFFDF8EB),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.primaryGold.withValues(alpha: 0.4),
+                width: 0.9,
+              ),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.library_music_rounded,
+                  size: 12,
+                  color: AppColors.primaryGold,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  'Worship',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.primaryGold,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Citygate Songs',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                          fontWeight: FontWeight.bold,
-                          fontSize: subtitleFontSize,
-                        ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.primaryGold.withValues(alpha: 0.15)
-                      : const Color(0xFFFDF8EB),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.primaryGold.withValues(alpha: 0.4),
-                    width: 0.9,
                   ),
                 ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.library_music_rounded,
-                      size: 13,
-                      color: AppColors.primaryGold,
-                    ),
-                    SizedBox(width: 5),
-                    Text(
-                      'Worship & Praise',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryGold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         SizedBox(height: spacing * 0.8),
@@ -1515,7 +1507,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildYouMightAlsoLike(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
-    final subtitleFontSize = Responsive.subtitleFontSize(context);
 
     List<Sermon> displayList = _recommendedSermons;
     if (displayList.isEmpty) {
@@ -1531,16 +1522,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: Text(
-            'You Might Also Like',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                  fontWeight: FontWeight.bold,
-                  fontSize: subtitleFontSize,
-                ),
-          ),
+        _buildSectionHeader(
+          context,
+          isDark,
+          icon: Icons.auto_awesome_rounded,
+          title: 'You Might Also Like',
         ),
         SizedBox(height: spacing * 0.8),
         SizedBox(
