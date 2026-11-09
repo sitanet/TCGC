@@ -29,9 +29,13 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     final statusBarIconBrightness = isDark ? Brightness.light : (lightBackground ? Brightness.dark : Brightness.light);
     final statusBarBrightness = isDark ? Brightness.dark : (lightBackground ? Brightness.light : Brightness.dark);
     
+    final foregroundColor = isDark || !lightBackground ? Colors.white : Colors.black87;
+
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
+      iconTheme: IconThemeData(color: foregroundColor),
+      actionsIconTheme: IconThemeData(color: foregroundColor),
       systemOverlayStyle: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: statusBarIconBrightness,
@@ -43,14 +47,21 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               behavior: HitTestBehavior.opaque,
               child: Container(
                 padding: const EdgeInsets.all(8),
-                child: const Icon(Icons.arrow_back),
+                child: Icon(Icons.arrow_back, color: foregroundColor),
               ),
             )
           : leading,
       title: title != null
           ? Text(
               title!,
-              style: Theme.of(context).textTheme.titleLarge,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: foregroundColor,
+                    fontWeight: FontWeight.bold,
+                  ) ?? TextStyle(
+                    color: foregroundColor,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
             )
           : null,
       centerTitle: true,

@@ -9,8 +9,6 @@ import '../../../core/utils/image_cache_manager.dart';
 import '../../../main.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/interests_service.dart';
-import '../../../data/services/download_service.dart';
-import '../../../data/services/played_audio_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/beginner_category.dart';
 
@@ -35,10 +33,6 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   final DataService _dataService = DataService();
   final InterestsService _interestsService = InterestsService();
-
-  String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
-  }
 
   String _formatDateClean(DateTime date) {
     const months = [
@@ -1682,11 +1676,9 @@ class _HomePageState extends ConsumerState<HomePage> {
 
             // 4. Date • Category (under the card)
             Text(
-              sermon.date != null
-                  ? (categoryCode.isNotEmpty
-                      ? '${_formatDateClean(sermon.date!)} • $categoryCode'
-                      : _formatDateClean(sermon.date!))
-                  : categoryCode,
+              categoryCode.isNotEmpty
+                  ? '${_formatDateClean(sermon.date)} • $categoryCode'
+                  : _formatDateClean(sermon.date),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -1697,109 +1689,6 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildRecentActivities(BuildContext context, bool isDark) {
-    final playedService = PlayedAudioService.instance;
-    final recentIds = playedService.recentlyPlayedIds;
-    final horizontalPadding = Responsive.horizontalPadding(context);
-    final isTabletOrLarger = !Responsive.isMobile(context);
-
-    // Filter sermons to those the user actually listened to, in order of playback
-    final Map<String, Sermon> sermonMap = {
-      for (final s in _sermons) s.id: s
-    };
-
-    List<Sermon> listenedSermons = [];
-    for (final id in recentIds) {
-      final s = sermonMap[id];
-      if (s != null) {
-        listenedSermons.add(s);
-      }
-      if (listenedSermons.length >= 4) break;
-    }
-
-    // Fallback: If user hasn't listened to any audio yet, gracefully display latest 4 items
-    final hasListeningHistory = listenedSermons.isNotEmpty;
-    final displaySermons = hasListeningHistory
-        ? listenedSermons
-        : _sermons.take(4).toList();
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                hasListeningHistory ? 'Recently Listened' : 'Recent Activities',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: AppColors.primaryGold,
-                      fontWeight: FontWeight.bold,
-                      fontSize: Responsive.subtitleFontSize(context),
-                    ),
-              ),
-              if (hasListeningHistory)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryGold.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    'History',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryGold,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (_isLoading)
-            const Center(child: CircularProgressIndicator())
-          else if (displaySermons.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Text(
-                  'No recent activities yet',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
-                ),
-              ),
-            )
-          else if (isTabletOrLarger)
-            // 2-column grid layout for Tablets/iPads
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 14,
-                mainAxisSpacing: 12,
-                mainAxisExtent: 84,
-              ),
-              itemCount: displaySermons.length,
-              itemBuilder: (context, index) {
-                return _buildActivityTile(context, isDark, displaySermons[index]);
-              },
-            )
-          else
-            // Single column stack for standard phones
-            ...displaySermons.map(
-              (sermon) => _buildActivityTile(context, isDark, sermon),
-            ),
-        ],
       ),
     );
   }
@@ -1832,225 +1721,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       sermon.imageUrl!,
       fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) => placeholder,
-    );
-  }
-
-  String _getTimeAgo(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays > 365) {
-      final years = (difference.inDays / 365).floor();
-      return '$years ${years == 1 ? 'year' : 'years'} ago';
-    } else if (difference.inDays > 30) {
-      final months = (difference.inDays / 30).floor();
-      return '$months ${months == 1 ? 'month' : 'months'} ago';
-    } else if (difference.inDays > 7) {
-      final weeks = (difference.inDays / 7).floor();
-      return '$weeks ${weeks == 1 ? 'week' : 'weeks'} ago';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays} ${difference.inDays == 1 ? 'day' : 'days'} ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} ${difference.inHours == 1 ? 'hour' : 'hours'} ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} ${difference.inMinutes == 1 ? 'min' : 'mins'} ago';
-    } else {
-      return 'Just now';
-    }
-  }
-
-  Widget _buildActivityTile(BuildContext context, bool isDark, Sermon sermon) {
-    final authProvider = ref.read(authChangeNotifierProvider);
-    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
-    final downloadService = DownloadService();
-    final user = authProvider.user;
-    final isServiceTeamMember = user?.isServiceTeamMember ?? false;
-    final isGeneralMarried = user?.isGeneralMarried ?? false;
-    final isInHouseMarried = user?.isInHouseMarried ?? false;
-    final isLocked =
-        (sermon.isServiceTeamOnly && !isServiceTeamMember) ||
-        (sermon.isGeneralMarriedOnly && !isGeneralMarried) ||
-        (sermon.isInHouseMarriedOnly && !isInHouseMarried);
-    final isCurrentlyPlaying =
-        audioProvider.currentSermon?.id == sermon.id && audioProvider.isPlaying;
-    final isPreBuffered = audioProvider.isPreBuffered(sermon.id);
-    final isDownloaded = downloadService.isDownloaded(sermon.id);
-    final isReadyToPlay = isPreBuffered || isDownloaded;
-
-    final timeAgo = _getTimeAgo(sermon.date);
-
-    return GestureDetector(
-      onTap: () {
-        if (isLocked) {
-          _showLockedMessage(context, isDark);
-          return;
-        }
-        ResumePlaybackHelper.handleMessageTap(
-          context: context,
-          ref: ref,
-          sermon: sermon,
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.cardDark : AppColors.surfaceLight,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    width: 50,
-                    height: 50,
-                    child: _buildSermonImage(sermon, isDark),
-                  ),
-                ),
-                // Wave animation when playing
-                if (isCurrentlyPlaying && !isLocked)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const _WaveAnimation(),
-                    ),
-                  ),
-                // Ready indicator (pre-buffered or downloaded) - only show when not playing
-                if (isReadyToPlay && !isLocked && !isCurrentlyPlaying)
-                  Positioned(
-                    bottom: 2,
-                    right: 2,
-                    child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.green.withValues(alpha: 0.4),
-                            blurRadius: 4,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.play_arrow,
-                        size: 12,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                if (isLocked)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.lock, size: 20, color: Colors.white),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Category (bold) - Title (regular gray)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: RichText(
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          text: TextSpan(
-                            children: [
-                              if (sermon.categoryName.isNotEmpty) ...[
-                                TextSpan(
-                                  text: sermon.categoryName,
-                                  style: TextStyle(
-                                    color: isDark
-                                        ? Colors.white
-                                        : Colors.black87,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: ' - ',
-                                  style: TextStyle(
-                                    color: isDark
-                                        ? Colors.white
-                                        : Colors.black87,
-                                    fontWeight: FontWeight.normal,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                              TextSpan(
-                                text:
-                                    '${_formatDate(sermon.date)} - ${sermon.title}',
-                                style: TextStyle(
-                                  color: isDark ? Colors.white : Colors.black87,
-                                  fontWeight: FontWeight.normal,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (isLocked)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: Icon(
-                            Icons.lock,
-                            size: 14,
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  // Speaker - Time ago
-                  Text(
-                    '${sermon.speaker ?? 'Unknown'} - $timeAgo',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: isDark
-                          ? AppColors.textSecondaryDark.withValues(alpha: 0.7)
-                          : AppColors.textSecondaryLight.withValues(alpha: 0.7),
-                      fontSize: 12,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -2092,61 +1762,6 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ],
       ),
-    );
-  }
-}
-
-// Wave animation widget for playing indicator
-class _WaveAnimation extends StatefulWidget {
-  const _WaveAnimation();
-
-  @override
-  State<_WaveAnimation> createState() => _WaveAnimationState();
-}
-
-class _WaveAnimationState extends State<_WaveAnimation>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: List.generate(4, (index) {
-            final delay = index * 0.15;
-            final animValue = ((_controller.value + delay) % 1.0);
-            final height = 8 + (animValue * 12);
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 1.5),
-              width: 3,
-              height: height,
-              decoration: BoxDecoration(
-                color: AppColors.primaryGold,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            );
-          }),
-        );
-      },
     );
   }
 }

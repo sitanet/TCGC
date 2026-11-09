@@ -7,7 +7,6 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 
@@ -258,6 +257,11 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
         title: 'Live Broadcast',
         showBackButton: true,
         lightBackground: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          tooltip: 'Back to Home',
+          onPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+        ),
         onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
         actions: [
           IconButton(
