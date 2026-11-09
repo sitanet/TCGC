@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 
@@ -79,16 +80,149 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     _webViewController?.runJavaScript('''
       (function() {
         var styleId = 'tcgc-flutter-clean-style';
-        if (!document.getElementById(styleId)) {
-          var s = document.createElement('style');
-          s.id = styleId;
-          s.innerHTML = `
-            .radio-top-bar, .radio-mode-switcher { display: none !important; }
-            .radio-mobile-container { padding-top: 2px !important; min-height: auto !important; }
-            html, body { overflow-x: hidden !important; }
-          `;
-          document.head.appendChild(s);
-        }
+        var existing = document.getElementById(styleId);
+        if (existing) existing.remove();
+
+        var s = document.createElement('style');
+        s.id = styleId;
+        s.innerHTML = `
+          .radio-top-bar, .radio-mode-switcher { display: none !important; }
+          .radio-mobile-container {
+            padding-top: 4px !important;
+            padding-bottom: 24px !important;
+            min-height: auto !important;
+            max-width: 500px !important;
+            margin: 0 auto !important;
+          }
+          html, body {
+            background-color: #FFFFFF !important;
+            background: #FFFFFF !important;
+            overflow-x: hidden !important;
+            color: #0F172A !important;
+          }
+          .radio-page-shell {
+            background: linear-gradient(180deg, #FFFFFF 0%, #FAFAF8 40%, #F5F3EC 100%) !important;
+            color: #0F172A !important;
+            min-height: 100vh !important;
+          }
+          .radio-page-shell::before {
+            background-image: radial-gradient(rgba(198, 179, 106, 0.18) 1.2px, transparent 1.2px) !important;
+            opacity: 0.8 !important;
+          }
+          .radio-top-ribbon-glow {
+            background: radial-gradient(ellipse at center, rgba(245, 200, 76, 0.22) 0%, rgba(201, 147, 32, 0.08) 50%, transparent 70%) !important;
+          }
+          .radio-artwork-container {
+            margin: 6px auto 14px !important;
+          }
+          .radio-artwork-card {
+            border: 2.5px solid #F0D788 !important;
+            border-radius: 22px !important;
+            box-shadow: 0 12px 32px rgba(198, 179, 106, 0.22), 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+            overflow: hidden !important;
+          }
+          .radio-program-title {
+            color: #0F172A !important;
+            font-weight: 800 !important;
+            font-size: 16px !important;
+            line-height: 1.35 !important;
+            text-shadow: none !important;
+            text-align: center !important;
+            padding: 0 10px !important;
+          }
+          .radio-meta-row {
+            margin: 10px auto !important;
+          }
+          .radio-live-badge.is-off-air {
+            background: #F1F5F9 !important;
+            border: 1px solid #CBD5E1 !important;
+            color: #64748B !important;
+          }
+          .radio-live-badge:not(.is-off-air) {
+            background: #FEF2F2 !important;
+            border: 1px solid #FCA5A5 !important;
+            color: #DC2626 !important;
+          }
+          .radio-meta-sep {
+            color: #CBD5E1 !important;
+          }
+          .radio-listeners-badge {
+            background: #F0FDF4 !important;
+            border: 1px solid #BBF7D0 !important;
+            color: #166534 !important;
+            font-weight: 600 !important;
+          }
+          .radio-timer-row {
+            margin: 4px auto 14px !important;
+          }
+          .radio-timer-clock {
+            color: #334155 !important;
+            font-weight: 700 !important;
+            font-size: 15px !important;
+            letter-spacing: 1px !important;
+          }
+          .radio-actions-row {
+            gap: 12px !important;
+            margin-bottom: 18px !important;
+          }
+          .radio-action-pill {
+            background: #FFFFFF !important;
+            border: 1.2px solid #E2E8F0 !important;
+            color: #334155 !important;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05) !important;
+            font-weight: 600 !important;
+          }
+          .radio-action-round {
+            background: #FFFFFF !important;
+            border: 1.2px solid #E2E8F0 !important;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05) !important;
+          }
+          .radio-action-round svg {
+            stroke: #334155 !important;
+          }
+          .radio-visualizer {
+            margin: 14px auto 20px !important;
+          }
+          .radio-visualizer .v-bar {
+            background: linear-gradient(180deg, #D4AF37 0%, #B8861B 100%) !important;
+            box-shadow: 0 0 6px rgba(212, 175, 55, 0.45) !important;
+            border-radius: 3px !important;
+          }
+          .radio-controls-row {
+            gap: 24px !important;
+            margin: 10px auto 24px !important;
+          }
+          .radio-ctrl-btn {
+            background: #F8FAFC !important;
+            border: 1.2px solid #E2E8F0 !important;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04) !important;
+          }
+          .radio-ctrl-btn svg {
+            stroke: #1E293B !important;
+          }
+          .radio-main-play-btn {
+            background: linear-gradient(135deg, #F5C84C 0%, #D49F24 100%) !important;
+            box-shadow: 0 10px 28px rgba(212, 159, 36, 0.5), 0 3px 8px rgba(0, 0, 0, 0.1) !important;
+            border: 3.5px solid #FFFFFF !important;
+          }
+          .radio-main-play-btn svg {
+            fill: #FFFFFF !important;
+          }
+          .radio-drawer {
+            background: #FFFFFF !important;
+            color: #0F172A !important;
+            border-top: 1px solid #E2E8F0 !important;
+            box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.08) !important;
+          }
+          .radio-drawer-title {
+            color: #0F172A !important;
+            font-weight: 700 !important;
+          }
+          .radio-drawer-close {
+            color: #64748B !important;
+          }
+        `;
+        document.head.appendChild(s);
       })();
     ''');
   }
@@ -98,7 +232,7 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     _streamLiveInitialized = true;
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF071534))
+      ..setBackgroundColor(Colors.white)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (url) {
@@ -150,7 +284,7 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     _watchLiveInitialized = true;
     _watchLiveController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.black)
+      ..setBackgroundColor(Colors.white)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (url) {
@@ -251,14 +385,17 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
       }
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fgColor = isDark ? Colors.white : const Color(0xFF151515);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF071534),
+      backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
       appBar: CustomAppBar(
         title: 'Live Broadcast',
         showBackButton: true,
-        lightBackground: false,
+        lightBackground: !isDark,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: fgColor),
           tooltip: 'Back to Home',
           onPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
         ),
@@ -266,17 +403,17 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
         actions: [
           IconButton(
             tooltip: 'Share Live Broadcast',
-            icon: const Icon(Icons.share_outlined, size: 21, color: Colors.white),
+            icon: Icon(Icons.share_outlined, size: 21, color: fgColor),
             onPressed: _handleShare,
           ),
           IconButton(
             tooltip: 'Open in Browser',
-            icon: const Icon(Icons.open_in_new_rounded, size: 20, color: Colors.white),
+            icon: Icon(Icons.open_in_new_rounded, size: 20, color: fgColor),
             onPressed: _handleOpenInBrowser,
           ),
           IconButton(
             tooltip: 'Refresh Stream',
-            icon: const Icon(Icons.refresh_rounded, size: 22, color: Colors.white),
+            icon: Icon(Icons.refresh_rounded, size: 22, color: fgColor),
             onPressed: _handleRefresh,
           ),
           const SizedBox(width: 4),
@@ -290,7 +427,7 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
             // Segmented Mode Switcher (Audio vs Video)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
-              child: _buildSegmentedSwitcher(),
+              child: _buildSegmentedSwitcher(isDark),
             ),
 
             // Main Broadcast Stage (TabBarView) - Expands fully down without padding/border clipping
@@ -303,11 +440,13 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
                     context: context,
                     controller: _webViewController,
                     isLoading: _isStreamLiveLoading,
+                    isDark: isDark,
                   ),
                   _buildStageView(
                     context: context,
                     controller: _watchLiveController,
                     isLoading: _isWatchLiveLoading,
+                    isDark: isDark,
                   ),
                 ],
               ),
@@ -319,46 +458,46 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   }
 
   /// Modern Segmented Pill Switcher (Audio vs Video) matching TCGC luxury styling
-  Widget _buildSegmentedSwitcher() {
+  Widget _buildSegmentedSwitcher(bool isDark) {
     return Container(
-      height: 46,
+      height: 48,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xD10C1A3C),
+        color: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF1F3F7),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: const Color(0xFFF5C84C).withValues(alpha: 0.22),
+          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
           width: 1,
         ),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x59000000),
-            blurRadius: 18,
-            offset: Offset(0, 4),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(24),
           gradient: const LinearGradient(
-            colors: [Color(0xFFF5C84C), Color(0xFFD49F24)],
+            colors: [Color(0xFFE5B038), Color(0xFFC69224)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFF5C84C).withValues(alpha: 0.42),
-              blurRadius: 12,
-              offset: const Offset(0, 3),
+              color: const Color(0xFFC69224).withValues(alpha: 0.38),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         dividerColor: Colors.transparent,
         labelColor: Colors.white,
-        unselectedLabelColor: const Color(0xBFFFFFFF),
+        unselectedLabelColor: isDark ? const Color(0xBFFFFFFF) : const Color(0xFF64748B),
         labelStyle: const TextStyle(
           fontWeight: FontWeight.w700,
           fontSize: 13.5,
@@ -401,10 +540,12 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     required BuildContext context,
     required WebViewController? controller,
     required bool isLoading,
+    required bool isDark,
   }) {
+    final bgColor = isDark ? const Color(0xFF121212) : Colors.white;
     return Container(
       width: double.infinity,
-      color: const Color(0xFF071534),
+      color: bgColor,
       child: Stack(
         children: [
           // Active WebView with EagerGestureRecognizer for instant platform responsiveness
@@ -421,45 +562,45 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
           // Modern Shimmer / Loading State
           if (isLoading || controller == null)
             Container(
-              color: const Color(0xFF071534),
+              color: bgColor,
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      width: 56,
-                      height: 56,
+                      width: 58,
+                      height: 58,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFFF5C84C).withValues(alpha: 0.12),
+                        color: AppColors.primaryGold.withValues(alpha: 0.12),
                         border: Border.all(
-                          color: const Color(0xFFF5C84C).withValues(alpha: 0.4),
+                          color: AppColors.primaryGold.withValues(alpha: 0.35),
                           width: 1.5,
                         ),
                       ),
                       child: const Center(
                         child: CircularProgressIndicator(
-                          color: Color(0xFFF5C84C),
+                          color: AppColors.primaryGold,
                           strokeWidth: 2.6,
                         ),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Connecting to Live Stream...',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.3,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.2,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'The City Gate Church Live Feed',
                       style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 12,
+                        color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
+                        fontSize: 12.5,
                       ),
                     ),
                   ],
