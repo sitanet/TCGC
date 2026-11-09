@@ -35,6 +35,27 @@ class Sermon {
     this.isInHouseMarriedOnly = false,
   });
 
+  static Duration _parseDuration(dynamic value) {
+    if (value == null) return Duration.zero;
+    if (value is int) return Duration(minutes: value);
+    final str = value.toString().trim();
+    if (str.isEmpty) return Duration.zero;
+    final intVal = int.tryParse(str);
+    if (intVal != null) return Duration(minutes: intVal);
+    final parts = str.split(':');
+    if (parts.length == 2) {
+      final m = int.tryParse(parts[0]) ?? 0;
+      final s = int.tryParse(parts[1]) ?? 0;
+      return Duration(minutes: m, seconds: s);
+    } else if (parts.length == 3) {
+      final h = int.tryParse(parts[0]) ?? 0;
+      final m = int.tryParse(parts[1]) ?? 0;
+      final s = int.tryParse(parts[2]) ?? 0;
+      return Duration(hours: h, minutes: m, seconds: s);
+    }
+    return Duration.zero;
+  }
+
   factory Sermon.fromJson(Map<String, dynamic> json) {
     final categoryValue = json['category'];
     final categoryStr = categoryValue?.toString() ?? '';
@@ -54,9 +75,7 @@ class Sermon {
       date: (json['date'] != null && json['date'].toString().isNotEmpty)
           ? (DateTime.tryParse(json['date'].toString()) ?? DateTime.now())
           : DateTime.now(),
-      duration: Duration(
-        minutes: int.tryParse((json['duration_minutes'] ?? json['duration'] ?? 0).toString()) ?? 0,
-      ),
+      duration: _parseDuration(json['duration_minutes'] ?? json['duration']),
       isRecommended: json['is_recommended'] == true,
       isServiceTeamOnly: json['is_service_team_only'] == true,
       isGeneralMarriedOnly: json['is_general_married_only'] == true,

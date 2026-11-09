@@ -49,6 +49,18 @@ class _HomePageState extends ConsumerState<HomePage> {
     return '${date.day} $monthName ${date.year}';
   }
 
+  String _formatDuration(Duration duration) {
+    if (duration.inSeconds <= 0) return '45:00';
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    if (hours > 0) {
+      return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+
   // Persistent in-memory cache for instant display across tab switches / navigation
   static List<Sermon> _staticSermons = [];
   static List<BeginnerCategory> _staticBeginnerCategories = [];
@@ -1033,7 +1045,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final spacing = Responsive.verticalSpacing(context);
     final subtitleFontSize = Responsive.subtitleFontSize(context);
 
-    // Pick trending / most listened messages across all users
+    // Pick 3 most listened / trending messages across all users
     List<Sermon> displayList = _trendingSermons;
     if (displayList.isEmpty) {
       displayList = _recommendedSermons;
@@ -1042,11 +1054,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       displayList = _sermons;
     }
 
-    final trendingPicks = displayList.take(12).toList();
+    final trendingPicks = displayList.take(3).toList();
     if (trendingPicks.isEmpty) return const SizedBox.shrink();
-
-    final cardWidth = Responsive.value(context, mobile: 140.0, tablet: 180.0, desktop: 200.0);
-    final containerHeight = cardWidth + 72.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1054,30 +1063,37 @@ class _HomePageState extends ConsumerState<HomePage> {
         Padding(
           padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(
-                Icons.local_fire_department_rounded,
-                color: AppColors.primaryGold,
-                size: 22,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.local_fire_department_rounded,
+                    color: AppColors.primaryGold,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Trending Messages',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.primaryGold,
+                          fontWeight: FontWeight.bold,
+                          fontSize: subtitleFontSize,
+                        ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                'Trending Messages',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: AppColors.primaryGold,
-                      fontWeight: FontWeight.bold,
-                      fontSize: subtitleFontSize,
-                    ),
-              ),
-              const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryGold.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
+                  color: isDark
+                      ? AppColors.primaryGold.withValues(alpha: 0.15)
+                      : const Color(0xFFFDF8EB),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: AppColors.primaryGold.withValues(alpha: 0.35),
-                    width: 0.8,
+                    color: AppColors.primaryGold.withValues(alpha: 0.4),
+                    width: 0.9,
                   ),
                 ),
                 child: const Row(
@@ -1085,14 +1101,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                   children: [
                     Icon(
                       Icons.headphones_rounded,
-                      size: 11,
+                      size: 13,
                       color: AppColors.primaryGold,
                     ),
-                    SizedBox(width: 4),
+                    SizedBox(width: 5),
                     Text(
                       'Most Listened',
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                         color: AppColors.primaryGold,
                       ),
@@ -1103,29 +1119,192 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
         ),
-        SizedBox(height: spacing * 0.8),
-        SizedBox(
-          height: containerHeight,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            itemCount: trendingPicks.length,
-            itemBuilder: (context, index) {
-              final sermon = trendingPicks[index];
-              return Padding(
-                padding: const EdgeInsets.only(right: 14.0),
-                child: _buildCleanSermonCard(
-                  context,
-                  isDark,
-                  sermon,
-                  cardWidth,
-                ),
-              );
-            },
+        SizedBox(height: spacing * 0.9),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: Column(
+            children: trendingPicks.map((sermon) {
+              return _buildMostListenedCard(context, isDark, sermon);
+            }).toList(),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMostListenedCard(BuildContext context, bool isDark, Sermon sermon) {
+    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+    final authProvider = ref.watch(authNotifierProvider);
+    final user = authProvider.user;
+    final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+    final isGeneralMarried = user?.isGeneralMarried ?? false;
+    final isInHouseMarried = user?.isInHouseMarried ?? false;
+    final isLocked =
+        (sermon.isServiceTeamOnly && !isServiceTeamMember) ||
+        (sermon.isGeneralMarriedOnly && !isGeneralMarried) ||
+        (sermon.isInHouseMarriedOnly && !isInHouseMarried);
+    final isCurrentlyPlaying =
+        audioProvider.currentSermon?.id == sermon.id && audioProvider.isPlaying;
+
+    final imageWidth = Responsive.value(context, mobile: 94.0, tablet: 115.0, desktop: 125.0);
+    final imageHeight = Responsive.value(context, mobile: 64.0, tablet: 75.0, desktop: 80.0);
+    final titleFontSize = Responsive.value(context, mobile: 14.5, tablet: 16.0);
+    final speakerFontSize = Responsive.value(context, mobile: 12.5, tablet: 13.5);
+    final playBtnSize = Responsive.value(context, mobile: 42.0, tablet: 46.0);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 11.0),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1D2A) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: () {
+            if (isLocked) {
+              _showLockedMessage(context, isDark);
+              return;
+            }
+            ResumePlaybackHelper.handleMessageTap(
+              context: context,
+              ref: ref,
+              sermon: sermon,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+            child: Row(
+              children: [
+                // 1. Thumbnail Image
+                Container(
+                  width: imageWidth,
+                  height: imageHeight,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: _buildSermonImage(sermon, isDark),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // 2. Middle Content (Title, Speaker, Duration)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        sermon.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: titleFontSize,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF151515),
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        sermon.speaker?.isNotEmpty == true ? sermon.speaker! : 'The CityGate Church',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: speakerFontSize,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? const Color(0xFFB0AFC7) : const Color(0xFF535176),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.access_time_rounded,
+                            size: 13.5,
+                            color: Color(0xFF1B873F),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatDuration(sermon.duration),
+                            style: const TextStyle(
+                              fontSize: 12.0,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1B873F),
+                            ),
+                          ),
+                          if (isLocked) ...[
+                            const SizedBox(width: 6),
+                            Icon(
+                              Icons.lock,
+                              size: 13,
+                              color: isDark ? Colors.white54 : Colors.grey[600],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // 3. Play Button
+                GestureDetector(
+                  onTap: () {
+                    if (isLocked) {
+                      _showLockedMessage(context, isDark);
+                      return;
+                    }
+                    ResumePlaybackHelper.handleMessageTap(
+                      context: context,
+                      ref: ref,
+                      sermon: sermon,
+                    );
+                  },
+                  child: Container(
+                    width: playBtnSize,
+                    height: playBtnSize,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGold,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primaryGold.withValues(alpha: 0.35),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: isCurrentlyPlaying
+                          ? const Icon(Icons.pause_rounded, color: Colors.white, size: 22)
+                          : isLocked
+                              ? const Icon(Icons.lock_rounded, color: Colors.white, size: 18)
+                              : const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 24),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
