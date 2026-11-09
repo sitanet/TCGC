@@ -1134,7 +1134,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Widget _buildMostListenedCard(BuildContext context, bool isDark, Sermon sermon) {
     final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
-    final authProvider = ref.watch(authNotifierProvider);
+    final authProvider = ref.watch(authChangeNotifierProvider);
     final user = authProvider.user;
     final isServiceTeamMember = user?.isServiceTeamMember ?? false;
     final isGeneralMarried = user?.isGeneralMarried ?? false;
