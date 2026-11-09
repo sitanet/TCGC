@@ -743,8 +743,15 @@ class _HomePageState extends ConsumerState<HomePage> {
     final spacing = Responsive.verticalSpacing(context);
     final subtitleFontSize = Responsive.subtitleFontSize(context);
 
-    // 3 rows x 3 columns = 9 compact cards
-    final displayedCategories = _beginnerCategories.take(9).toList();
+    final cardWidth = Responsive.value(context, mobile: 94.0, tablet: 115.0, desktop: 125.0);
+    final artworkHeight = Responsive.value(context, mobile: 64.0, tablet: 76.0, desktop: 82.0);
+    final textBlockHeight = Responsive.value(context, mobile: 38.0, tablet: 42.0, desktop: 44.0);
+    final rowSpacing = Responsive.value(context, mobile: 10.0, tablet: 12.0, desktop: 14.0);
+    final cardItemHeight = artworkHeight + 5.0 + textBlockHeight;
+    final containerHeight = (cardItemHeight * 2) + rowSpacing + 2.0;
+
+    final categories = _beginnerCategories;
+    final columnCount = (categories.length / 2).ceil();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -791,18 +798,27 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         SizedBox(height: spacing * 0.8),
         if (_beginnerCategories.isEmpty && _isLoading)
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: Responsive.value(context, mobile: 8.0, tablet: 12.0),
-              mainAxisSpacing: Responsive.value(context, mobile: 8.0, tablet: 12.0),
-              childAspectRatio: Responsive.value(context, mobile: 0.85, tablet: 0.90, desktop: 0.95),
+          SizedBox(
+            height: containerHeight,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              itemCount: 4,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildCategoryShimmerCard(context, isDark, cardWidth, artworkHeight, textBlockHeight),
+                      SizedBox(height: rowSpacing),
+                      _buildCategoryShimmerCard(context, isDark, cardWidth, artworkHeight, textBlockHeight),
+                    ],
+                  ),
+                );
+              },
             ),
-            itemCount: 9,
-            itemBuilder: (context, index) => _buildCategoryShimmerCard(context, isDark),
           )
         else if (_beginnerCategories.isEmpty)
           Padding(
@@ -841,21 +857,51 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           )
         else
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: Responsive.value(context, mobile: 8.0, tablet: 12.0),
-              mainAxisSpacing: Responsive.value(context, mobile: 8.0, tablet: 12.0),
-              childAspectRatio: Responsive.value(context, mobile: 0.85, tablet: 0.90, desktop: 0.95),
+          SizedBox(
+            height: containerHeight,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              itemCount: columnCount,
+              itemBuilder: (context, colIndex) {
+                final topIndex = colIndex * 2;
+                final bottomIndex = topIndex + 1;
+                final topCategory = categories[topIndex];
+                final bottomCategory =
+                    bottomIndex < categories.length ? categories[bottomIndex] : null;
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildBeginnerCategoryCard(
+                        context,
+                        isDark,
+                        topCategory,
+                        cardWidth,
+                        artworkHeight,
+                        textBlockHeight,
+                      ),
+                      SizedBox(height: rowSpacing),
+                      if (bottomCategory != null)
+                        _buildBeginnerCategoryCard(
+                          context,
+                          isDark,
+                          bottomCategory,
+                          cardWidth,
+                          artworkHeight,
+                          textBlockHeight,
+                        )
+                      else
+                        SizedBox(width: cardWidth, height: cardItemHeight),
+                    ],
+                  ),
+                );
+              },
             ),
-            itemCount: displayedCategories.length,
-            itemBuilder: (context, index) {
-              final cat = displayedCategories[index];
-              return _buildBeginnerCategoryCard(context, isDark, cat);
-            },
           ),
       ],
     );
@@ -865,9 +911,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     BuildContext context,
     bool isDark,
     BeginnerCategory category,
+    double cardWidth,
+    double artworkHeight,
+    double textBlockHeight,
   ) {
-    final titleFontSize = Responsive.value(context, mobile: 10.5, tablet: 12.5);
-    final badgeFontSize = Responsive.value(context, mobile: 8.5, tablet: 10.0);
+    final titleFontSize = Responsive.value(context, mobile: 11.0, tablet: 12.5);
+    final countFontSize = Responsive.value(context, mobile: 9.5, tablet: 10.5);
 
     return GestureDetector(
       onTap: () {
@@ -886,112 +935,123 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         );
       },
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.3 : 0.15),
-            width: 0.8,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
+      child: SizedBox(
+        width: cardWidth,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 1. Clean Artwork (No text or dark overlay on top)
+            Container(
+              width: cardWidth,
+              height: artworkHeight,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppColors.primaryGold.withValues(alpha: isDark ? 0.25 : 0.12),
+                  width: 0.8,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(13),
+                child: _buildCategoryCardImage(
+                  category.imageUrl ??
+                      (category.sermons.isNotEmpty
+                          ? category.sermons.first.imageUrl
+                          : null),
+                  isDark,
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+
+            // 2. Title & Message Count Underneath the Card
+            SizedBox(
+              height: textBlockHeight,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    category.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: titleFontSize,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                      height: 1.15,
+                    ),
+                  ),
+                  if (category.sermonCount > 0) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '${category.sermonCount} msg',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: countFontSize,
+                        fontWeight: FontWeight.w400,
+                        color: isDark ? Colors.white54 : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(11),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Background Artwork
-              _buildCategoryCardImage(
-                category.imageUrl ??
-                    (category.sermons.isNotEmpty
-                        ? category.sermons.first.imageUrl
-                        : null),
-                isDark,
-              ),
-
-              // Gradient Overlay for Readability
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.45),
-                      Colors.black.withValues(alpha: 0.94),
-                    ],
-                    stops: const [0.2, 0.6, 1.0],
-                  ),
-                ),
-              ),
-
-              // Top Badge: Message Count
-              Positioned(
-                top: 5,
-                right: 5,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.75),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppColors.primaryGold.withValues(alpha: 0.6),
-                      width: 0.6,
-                    ),
-                  ),
-                  child: Text(
-                    '${category.sermonCount} msg',
-                    style: TextStyle(
-                      fontSize: badgeFontSize,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryGold,
-                    ),
-                  ),
-                ),
-              ),
-
-              // Bottom Title (compact)
-              Positioned(
-                bottom: 6,
-                left: 6,
-                right: 6,
-                child: Text(
-                  category.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: titleFontSize,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    height: 1.15,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black.withValues(alpha: 0.8),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
   }
 
-  Widget _buildCategoryShimmerCard(BuildContext context, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.grey[200],
-        borderRadius: BorderRadius.circular(12),
+  Widget _buildCategoryShimmerCard(
+    BuildContext context,
+    bool isDark,
+    double cardWidth,
+    double artworkHeight,
+    double textBlockHeight,
+  ) {
+    return SizedBox(
+      width: cardWidth,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: cardWidth,
+            height: artworkHeight,
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.grey[200],
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          const SizedBox(height: 5),
+          Container(
+            width: cardWidth * 0.8,
+            height: 10,
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.grey[200],
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            width: cardWidth * 0.45,
+            height: 8,
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.grey[200],
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
       ),
     );
   }
