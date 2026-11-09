@@ -219,46 +219,63 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 34,
-              height: 34,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   colors: [
-                    const Color(0xFFE5A93C),
-                    Theme.of(context).primaryColor,
+                    Color(0xFFFFD54F),
+                    AppColors.primaryGold,
+                    Color(0xFFB8860B),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primaryGold.withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: const Center(
                 child: Icon(
                   Icons.auto_awesome_rounded,
                   color: Colors.white,
-                  size: 18,
+                  size: 19,
                 ),
               ),
             ),
             const SizedBox(width: 10),
-            const Text(
-              'Wing AI',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Wing AI',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                Text(
+                  'Spiritual Guidance',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey[400]
+                        : Colors.grey[600],
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
         actions: [
-          // Rate limit indicator
-          BlocBuilder<AskWingAICubit, AskWingAIState>(
-            builder: (context, state) {
-              if (state is AskWingAIReady && state.rateLimitStatus != null) {
-                return RateLimitIndicator(
-                  status: state.rateLimitStatus!,
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
           IconButton(
             icon: const Icon(Icons.privacy_tip_outlined, color: AppColors.primaryGold),
             tooltip: 'AI Privacy & Data Notice',
@@ -309,10 +326,7 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
             ErrorHandler.showError(context, state.message);
           }
 
-          // Handle rate limit exceeded
-          if (state is AskWingAIRateLimitExceeded) {
-            _showRateLimitDialog(context, state);
-          }
+          // Rate limit removed - no dialog
 
           // Handle feature disabled
           if (state is AskWingAIFeatureDisabled) {
@@ -664,10 +678,6 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
   bool _canSubmitQuestion(AskWingAIState state) {
     if (state is AskWingAIQuestionSubmitting) return false;
     if (state is AskWingAIFeatureDisabled) return false;
-    if (state is AskWingAIRateLimitExceeded) return false;
-    if (state is AskWingAIReady && !(state.rateLimitStatus?.canAsk ?? true)) {
-      return false;
-    }
     return true;
   }
 

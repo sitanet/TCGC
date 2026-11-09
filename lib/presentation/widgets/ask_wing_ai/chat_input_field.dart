@@ -244,10 +244,6 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
     if (_isListening) {
       return 'Listening to your voice...';
     }
-
-    if (!widget.enabled) {
-      return 'Daily limit reached (15/15) • Please wait until tomorrow';
-    }
     return 'Search messages or ask Wing AI...';
   }
 
@@ -299,11 +295,9 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
                   border: Border.all(
                     color: _isListening
                         ? const Color(0xFFE5A93C)
-                        : (!_isConnected
-                            ? Colors.red.withValues(alpha: 0.5)
-                            : (_isFocused
-                                ? primaryColor.withValues(alpha: 0.6)
-                                : (isDark ? Colors.grey[700]! : Colors.grey[300]!))),
+                        : (_isFocused
+                            ? const Color(0xFFE5A93C).withValues(alpha: 0.8)
+                            : (isDark ? Colors.grey[700]! : Colors.grey[300]!)),
                     width: (_isFocused || _isListening) ? 1.5 : 1,
                   ),
                 ),
@@ -326,9 +320,7 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
                           hintStyle: TextStyle(
                             color: _isListening
                                 ? const Color(0xFFE5A93C)
-                                : (!_isConnected
-                                    ? Colors.red[300]
-                                    : (isDark ? Colors.grey[500] : Colors.grey[400])),
+                                : (isDark ? Colors.grey[400] : Colors.grey[500]),
                             fontSize: 14,
                             fontStyle: _isListening ? FontStyle.italic : FontStyle.normal,
                           ),
