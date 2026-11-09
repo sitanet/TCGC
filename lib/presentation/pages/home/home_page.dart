@@ -829,16 +829,19 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildBeginnerCategories(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
+    final isSingleRow = !Responsive.isMobile(context);
 
-    final cardWidth = Responsive.value(context, mobile: 94.0, tablet: 115.0, desktop: 125.0);
-    final artworkHeight = Responsive.value(context, mobile: 64.0, tablet: 76.0, desktop: 82.0);
-    final textBlockHeight = Responsive.value(context, mobile: 38.0, tablet: 42.0, desktop: 44.0);
+    final cardWidth = Responsive.value(context, mobile: 94.0, tablet: 130.0, desktop: 145.0);
+    final artworkHeight = Responsive.value(context, mobile: 64.0, tablet: 86.0, desktop: 96.0);
+    final textBlockHeight = Responsive.value(context, mobile: 38.0, tablet: 44.0, desktop: 48.0);
     final rowSpacing = Responsive.value(context, mobile: 10.0, tablet: 12.0, desktop: 14.0);
     final cardItemHeight = artworkHeight + 5.0 + textBlockHeight;
-    final containerHeight = (cardItemHeight * 2) + rowSpacing + 2.0;
+    final containerHeight = isSingleRow
+        ? cardItemHeight + 6.0
+        : (cardItemHeight * 2) + rowSpacing + 2.0;
 
     final categories = _beginnerCategories;
-    final columnCount = (categories.length / 2).ceil();
+    final itemCount = isSingleRow ? categories.length : (categories.length / 2).ceil();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -858,8 +861,20 @@ class _HomePageState extends ConsumerState<HomePage> {
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              itemCount: 4,
+              itemCount: isSingleRow ? 6 : 4,
               itemBuilder: (context, index) {
+                if (isSingleRow) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 14.0),
+                    child: _buildCategoryShimmerCard(
+                      context,
+                      isDark,
+                      cardWidth,
+                      artworkHeight,
+                      textBlockHeight,
+                    ),
+                  );
+                }
                 return Padding(
                   padding: const EdgeInsets.only(right: 12.0),
                   child: Column(
@@ -917,8 +932,22 @@ class _HomePageState extends ConsumerState<HomePage> {
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              itemCount: columnCount,
+              itemCount: itemCount,
               itemBuilder: (context, colIndex) {
+                if (isSingleRow) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 14.0),
+                    child: _buildBeginnerCategoryCard(
+                      context,
+                      isDark,
+                      categories[colIndex],
+                      cardWidth,
+                      artworkHeight,
+                      textBlockHeight,
+                    ),
+                  );
+                }
+
                 final topIndex = colIndex * 2;
                 final bottomIndex = topIndex + 1;
                 final topCategory = categories[topIndex];
@@ -969,8 +998,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     double artworkHeight,
     double textBlockHeight,
   ) {
-    final titleFontSize = Responsive.value(context, mobile: 11.0, tablet: 12.5);
-    final countFontSize = Responsive.value(context, mobile: 9.5, tablet: 10.5);
+    final titleFontSize = Responsive.value(context, mobile: 11.0, tablet: 12.5, desktop: 13.5);
+    final countFontSize = Responsive.value(context, mobile: 9.5, tablet: 10.5, desktop: 11.5);
 
     return GestureDetector(
       onTap: () {
