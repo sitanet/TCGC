@@ -36,6 +36,7 @@ class ApiConstants {
   static const String messageCategories = '/message-categories/';
   static const String beginnerCategories = '/beginner-categories/';
   static const String messages = '/messages/';
+  static const String songs = '/songs/';
   static const String messagesByCategory = '/messages/by_category/';
   static const String messageStats =
       '/messages/stats/'; // Track favorite/share stats

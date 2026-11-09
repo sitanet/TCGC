@@ -295,6 +295,73 @@ class DataService {
     return await getMessages(forceRefresh: forceRefresh);
   }
 
+  // Persistent in-memory cache for Citygate Songs
+  static List<Sermon>? _cachedCitygateSongs;
+
+  // Get Citygate Songs from /api/songs/
+  Future<List<Sermon>> getCitygateSongs({
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && _cachedCitygateSongs != null && _cachedCitygateSongs!.isNotEmpty) {
+      return _cachedCitygateSongs!;
+    }
+
+    try {
+      final response = await _api.get(ApiConstants.songs);
+      if (response.isSuccess) {
+        final List<dynamic> data = response.dataList;
+        if (data.isNotEmpty) {
+          final songs = data.map((json) {
+            final leadSinger = json['lead_singer']?.toString() ??
+                json['speaker']?.toString() ??
+                'The CityGate Church Choir';
+            return Sermon(
+              id: 'song_${json['id']}',
+              title: json['title']?.toString() ?? '',
+              description: json['description']?.toString() ?? (json['lyrics']?.toString() ?? ''),
+              speaker: leadSinger,
+              imageUrl: json['image_url']?.toString() ?? json['image']?.toString(),
+              audioUrl: json['audio_url']?.toString() ?? json['audio_file']?.toString(),
+              videoUrl: null,
+              transcript: json['lyrics']?.toString(),
+              category: 'Citygate Songs',
+              categoryName: 'Citygate Songs',
+              date: (json['date'] != null && json['date'].toString().isNotEmpty)
+                  ? (DateTime.tryParse(json['date'].toString()) ?? DateTime.now())
+                  : DateTime.now(),
+              duration: Duration(
+                minutes: int.tryParse((json['duration_minutes'] ?? 0).toString()) ?? 0,
+              ),
+              isRecommended: false,
+            );
+          }).toList();
+
+          _cachedCitygateSongs = songs;
+          return songs;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading Citygate Songs: $e');
+    }
+
+    // Fallback: match from existing messages or keywords
+    final allMessages = await getMessages(forceRefresh: forceRefresh);
+    final songKeywords = ['song', 'worship', 'praise', 'choir', 'hymn', 'music', 'sound'];
+    final fallbackSongs = allMessages.where((s) {
+      final t = s.title.toLowerCase();
+      final c = s.category.toLowerCase();
+      final cn = s.categoryName.toLowerCase();
+      return songKeywords.any((kw) => t.contains(kw) || c.contains(kw) || cn.contains(kw));
+    }).toList();
+
+    if (fallbackSongs.isNotEmpty) {
+      _cachedCitygateSongs = fallbackSongs;
+      return fallbackSongs;
+    }
+
+    return allMessages.take(8).toList();
+  }
+
   // Get speaker names only (for filtering)
   Future<List<String>> getSpeakerNames() async {
     final speakers = await getSpeakers();

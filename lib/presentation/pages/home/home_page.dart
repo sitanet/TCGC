@@ -66,11 +66,13 @@ class _HomePageState extends ConsumerState<HomePage> {
   static List<BeginnerCategory> _staticBeginnerCategories = [];
   static List<Sermon> _staticRecommendedSermons = [];
   static List<Sermon> _staticTrendingSermons = [];
+  static List<Sermon> _staticCitygateSongs = [];
 
   List<Sermon> _sermons = [];
   List<BeginnerCategory> _beginnerCategories = [];
   List<Sermon> _recommendedSermons = [];
   List<Sermon> _trendingSermons = [];
+  List<Sermon> _citygateSongs = [];
   bool _isLoading = true;
   late final ScrollController _homeScrollController;
   bool _isScrolledPastHeader = false;
@@ -84,6 +86,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       _beginnerCategories = _staticBeginnerCategories;
       _recommendedSermons = _staticRecommendedSermons;
       _trendingSermons = _staticTrendingSermons;
+      _citygateSongs = _staticCitygateSongs;
       _isLoading = false;
     }
 
@@ -196,6 +199,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       // Load events and recommended in parallel (offline-first)
       _loadRecommendedAsync(forceRefresh, canAccessSermon);
       _loadTrendingAsync(forceRefresh, canAccessSermon);
+      _loadCitygateSongsAsync(forceRefresh, canAccessSermon);
 
       // Automatically refresh latest messages and data from server in background on app launch
       // so user does not need to swipe down to see the latest messages!
@@ -270,6 +274,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       // Also refresh events and recommended
       _loadRecommendedAsync(true, canAccessSermon);
       _loadTrendingAsync(true, canAccessSermon);
+      _loadCitygateSongsAsync(true, canAccessSermon);
     } catch (e) {
       debugPrint('Background home refresh error: $e');
     }
@@ -293,6 +298,24 @@ class _HomePageState extends ConsumerState<HomePage> {
       _staticRecommendedSermons = recommended;
     } catch (e) {
       debugPrint('Recommended load error: $e');
+    }
+  }
+
+  Future<void> _loadCitygateSongsAsync(
+    bool forceRefresh,
+    bool Function(Sermon) canAccessSermon,
+  ) async {
+    try {
+      final allSongs = await _dataService.getCitygateSongs(
+        forceRefresh: forceRefresh,
+      );
+      final songs = allSongs.where(canAccessSermon).toList();
+      if (mounted) {
+        setState(() => _citygateSongs = songs);
+      }
+      _staticCitygateSongs = songs;
+    } catch (e) {
+      debugPrint('Citygate songs load error: $e');
     }
   }
 
@@ -1382,20 +1405,21 @@ class _HomePageState extends ConsumerState<HomePage> {
     final spacing = Responsive.verticalSpacing(context);
     final subtitleFontSize = Responsive.subtitleFontSize(context);
 
-    // Filter sermons for Citygate Songs (by category, keywords, or worship/praise)
-    final songKeywords = ['song', 'worship', 'praise', 'choir', 'hymn', 'music', 'sound'];
-    List<Sermon> songList = _sermons.where((s) {
-      final title = s.title.toLowerCase();
-      final cat = s.category.toLowerCase();
-      final catName = s.categoryName.toLowerCase();
-      final desc = s.description.toLowerCase();
-      return songKeywords.any((kw) =>
-          title.contains(kw) ||
-          cat.contains(kw) ||
-          catName.contains(kw) ||
-          desc.contains(kw));
-    }).toList();
-
+    List<Sermon> songList = _citygateSongs;
+    if (songList.isEmpty) {
+      final songKeywords = ['song', 'worship', 'praise', 'choir', 'hymn', 'music', 'sound'];
+      songList = _sermons.where((s) {
+        final title = s.title.toLowerCase();
+        final cat = s.category.toLowerCase();
+        final catName = s.categoryName.toLowerCase();
+        final desc = s.description.toLowerCase();
+        return songKeywords.any((kw) =>
+            title.contains(kw) ||
+            cat.contains(kw) ||
+            catName.contains(kw) ||
+            desc.contains(kw));
+      }).toList();
+    }
     if (songList.isEmpty) {
       songList = _sermons;
     }
