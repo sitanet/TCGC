@@ -365,6 +365,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                 SizedBox(height: spacing * 1.5),
                 _buildTrendingMessages(context, isDark),
                 SizedBox(height: spacing * 1.5),
+                _buildCitygateSongs(context, isDark),
+                SizedBox(height: spacing * 1.5),
                 _buildYouMightAlsoLike(context, isDark),
                 SizedBox(height: spacing * 6),
               ],
@@ -768,7 +770,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Welcome to CityGate Mobile',
+                    'Are you new to this space',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: AppColors.primaryGold,
                           fontWeight: FontWeight.bold,
@@ -1141,7 +1143,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Trending Messages',
+                    'Most Listened Messages',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: AppColors.primaryGold,
                           fontWeight: FontWeight.bold,
@@ -1172,7 +1174,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ),
                     SizedBox(width: 5),
                     Text(
-                      'Most Listened',
+                      'Top Audio',
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
@@ -1212,11 +1214,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     final isCurrentlyPlaying =
         audioProvider.currentSermon?.id == sermon.id && audioProvider.isPlaying;
 
-    final imageWidth = Responsive.value(context, mobile: 94.0, tablet: 115.0, desktop: 125.0);
-    final imageHeight = Responsive.value(context, mobile: 64.0, tablet: 75.0, desktop: 80.0);
-    final titleFontSize = Responsive.value(context, mobile: 14.5, tablet: 16.0);
-    final speakerFontSize = Responsive.value(context, mobile: 12.5, tablet: 13.5);
-    final playBtnSize = Responsive.value(context, mobile: 42.0, tablet: 46.0);
+    final imageWidth = Responsive.value(context, mobile: 90.0, tablet: 110.0, desktop: 120.0);
+    final imageHeight = Responsive.value(context, mobile: 72.0, tablet: 82.0, desktop: 88.0);
+    final titleFontSize = Responsive.value(context, mobile: 13.0, tablet: 14.5);
+    final speakerFontSize = Responsive.value(context, mobile: 11.5, tablet: 12.5);
+    final playBtnSize = Responsive.value(context, mobile: 40.0, tablet: 44.0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 11.0),
@@ -1276,7 +1278,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     children: [
                       Text(
                         sermon.title,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: titleFontSize,
@@ -1288,12 +1290,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                       const SizedBox(height: 3),
                       Text(
                         sermon.speaker?.isNotEmpty == true ? sermon.speaker! : 'The CityGate Church',
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: speakerFontSize,
                           fontWeight: FontWeight.w500,
                           color: isDark ? const Color(0xFFB0AFC7) : const Color(0xFF535176),
+                          height: 1.2,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1371,6 +1374,123 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCitygateSongs(BuildContext context, bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final subtitleFontSize = Responsive.subtitleFontSize(context);
+
+    // Filter sermons for Citygate Songs (by category, keywords, or worship/praise)
+    final songKeywords = ['song', 'worship', 'praise', 'choir', 'hymn', 'music', 'sound'];
+    List<Sermon> songList = _sermons.where((s) {
+      final title = s.title.toLowerCase();
+      final cat = s.category.toLowerCase();
+      final catName = s.categoryName.toLowerCase();
+      final desc = s.description.toLowerCase();
+      return songKeywords.any((kw) =>
+          title.contains(kw) ||
+          cat.contains(kw) ||
+          catName.contains(kw) ||
+          desc.contains(kw));
+    }).toList();
+
+    if (songList.isEmpty) {
+      songList = _sermons;
+    }
+
+    final songsPicks = songList.take(12).toList();
+    if (songsPicks.isEmpty) return const SizedBox.shrink();
+
+    final cardWidth = Responsive.value(context, mobile: 140.0, tablet: 180.0, desktop: 200.0);
+    final containerHeight = cardWidth + 72.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.music_note_rounded,
+                    color: AppColors.primaryGold,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Citygate Songs',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                          fontWeight: FontWeight.bold,
+                          fontSize: subtitleFontSize,
+                        ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.primaryGold.withValues(alpha: 0.15)
+                      : const Color(0xFFFDF8EB),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.primaryGold.withValues(alpha: 0.4),
+                    width: 0.9,
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.library_music_rounded,
+                      size: 13,
+                      color: AppColors.primaryGold,
+                    ),
+                    SizedBox(width: 5),
+                    Text(
+                      'Worship & Praise',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryGold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: spacing * 0.8),
+        SizedBox(
+          height: containerHeight,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            itemCount: songsPicks.length,
+            itemBuilder: (context, index) {
+              final sermon = songsPicks[index];
+              return Padding(
+                padding: const EdgeInsets.only(right: 14.0),
+                child: _buildCleanSermonCard(
+                  context,
+                  isDark,
+                  sermon,
+                  cardWidth,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
