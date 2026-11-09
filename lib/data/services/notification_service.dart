@@ -35,6 +35,42 @@ class _NotificationChannelConfig {
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   debugPrint('Handling background message: ${message.messageId}');
+  // If the push message has no system notification payload (e.g. data-only push), show it manually
+  if (message.notification == null && message.data.isNotEmpty) {
+    try {
+      final flutterLocalNotifications = FlutterLocalNotificationsPlugin();
+      final title = message.data['title'] ?? 'TCGC Announcement';
+      final body = message.data['body'] ?? message.data['description'] ?? message.data['message'] ?? '';
+      
+      const androidDetails = AndroidNotificationDetails(
+        'high_importance_channel',
+        'High Importance Notifications',
+        channelDescription: 'This channel is used for important notifications.',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+        playSound: true,
+        enableVibration: true,
+      );
+      const notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+          presentBadge: true,
+        ),
+      );
+      await flutterLocalNotifications.show(
+        message.hashCode,
+        title,
+        body,
+        notificationDetails,
+        payload: jsonEncode(message.data),
+      );
+    } catch (e) {
+      debugPrint('Error showing background notification: $e');
+    }
+  }
 }
 
 class NotificationService {
@@ -73,9 +109,8 @@ class NotificationService {
       // Local notifications work on all platforms - initialize first
       await _initLocalNotifications();
 
-      // Defer FCM initialization to avoid creating background engine at startup
-      // This will be done when actually needed or after a delay
-      Future.delayed(const Duration(seconds: 5), () => _initializeFCM());
+      // Initialize FCM immediately so device is registered with backend right away
+      await _initializeFCM();
     } catch (e) {
       debugPrint('Notification service initialization error: $e');
     }
@@ -149,6 +184,9 @@ class NotificationService {
           .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin
           >();
+
+      // Request Android 13+ (API 33+) notification runtime permission
+      await androidPlugin?.requestNotificationsPermission();
 
       // Create multiple channels for different notification types
       await androidPlugin?.createNotificationChannel(
