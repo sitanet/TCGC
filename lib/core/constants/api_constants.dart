@@ -38,6 +38,7 @@ class ApiConstants {
   static const String messages = '/messages/';
   static const String songs = '/songs/';
   static const String messagesByCategory = '/messages/by_category/';
+  static const String trendingMessages = '/messages/trending/';
   static const String messageStats =
       '/messages/stats/'; // Track favorite/share stats
   static const String topFavorites =

@@ -277,6 +277,18 @@ class DataService {
   Future<List<Sermon>> getTrendingMessages({
     bool forceRefresh = false,
   }) async {
+    // 1. Try dedicated trending endpoint
+    try {
+      final response = await _api.get(ApiConstants.trendingMessages);
+      if (response.isSuccess) {
+        final List<dynamic> data = response.dataList;
+        if (data.isNotEmpty) {
+          return data.map((json) => Sermon.fromJson(json)).toList();
+        }
+      }
+    } catch (_) {}
+
+    // 2. Try top favorites endpoint
     try {
       final response = await _api.get(ApiConstants.topFavorites);
       if (response.isSuccess) {
@@ -287,12 +299,20 @@ class DataService {
       }
     } catch (_) {}
 
-    final recommended = await getRecommendedMessages(forceRefresh: forceRefresh);
-    if (recommended.isNotEmpty) {
-      return recommended;
-    }
+    // 3. Fallback: select messages that are NOT recommended, to avoid duplicating 'You Might Also Like'
+    try {
+      final allMessages = await getMessages(forceRefresh: forceRefresh);
+      final recommended = await getRecommendedMessages(forceRefresh: forceRefresh);
+      final recommendedIds = recommended.map((s) => s.id).toSet();
 
-    return await getMessages(forceRefresh: forceRefresh);
+      final nonRecommended = allMessages.where((s) => !recommendedIds.contains(s.id)).toList();
+      if (nonRecommended.isNotEmpty) {
+        return nonRecommended;
+      }
+      return allMessages;
+    } catch (_) {
+      return [];
+    }
   }
 
   // Persistent in-memory cache for Citygate Songs

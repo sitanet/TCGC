@@ -1161,10 +1161,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     // Pick strictly at most 4 most listened / trending messages (deduplicated)
     List<Sermon> displayList = _trendingSermons;
     if (displayList.isEmpty) {
-      displayList = _recommendedSermons;
-    }
-    if (displayList.isEmpty) {
-      displayList = _sermons;
+      // Pick sermons not in recommended so trending is distinct
+      final recIds = _recommendedSermons.map((s) => s.id).toSet();
+      displayList = _sermons.where((s) => !recIds.contains(s.id)).toList();
+      if (displayList.isEmpty) {
+        displayList = _sermons;
+      }
     }
 
     final seenIds = <String>{};
@@ -1519,9 +1521,19 @@ class _HomePageState extends ConsumerState<HomePage> {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
 
-    List<Sermon> displayList = _recommendedSermons;
+    // Exclude sermons that are already displayed in Trending Messages
+    final trendingIds = _trendingSermons.take(4).map((s) => s.id).toSet();
+
+    List<Sermon> displayList = _recommendedSermons
+        .where((s) => !trendingIds.contains(s.id))
+        .toList();
     if (displayList.isEmpty) {
-      displayList = _sermons;
+      displayList = _sermons
+          .where((s) => !trendingIds.contains(s.id))
+          .toList();
+    }
+    if (displayList.isEmpty) {
+      displayList = _recommendedSermons;
     }
 
     final recommendedPicks = displayList.take(12).toList();
