@@ -53,7 +53,7 @@ import 'core/utils/error_handler.dart';
 final communityChangeNotifierProvider =
     ChangeNotifierProvider<CommunityProvider>((ref) => CommunityProvider());
 
-const String appVersion = '1.0.0';
+const String appVersion = '1.0.2';
 
 // Riverpod providers wrapping ChangeNotifier classes
 final themeChangeNotifierProvider = ChangeNotifierProvider<ThemeProvider>(
