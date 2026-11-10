@@ -317,15 +317,80 @@ class DataService {
 
   // Persistent in-memory cache for Citygate Songs
   static List<Sermon>? _cachedCitygateSongs;
+  static const String _worshipSongsCacheKey = 'worship_sessions_songs_cache';
 
-  // Get Citygate Songs from /api/songs/
+  // Get all songs under the category 'Worship Sessions'
   Future<List<Sermon>> getCitygateSongs({
     bool forceRefresh = false,
   }) async {
-    if (!forceRefresh && _cachedCitygateSongs != null && _cachedCitygateSongs!.isNotEmpty) {
-      return _cachedCitygateSongs!;
+    if (!forceRefresh) {
+      if (_cachedCitygateSongs != null && _cachedCitygateSongs!.isNotEmpty) {
+        return _cachedCitygateSongs!;
+      }
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedJson = prefs.getString(_worshipSongsCacheKey);
+        if (cachedJson != null && cachedJson.isNotEmpty) {
+          final List<dynamic> decoded = jsonDecode(cachedJson);
+          final diskSongs = decoded.map((j) => Sermon.fromJson(j as Map<String, dynamic>)).toList();
+          if (diskSongs.isNotEmpty) {
+            _cachedCitygateSongs = diskSongs;
+            return diskSongs;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error reading worship songs from disk: $e');
+      }
     }
 
+    // 1. Fetch all songs under the category 'Worship Sessions' (Category ID 24)
+    try {
+      int worshipCatId = 24;
+      try {
+        final categories = await getMessageCategories(forceRefresh: forceRefresh);
+        final match = categories.firstWhere(
+          (c) =>
+              c.name.trim().toLowerCase() == 'worship sessions' ||
+              c.name.trim().toLowerCase().contains('worship session'),
+          orElse: () => const MessageCategory(
+            id: '24',
+            name: 'Worship Sessions',
+            isActive: true,
+          ),
+        );
+        worshipCatId = int.tryParse(match.id) ?? 24;
+      } catch (e) {
+        debugPrint('Finding Worship Sessions category ID fallback to 24: $e');
+        worshipCatId = 24;
+      }
+
+      final allResults = await _api.getAllPages('${ApiConstants.messages}?category_id=$worshipCatId');
+      if (allResults.isNotEmpty) {
+        final List<Sermon> songs = allResults.map((json) {
+          final s = Sermon.fromJson(json as Map<String, dynamic>);
+          return s.copyWith(
+            category: 'Worship Sessions',
+            categoryName: 'Worship Sessions',
+          );
+        }).toList();
+
+        if (songs.isNotEmpty) {
+          _cachedCitygateSongs = songs;
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(
+              _worshipSongsCacheKey,
+              jsonEncode(songs.map((s) => s.toJson()).toList()),
+            );
+          } catch (_) {}
+          return songs;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading Worship Sessions from API: $e');
+    }
+
+    // 2. Also check /api/songs/ endpoint if backend has direct song entries
     try {
       final response = await _api.get(ApiConstants.songs);
       if (response.isSuccess) {
@@ -344,8 +409,8 @@ class DataService {
               audioUrl: json['audio_url']?.toString() ?? json['audio_file']?.toString(),
               videoUrl: null,
               transcript: json['lyrics']?.toString(),
-              category: 'Citygate Songs',
-              categoryName: 'Citygate Songs',
+              category: 'Worship Sessions',
+              categoryName: 'Worship Sessions',
               date: (json['date'] != null && json['date'].toString().isNotEmpty)
                   ? (DateTime.tryParse(json['date'].toString()) ?? DateTime.now())
                   : DateTime.now(),
@@ -364,22 +429,29 @@ class DataService {
       debugPrint('Error loading Citygate Songs: $e');
     }
 
-    // Fallback: match from existing messages or keywords
-    final allMessages = await getMessages(forceRefresh: forceRefresh);
-    final songKeywords = ['song', 'worship', 'praise', 'choir', 'hymn', 'music', 'sound'];
-    final fallbackSongs = allMessages.where((s) {
-      final t = s.title.toLowerCase();
-      final c = s.category.toLowerCase();
-      final cn = s.categoryName.toLowerCase();
-      return songKeywords.any((kw) => t.contains(kw) || c.contains(kw) || cn.contains(kw));
-    }).toList();
+    // 3. Fallback: match from cached messages matching 'Worship Sessions'
+    try {
+      final allMessages = await getMessages(forceRefresh: false);
+      final worshipFiltered = allMessages.where((s) {
+        final t = s.title.toLowerCase();
+        final c = s.category.toLowerCase();
+        final cn = s.categoryName.toLowerCase();
+        return c == 'worship sessions' ||
+            cn == 'worship sessions' ||
+            c == '24' ||
+            t.startsWith('worship session') ||
+            t.contains('worship');
+      }).toList();
 
-    if (fallbackSongs.isNotEmpty) {
-      _cachedCitygateSongs = fallbackSongs;
-      return fallbackSongs;
+      if (worshipFiltered.isNotEmpty) {
+        _cachedCitygateSongs = worshipFiltered;
+        return worshipFiltered;
+      }
+    } catch (e) {
+      debugPrint('Error extracting fallback worship songs: $e');
     }
 
-    return allMessages.take(8).toList();
+    return _cachedCitygateSongs ?? [];
   }
 
   // Get speaker names only (for filtering)

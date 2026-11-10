@@ -79,14 +79,14 @@ class ApiService {
   /// POST request without authentication header - use for login/register
   Future<ApiResponse> postPublic(String endpoint, Map<String, dynamic> data) async {
     try {
-      print('ApiService POST (public): ${ApiConstants.baseUrl}$endpoint');
+      debugPrint('ApiService POST (public): ${ApiConstants.baseUrl}$endpoint');
       final response = await http.post(
         Uri.parse('${ApiConstants.baseUrl}$endpoint'),
         headers: _publicHeaders,
         body: jsonEncode(data),
       ).timeout(const Duration(seconds: 60));
 
-      print('ApiService POST (public) response: ${response.statusCode}');
+      debugPrint('ApiService POST (public) response: ${response.statusCode}');
 
       return ApiResponse(
         statusCode: response.statusCode,
@@ -94,7 +94,7 @@ class ApiService {
         isSuccess: response.statusCode >= 200 && response.statusCode < 300,
       );
     } catch (e) {
-      print('ApiService POST (public) error: $e');
+      debugPrint('ApiService POST (public) error: $e');
       return ApiResponse(
         statusCode: 0,
         body: jsonEncode({'error': e.toString()}),
@@ -154,14 +154,14 @@ class ApiService {
 
   Future<ApiResponse> post(String endpoint, Map<String, dynamic> data) async {
     try {
-      print('ApiService POST: ${ApiConstants.baseUrl}$endpoint');
+      debugPrint('ApiService POST: ${ApiConstants.baseUrl}$endpoint');
       var response = await http.post(
         Uri.parse('${ApiConstants.baseUrl}$endpoint'),
         headers: _headers,
         body: jsonEncode(data),
       ).timeout(const Duration(seconds: 60));
 
-      print('ApiService POST response: ${response.statusCode}');
+      debugPrint('ApiService POST response: ${response.statusCode}');
 
       if (response.statusCode == 401 && await _refreshAccessToken()) {
         response = await http.post(
@@ -177,7 +177,7 @@ class ApiService {
         isSuccess: response.statusCode >= 200 && response.statusCode < 300,
       );
     } catch (e) {
-      print('ApiService POST error: $e');
+      debugPrint('ApiService POST error: $e');
       return ApiResponse(
         statusCode: 0,
         body: jsonEncode({'error': e.toString()}),
@@ -278,7 +278,9 @@ class ApiService {
   /// Uses compute isolate for JSON parsing to prevent UI jank
   Future<List<dynamic>> getAllPages(String endpoint) async {
     final allResults = <dynamic>[];
-    String? nextUrl = '${ApiConstants.baseUrl}$endpoint';
+    String? nextUrl = endpoint.startsWith('http')
+        ? endpoint
+        : '${ApiConstants.baseUrl}$endpoint';
     int pageCount = 0;
     const maxPages = 50; // Safety limit to prevent infinite loops
     

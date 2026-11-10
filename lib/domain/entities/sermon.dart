@@ -83,6 +83,44 @@ class Sermon {
     );
   }
 
+  Sermon copyWith({
+    String? id,
+    String? title,
+    String? description,
+    String? speaker,
+    String? imageUrl,
+    String? audioUrl,
+    String? videoUrl,
+    String? transcript,
+    String? category,
+    String? categoryName,
+    DateTime? date,
+    Duration? duration,
+    bool? isRecommended,
+    bool? isServiceTeamOnly,
+    bool? isGeneralMarriedOnly,
+    bool? isInHouseMarriedOnly,
+  }) {
+    return Sermon(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      speaker: speaker ?? this.speaker,
+      imageUrl: imageUrl ?? this.imageUrl,
+      audioUrl: audioUrl ?? this.audioUrl,
+      videoUrl: videoUrl ?? this.videoUrl,
+      transcript: transcript ?? this.transcript,
+      category: category ?? this.category,
+      categoryName: categoryName ?? this.categoryName,
+      date: date ?? this.date,
+      duration: duration ?? this.duration,
+      isRecommended: isRecommended ?? this.isRecommended,
+      isServiceTeamOnly: isServiceTeamOnly ?? this.isServiceTeamOnly,
+      isGeneralMarriedOnly: isGeneralMarriedOnly ?? this.isGeneralMarriedOnly,
+      isInHouseMarriedOnly: isInHouseMarriedOnly ?? this.isInHouseMarriedOnly,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

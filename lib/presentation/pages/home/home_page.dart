@@ -1456,25 +1456,18 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     List<Sermon> songList = _citygateSongs;
     if (songList.isEmpty) {
-      final songKeywords = ['song', 'worship', 'praise', 'choir', 'hymn', 'music', 'sound'];
       songList = _sermons.where((s) {
-        final title = s.title.toLowerCase();
-        final cat = s.category.toLowerCase();
-        final catName = s.categoryName.toLowerCase();
-        final desc = s.description.toLowerCase();
-        return songKeywords.any((kw) =>
-            title.contains(kw) ||
-            cat.contains(kw) ||
-            catName.contains(kw) ||
-            desc.contains(kw));
+        final cat = s.category.trim().toLowerCase();
+        final catName = s.categoryName.trim().toLowerCase();
+        final title = s.title.trim().toLowerCase();
+        return cat == 'worship sessions' ||
+            catName == 'worship sessions' ||
+            cat == '24' ||
+            title.startsWith('worship session');
       }).toList();
     }
-    if (songList.isEmpty) {
-      songList = _sermons;
-    }
 
-    final songsPicks = songList.take(12).toList();
-    if (songsPicks.isEmpty) return const SizedBox.shrink();
+    if (songList.isEmpty && !_isLoading) return const SizedBox.shrink();
 
     final cardWidth = Responsive.value(context, mobile: 140.0, tablet: 180.0, desktop: 200.0);
     final containerHeight = cardWidth + 72.0;
@@ -1487,61 +1480,124 @@ class _HomePageState extends ConsumerState<HomePage> {
           isDark,
           icon: Icons.music_note_rounded,
           title: 'Citygate Songs',
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? AppColors.primaryGold.withValues(alpha: 0.15)
-                  : const Color(0xFFFDF8EB),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: AppColors.primaryGold.withValues(alpha: 0.4),
-                width: 0.9,
-              ),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.library_music_rounded,
-                  size: 12,
-                  color: AppColors.primaryGold,
+          subtitle: 'Spiritual sounds & worship sessions',
+          trailing: InkWell(
+            onTap: songList.isNotEmpty
+                ? () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AudioListPage(
+                          category: 'Worship Sessions',
+                          audioItems: songList,
+                          categories: const ['Worship Sessions'],
+                          isDirectCollection: true,
+                        ),
+                      ),
+                    );
+                  }
+                : null,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? AppColors.primaryGold.withValues(alpha: 0.15)
+                    : const Color(0xFFFDF8EB),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppColors.primaryGold.withValues(alpha: 0.4),
+                  width: 0.9,
                 ),
-                SizedBox(width: 4),
-                Text(
-                  'Worship',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.library_music_rounded,
+                    size: 12,
                     color: AppColors.primaryGold,
                   ),
-                ),
-              ],
+                  SizedBox(width: 4),
+                  Text(
+                    'Worship • See all',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryGold,
+                    ),
+                  ),
+                  SizedBox(width: 2),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 9,
+                    color: AppColors.primaryGold,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
         SizedBox(height: spacing * 0.8),
-        SizedBox(
-          height: containerHeight,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            itemCount: songsPicks.length,
-            itemBuilder: (context, index) {
-              final sermon = songsPicks[index];
-              return Padding(
-                padding: const EdgeInsets.only(right: 14.0),
-                child: _buildCleanSermonCard(
-                  context,
-                  isDark,
-                  sermon,
-                  cardWidth,
-                ),
-              );
-            },
+        if (songList.isEmpty && _isLoading)
+          SizedBox(
+            height: containerHeight,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              itemCount: 4,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 14.0),
+                  child: SizedBox(
+                    width: cardWidth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: cardWidth,
+                          height: cardWidth,
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white12 : Colors.grey[300],
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: cardWidth * 0.7,
+                          height: 12,
+                          color: isDark ? Colors.white12 : Colors.grey[300],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          )
+        else
+          SizedBox(
+            height: containerHeight,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              itemCount: songList.length,
+              itemBuilder: (context, index) {
+                final sermon = songList[index];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 14.0),
+                  child: _buildCleanSermonCard(
+                    context,
+                    isDark,
+                    sermon,
+                    cardWidth,
+                  ),
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }
