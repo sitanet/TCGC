@@ -3,6 +3,7 @@ import 'dart:async'
 import 'dart:io';
 import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -119,6 +120,17 @@ void main() async {
         debugPrint('Fast auth initialization error: $e');
       }
 
+      // Initialize Firebase and background messaging handler early for reliable background/killed push delivery
+      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+        try {
+          await Firebase.initializeApp();
+          FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+          debugPrint('Firebase & background messaging handler registered early');
+        } catch (e) {
+          debugPrint('Firebase early init error: $e');
+        }
+      }
+
       // Start the app with the pre-restored session
       runApp(
         ProviderScope(
@@ -128,24 +140,6 @@ void main() async {
           child: const MyApp(),
         ),
       );
-
-      // Initialize Firebase in background (non-blocking)
-      Future.microtask(() async {
-        if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-          try {
-            await Firebase.initializeApp().timeout(
-              const Duration(seconds: 10),
-              onTimeout: () {
-                debugPrint('Firebase initialization timed out');
-                throw TimeoutException('Firebase init timeout');
-              },
-            );
-            debugPrint('Firebase initialized');
-          } catch (e) {
-            debugPrint('Firebase initialization error: $e');
-          }
-        }
-      });
 
       // Initialize AudioService in background with delay to let UI render first
       Future.delayed(const Duration(milliseconds: 500), () async {
@@ -673,6 +667,8 @@ class _MyAppState extends ConsumerState<MyApp> {
       _showGetStarted = false;
       _showSignUp = false;
     });
+    // Link device token with the authenticated user for push notifications
+    NotificationService().registerDevice();
     // Start pre-buffering all messages in background after login
     _startBackgroundPreBuffering();
   }

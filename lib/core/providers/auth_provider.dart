@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/notification_service.dart';
 import '../../domain/entities/user.dart';
 
 export '../../data/services/auth_service.dart' show KycResult;
@@ -68,11 +69,16 @@ class AuthProvider extends ChangeNotifier {
 
         // Refresh profile from network in background (silent update)
         _refreshProfileInBackground();
+        // Register device with user for push notifications
+        NotificationService().registerDevice();
         return;
       }
 
       // No cached profile - must fetch from network (first login or cache cleared)
       _user = await _authService.getProfile();
+      if (_user != null) {
+        NotificationService().registerDevice();
+      }
     } else {
       // User is not authenticated; check if there is an unverified email pending confirmation
       _pendingVerificationEmail = await _authService.getPendingVerificationEmail();
@@ -140,6 +146,8 @@ class AuthProvider extends ChangeNotifier {
 
       print('[AUTH] Profile fetched: ${_user?.email}');
       notifyListeners();
+      // Link FCM token with this user in backend
+      NotificationService().registerDevice();
       return true;
     }
 
@@ -230,6 +238,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    NotificationService().unregisterDevice();
     await _authService.logout();
     _user = null;
     _pendingVerificationEmail = null;

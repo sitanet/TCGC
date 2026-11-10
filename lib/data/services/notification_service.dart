@@ -32,14 +32,25 @@ class _NotificationChannelConfig {
 }
 
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase background init error: $e');
+  }
   debugPrint('Handling background message: ${message.messageId}');
-  // If the push message has no system notification payload (e.g. data-only push), show it manually
+
+  // If the push message has no system notification payload (e.g. data-only push),
+  // show it manually via local notifications
   if (message.notification == null && message.data.isNotEmpty) {
     try {
       final flutterLocalNotifications = FlutterLocalNotificationsPlugin();
-      final title = message.data['title'] ?? 'TCGC Announcement';
+      const androidInit = AndroidInitializationSettings('@drawable/ic_notification');
+      const iosInit = DarwinInitializationSettings();
+      const initSettings = InitializationSettings(android: androidInit, iOS: iosInit);
+      await flutterLocalNotifications.initialize(initSettings);
+
+      final title = message.data['title'] ?? 'The CityGate Church';
       final body = message.data['body'] ?? message.data['description'] ?? message.data['message'] ?? '';
       
       const androidDetails = AndroidNotificationDetails(
@@ -48,7 +59,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         channelDescription: 'This channel is used for important notifications.',
         importance: Importance.high,
         priority: Priority.high,
-        icon: '@mipmap/ic_launcher',
+        icon: '@drawable/ic_notification',
+        color: Color(0xFFD4AF37),
         playSound: true,
         enableVibration: true,
       );
@@ -127,14 +139,27 @@ class NotificationService {
       } catch (_) {}
 
       FirebaseMessaging.onBackgroundMessage(
-        _firebaseMessagingBackgroundHandler,
+        firebaseMessagingBackgroundHandler,
       );
       await _requestPermission();
       await _configureFCM();
+      await _subscribeToDefaultTopics();
       await _getToken();
     } catch (e) {
       debugPrint('FCM initialization error: $e');
       _fcmInitialized = false;
+    }
+  }
+
+  Future<void> _subscribeToDefaultTopics() async {
+    final messaging = _messaging;
+    if (messaging == null) return;
+    try {
+      await messaging.subscribeToTopic('all');
+      await messaging.subscribeToTopic('announcements');
+      debugPrint('Subscribed to default FCM topics (all, announcements)');
+    } catch (e) {
+      debugPrint('Error subscribing to FCM topics: $e');
     }
   }
 
@@ -159,7 +184,7 @@ class NotificationService {
 
   Future<void> _initLocalNotifications() async {
     const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
+      '@drawable/ic_notification',
     );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -356,7 +381,7 @@ class NotificationService {
             channelDescription: channelConfig.description,
             importance: Importance.high,
             priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
+            icon: '@drawable/ic_notification',
             largeIcon: largeIconPath != null
                 ? FilePathAndroidBitmap(largeIconPath)
                 : null,
@@ -429,7 +454,7 @@ class NotificationService {
           channelDescription: 'Wallet credit and transaction notifications.',
           importance: Importance.high,
           priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
+          icon: '@drawable/ic_notification',
           color: gold,
           colorized: true,
           styleInformation: styleInfo,
@@ -568,6 +593,16 @@ class NotificationService {
   }
 
   Future<void> registerDevice() async {
+    if (_fcmToken == null) {
+      final messaging = _messaging;
+      if (messaging != null) {
+        try {
+          _fcmToken = await messaging.getToken();
+        } catch (e) {
+          debugPrint('Error getting FCM token during registerDevice: $e');
+        }
+      }
+    }
     await _registerDeviceToken();
   }
 
