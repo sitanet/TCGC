@@ -59,6 +59,7 @@ class AskWingAIService {
     List<int>? previousMessageIds,
     String? sessionId,
     String? responseStyle,
+    List<Map<String, dynamic>>? conversationHistory,
   }) async {
     try {
       final token = await _tokenService.getToken();
@@ -70,8 +71,10 @@ class AskWingAIService {
         'question': question,
         if (previousMessageIds != null && previousMessageIds.isNotEmpty)
           'previous_message_ids': previousMessageIds,
-        if (sessionId != null) 'session_id': sessionId,
-        if (responseStyle != null) 'response_style': responseStyle,
+        if (sessionId != null && sessionId.isNotEmpty) 'session_id': sessionId,
+        if (responseStyle != null && responseStyle.isNotEmpty) 'response_style': responseStyle,
+        if (conversationHistory != null && conversationHistory.isNotEmpty)
+          'conversation_history': conversationHistory,
       };
 
       final response = await http.post(

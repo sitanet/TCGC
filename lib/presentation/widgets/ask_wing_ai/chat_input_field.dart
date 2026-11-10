@@ -74,7 +74,6 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
             });
             debugPrint('Speech recognition pre-init error: ${errorNotification.errorMsg}');
           },
-          options: [stt.SpeechToText.androidNoBluetooth],
         );
       }
     } catch (e) {
@@ -160,14 +159,13 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
             );
           }
         },
-        options: [stt.SpeechToText.androidNoBluetooth],
       );
 
       if (!ready) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Voice recognition is not available or ready on this device.'),
+              content: Text('Voice recognition is not ready. Please check Google Voice typing or speech service in settings.'),
               duration: Duration(seconds: 3),
             ),
           );
@@ -196,9 +194,9 @@ class _ChatInputFieldState extends State<ChatInputField> with SingleTickerProvid
           }
         },
         listenOptions: stt.SpeechListenOptions(
-          listenMode: stt.ListenMode.dictation,
-          pauseFor: const Duration(seconds: 4),
-          listenFor: const Duration(seconds: 60),
+          listenMode: stt.ListenMode.confirmation,
+          pauseFor: const Duration(seconds: 3),
+          listenFor: const Duration(seconds: 45),
           partialResults: true,
           cancelOnError: false,
         ),
