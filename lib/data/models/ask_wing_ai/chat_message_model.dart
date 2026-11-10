@@ -26,6 +26,7 @@ class ChatMessageModel extends Equatable {
 
   /// Check if message is from user
   bool get isUserMessage => messageType == MessageType.user;
+  bool get isUser => isUserMessage;
   
   /// Check if message has an error
   bool get hasError => false; // TODO: Add error field if needed

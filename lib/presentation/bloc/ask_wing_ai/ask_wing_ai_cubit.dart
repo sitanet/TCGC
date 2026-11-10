@@ -98,8 +98,8 @@ class AskWingAICubit extends Cubit<AskWingAIState> {
           : previousMessages;
 
       final historyPayload = recentTurns.map((m) => {
-        'type': m.isUser ? 'user' : 'ai',
-        'role': m.isUser ? 'user' : 'assistant',
+        'type': m.isUserMessage ? 'user' : 'ai',
+        'role': m.isUserMessage ? 'user' : 'assistant',
         'content': m.content,
       }).toList();
 
