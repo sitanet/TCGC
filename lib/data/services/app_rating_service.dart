@@ -150,7 +150,7 @@ class AppRatingService {
       if (await _inAppReview.isAvailable()) {
         await _inAppReview.requestReview();
       } else {
-        await _inAppReview.openStoreListing(appStoreId: 'com.tcgc.tcgc');
+        await _inAppReview.openStoreListing(appStoreId: '6821748352');
       }
     } catch (e) {
       debugPrint('Error opening Play Store rating: $e');

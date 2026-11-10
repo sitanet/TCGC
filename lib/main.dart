@@ -233,7 +233,7 @@ class _MyAppState extends ConsumerState<MyApp> {
         if (Platform.isAndroid) {
           url = 'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
         } else if (Platform.isIOS) {
-          url = 'https://apps.apple.com/app/tcgc'; // Replace with actual App store URL when available
+          url = 'https://apps.apple.com/us/app/citygate-mobile/id6821748352';
         }
       }
     }
