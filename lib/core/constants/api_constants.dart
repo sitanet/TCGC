@@ -140,8 +140,9 @@ class ApiConstants {
   static const String secureVerifyNin = '/kyc/secure/verify-nin/';
   static const String confirmIdentity = '/kyc/secure/confirm-identity/';
 
-  // Data Protection & Privacy (NDPR)
+  // Data Protection & Privacy (NDPR) & Legal
   static const String privacyPolicy = '/privacy-policy/';
+  static const String termsOfService = '/terms-of-service/';
   static const String recordConsent = '/consent/';
   static const String withdrawConsent = '/consent/withdraw/';
   static const String consentStatus = '/consent/status/';
