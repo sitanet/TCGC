@@ -11,6 +11,7 @@ import '../../../data/services/data_service.dart';
 import '../../../data/services/interests_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/beginner_category.dart';
+import '../../../data/services/played_audio_service.dart';
 
 import '../../widgets/resume_playback_sheet.dart';
 import '../audio/audio_list_page.dart';
@@ -61,12 +62,14 @@ class _HomePageState extends ConsumerState<HomePage> {
   static List<Sermon> _staticRecommendedSermons = [];
   static List<Sermon> _staticTrendingSermons = [];
   static List<Sermon> _staticCitygateSongs = [];
+  static List<Sermon> _staticRecentlyPlayedSermons = [];
 
   List<Sermon> _sermons = [];
   List<BeginnerCategory> _beginnerCategories = [];
   List<Sermon> _recommendedSermons = [];
   List<Sermon> _trendingSermons = [];
   List<Sermon> _citygateSongs = [];
+  List<Sermon> _recentlyPlayedSermons = [];
   bool _isLoading = true;
   late final ScrollController _homeScrollController;
   bool _isScrolledPastHeader = false;
@@ -81,6 +84,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       _recommendedSermons = _staticRecommendedSermons;
       _trendingSermons = _staticTrendingSermons;
       _citygateSongs = _staticCitygateSongs;
+      _recentlyPlayedSermons = _staticRecentlyPlayedSermons;
       _isLoading = false;
     }
 
@@ -96,6 +100,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<void> _initServices() async {
     await _interestsService.initialize();
+    await PlayedAudioService.instance.initialize();
   }
 
 
@@ -190,10 +195,11 @@ class _HomePageState extends ConsumerState<HomePage> {
         _staticBeginnerCategories = resolvedCategories;
       }
 
-      // Load events and recommended in parallel (offline-first)
+      // Load events, recommended, trending, songs and recently played in parallel (offline-first)
       _loadRecommendedAsync(forceRefresh, canAccessSermon);
       _loadTrendingAsync(forceRefresh, canAccessSermon);
       _loadCitygateSongsAsync(forceRefresh, canAccessSermon);
+      _loadRecentlyPlayedAsync(canAccessSermon);
 
       // Automatically refresh latest messages and data from server in background on app launch
       // so user does not need to swipe down to see the latest messages!
@@ -269,6 +275,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       _loadRecommendedAsync(true, canAccessSermon);
       _loadTrendingAsync(true, canAccessSermon);
       _loadCitygateSongsAsync(true, canAccessSermon);
+      _loadRecentlyPlayedAsync(canAccessSermon);
     } catch (e) {
       debugPrint('Background home refresh error: $e');
     }
@@ -331,6 +338,66 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  Future<void> _loadRecentlyPlayedAsync(
+    bool Function(Sermon) canAccessSermon,
+  ) async {
+    try {
+      final playedService = PlayedAudioService.instance;
+      final recentIds = await playedService.getRecentlyPlayedIdsAsync();
+      if (recentIds.isEmpty) {
+        if (mounted && _recentlyPlayedSermons.isNotEmpty) {
+          setState(() => _recentlyPlayedSermons = []);
+        }
+        _staticRecentlyPlayedSermons = [];
+        return;
+      }
+
+      final Map<String, Sermon> sermonMap = {};
+      for (final s in _sermons) {
+        sermonMap[s.id] = s;
+      }
+      for (final s in _recommendedSermons) {
+        sermonMap.putIfAbsent(s.id, () => s);
+      }
+      for (final s in _trendingSermons) {
+        sermonMap.putIfAbsent(s.id, () => s);
+      }
+      for (final s in _citygateSongs) {
+        sermonMap.putIfAbsent(s.id, () => s);
+      }
+
+      final List<Sermon> result = [];
+      for (final id in recentIds) {
+        final sermon = sermonMap[id];
+        if (sermon != null && canAccessSermon(sermon)) {
+          result.add(sermon);
+          if (result.length >= 5) break; // User requested: "like 5 of them"
+        }
+      }
+
+      // If some recently played IDs are not yet in memory, fetch directly from data service
+      if (result.length < 5) {
+        for (final id in recentIds) {
+          if (!sermonMap.containsKey(id)) {
+            final s = await _dataService.getMessageById(id);
+            if (s != null && canAccessSermon(s)) {
+              sermonMap[s.id] = s;
+              result.add(s);
+              if (result.length >= 5) break;
+            }
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() => _recentlyPlayedSermons = result);
+      }
+      _staticRecentlyPlayedSermons = result;
+    } catch (e) {
+      debugPrint('Recently played sermons load error: $e');
+    }
+  }
+
   void _onHomeScroll() {
     if (!mounted) return;
     final isScrolledPast = _homeScrollController.offset > 120;
@@ -350,6 +417,22 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(audioPlayerChangeNotifierProvider, (prev, next) {
+      if (prev?.currentSermon?.id != next.currentSermon?.id && next.currentSermon != null) {
+        final authProvider = ref.read(authChangeNotifierProvider);
+        final user = authProvider.user;
+        final isServiceTeamMember = user?.isServiceTeamMember ?? false;
+        final isGeneralMarried = user?.isGeneralMarried ?? false;
+        final isInHouseMarried = user?.isInHouseMarried ?? false;
+        _loadRecentlyPlayedAsync((sermon) {
+          if (sermon.isServiceTeamOnly && !isServiceTeamMember) return false;
+          if (sermon.isGeneralMarriedOnly && !isGeneralMarried) return false;
+          if (sermon.isInHouseMarriedOnly && !isInHouseMarried) return false;
+          return true;
+        });
+      }
+    });
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final spacing = Responsive.verticalSpacing(context);
 
@@ -385,6 +468,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                 _buildCitygateSongs(context, isDark),
                 SizedBox(height: spacing * 1.5),
                 _buildYouMightAlsoLike(context, isDark),
+                if (_recentlyPlayedSermons.isNotEmpty) ...[
+                  SizedBox(height: spacing * 1.5),
+                  _buildRecentlyPlayed(context, isDark),
+                ],
                 SizedBox(height: spacing * 6),
               ],
             ),
@@ -1646,6 +1733,86 @@ class _HomePageState extends ConsumerState<HomePage> {
             itemCount: recommendedPicks.length,
             itemBuilder: (context, index) {
               final sermon = recommendedPicks[index];
+              return Padding(
+                padding: const EdgeInsets.only(right: 14.0),
+                child: _buildCleanSermonCard(
+                  context,
+                  isDark,
+                  sermon,
+                  cardWidth,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentlyPlayed(BuildContext context, bool isDark) {
+    if (_recentlyPlayedSermons.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final spacing = Responsive.verticalSpacing(context);
+    final playedPicks = _recentlyPlayedSermons.take(5).toList();
+
+    final cardWidth = Responsive.value(context, mobile: 140.0, tablet: 180.0, desktop: 200.0);
+    final containerHeight = cardWidth + 72.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(
+          context,
+          isDark,
+          icon: Icons.history_rounded,
+          title: 'Recently Played',
+          subtitle: 'Pick up where you left off',
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppColors.primaryGold.withValues(alpha: 0.15)
+                  : const Color(0xFFFDF8EB),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.primaryGold.withValues(alpha: 0.4),
+                width: 0.9,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.play_circle_fill_rounded,
+                  size: 12,
+                  color: AppColors.primaryGold,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${playedPicks.length} Recent',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryGold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(height: spacing * 0.8),
+        SizedBox(
+          height: containerHeight,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            itemCount: playedPicks.length,
+            itemBuilder: (context, index) {
+              final sermon = playedPicks[index];
               return Padding(
                 padding: const EdgeInsets.only(right: 14.0),
                 child: _buildCleanSermonCard(

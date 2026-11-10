@@ -10,6 +10,7 @@ class PlayedAudioService {
   Set<String> _playedIds = {};
   List<String> _recentlyPlayedIds = [];
   Set<String> _viewedCategoryIds = {};
+  bool _isInitialized = false;
   
   PlayedAudioService._();
   
@@ -21,10 +22,12 @@ class PlayedAudioService {
   factory PlayedAudioService() => instance;
   
   Future<void> initialize() async {
+    if (_isInitialized && _prefs != null) return;
     _prefs ??= await SharedPreferences.getInstance();
     _loadPlayedIds();
     _loadRecentAudioIds();
     _loadViewedCategories();
+    _isInitialized = true;
   }
   
   void _loadPlayedIds() {
@@ -56,8 +59,18 @@ class PlayedAudioService {
   bool isPlayed(String audioId) {
     return _playedIds.contains(audioId);
   }
+
+  Future<List<String>> getRecentlyPlayedIdsAsync() async {
+    if (!_isInitialized || _prefs == null) {
+      await initialize();
+    }
+    return List.unmodifiable(_recentlyPlayedIds);
+  }
   
   Future<void> markAsPlayed(String audioId) async {
+    if (!_isInitialized || _prefs == null) {
+      await initialize();
+    }
     if (!_playedIds.contains(audioId)) {
       _playedIds.add(audioId);
       await _savePlayedIds();
