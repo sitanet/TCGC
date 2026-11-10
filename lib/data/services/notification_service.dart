@@ -60,6 +60,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         importance: Importance.high,
         priority: Priority.high,
         icon: '@drawable/ic_notification',
+        largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
         color: Color(0xFFD4AF37),
         playSound: true,
         enableVibration: true,
@@ -157,7 +158,9 @@ class NotificationService {
     try {
       await messaging.subscribeToTopic('all');
       await messaging.subscribeToTopic('announcements');
-      debugPrint('Subscribed to default FCM topics (all, announcements)');
+      await messaging.subscribeToTopic('messages');
+      await messaging.subscribeToTopic('events');
+      debugPrint('Subscribed to default FCM topics (all, announcements, messages, events)');
     } catch (e) {
       debugPrint('Error subscribing to FCM topics: $e');
     }
@@ -384,7 +387,7 @@ class NotificationService {
             icon: '@drawable/ic_notification',
             largeIcon: largeIconPath != null
                 ? FilePathAndroidBitmap(largeIconPath)
-                : null,
+                : const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
             color: channelConfig.color,
             colorized: true,
             styleInformation: styleInfo,
@@ -455,6 +458,7 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
           icon: '@drawable/ic_notification',
+          largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
           color: gold,
           colorized: true,
           styleInformation: styleInfo,
