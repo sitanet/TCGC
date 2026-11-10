@@ -242,22 +242,26 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
       (function() {
         function attachBridge() {
           var audioPlayer = document.getElementById('nativeAudioPlayer');
-          if (!audioPlayer) {
+          var playBtn = document.getElementById('radioPlayBtn');
+          if (!audioPlayer && !playBtn) {
             setTimeout(attachBridge, 300);
             return;
           }
           if (window._flutterStreamBridgeInstalled) return;
           window._flutterStreamBridgeInstalled = true;
 
-          // Mute HTML5 audio element so sound plays via Flutter's native background AudioService
-          audioPlayer.muted = true;
+          // Mute HTML5 audio element so sound plays exclusively via Flutter's native background AudioService
+          if (audioPlayer) {
+            audioPlayer.muted = true;
+            audioPlayer.volume = 0;
+          }
 
-          audioPlayer.addEventListener('play', function() {
+          function sendPlayMessage() {
             var titleEl = document.getElementById('radioProgramTitle');
             var artEl = document.getElementById('radioArtworkImg');
             var title = titleEl ? titleEl.textContent.trim() : 'Live Broadcast';
             var art = artEl ? artEl.src : '';
-            var streamUrl = (typeof currentStreamUrl !== 'undefined' && currentStreamUrl) ? currentStreamUrl : audioPlayer.src;
+            var streamUrl = (typeof currentStreamUrl !== 'undefined' && currentStreamUrl) ? currentStreamUrl : (audioPlayer ? audioPlayer.src : '');
 
             if (window.FlutterLiveStream) {
               window.FlutterLiveStream.postMessage(JSON.stringify({
@@ -267,39 +271,47 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
                 artworkUrl: art
               }));
             }
-          });
 
-          audioPlayer.addEventListener('pause', function() {
+            // Silence and pause HTML5 audio so it does not download duplicate data
+            // or trigger browser-level pause when screen blanks / phone locks
+            if (audioPlayer) {
+              try {
+                audioPlayer.muted = true;
+                audioPlayer.pause();
+              } catch(e) {}
+            }
+          }
+
+          function sendPauseMessage() {
             if (window.FlutterLiveStream) {
               window.FlutterLiveStream.postMessage(JSON.stringify({
                 action: 'pause'
               }));
             }
-          });
+          }
 
-          var playBtn = document.getElementById('radioPlayBtn');
           if (playBtn) {
             playBtn.addEventListener('click', function() {
               setTimeout(function() {
                 var isPlayingNow = typeof isPlaying !== 'undefined' ? isPlaying : false;
                 if (isPlayingNow) {
-                  var titleEl = document.getElementById('radioProgramTitle');
-                  var artEl = document.getElementById('radioArtworkImg');
-                  var title = titleEl ? titleEl.textContent.trim() : 'Live Broadcast';
-                  var art = artEl ? artEl.src : '';
-                  var streamUrl = (typeof currentStreamUrl !== 'undefined' && currentStreamUrl) ? currentStreamUrl : (audioPlayer ? audioPlayer.src : '');
-
-                  if (window.FlutterLiveStream) {
-                    window.FlutterLiveStream.postMessage(JSON.stringify({
-                      action: 'play',
-                      streamUrl: streamUrl,
-                      title: title,
-                      artworkUrl: art
-                    }));
-                  }
+                  sendPlayMessage();
+                } else {
+                  sendPauseMessage();
                 }
               }, 120);
             });
+          }
+
+          // If the webpage starts play directly
+          if (audioPlayer) {
+            audioPlayer.addEventListener('play', function() {
+              sendPlayMessage();
+            });
+            // NOTE: We intentionally do NOT listen to audioPlayer 'pause' event here.
+            // When the Android screen blanks or activity pauses, the WebView freezes
+            // and automatically pauses HTML5 <audio>, which would erroneously pause
+            // Flutter's background native AudioService.
           }
         }
         attachBridge();
@@ -313,24 +325,25 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
       final action = data['action'] as String?;
 
       if (action == 'play') {
-        final streamUrl = data['streamUrl'] as String?;
+        var streamUrl = data['streamUrl'] as String?;
+        if (streamUrl == null || streamUrl.trim().isEmpty) {
+          streamUrl = 'https://listen.mixlr.com/d0f784be72d6e96ef254f2a5b696a9bd';
+        }
         final title = data['title'] as String? ?? 'Live Broadcast';
         final artworkUrl = data['artworkUrl'] as String?;
 
-        if (streamUrl != null && streamUrl.isNotEmpty) {
-          try {
-            await ref.read(audioPlayerChangeNotifierProvider).playLiveStream(
-              streamUrl,
-              title: title,
-              artworkUrl: artworkUrl,
-            );
-          } catch (e) {
-            debugPrint('Live stream native play failed: $e, falling back to web audio');
-            // Fallback: unmute web audio player so user still hears audio if native stream fails
-            _webViewController?.runJavaScript(
-              "var a = document.getElementById('nativeAudioPlayer'); if (a) { a.muted = false; a.play(); }"
-            );
-          }
+        try {
+          await ref.read(audioPlayerChangeNotifierProvider).playLiveStream(
+            streamUrl,
+            title: title,
+            artworkUrl: artworkUrl,
+          );
+        } catch (e) {
+          debugPrint('Live stream native play failed: $e, falling back to web audio');
+          // Fallback: unmute web audio player so user still hears audio if native stream fails
+          _webViewController?.runJavaScript(
+            "var a = document.getElementById('nativeAudioPlayer'); if (a) { a.muted = false; a.play(); }"
+          );
         }
       } else if (action == 'pause') {
         final currentSermon = ref.read(audioPlayerChangeNotifierProvider).currentSermon;

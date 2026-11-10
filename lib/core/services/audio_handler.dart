@@ -1,4 +1,5 @@
 import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'seamless_audio_source.dart';
@@ -27,6 +28,7 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
   AudioPlayer get player => _player;
 
   MyAudioHandler() {
+    _initAudioSession();
     _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
     
     _player.processingStateStream.listen((state) {
@@ -34,7 +36,9 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
       if (state == ProcessingState.completed) {
         // Don't call stop() - just update state, keep notification visible
         _player.pause();
-        _player.seek(Duration.zero);
+        if (_player.duration != null && _player.duration! > Duration.zero) {
+          _player.seek(Duration.zero);
+        }
       }
     });
     
@@ -51,6 +55,44 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
         debugPrint('Stack: $st');
       },
     );
+  }
+
+  Future<void> _initAudioSession() async {
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+
+      session.interruptionEventStream.listen((event) {
+        if (event.begin) {
+          switch (event.type) {
+            case AudioInterruptionType.duck:
+              _player.setVolume(0.5);
+              break;
+            case AudioInterruptionType.pause:
+            case AudioInterruptionType.unknown:
+              pause();
+              break;
+          }
+        } else {
+          switch (event.type) {
+            case AudioInterruptionType.duck:
+              _player.setVolume(1.0);
+              break;
+            case AudioInterruptionType.pause:
+              play();
+              break;
+            case AudioInterruptionType.unknown:
+              break;
+          }
+        }
+      });
+
+      session.becomingNoisyEventStream.listen((_) {
+        pause();
+      });
+    } catch (e) {
+      debugPrint('AudioSession configuration error: $e');
+    }
   }
 
   PlaybackState _transformEvent(PlaybackEvent event) {
@@ -151,18 +193,23 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   Future<void> setLiveAudioSource(String url, MediaItem item) async {
-    debugPrint('Setting live audio source: ');
+    debugPrint('Setting live audio source: $url');
     _currentUrl = url;
     _currentMediaItem = item;
     _lastPosition = Duration.zero;
     mediaItem.add(item);
     try {
       final safeUrl = url.trim().contains(' ') ? Uri.encodeFull(url.trim()) : url.trim();
-      await _player.setAudioSource(AudioSource.uri(Uri.parse(safeUrl)));
+      await _player.setAudioSource(
+        AudioSource.uri(
+          Uri.parse(safeUrl),
+          tag: item,
+        ),
+      );
       debugPrint('Live audio source set successfully');
-    } catch (e) {
-      debugPrint('Error setting live audio source: ');
-      debugPrint('Stack: ');
+    } catch (e, st) {
+      debugPrint('Error setting live audio source: $e');
+      debugPrint('Stack: $st');
       rethrow;
     }
   }

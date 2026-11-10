@@ -42,7 +42,7 @@ Future<void> initAudioService() async {
         androidNotificationChannelName: 'TCGC Audio',
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: false,
-        androidNotificationIcon: 'mipmap/ic_launcher',
+        androidNotificationIcon: 'drawable/ic_notification',
         fastForwardInterval: const Duration(seconds: 10),
         rewindInterval: const Duration(seconds: 10),
         androidShowNotificationBadge: false, // Disabled to reduce memory on low-end devices
@@ -965,6 +965,8 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
       _errorMessage = 'Failed to play live stream: $e';
       _isLoading = false;
       _isLiveStream = false;
+      notifyListeners();
+      rethrow;
     }
     notifyListeners();
   }
