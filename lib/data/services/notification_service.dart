@@ -362,7 +362,7 @@ class NotificationService {
           FilePathAndroidBitmap(bigPicturePath),
           largeIcon: largeIconPath != null
               ? FilePathAndroidBitmap(largeIconPath)
-              : null,
+              : const DrawableResourceAndroidBitmap('@drawable/ic_citygate_logo'),
           contentTitle: '<b>${notification.title}</b>',
           htmlFormatContentTitle: true,
           summaryText: notification.body,
@@ -415,7 +415,7 @@ class NotificationService {
             icon: '@drawable/ic_notification',
             largeIcon: largeIconPath != null
                 ? FilePathAndroidBitmap(largeIconPath)
-                : const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+                : const DrawableResourceAndroidBitmap('@drawable/ic_citygate_logo'),
             color: channelConfig.color,
             colorized: true,
             styleInformation: styleInfo,
@@ -486,7 +486,7 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
           icon: '@drawable/ic_notification',
-          largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+          largeIcon: const DrawableResourceAndroidBitmap('@drawable/ic_citygate_logo'),
           color: gold,
           colorized: true,
           styleInformation: styleInfo,
