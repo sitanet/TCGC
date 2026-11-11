@@ -1062,6 +1062,13 @@ class _MainScreenState extends ConsumerState<MainScreen>
   Future<void> _handleNotificationNavigation(Map<String, dynamic> data) async {
     final type = data['type'];
 
+    if (type == 'livestream' || type == 'live' || type == 'live_stream') {
+      final isVideo = (data['sub_tab'] == 'video' || data['live_type'] == 'video');
+      ref.read(liveStreamSubTabIndexProvider.notifier).state = isVideo ? 1 : 0;
+      ref.read(mainTabIndexProvider.notifier).state = 2; // Switch to LiveStream tab
+      return;
+    }
+
     if (type == 'new_message' || type == 'message') {
       final messageId = data['message_id'];
       if (messageId != null) {

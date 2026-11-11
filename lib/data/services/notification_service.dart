@@ -160,7 +160,9 @@ class NotificationService {
       await messaging.subscribeToTopic('announcements');
       await messaging.subscribeToTopic('messages');
       await messaging.subscribeToTopic('events');
-      debugPrint('Subscribed to default FCM topics (all, announcements, messages, events)');
+      await messaging.subscribeToTopic('livestream');
+      await messaging.subscribeToTopic('live');
+      debugPrint('Subscribed to default FCM topics (all, announcements, messages, events, livestream, live)');
     } catch (e) {
       debugPrint('Error subscribing to FCM topics: $e');
     }
@@ -255,6 +257,19 @@ class NotificationService {
           'Wallet',
           description: 'Wallet credit and transaction notifications.',
           importance: Importance.high,
+          enableVibration: true,
+          playSound: true,
+          ledColor: Color(0xFFD4AF37),
+        ),
+      );
+
+      // Dedicated live broadcast channel with max priority and gold LED color
+      await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'livestream_channel',
+          'Live Broadcasts',
+          description: 'Instant notifications when church services and broadcasts are live.',
+          importance: Importance.max,
           enableVibration: true,
           playSound: true,
           ledColor: Color(0xFFD4AF37),
@@ -361,13 +376,23 @@ class NotificationService {
         );
       }
 
-      // Add action buttons for message notifications
+      // Add action buttons for message and live notifications
       List<AndroidNotificationAction>? actions;
       if (notificationType == 'new_message' || notificationType == 'message') {
         actions = [
           const AndroidNotificationAction(
             'play',
             '▶ Play',
+            showsUserInterface: true,
+          ),
+        ];
+      } else if (notificationType == 'livestream' ||
+          notificationType == 'live' ||
+          notificationType == 'live_stream') {
+        actions = [
+          const AndroidNotificationAction(
+            'tune_in',
+            '🔴 Tune In',
             showsUserInterface: true,
           ),
         ];
@@ -540,6 +565,16 @@ class NotificationService {
           description: 'Wallet notification',
           color: const Color(0xFFD4AF37), // Gold
           summaryText: '<font color="#D4AF37">Wallet</font>',
+        );
+      case 'livestream':
+      case 'live':
+      case 'live_stream':
+        return _NotificationChannelConfig(
+          channelId: 'livestream_channel',
+          channelName: 'Live Broadcasts',
+          description: 'Live service broadcast alerts',
+          color: const Color(0xFFD4AF37), // Gold
+          summaryText: '<font color="#D4AF37">🔴 Live Broadcast</font>',
         );
       default:
         return _NotificationChannelConfig(
