@@ -81,7 +81,7 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="tcgc" android:host="app"/>
+                <data android:scheme="tcgc"/>
             </intent-filter>
             
             <!-- App Links (https) -->

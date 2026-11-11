@@ -927,6 +927,13 @@ class _MainScreenState extends ConsumerState<MainScreen>
     NotificationService.onNotificationTapped = (data) {
       _handleNotificationNavigation(data);
     };
+    if (NotificationService.pendingNotificationData != null) {
+      final pending = NotificationService.pendingNotificationData!;
+      NotificationService.pendingNotificationData = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleNotificationNavigation(pending);
+      });
+    }
   }
 
   void _initDeepLinks() async {
@@ -1060,10 +1067,19 @@ class _MainScreenState extends ConsumerState<MainScreen>
   }
 
   Future<void> _handleNotificationNavigation(Map<String, dynamic> data) async {
-    final type = data['type'];
+    final type = data['type']?.toString();
+    final url = (data['url'] ?? data['deep_link'] ?? data['link'] ?? '').toString();
 
-    if (type == 'livestream' || type == 'live' || type == 'live_stream') {
-      final isVideo = (data['sub_tab'] == 'video' || data['live_type'] == 'video');
+    if (type == 'livestream' ||
+        type == 'live' ||
+        type == 'live_stream' ||
+        url.contains('/app/audio') ||
+        url.contains('/app/video') ||
+        url.contains('listen-live')) {
+      final isVideo = (data['sub_tab'] == 'video' ||
+          data['live_type'] == 'video' ||
+          url.contains('/app/video') ||
+          url.contains('watch-live'));
       ref.read(liveStreamSubTabIndexProvider.notifier).state = isVideo ? 1 : 0;
       ref.read(mainTabIndexProvider.notifier).state = 2; // Switch to LiveStream tab
       return;

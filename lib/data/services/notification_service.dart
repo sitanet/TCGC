@@ -279,6 +279,7 @@ class NotificationService {
   }
 
   static Function(Map<String, dynamic> data)? onNotificationTapped;
+  static Map<String, dynamic>? pendingNotificationData;
 
   void _onNotificationTapped(NotificationResponse response) {
     debugPrint('Notification tapped: ${response.payload}');
@@ -294,6 +295,8 @@ class NotificationService {
 
       if (onNotificationTapped != null) {
         onNotificationTapped!(data);
+      } else {
+        pendingNotificationData = data;
       }
     } catch (e) {
       debugPrint('Error parsing notification payload: $e');
@@ -589,6 +592,11 @@ class NotificationService {
 
   void _handleMessageOpenedApp(RemoteMessage message) {
     debugPrint('Message opened app: ${message.data}');
+    if (onNotificationTapped != null) {
+      onNotificationTapped!(message.data);
+    } else {
+      pendingNotificationData = message.data;
+    }
   }
 
   Future<void> _getToken() async {
