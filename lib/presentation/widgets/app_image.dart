@@ -53,9 +53,8 @@ class AppImage extends StatelessWidget {
 
     Widget image;
     if (_isNetworkImage) {
-      // Calculate memory cache dimensions to prevent OOM
+      // Calculate memory cache width to prevent OOM while preserving aspect ratio
       final cacheWidth = width != null ? (width! * 2).toInt() : 400;
-      final cacheHeight = height != null ? (height! * 2).toInt() : 400;
       
       image = CachedNetworkImage(
         imageUrl: imagePath!,
@@ -63,8 +62,8 @@ class AppImage extends StatelessWidget {
         width: width,
         height: height,
         fit: fit,
+        alignment: Alignment.topCenter,
         memCacheWidth: cacheWidth,
-        memCacheHeight: cacheHeight,
         placeholder: (context, url) => placeholder,
         errorWidget: (context, url, error) => placeholder,
         // Use 0 duration when image is in memory cache to show instantly

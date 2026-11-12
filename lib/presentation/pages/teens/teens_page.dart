@@ -213,9 +213,9 @@ class _TeensPageState extends ConsumerState<TeensPage> {
             ? CachedNetworkImage(
                 imageUrl: _bannerUrl!,
                 fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
                 width: double.infinity,
                 memCacheWidth: 600,
-                memCacheHeight: 400,
                 placeholder: (context, url) => Container(
                   color: isDark ? AppColors.cardDark : Colors.grey[200],
                   child: const Center(
@@ -333,8 +333,8 @@ class _TeensPageState extends ConsumerState<TeensPage> {
                 child: CachedNetworkImage(
                   imageUrl: category.imageUrl!,
                   fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
                   memCacheWidth: 128,
-                  memCacheHeight: 128,
                   placeholder: (context, url) =>
                       Icon(icon, color: color, size: iconSize),
                   errorWidget: (context, url, error) =>

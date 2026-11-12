@@ -787,8 +787,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
                       width: 52,
                       height: 52,
                       fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
                       memCacheWidth: 104,
-                      memCacheHeight: 104,
                       placeholder: (_, __) => Container(
                         width: 52,
                         height: 52,
@@ -1059,8 +1059,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
                       width: 48,
                       height: 48,
                       fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
                       memCacheWidth: 96,
-                      memCacheHeight: 96,
                       fadeInDuration: Duration.zero,
                       fadeOutDuration: Duration.zero,
                       placeholder: (_, __) => Container(
@@ -1588,9 +1588,9 @@ class _AudioPageState extends ConsumerState<AudioPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Square 1:1 Artwork Card
+          // 1. Portrait-friendly Artwork Card
           AspectRatio(
-            aspectRatio: 1.0,
+            aspectRatio: 0.90,
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
@@ -1614,8 +1614,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
                           width: double.infinity,
                           height: double.infinity,
                           fit: BoxFit.cover,
+                          alignment: Alignment.topCenter,
                           memCacheWidth: 400,
-                          memCacheHeight: 400,
                           useOldImageOnUrlChange: true,
                           fadeInDuration: Duration.zero,
                           fadeOutDuration: Duration.zero,
@@ -1784,8 +1784,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
         width: double.infinity,
         height: double.infinity,
         fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
         memCacheWidth: 400,
-        memCacheHeight: 400,
         useOldImageOnUrlChange: true,
         fadeInDuration: Duration.zero,
         fadeOutDuration: Duration.zero,
