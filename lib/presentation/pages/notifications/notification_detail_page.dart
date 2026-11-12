@@ -1,6 +1,11 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../domain/entities/app_notification.dart';
@@ -25,16 +30,101 @@ class _NotificationDetailPageState
   void initState() {
     super.initState();
     _notification = widget.notification;
-    // Mark as read when opening detail page
     if (!_notification.isRead) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref
             .read(notificationChangeNotifierProvider)
             .markAsRead(_notification.id);
-        setState(() {
-          _notification = _notification.copyWith(isRead: true);
-        });
+        if (mounted) {
+          setState(() {
+            _notification = _notification.copyWith(isRead: true);
+          });
+        }
       });
+    }
+  }
+
+  String get _displayBody {
+    final body = _notification.body.trim();
+    if (body.isNotEmpty) return body;
+    final data = _notification.data;
+    if (data == null) return '';
+    final fallback =
+        data['update_message'] ?? data['message'] ?? data['description'];
+    return fallback?.toString().trim() ?? '';
+  }
+
+  String? get _versionLabel {
+    final data = _notification.data;
+    if (data == null) return null;
+    final ver = data['latest_version'] ?? data['version'];
+    final v = ver?.toString().trim();
+    if (v == null || v.isEmpty) return null;
+    return v.startsWith('v') ? v : 'Version $v';
+  }
+
+  String? get _actionUrl {
+    final data = _notification.data;
+    if (data == null) return null;
+    for (final key in ['update_url', 'url', 'link', 'deep_link']) {
+      final raw = data[key]?.toString().trim();
+      if (raw != null && raw.isNotEmpty) {
+        return raw;
+      }
+    }
+    return null;
+  }
+
+  String get _actionButtonLabel {
+    final type = _notification.notificationType.toLowerCase();
+    final url = (_actionUrl ?? '').toLowerCase();
+    if (type.contains('update') ||
+        url.contains('play.google.com') ||
+        url.contains('apps.apple.com') ||
+        url.contains('market://')) {
+      return 'Update Now';
+    }
+    if (type == 'live' || url.contains('/app/audio') || url.contains('/app/video')) {
+      return 'Open Now';
+    }
+    return 'View Details';
+  }
+
+  Future<void> _openActionUrl() async {
+    final raw = _actionUrl;
+    if (raw == null || raw.isEmpty) return;
+
+    var formattedUrl = raw;
+    if (!kIsWeb &&
+        Platform.isAndroid &&
+        formattedUrl.contains('play.google.com/store/apps/details')) {
+      try {
+        final playUri = Uri.parse(formattedUrl);
+        final appId = playUri.queryParameters['id'];
+        if (appId != null && appId.isNotEmpty) {
+          formattedUrl = 'market://details?id=$appId';
+        }
+      } catch (_) {}
+    }
+
+    if (!formattedUrl.startsWith('http://') &&
+        !formattedUrl.startsWith('https://') &&
+        !formattedUrl.startsWith('market://') &&
+        !formattedUrl.startsWith('tcgc://')) {
+      formattedUrl = 'https://$formattedUrl';
+    }
+
+    try {
+      await launchUrl(
+        Uri.parse(formattedUrl),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open link')),
+        );
+      }
     }
   }
 
@@ -60,10 +150,8 @@ class _NotificationDetailPageState
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header with icon and type badge
             _buildHeader(context, isDark, config),
-            // Content
-            _buildContent(context, isDark, config),
+            _buildContent(context, isDark),
           ],
         ),
       ),
@@ -78,19 +166,19 @@ class _NotificationDetailPageState
     final spacing = Responsive.verticalSpacing(context);
     final iconSize = Responsive.value(
       context,
-      mobile: 80.0,
-      tablet: 100.0,
-      desktop: 120.0,
+      mobile: 68.0,
+      tablet: 84.0,
+      desktop: 96.0,
     );
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(spacing),
+      padding: EdgeInsets.fromLTRB(spacing, spacing, spacing, spacing * 1.25),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            config.color.withValues(alpha: 0.15),
-            config.color.withValues(alpha: 0.05),
+            config.color.withValues(alpha: 0.14),
+            config.color.withValues(alpha: 0.03),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -102,13 +190,12 @@ class _NotificationDetailPageState
       ),
       child: Column(
         children: [
-          // Icon container with gradient
           Container(
             width: iconSize,
             height: iconSize,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [config.color, config.color.withValues(alpha: 0.7)],
+                colors: [config.color, config.color.withValues(alpha: 0.75)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -117,93 +204,158 @@ class _NotificationDetailPageState
               ),
               boxShadow: [
                 BoxShadow(
-                  color: config.color.withValues(alpha: 0.3),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
+                  color: config.color.withValues(alpha: 0.28),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
-            child: Icon(config.icon, color: Colors.white, size: iconSize * 0.5),
+            child: Icon(config.icon, color: Colors.white, size: iconSize * 0.48),
           ),
-          SizedBox(height: spacing * 1.5),
-          // Type badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: config.color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: config.color.withValues(alpha: 0.4),
-                width: 1.5,
+          SizedBox(height: spacing),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: config.color.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: config.color.withValues(alpha: 0.35),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  config.label,
+                  style: TextStyle(
+                    color: config.color,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
               ),
-            ),
-            child: Text(
-              config.label,
-              style: TextStyle(
-                color: config.color,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-            ),
+              if (_versionLabel != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.primaryGold.withValues(alpha: 0.35),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    _versionLabel!,
+                    style: const TextStyle(
+                      color: AppColors.primaryGold,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          SizedBox(height: spacing * 1.5),
-          // Title
+          SizedBox(height: spacing),
           Text(
             _notification.title,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontSize: Responsive.titleFontSize(context),
-            ),
+                  fontWeight: FontWeight.w800,
+                  fontSize: Responsive.titleFontSize(context),
+                ),
           ),
-          SizedBox(height: spacing * 0.75),
-          // Time
+          SizedBox(height: spacing * 0.5),
           Text(
             _formatDateTime(_notification.createdAt),
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-              fontSize: 12,
-            ),
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                  fontSize: 12,
+                ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildContent(
-    BuildContext context,
-    bool isDark,
-    _NotificationConfig config,
-  ) {
+  Widget _buildContent(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
     final spacing = Responsive.verticalSpacing(context);
+    final bodyText = _displayBody;
+    final actionUrl = _actionUrl;
 
     return Padding(
       padding: EdgeInsets.all(horizontalPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(height: spacing * 0.5),
-          // Image if available
           if (_notification.imageUrl != null &&
               _notification.imageUrl!.isNotEmpty)
-            _buildImageSection(context, spacing),
-          // Message body
-          if (_notification.body.isNotEmpty) ...[
-            SizedBox(height: spacing),
-            _buildBodySection(context, isDark, spacing),
-          ],
-          // Additional data if available
-          if (_notification.data != null && _notification.data!.isNotEmpty) ...[
+            _buildImageSection(context, isDark, spacing),
+          if (bodyText.isNotEmpty) ...[
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(spacing * 1.1),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.cardDark : Colors.white,
+                borderRadius: BorderRadius.circular(
+                  Responsive.borderRadius(context),
+                ),
+                border: Border.all(
+                  color: isDark
+                      ? AppColors.dividerDark
+                      : AppColors.dividerLight.withValues(alpha: 0.8),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                bodyText,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      height: 1.65,
+                      fontSize: 15,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight,
+                    ),
+              ),
+            ),
             SizedBox(height: spacing * 1.5),
-            _buildDataSection(context, isDark, spacing),
           ],
-          SizedBox(height: spacing * 2),
-          // Action buttons
+          if (actionUrl != null) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _openActionUrl,
+                icon: const Icon(Icons.open_in_new_rounded, size: 19),
+                label: Text(
+                  _actionButtonLabel,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGold,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: spacing),
+          ],
           _buildActionButtons(context, spacing),
           SizedBox(height: spacing),
         ],
@@ -211,7 +363,11 @@ class _NotificationDetailPageState
     );
   }
 
-  Widget _buildImageSection(BuildContext context, double spacing) {
+  Widget _buildImageSection(
+    BuildContext context,
+    bool isDark,
+    double spacing,
+  ) {
     final borderRadius = Responsive.borderRadius(context);
 
     return Column(
@@ -223,129 +379,17 @@ class _NotificationDetailPageState
             imageUrl: _notification.imageUrl!,
             fit: BoxFit.cover,
             width: double.infinity,
-            height: 220,
+            height: 210,
             placeholder: (context, url) => Container(
               width: double.infinity,
-              height: 220,
-              color: Colors.grey[300],
+              height: 210,
+              color: isDark ? AppColors.cardDark : Colors.grey[200],
               child: const Center(child: CircularProgressIndicator()),
             ),
-            errorWidget: (context, url, error) => Container(
-              width: double.infinity,
-              height: 220,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(borderRadius),
-              ),
-              child: const Center(
-                child: Icon(Icons.image_not_supported_rounded, size: 48),
-              ),
-            ),
+            errorWidget: (context, url, error) => const SizedBox.shrink(),
           ),
         ),
-        SizedBox(height: spacing),
-      ],
-    );
-  }
-
-  Widget _buildBodySection(BuildContext context, bool isDark, double spacing) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Details',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-          ),
-        ),
-        SizedBox(height: spacing * 0.5),
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(spacing),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.cardDark : Colors.grey[100],
-            borderRadius: BorderRadius.circular(
-              Responsive.borderRadius(context),
-            ),
-            border: Border.all(
-              color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-              width: 1,
-            ),
-          ),
-          child: Text(
-            _notification.body,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              height: 1.6,
-              color: isDark
-                  ? AppColors.textPrimaryDark
-                  : AppColors.textPrimaryLight,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDataSection(BuildContext context, bool isDark, double spacing) {
-    final data = _notification.data ?? {};
-    final borderRadius = Responsive.borderRadius(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Additional Information',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-          ),
-        ),
-        SizedBox(height: spacing * 0.5),
-        ...data.entries.map((entry) {
-          return Container(
-            margin: EdgeInsets.only(bottom: spacing * 0.5),
-            padding: EdgeInsets.all(spacing * 0.75),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.cardDark : Colors.grey[50],
-              borderRadius: BorderRadius.circular(borderRadius),
-              border: Border.all(
-                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                width: 0.5,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  entry.key
-                      .replaceAll('_', ' ')
-                      .split(' ')
-                      .map(
-                        (word) => word.isEmpty
-                            ? ''
-                            : word[0].toUpperCase() +
-                                  word.substring(1).toLowerCase(),
-                      )
-                      .join(' '),
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: AppColors.primaryGold,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                SizedBox(height: spacing * 0.25),
-                Text(
-                  entry.value.toString(),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
+        SizedBox(height: spacing * 1.25),
       ],
     );
   }
@@ -356,25 +400,31 @@ class _NotificationDetailPageState
         Expanded(
           child: OutlinedButton.icon(
             onPressed: () => _copyToClipboard(context),
-            icon: const Icon(Icons.content_copy_rounded),
+            icon: const Icon(Icons.content_copy_rounded, size: 18),
             label: const Text('Copy'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primaryGold,
               side: const BorderSide(color: AppColors.primaryGold, width: 1.5),
               padding: EdgeInsets.symmetric(vertical: spacing * 0.75),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ),
         SizedBox(width: spacing),
         Expanded(
-          child: ElevatedButton.icon(
+          child: OutlinedButton.icon(
             onPressed: () => _shareNotification(context),
-            icon: const Icon(Icons.share_rounded),
+            icon: const Icon(Icons.share_rounded, size: 18),
             label: const Text('Share'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryGold,
-              foregroundColor: Colors.white,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primaryGold,
+              side: const BorderSide(color: AppColors.primaryGold, width: 1.5),
               padding: EdgeInsets.symmetric(vertical: spacing * 0.75),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ),
@@ -382,16 +432,25 @@ class _NotificationDetailPageState
     );
   }
 
-  void _copyToClipboard(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Notification copied to clipboard')),
-    );
+  Future<void> _copyToClipboard(BuildContext context) async {
+    final bodyText = _displayBody;
+    final text = bodyText.isEmpty
+        ? _notification.title
+        : '${_notification.title}\n\n$bodyText';
+    await Clipboard.setData(ClipboardData(text: text));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Notification copied to clipboard')),
+      );
+    }
   }
 
-  void _shareNotification(BuildContext context) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Sharing notification...')));
+  Future<void> _shareNotification(BuildContext context) async {
+    final bodyText = _displayBody;
+    final text = bodyText.isEmpty
+        ? _notification.title
+        : '${_notification.title}\n\n$bodyText';
+    await Share.share(text);
   }
 
   void _showOptionsMenu(BuildContext context) {
@@ -415,7 +474,7 @@ class _NotificationDetailPageState
             ),
           ),
           ListTile(
-            leading: Icon(Icons.delete_rounded, color: Colors.red),
+            leading: const Icon(Icons.delete_rounded, color: Colors.red),
             title: const Text('Delete Notification'),
             onTap: () {
               Navigator.pop(context);
@@ -455,10 +514,9 @@ class _NotificationDetailPageState
   void _toggleReadStatus(BuildContext context) {
     final provider = ref.read(notificationChangeNotifierProvider);
     if (_notification.isRead) {
-      // Mark as unread - would need backend support
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Marked as unread')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Marked as unread')),
+      );
     } else {
       provider.markAsRead(_notification.id);
       setState(() {
@@ -468,7 +526,20 @@ class _NotificationDetailPageState
   }
 
   _NotificationConfig _getNotificationConfig() {
-    switch (_notification.notificationType) {
+    switch (_notification.notificationType.toLowerCase()) {
+      case 'live':
+        return _NotificationConfig(
+          icon: Icons.live_tv_rounded,
+          color: AppColors.sardine,
+          label: 'LIVE',
+        );
+      case 'update':
+      case 'app_update':
+        return _NotificationConfig(
+          icon: Icons.system_update_rounded,
+          color: AppColors.primaryGold,
+          label: 'APP UPDATE',
+        );
       case 'event':
         return _NotificationConfig(
           icon: Icons.event_rounded,
@@ -518,7 +589,7 @@ class _NotificationDetailPageState
   }
 
   String _formatDateTime(DateTime dateTime) {
-    final months = [
+    const months = [
       'Jan',
       'Feb',
       'Mar',
