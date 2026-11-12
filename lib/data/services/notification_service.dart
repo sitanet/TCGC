@@ -428,8 +428,8 @@ class NotificationService {
             presentAlert: true,
             presentBadge: true,
             presentSound: true,
-            attachments: imageUrl != null
-                ? [DarwinNotificationAttachment(imageUrl)]
+            attachments: bigPicturePath != null
+                ? [DarwinNotificationAttachment(bigPicturePath)]
                 : null,
           ),
         ),
