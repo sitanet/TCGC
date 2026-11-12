@@ -35,6 +35,7 @@ import 'presentation/widgets/bottom_nav_bar.dart';
 import 'presentation/widgets/mini_player.dart';
 import 'presentation/widgets/promotion_popup.dart';
 import 'presentation/widgets/ready_to_play_popup.dart';
+import 'presentation/widgets/app_update_card.dart';
 import 'data/services/data_service.dart' show DataService, AppUpdateInfo;
 import 'data/services/notification_service.dart';
 import 'presentation/pages/audio/audio_player_page.dart';
@@ -53,7 +54,7 @@ import 'core/utils/error_handler.dart';
 final communityChangeNotifierProvider =
     ChangeNotifierProvider<CommunityProvider>((ref) => CommunityProvider());
 
-const String appVersion = '1.0.2';
+const String appVersion = '1.0.3';
 
 // Riverpod providers wrapping ChangeNotifier classes
 final themeChangeNotifierProvider = ChangeNotifierProvider<ThemeProvider>(
@@ -283,325 +284,6 @@ class _MyAppState extends ConsumerState<MyApp> {
     }
   }
 
-  Widget _buildUpdateDialog(BuildContext context, bool isDark) {
-    return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF0E0E0D)
-          : const Color(0xFFFAF9F6),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Close button row — only shown when update is NOT forced
-            if (!_updateInfo!.forceUpdate)
-              Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 12, right: 16),
-                  child: IconButton(
-                    onPressed: _closeUpdateDialog,
-                    style: IconButton.styleFrom(
-                      backgroundColor: isDark
-                          ? Colors.white.withValues(alpha: 0.05)
-                          : Colors.black.withValues(alpha: 0.04),
-                      shape: const CircleBorder(),
-                      padding: const EdgeInsets.all(8),
-                    ),
-                    icon: Icon(
-                      Icons.close_rounded,
-                      color: isDark ? Colors.white70 : Colors.black54,
-                      size: 22,
-                    ),
-                    tooltip: 'Close',
-                  ),
-                ),
-              )
-            else
-              const SizedBox(height: 24),
-            // Scrollable content area
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Column(
-                  children: [
-                    SizedBox(height: _updateInfo!.forceUpdate ? 40 : 16),
-                    // Animated premium outer glowing ring artwork
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          width: 160,
-                          height: 160,
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryGold.withValues(alpha: 0.03),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        Container(
-                          width: 130,
-                          height: 130,
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryGold.withValues(alpha: 0.08),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Color(0xFFFFD700),
-                                Color(0xFFB8860B),
-                              ],
-                            ),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primaryGold.withValues(alpha: 0.35),
-                                blurRadius: 24,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.rocket_launch_rounded,
-                            size: 42,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-                    // Title
-                    Text(
-                      _updateInfo!.forceUpdate
-                          ? 'Update Required'
-                          : 'New Update Available',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 24,
-                        letterSpacing: -0.5,
-                        color: isDark ? Colors.white : const Color(0xFF1E1E1E),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Version capsule
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGold.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(
-                          color: AppColors.primaryGold.withValues(alpha: 0.25),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        'Version ${_updateInfo!.latestVersion}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primaryGold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    // What's new card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF161615) : Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.06)
-                              : Colors.black.withValues(alpha: 0.04),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(
-                              alpha: isDark ? 0.25 : 0.04,
-                            ),
-                            blurRadius: 24,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryGold.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.new_releases_rounded,
-                                  size: 18,
-                                  color: AppColors.primaryGold,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                "What's New",
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  color: isDark ? Colors.white : const Color(0xFF1E1E1E),
-                                  letterSpacing: -0.2,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          // Update message
-                          Text(
-                            _updateInfo!.updateMessage,
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 1.6,
-                              color: isDark
-                                  ? const Color(0xFFABABAB)
-                                  : const Color(0xFF555555),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    // Info note for force update
-                    if (_updateInfo!.forceUpdate)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.orange.withValues(alpha: 0.2),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.info_outline_rounded,
-                              color: Colors.orange,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                'This update is required to continue using the application.',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: isDark ? Colors.orange[200] : Colors.orange[800],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    const SizedBox(height: 32),
-                    // Update Now CTA
-                    Container(
-                      width: double.infinity,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFFFFD700),
-                            Color(0xFFB8860B),
-                          ],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primaryGold.withValues(alpha: 0.35),
-                            blurRadius: 15,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton(
-                        onPressed: _openUpdateUrl,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.download_rounded,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                            SizedBox(width: 10),
-                            Text(
-                              'Update Now',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (!_updateInfo!.forceUpdate) ...[
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: TextButton(
-                          onPressed: _closeUpdateDialog,
-                          style: TextButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                          ),
-                          child: Text(
-                            'Remind Me Later',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   void initState() {
     super.initState();
@@ -686,7 +368,6 @@ class _MyAppState extends ConsumerState<MyApp> {
 
 
     if (_showUpdateDialog && _updateInfo != null) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
       return MaterialApp(
         scaffoldMessengerKey: rootScaffoldMessengerKey,
         title: 'TCGC',
@@ -694,7 +375,11 @@ class _MyAppState extends ConsumerState<MyApp> {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: themeProvider.themeMode,
-        home: _buildUpdateDialog(context, isDark),
+        home: AppUpdateScreen(
+          updateInfo: _updateInfo!,
+          onUpdateNow: _openUpdateUrl,
+          onClose: _closeUpdateDialog,
+        ),
       );
     }
 
