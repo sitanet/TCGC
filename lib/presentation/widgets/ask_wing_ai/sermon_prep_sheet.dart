@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_cache_manager.dart';
 import '../../../data/services/data_service.dart';
 import '../../../domain/entities/transcript.dart';
 
@@ -190,7 +192,7 @@ class _SermonPrepSheetState extends State<SermonPrepSheet> {
         final excerpt = _cleanText(t.content);
         if (excerpt.isNotEmpty) {
           final capped =
-              excerpt.length > 900 ? '${excerpt.substring(0, 900)}...' : excerpt;
+              excerpt.length > 500 ? '${excerpt.substring(0, 500)}...' : excerpt;
           buffer.writeln('  Excerpt: $capped');
         }
       }
@@ -438,20 +440,21 @@ class _SermonPrepSheetState extends State<SermonPrepSheet> {
                       ..._filteredTranscripts.take(30).map((t) {
                         final isSelected = _selectedIds.contains(t.id);
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
+                          margin: const EdgeInsets.only(bottom: 10),
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? AppColors.primaryGold.withValues(alpha: 0.12)
-                                : surfaceColor,
-                            borderRadius: BorderRadius.circular(12),
+                                : (isDark ? const Color(0xFF1E222A) : Colors.white),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                               color: isSelected
                                   ? AppColors.primaryGold
-                                  : Colors.transparent,
+                                  : (isDark ? Colors.white12 : Colors.grey.shade200),
+                              width: isSelected ? 1.5 : 1.0,
                             ),
                           ),
-                          child: ListTile(
-                            dense: true,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(14),
                             onTap: () {
                               setState(() {
                                 if (isSelected) {
@@ -469,33 +472,103 @@ class _SermonPrepSheetState extends State<SermonPrepSheet> {
                                 }
                               });
                             },
-                            leading: Icon(
-                              isSelected
-                                  ? Icons.check_circle_rounded
-                                  : Icons.description_outlined,
-                              color: isSelected
-                                  ? AppColors.primaryGold
-                                  : subColor,
-                            ),
-                            title: Text(
-                              t.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w600,
-                                color: textColor,
+                            child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Thumbnail or book badge
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: SizedBox(
+                                      width: 44,
+                                      height: 44,
+                                      child: (t.imageUrl != null && t.imageUrl!.isNotEmpty && t.imageUrl!.startsWith('http'))
+                                          ? CachedNetworkImage(
+                                              imageUrl: t.imageUrl!,
+                                              cacheManager: CustomImageCacheManager.instance,
+                                              fit: BoxFit.cover,
+                                              placeholder: (_, __) => Container(
+                                                color: AppColors.primaryGold.withValues(alpha: 0.15),
+                                                child: const Icon(Icons.menu_book_rounded, color: AppColors.primaryGold, size: 20),
+                                              ),
+                                              errorWidget: (_, __, ___) => Container(
+                                                color: AppColors.primaryGold.withValues(alpha: 0.15),
+                                                child: const Icon(Icons.menu_book_rounded, color: AppColors.primaryGold, size: 20),
+                                              ),
+                                            )
+                                          : Container(
+                                              color: AppColors.primaryGold.withValues(alpha: 0.15),
+                                              child: const Icon(Icons.menu_book_rounded, color: AppColors.primaryGold, size: 20),
+                                            ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  // Text details
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          t.title,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w700,
+                                            height: 1.25,
+                                            color: textColor,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Row(
+                                          children: [
+                                            if (t.speaker != null && t.speaker!.isNotEmpty) ...[
+                                              Flexible(
+                                                child: Text(
+                                                  t.speaker!,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(fontSize: 11.5, color: subColor),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text('•', style: TextStyle(fontSize: 11, color: subColor)),
+                                              const SizedBox(width: 6),
+                                            ],
+                                            Text(
+                                              t.categoryName.isNotEmpty ? t.categoryName : (t.category.isNotEmpty ? t.category : 'Transcript'),
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.primaryGold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Selection checkbox indicator
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isSelected ? AppColors.primaryGold : Colors.transparent,
+                                      border: Border.all(
+                                        color: isSelected ? AppColors.primaryGold : (isDark ? Colors.white30 : Colors.grey.shade400),
+                                        width: 1.8,
+                                      ),
+                                    ),
+                                    child: isSelected
+                                        ? const Icon(Icons.check, size: 16, color: Colors.white)
+                                        : null,
+                                  ),
+                                ],
                               ),
-                            ),
-                            subtitle: Text(
-                              [
-                                if (t.speaker != null && t.speaker!.isNotEmpty)
-                                  t.speaker!,
-                                if (t.categoryName.isNotEmpty) t.categoryName,
-                              ].join(' • '),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 11.5, color: subColor),
                             ),
                           ),
                         );

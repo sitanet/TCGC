@@ -296,31 +296,27 @@ class WelcomeMessage extends StatelessWidget {
   }
 
   Widget _buildAiToolsRow(bool isDark) {
-    return Row(
+    return Column(
       children: [
         if (onPrepareSermonTap != null)
-          Expanded(
-            child: _CompactToolCard(
-              icon: Icons.edit_note_rounded,
-              accentColor: AppColors.primaryGold,
-              title: 'Prepare Message',
-              subtitle: 'Sermon & study prep',
-              isDark: isDark,
-              onTap: onPrepareSermonTap!,
-            ),
+          _CompactToolCard(
+            icon: Icons.edit_note_rounded,
+            accentColor: AppColors.primaryGold,
+            title: 'Prepare Message or Sermon',
+            subtitle: 'Draft sermons, Bible studies & teaching outlines from transcripts',
+            isDark: isDark,
+            onTap: onPrepareSermonTap!,
           ),
         if (onPrepareSermonTap != null && onMessageReviewTap != null)
-          const SizedBox(width: 10),
+          const SizedBox(height: 8),
         if (onMessageReviewTap != null)
-          Expanded(
-            child: _CompactToolCard(
-              icon: Icons.auto_stories_rounded,
-              accentColor: const Color(0xFF3B82F6),
-              title: 'Message Review',
-              subtitle: 'Break down transcripts',
-              isDark: isDark,
-              onTap: onMessageReviewTap!,
-            ),
+          _CompactToolCard(
+            icon: Icons.auto_stories_rounded,
+            accentColor: AppColors.primaryGold,
+            title: 'Message Review',
+            subtitle: 'Break down minister teachings into simple, easy understanding',
+            isDark: isDark,
+            onTap: onMessageReviewTap!,
           ),
       ],
     );
@@ -352,7 +348,7 @@ class _CompactToolCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E222A) : Colors.white,
             borderRadius: BorderRadius.circular(14),
@@ -364,41 +360,44 @@ class _CompactToolCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 32,
-                height: 32,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: accentColor.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(9),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: accentColor, size: 18),
+                child: Icon(icon, color: accentColor, size: 20),
               ),
-              const SizedBox(width: 9),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.w700,
                         color: isDark ? Colors.white : AppColors.textPrimaryLight,
                       ),
                     ),
-                    const SizedBox(height: 1),
+                    const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 11.5,
                         color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        height: 1.25,
                       ),
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: isDark ? Colors.white30 : Colors.black26,
               ),
             ],
           ),
