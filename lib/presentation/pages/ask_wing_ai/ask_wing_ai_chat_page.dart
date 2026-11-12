@@ -6,6 +6,8 @@ import '../../widgets/ask_wing_ai/chat_message_list.dart';
 import '../../widgets/ask_wing_ai/response_mode_sheet.dart';
 import '../../widgets/ask_wing_ai/chat_input_field.dart';
 import '../../widgets/ask_wing_ai/welcome_message.dart';
+import '../../widgets/ask_wing_ai/sermon_prep_sheet.dart';
+import '../../widgets/ask_wing_ai/message_review_sheet.dart';
 import '../../../data/models/ask_wing_ai/chat_message_model.dart';
 import '../../widgets/ask_wing_ai/ai_consent_dialog.dart';
 import '../../../core/theme/app_colors.dart';
@@ -712,6 +714,8 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
           });
           _scrollToBottom();
         },
+        onPrepareSermonTap: () => _openSermonPrep(state),
+        onMessageReviewTap: () => _openMessageReview(state),
       );
     }
 
@@ -762,6 +766,62 @@ class _AskWingAIChatPageState extends State<AskWingAIChatPage> {
 
     context.read<AskWingAICubit>().submitQuestion(question, responseStyle: selectedMode.id);
     _textController.clear();
+  }
+
+  Future<void> _openSermonPrep(AskWingAIState state) async {
+    if (!_canSubmitQuestion(state)) return;
+    final hasConsent = await AIConsentDialog.hasConsented();
+    if (!hasConsent && mounted) {
+      final granted = await AIConsentDialog.showConsentDialog(context);
+      if (!granted) return;
+    }
+    if (!mounted) return;
+
+    final result = await SermonPrepSheet.show(
+      context,
+      isServiceTeamMember: _currentUser?.isServiceTeamMember ?? false,
+      isGeneralMarried: _currentUser?.isGeneralMarried ?? false,
+      isInHouseMarried: _currentUser?.isInHouseMarried ?? false,
+    );
+    if (result == null || !mounted) return;
+
+    setState(() {
+      _showDashboard = false;
+      _matchedSermons = [];
+    });
+
+    context.read<AskWingAICubit>().submitQuestion(
+          result.prompt,
+          responseStyle: result.responseStyle,
+        );
+  }
+
+  Future<void> _openMessageReview(AskWingAIState state) async {
+    if (!_canSubmitQuestion(state)) return;
+    final hasConsent = await AIConsentDialog.hasConsented();
+    if (!hasConsent && mounted) {
+      final granted = await AIConsentDialog.showConsentDialog(context);
+      if (!granted) return;
+    }
+    if (!mounted) return;
+
+    final result = await MessageReviewSheet.show(
+      context,
+      isServiceTeamMember: _currentUser?.isServiceTeamMember ?? false,
+      isGeneralMarried: _currentUser?.isGeneralMarried ?? false,
+      isInHouseMarried: _currentUser?.isInHouseMarried ?? false,
+    );
+    if (result == null || !mounted) return;
+
+    setState(() {
+      _showDashboard = false;
+      _matchedSermons = [];
+    });
+
+    context.read<AskWingAICubit>().submitQuestion(
+          result.prompt,
+          responseStyle: result.responseStyle,
+        );
   }
 
   void _scrollToBottom() {

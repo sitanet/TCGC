@@ -12,6 +12,8 @@ class WelcomeMessage extends StatelessWidget {
   final String? lastQuestion;
   final int messageCount;
   final VoidCallback? onContinuePreviousChat;
+  final VoidCallback? onPrepareSermonTap;
+  final VoidCallback? onMessageReviewTap;
 
   const WelcomeMessage({
     super.key,
@@ -23,6 +25,8 @@ class WelcomeMessage extends StatelessWidget {
     this.lastQuestion,
     this.messageCount = 0,
     this.onContinuePreviousChat,
+    this.onPrepareSermonTap,
+    this.onMessageReviewTap,
   });
 
   @override
@@ -144,7 +148,13 @@ class WelcomeMessage extends StatelessWidget {
               // ── Option to Continue Previous Question ──
               if (hasPreviousChat) ...[
                 _buildContinuePreviousCard(isDark),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
+              ],
+
+              // ── Compact 2-Column Tool Row: Prepare Message & Message Review ──
+              if (onPrepareSermonTap != null || onMessageReviewTap != null) ...[
+                _buildAiToolsRow(isDark),
+                const SizedBox(height: 12),
               ],
 
               // ── Clean Suggestion Grid (2x2) ──
@@ -275,6 +285,118 @@ class WelcomeMessage extends StatelessWidget {
                     ),
                     SizedBox(width: 2),
                     Icon(Icons.arrow_forward_rounded, size: 11, color: Colors.white),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAiToolsRow(bool isDark) {
+    return Row(
+      children: [
+        if (onPrepareSermonTap != null)
+          Expanded(
+            child: _CompactToolCard(
+              icon: Icons.edit_note_rounded,
+              accentColor: AppColors.primaryGold,
+              title: 'Prepare Message',
+              subtitle: 'Sermon & study prep',
+              isDark: isDark,
+              onTap: onPrepareSermonTap!,
+            ),
+          ),
+        if (onPrepareSermonTap != null && onMessageReviewTap != null)
+          const SizedBox(width: 10),
+        if (onMessageReviewTap != null)
+          Expanded(
+            child: _CompactToolCard(
+              icon: Icons.auto_stories_rounded,
+              accentColor: const Color(0xFF3B82F6),
+              title: 'Message Review',
+              subtitle: 'Break down transcripts',
+              isDark: isDark,
+              onTap: onMessageReviewTap!,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _CompactToolCard extends StatelessWidget {
+  final IconData icon;
+  final Color accentColor;
+  final String title;
+  final String subtitle;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _CompactToolCard({
+    required this.icon,
+    required this.accentColor,
+    required this.title,
+    required this.subtitle,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E222A) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: accentColor.withValues(alpha: isDark ? 0.35 : 0.28),
+              width: 0.9,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(icon, color: accentColor, size: 18),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                    ),
                   ],
                 ),
               ),
