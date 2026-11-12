@@ -8,15 +8,41 @@ class ImageCacheService {
   factory ImageCacheService() => _instance;
   ImageCacheService._internal();
 
-  bool _initialized = false;
+  final Set<String> _warmedUrls = <String>{};
 
   Future<void> preCacheImages({
     required List<MessageCategory> categories,
     required List<Sermon> sermons,
   }) async {
-    // Disabled to prevent ANR - images will load on demand
-    debugPrint('ImageCacheService: Pre-caching disabled to prevent ANR');
+    // Disabled bulk sermon pre-caching to prevent ANR
     return;
+  }
+
+  /// Safely pre-warms a bounded list of image URLs (e.g. minister portraits)
+  /// into disk cache in small batches so UI rendering stays smooth.
+  Future<void> preCacheUrlsThrottled(
+    List<String> urls, {
+    int batchSize = 3,
+  }) async {
+    final pending = urls
+        .where((u) => u.startsWith('http') && !_warmedUrls.contains(u))
+        .toList();
+    if (pending.isEmpty) return;
+
+    for (var i = 0; i < pending.length; i += batchSize) {
+      final batch = pending.skip(i).take(batchSize).toList();
+      await Future.wait(
+        batch.map((url) async {
+          _warmedUrls.add(url);
+          try {
+            await CustomImageCacheManager.instance.getSingleFile(url);
+          } catch (e) {
+            _warmedUrls.remove(url);
+            debugPrint('ImageCacheService: Failed to pre-warm $url: $e');
+          }
+        }),
+      );
+    }
   }
 
   void preCacheUrl(String url) {

@@ -799,8 +799,6 @@ class _MainScreenState extends ConsumerState<MainScreen>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       _saveCurrentTab();
-      // Clear memory cache when app goes to background to prevent OOM
-      ImageCacheService.clearMemoryCache();
     }
   }
 

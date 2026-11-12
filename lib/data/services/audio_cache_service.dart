@@ -49,8 +49,68 @@ class AudioCacheService {
           await legacyCache.delete(recursive: true);
         }
       } catch (_) {}
+
+      // Prune stale temp audio cache files (> 7 days or > 50MB total)
+      _pruneStaleTempAudioCache(tempDir);
     } catch (e) {
       debugPrint('AudioCacheService init error: $e');
+    }
+  }
+
+  /// Removes stale cached audio files from temp cache directories so app
+  /// storage stays bounded even after streaming many sermons.
+  Future<void> _pruneStaleTempAudioCache(Directory tempDir) async {
+    try {
+      const maxBytes = 50 * 1024 * 1024; // 50 MB cap
+      final cutoff = DateTime.now().subtract(const Duration(days: 7));
+      final dirs = [
+        Directory('${tempDir.path}/audio_buffer_cache'),
+        Directory('${tempDir.path}/audio_cache'),
+      ];
+
+      final files = <File>[];
+      int totalBytes = 0;
+
+      for (final dir in dirs) {
+        if (!await dir.exists()) continue;
+        await for (final entity in dir.list(recursive: true, followLinks: false)) {
+          if (entity is File) {
+            try {
+              final stat = await entity.stat();
+              if (stat.modified.isBefore(cutoff)) {
+                await entity.delete();
+              } else {
+                files.add(entity);
+                totalBytes += stat.size;
+              }
+            } catch (_) {}
+          }
+        }
+      }
+
+      if (totalBytes > maxBytes && files.isNotEmpty) {
+        final stats = <File, FileStat>{};
+        for (final f in files) {
+          try {
+            stats[f] = await f.stat();
+          } catch (_) {}
+        }
+        files.sort((a, b) {
+          final ma = stats[a]?.modified ?? DateTime(0);
+          final mb = stats[b]?.modified ?? DateTime(0);
+          return ma.compareTo(mb);
+        });
+        for (final f in files) {
+          if (totalBytes <= maxBytes) break;
+          final size = stats[f]?.size ?? 0;
+          try {
+            await f.delete();
+            totalBytes -= size;
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      debugPrint('AudioCacheService prune error: $e');
     }
   }
 

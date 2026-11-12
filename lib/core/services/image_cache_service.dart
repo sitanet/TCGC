@@ -15,20 +15,20 @@ class ImageCacheService {
     int maxBytes;
     
     if (kIsWeb) {
-      maxImages = 100;
-      maxBytes = 50 * 1024 * 1024; // 50MB for web
+      maxImages = 150;
+      maxBytes = 60 * 1024 * 1024; // 60MB for web
     } else if (Platform.isAndroid) {
-      // Very conservative for Android - many low-end devices have 1-2GB RAM
-      maxImages = 50;
-      maxBytes = 15 * 1024 * 1024; // 15MB for Android (reduced from 30MB)
+      // Balanced limit so decoded minister & sermon images stay in RAM
+      maxImages = 150;
+      maxBytes = 50 * 1024 * 1024; // 50MB for Android
     } else if (Platform.isIOS) {
       // iOS devices generally have better memory management
-      maxImages = 70;
-      maxBytes = 30 * 1024 * 1024; // 30MB for iOS
+      maxImages = 200;
+      maxBytes = 60 * 1024 * 1024; // 60MB for iOS
     } else {
       // Desktop platforms
-      maxImages = 100;
-      maxBytes = 50 * 1024 * 1024; // 50MB for desktop
+      maxImages = 150;
+      maxBytes = 60 * 1024 * 1024; // 60MB for desktop
     }
     
     try {

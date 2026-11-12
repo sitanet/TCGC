@@ -12,10 +12,9 @@ class CustomImageCacheManager {
     _instance ??= CacheManager(
       Config(
         key,
-        // Cache images for 90 days
-        stalePeriod: const Duration(days: 90),
-        // Keep cached images for up to 1 year
-        maxNrOfCacheObjects: 500,
+        // Cache images for 30 days (caps disk bloat while keeping active portraits fast)
+        stalePeriod: const Duration(days: 30),
+        maxNrOfCacheObjects: 150,
         // Repository for local database
         repo: JsonCacheInfoRepository(databaseName: key),
         fileService: HttpFileService(),

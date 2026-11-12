@@ -7,6 +7,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../core/utils/image_cache_manager.dart';
 import '../../../data/services/data_service.dart';
 import '../../../data/services/audio_cache_service.dart';
+import '../../../data/services/image_cache_service.dart';
 import '../../../data/services/played_audio_service.dart';
 import '../../../domain/entities/sermon.dart';
 import '../../../domain/entities/transcript.dart';
@@ -138,6 +139,16 @@ class _AudioPageState extends ConsumerState<AudioPage>
         _staticTranscripts = transcripts;
         _staticSpeakers = speakers;
 
+        // Pre-warm minister portraits in small batches so they appear instantly
+        final speakerPhotoUrls = speakers
+            .map((s) => s.photoUrl)
+            .whereType<String>()
+            .where((u) => u.isNotEmpty)
+            .toList();
+        if (speakerPhotoUrls.isNotEmpty) {
+          ImageCacheService().preCacheUrlsThrottled(speakerPhotoUrls);
+        }
+
         // Pre-buffer in background
         _audioCacheService.preBufferCategory(sermons, count: 3);
       }
@@ -203,6 +214,16 @@ class _AudioPageState extends ConsumerState<AudioPage>
         _staticSermons = sermons;
         _staticTranscripts = transcripts;
         _staticSpeakers = speakers;
+
+        // Pre-warm minister portraits in small batches so they appear instantly
+        final speakerPhotoUrls = speakers
+            .map((s) => s.photoUrl)
+            .whereType<String>()
+            .where((u) => u.isNotEmpty)
+            .toList();
+        if (speakerPhotoUrls.isNotEmpty) {
+          ImageCacheService().preCacheUrlsThrottled(speakerPhotoUrls);
+        }
       }
 
       debugPrint('Background refresh completed - ${transcripts.length} transcripts loaded');
@@ -1615,10 +1636,11 @@ class _AudioPageState extends ConsumerState<AudioPage>
                           height: double.infinity,
                           fit: BoxFit.cover,
                           alignment: Alignment.topCenter,
-                          memCacheWidth: 400,
+                          memCacheWidth: 320,
                           useOldImageOnUrlChange: true,
                           fadeInDuration: Duration.zero,
                           fadeOutDuration: Duration.zero,
+                          placeholder: (_, __) => _buildSpeakerFallbackImage(isDark),
                           errorWidget: (_, __, ___) => _buildSpeakerFallbackImage(isDark),
                         ),
                       )
