@@ -17,6 +17,7 @@ class CommunityPage extends ConsumerStatefulWidget {
 
 class _CommunityPageState extends ConsumerState<CommunityPage> {
   String _searchQuery = '';
+  String _selectedCategory = 'All';
   bool _checkingPolicy = true;
   bool _policyAccepted = false;
   bool _policyChecked = false;
@@ -188,6 +189,41 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                 ),
               ),
             ),
+            // Category filter chips (when rooms have categories)
+            if (_roomCategories(p.rooms).length > 1)
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 44,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    itemCount: _roomCategories(p.rooms).length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (_, idx) {
+                      final cat = _roomCategories(p.rooms)[idx];
+                      final isSelected = _selectedCategory == cat;
+                      return ChoiceChip(
+                        label: Text(
+                          cat,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            color: isSelected
+                                ? Colors.black
+                                : (isDark ? Colors.white70 : Colors.black87),
+                          ),
+                        ),
+                        selected: isSelected,
+                        selectedColor: AppColors.primaryGold,
+                        backgroundColor: isDark ? AppColors.cardDark : const Color(0xFFF2F2F2),
+                        side: BorderSide.none,
+                        visualDensity: VisualDensity.compact,
+                        onSelected: (_) => setState(() => _selectedCategory = cat),
+                      );
+                    },
+                  ),
+                ),
+              ),
             // Rooms list
             p.isLoading && p.rooms.isEmpty
                 ? const SliverFillRemaining(
@@ -236,7 +272,35 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                       )
                     : SliverList(
                         delegate: SliverChildBuilderDelegate(
-                          (ctx, i) => _buildRoomTile(context, isDark, _filteredRooms(p.rooms)[i]),
+                          (ctx, i) {
+                            final rooms = _filteredRooms(p.rooms);
+                            final room = rooms[i];
+                            final catLabel = room.categoryName ?? 'General';
+                            final showCategoryHeader = _selectedCategory == 'All' &&
+                                _roomCategories(p.rooms).length > 1 &&
+                                (i == 0 || (rooms[i - 1].categoryName ?? 'General') != catLabel);
+                            if (!showCategoryHeader) {
+                              return _buildRoomTile(context, isDark, room);
+                            }
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
+                                  child: Text(
+                                    catLabel.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.9,
+                                      color: AppColors.primaryGold.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ),
+                                _buildRoomTile(context, isDark, room),
+                              ],
+                            );
+                          },
                           childCount: _filteredRooms(p.rooms).length,
                         ),
                       ),
@@ -247,13 +311,33 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     );
   }
 
+  List<String> _roomCategories(List<CommunityRoom> rooms) {
+    final hasUncategorized = rooms.any((r) => (r.categoryName ?? '').isEmpty);
+    final seen = <String>{};
+    final ordered = <String>[];
+    for (final r in rooms) {
+      final name = r.categoryName;
+      if (name != null && name.isNotEmpty && seen.add(name)) {
+        ordered.add(name);
+      }
+    }
+    if (ordered.isEmpty) return ['All'];
+    return ['All', ...ordered, if (hasUncategorized) 'General'];
+  }
+
   List<CommunityRoom> _filteredRooms(List<CommunityRoom> rooms) {
-    if (_searchQuery.isEmpty) return rooms;
-    return rooms
-        .where((r) =>
-            r.name.toLowerCase().contains(_searchQuery) ||
-            (r.description ?? '').toLowerCase().contains(_searchQuery))
-        .toList();
+    return rooms.where((r) {
+      if (_selectedCategory != 'All') {
+        final cat = (r.categoryName != null && r.categoryName!.isNotEmpty)
+            ? r.categoryName!
+            : 'General';
+        if (cat != _selectedCategory) return false;
+      }
+      if (_searchQuery.isEmpty) return true;
+      return r.name.toLowerCase().contains(_searchQuery) ||
+          (r.description ?? '').toLowerCase().contains(_searchQuery) ||
+          (r.categoryName ?? '').toLowerCase().contains(_searchQuery);
+    }).toList();
   }
 
   Widget _buildHeroHeader(bool isDark, CommunityProvider p) {

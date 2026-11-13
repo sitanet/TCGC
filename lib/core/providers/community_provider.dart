@@ -29,19 +29,30 @@ class CommunityRoom {
   final String? description;
   final String icon;
   final String roomType;
+  final int? categoryId;
+  final String? categoryName;
+  final int categoryOrder;
   final int? memberCount;
   final ChatMessage? lastMessage;
 
   CommunityRoom({required this.id, required this.name, this.description,
-      required this.icon, this.roomType = 'public', this.memberCount, this.lastMessage});
+      required this.icon, this.roomType = 'public',
+      this.categoryId, this.categoryName, this.categoryOrder = 9999,
+      this.memberCount, this.lastMessage});
 
-  factory CommunityRoom.fromJson(Map<String, dynamic> j) => CommunityRoom(
+  factory CommunityRoom.fromJson(Map<String, dynamic> j) {
+    final cat = j['category'] as Map<String, dynamic>?;
+    return CommunityRoom(
         id: j['id'], name: j['name'] ?? '', description: j['description'],
         icon: j['icon'] ?? 'chat_bubble_outline',
         roomType: j['room_type'] ?? 'public',
+        categoryId: cat?['id'],
+        categoryName: cat?['name'],
+        categoryOrder: cat?['order'] ?? 9999,
         memberCount: j['member_count'],
         lastMessage: j['last_message'] != null
             ? ChatMessage.fromJson(j['last_message']) : null);
+  }
 
   bool get isPublic => roomType == 'public';
 }
