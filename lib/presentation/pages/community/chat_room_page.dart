@@ -758,23 +758,27 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
         children: [
           Row(
             children: [
-              // Play/Pause button
+              // Play/Pause button (host controls playback for everyone)
               GestureDetector(
-                onTap: () {
-                  ref.read(listenTogetherProvider.notifier).togglePlayPause();
-                },
+                onTap: listenState.isHost
+                    ? () => ref.read(listenTogetherProvider.notifier).togglePlayPause()
+                    : null,
                 child: Container(
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: AppColors.primaryGold,
+                    color: listenState.isHost
+                        ? AppColors.primaryGold
+                        : AppColors.primaryGold.withValues(alpha: 0.4),
                     shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryGold.withValues(alpha: 0.3),
-                        blurRadius: 6,
-                      ),
-                    ],
+                    boxShadow: listenState.isHost
+                        ? [
+                            BoxShadow(
+                              color: AppColors.primaryGold.withValues(alpha: 0.3),
+                              blurRadius: 6,
+                            ),
+                          ]
+                        : [],
                   ),
                   child: Icon(
                     listenState.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
@@ -924,12 +928,21 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
               isHost ? 'Open' : 'Join',
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
-            onPressed: () {
-              ref.read(listenTogetherProvider.notifier).joinAsListener(
+            onPressed: () async {
+              await ref.read(listenTogetherProvider.notifier).joinAsListener(
                 roomId: widget.room.id,
                 session: session,
                 myUserId: int.tryParse(me?.id ?? '0') ?? 0,
               );
+              if (!isHost) {
+                final memberName = (me?.fullName ?? '').trim().isNotEmpty
+                    ? me!.fullName.trim()
+                    : 'A member';
+                await ref.read(communityChangeNotifierProvider).sendMessage(
+                  widget.room.id,
+                  '🎧 $memberName joined to listen',
+                );
+              }
             },
           ),
         ],
@@ -1098,6 +1111,31 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
 
   Widget _buildMessageBubble(BuildContext context, bool isDark, ChatMessage msg,
       bool isMe, bool showAvatar, String? myId) {
+    if (!msg.isDeleted &&
+        msg.text.startsWith('🎧 ') &&
+        msg.text.endsWith(' joined to listen')) {
+      return Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.16 : 0.12),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.primaryGold.withValues(alpha: 0.35),
+            ),
+          ),
+          child: Text(
+            msg.text,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppColors.primaryGold : const Color(0xFF7A5610),
+            ),
+          ),
+        ),
+      );
+    }
     return Dismissible(
       key: ValueKey('msg_${msg.id}'),
       direction: msg.isDeleted ? DismissDirection.none : DismissDirection.startToEnd,
@@ -1219,13 +1257,28 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  msg.replyToSender ?? 'Member',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: isMe ? Colors.white : AppColors.primaryGold,
-                                  ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.reply_rounded,
+                                      size: 13,
+                                      color: isMe ? Colors.white : AppColors.primaryGold,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        msg.replyToSender ?? 'Member',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: isMe ? Colors.white : AppColors.primaryGold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 1),
                                 Text(

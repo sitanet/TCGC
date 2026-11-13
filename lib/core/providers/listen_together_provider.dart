@@ -27,6 +27,7 @@ class ListenTogetherNotifier extends ChangeNotifier {
   DateTime? _lastLocalAction;
   DateTime? _lastSeekTime;
   bool _isSyncing = false;
+  bool _isPushing = false;
   static const _localActionCooldown = Duration(seconds: 2);
   static const _seekCooldown = Duration(seconds: 6);
 
@@ -51,8 +52,8 @@ class ListenTogetherNotifier extends ChangeNotifier {
     _posSub = _player.positionStream.listen((_) => notifyListeners());
     _durSub = _player.durationStream.listen((_) => notifyListeners());
     _playSub = _player.playingStream.listen((playing) {
-      if (_isHost && _isJoined) {
-        _pushState();
+      if (_isHost && _isJoined && !_isPushing) {
+        _pushState(isPlayingOverride: playing);
       }
       notifyListeners();
     });
@@ -169,7 +170,8 @@ class ListenTogetherNotifier extends ChangeNotifier {
       if (_isHost) {
         _syncTimer = Timer.periodic(const Duration(seconds: 2), (_) => _pushState());
       } else {
-        _syncTimer = Timer.periodic(const Duration(seconds: 2), (_) => _pollAndSync());
+        // Poll sub-second so host pause/play propagates to listeners right away
+        _syncTimer = Timer.periodic(const Duration(milliseconds: 800), (_) => _pollAndSync());
       }
 
       _isLoading = false;
@@ -182,8 +184,11 @@ class ListenTogetherNotifier extends ChangeNotifier {
     }
   }
 
-  Future<void> _pushState() async {
+  Future<void> _pushState({bool? isPlayingOverride, bool force = false}) async {
     if (!_isJoined || _session == null || _currentRoomId == null || !_isHost) return;
+    if (_isPushing && !force) return;
+    _isPushing = true;
+    final playing = isPlayingOverride ?? _player.playing;
     final pos = _player.position.inMilliseconds / 1000.0;
     try {
       await _api.post(ApiConstants.communityListenSession(_currentRoomId!), {
@@ -191,11 +196,27 @@ class ListenTogetherNotifier extends ChangeNotifier {
         'resource_id': _session!.resourceId,
         'resource_title': _session!.resourceTitle,
         'audio_url': _session!.audioUrl,
-        'is_playing': _player.playing,
+        'is_playing': playing,
         'position_seconds': pos,
       });
+      _session = ListenSession(
+        id: _session!.id,
+        roomId: _session!.roomId,
+        hostId: _session!.hostId,
+        hostName: _session!.hostName,
+        resourceType: _session!.resourceType,
+        resourceId: _session!.resourceId,
+        resourceTitle: _session!.resourceTitle,
+        audioUrl: _session!.audioUrl,
+        isPlaying: playing,
+        positionSeconds: pos,
+        updatedAt: DateTime.now().toUtc(),
+        isActive: _session!.isActive,
+      );
     } catch (e) {
       debugPrint('_pushState error: $e');
+    } finally {
+      _isPushing = false;
     }
   }
 
@@ -282,15 +303,19 @@ class ListenTogetherNotifier extends ChangeNotifier {
   }
 
   Future<void> togglePlayPause() async {
+    // Only the host controls play/pause for the room
+    if (!_isHost) return;
     _lastLocalAction = DateTime.now();
-    if (_player.playing) {
-      await _player.pause();
-    } else {
+    final willPlay = !_player.playing;
+    if (willPlay) {
       await _player.play();
+    } else {
+      await _player.pause();
     }
-    if (_isHost) {
-      await _pushState();
-    }
+    // Restart periodic timer so an in-flight/imminent tick doesn't overwrite this state
+    _syncTimer?.cancel();
+    _syncTimer = Timer.periodic(const Duration(seconds: 2), (_) => _pushState());
+    await _pushState(isPlayingOverride: willPlay, force: true);
     notifyListeners();
   }
 
