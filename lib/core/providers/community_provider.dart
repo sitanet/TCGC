@@ -46,6 +46,20 @@ class CommunityRoom {
   bool get isPublic => roomType == 'public';
 }
 
+class MessageReaction {
+  final String emoji;
+  final int count;
+  final bool reacted;
+
+  MessageReaction({required this.emoji, required this.count, this.reacted = false});
+
+  factory MessageReaction.fromJson(Map<String, dynamic> j) => MessageReaction(
+        emoji: j['emoji'] ?? '',
+        count: j['count'] ?? 1,
+        reacted: j['reacted'] ?? false,
+      );
+}
+
 class ChatMessage {
   final int id;
   final String text;
@@ -62,6 +76,10 @@ class ChatMessage {
   final bool isDelivered;
   final bool isRead;
   final String? resourceAudioUrl; // resolved streamable URL for listen-together
+  final int? replyToId;
+  final String? replyToSender;
+  final String? replyToText;
+  final List<MessageReaction> reactions;
   final DateTime createdAt;
 
   ChatMessage({required this.id, required this.text, required this.isDeleted,
@@ -70,10 +88,14 @@ class ChatMessage {
       this.fileUrl, this.fileType, this.fileName,
       this.isDelivered = false, this.isRead = false,
       this.resourceAudioUrl,
+      this.replyToId, this.replyToSender, this.replyToText,
+      this.reactions = const [],
       required this.createdAt});
 
   factory ChatMessage.fromJson(Map<String, dynamic> j) {
     final sender = j['sender'] ?? {};
+    final reply = j['reply_to'] as Map<String, dynamic>?;
+    final rawReactions = j['reactions'] as List? ?? [];
     return ChatMessage(
       id: j['id'], text: j['text'] ?? '', isDeleted: j['is_deleted'] ?? false,
       senderId: sender['id'] ?? 0, senderName: sender['name'] ?? '',
@@ -84,6 +106,12 @@ class ChatMessage {
       isDelivered: j['is_delivered'] ?? false,
       isRead: j['is_read'] ?? false,
       resourceAudioUrl: j['resource_audio_url'],
+      replyToId: reply?['id'],
+      replyToSender: reply?['sender_name'],
+      replyToText: reply?['text'],
+      reactions: rawReactions
+          .map((e) => MessageReaction.fromJson(e as Map<String, dynamic>))
+          .toList(),
       createdAt: DateTime.parse(j['created_at']));
   }
 
@@ -253,7 +281,7 @@ class CommunityProvider extends ChangeNotifier {
 
   void stopPolling() => _pollTimer?.cancel();
 
-  Future<bool> sendFileMessage(int roomId, File file, String fileType, {String? text}) async {
+  Future<bool> sendFileMessage(int roomId, File file, String fileType, {String? text, int? replyToId}) async {
     _isSending = true;
     _error = null;
     notifyListeners();
@@ -261,6 +289,7 @@ class CommunityProvider extends ChangeNotifier {
       final fields = <String, String>{
         'text': text ?? '',
         'file_type': fileType,
+        if (replyToId != null) 'reply_to_id': replyToId.toString(),
       };
       final res = await _api.postMultipart(
         ApiConstants.communityMessageUpload(roomId),
@@ -283,7 +312,7 @@ class CommunityProvider extends ChangeNotifier {
   }
 
   Future<bool> sendMessage(int roomId, String text,
-      {String? resourceType, int? resourceId, String? resourceTitle}) async {
+      {String? resourceType, int? resourceId, String? resourceTitle, int? replyToId}) async {
     _isSending = true;
     _error = null;
     notifyListeners();
@@ -292,6 +321,7 @@ class CommunityProvider extends ChangeNotifier {
       if (resourceType != null) body['resource_type'] = resourceType;
       if (resourceId != null) body['resource_id'] = resourceId;
       if (resourceTitle != null) body['resource_title'] = resourceTitle;
+      if (replyToId != null) body['reply_to_id'] = replyToId;
 
       final res = await _api.post(ApiConstants.communityMessages(roomId), body);
       if (res.isSuccess) {
@@ -307,6 +337,50 @@ class CommunityProvider extends ChangeNotifier {
     _isSending = false;
     notifyListeners();
     return false;
+  }
+
+  Future<void> toggleReaction(int messageId, String emoji) async {
+    try {
+      final res = await _api.post(
+        ApiConstants.communityReactMessage(messageId),
+        {'emoji': emoji},
+      );
+      if (res.isSuccess) {
+        final raw = res.data['reactions'] as List? ?? [];
+        final updated = raw
+            .map((e) => MessageReaction.fromJson(e as Map<String, dynamic>))
+            .toList();
+        final idx = _messages.indexWhere((m) => m.id == messageId);
+        if (idx != -1) {
+          final old = _messages[idx];
+          _messages[idx] = ChatMessage(
+            id: old.id,
+            text: old.text,
+            isDeleted: old.isDeleted,
+            senderId: old.senderId,
+            senderName: old.senderName,
+            senderPhoto: old.senderPhoto,
+            resourceType: old.resourceType,
+            resourceId: old.resourceId,
+            resourceTitle: old.resourceTitle,
+            fileUrl: old.fileUrl,
+            fileType: old.fileType,
+            fileName: old.fileName,
+            isDelivered: old.isDelivered,
+            isRead: old.isRead,
+            resourceAudioUrl: old.resourceAudioUrl,
+            replyToId: old.replyToId,
+            replyToSender: old.replyToSender,
+            replyToText: old.replyToText,
+            reactions: updated,
+            createdAt: old.createdAt,
+          );
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('toggleReaction: $e');
+    }
   }
 
   Future<void> deleteMessage(int messageId) async {

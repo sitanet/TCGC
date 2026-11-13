@@ -45,6 +45,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   bool _isSending = false;
   ListenSession? _activeSession;
   Timer? _sessionPollTimer;
+  ChatMessage? _replyingTo;
 
   // Voice note recording & playback
   final AudioRecorder _recorder = AudioRecorder();
@@ -318,11 +319,15 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     debugPrint('File type: $fileType');
     debugPrint('Room ID: ${widget.room.id}');
     
-    setState(() => _isSending = true);
+    final replyToId = _replyingTo?.id;
+    setState(() {
+      _isSending = true;
+      _replyingTo = null;
+    });
     
     try {
       final p = ref.read(communityChangeNotifierProvider);
-      final success = await p.sendFileMessage(widget.room.id, file, fileType);
+      final success = await p.sendFileMessage(widget.room.id, file, fileType, replyToId: replyToId);
       
       debugPrint('Send file result: $success');
       
@@ -355,11 +360,15 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     final text = _textController.text.trim();
     if (text.isEmpty || _isSending) return;
 
-    setState(() => _isSending = true);
+    final replyToId = _replyingTo?.id;
+    setState(() {
+      _isSending = true;
+      _replyingTo = null;
+    });
     _textController.clear();
 
     final p = ref.read(communityChangeNotifierProvider);
-    await p.sendMessage(widget.room.id, text);
+    await p.sendMessage(widget.room.id, text, replyToId: replyToId);
 
     setState(() => _isSending = false);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -465,12 +474,29 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   Future<void> _toggleVoiceNote(ChatMessage msg) async {
     if (msg.fileUrl == null || msg.fileUrl!.isEmpty) return;
     try {
-      if (_playingVoiceMsgId == msg.id) {
-        if (_voicePlaying) {
-          await _voicePlayer.pause();
-        } else {
-          await _voicePlayer.play();
+      final isAudioMessagePlaying = ref.read(listenTogetherProvider).isPlaying ||
+          ref.read(audioPlayerChangeNotifierProvider).isPlaying;
+
+      if (_playingVoiceMsgId == msg.id && _voicePlaying) {
+        await _voicePlayer.pause();
+        return;
+      }
+
+      if (isAudioMessagePlaying) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Stop the playing audio message first before playing a voice note.'),
+              backgroundColor: Colors.orange[800],
+              duration: const Duration(seconds: 3),
+            ),
+          );
         }
+        return;
+      }
+
+      if (_playingVoiceMsgId == msg.id) {
+        await _voicePlayer.play();
         return;
       }
       setState(() {
@@ -496,6 +522,18 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     final p = ref.watch(communityChangeNotifierProvider);
     final me = ref.read(authChangeNotifierProvider).user;
     final listenState = ref.watch(listenTogetherProvider);
+
+    // Audio message has priority over voice notes: pause any playing voice note if audio message starts
+    ref.listen<ListenTogetherNotifier>(listenTogetherProvider, (_, next) {
+      if (next.isPlaying && _voicePlaying) {
+        _voicePlayer.pause();
+      }
+    });
+    ref.listen(audioPlayerChangeNotifierProvider, (_, next) {
+      if (next.isPlaying && _voicePlaying) {
+        _voicePlayer.pause();
+      }
+    });
 
     // Scroll to bottom when new messages arrive
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -644,6 +682,8 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                         },
                       ),
           ),
+          // Reply preview bar
+          if (_replyingTo != null) _buildReplyPreviewBar(isDark),
           // Input bar
           _buildInputBar(isDark),
         ],
@@ -986,13 +1026,98 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     );
   }
 
+  String _messagePreviewText(ChatMessage msg) {
+    if (msg.isDeleted) return '🚫 Message deleted';
+    if (msg.fileType == 'voice') return '🎤 Voice note';
+    if (msg.fileType == 'image') return '📷 Photo';
+    if (msg.hasFile) return '📎 ${msg.fileName ?? "File"}';
+    if (msg.hasResource) return '🎧 ${msg.resourceTitle ?? "Shared resource"}';
+    return msg.text;
+  }
+
+  Widget _buildReplyPreviewBar(bool isDark) {
+    final target = _replyingTo;
+    if (target == null) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.white,
+        border: Border(
+          top: BorderSide(color: AppColors.primaryGold.withValues(alpha: 0.18)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.primaryGold,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Replying to ${target.senderName}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryGold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _messagePreviewText(target),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? AppColors.textSecondaryDark : Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.close_rounded,
+              size: 18,
+              color: isDark ? AppColors.textSecondaryDark : Colors.black54,
+            ),
+            onPressed: () => setState(() => _replyingTo = null),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMessageBubble(BuildContext context, bool isDark, ChatMessage msg,
       bool isMe, bool showAvatar, String? myId) {
-    return GestureDetector(
-      onLongPress: isMe && !msg.isDeleted
-          ? () => _showDeleteDialog(context, msg)
-          : null,
-      child: Padding(
+    return Dismissible(
+      key: ValueKey('msg_${msg.id}'),
+      direction: msg.isDeleted ? DismissDirection.none : DismissDirection.startToEnd,
+      confirmDismiss: (_) async {
+        setState(() => _replyingTo = msg);
+        return false;
+      },
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 16),
+        child: const Icon(Icons.reply_rounded, color: AppColors.primaryGold, size: 22),
+      ),
+      child: GestureDetector(
+        onDoubleTap: !msg.isDeleted
+            ? () => ref.read(communityChangeNotifierProvider).toggleReaction(msg.id, '❤️')
+            : null,
+        onLongPress: !msg.isDeleted
+            ? () => _showMessageOptions(context, msg, isMe)
+            : null,
+        child: Padding(
         padding: EdgeInsets.only(
           bottom: 4,
           left: isMe ? 48 : 0,
@@ -1070,21 +1195,122 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                         ),
                       ],
                     ),
-                    child: msg.hasResource
-                        ? _buildResourceCard(isDark, msg, isMe)
-                        : msg.hasFile
-                            ? _buildFileCard(isDark, msg, isMe)
-                            : Text(
-                                msg.text,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: isMe
-                                      ? Colors.white
-                                      : (isDark ? Colors.white : Colors.black87),
-                                  fontStyle: msg.isDeleted ? FontStyle.italic : FontStyle.normal,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (msg.replyToId != null) ...[
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isMe
+                                  ? Colors.black.withValues(alpha: 0.14)
+                                  : AppColors.primaryGold.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border(
+                                left: BorderSide(
+                                  color: isMe ? Colors.white : AppColors.primaryGold,
+                                  width: 3,
                                 ),
                               ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  msg.replyToSender ?? 'Member',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isMe ? Colors.white : AppColors.primaryGold,
+                                  ),
+                                ),
+                                const SizedBox(height: 1),
+                                Text(
+                                  msg.replyToText ?? '',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isMe
+                                        ? Colors.white.withValues(alpha: 0.85)
+                                        : (isDark ? Colors.white70 : Colors.black54),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        msg.hasResource
+                            ? _buildResourceCard(isDark, msg, isMe)
+                            : msg.hasFile
+                                ? _buildFileCard(isDark, msg, isMe)
+                                : Text(
+                                    msg.text,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: isMe
+                                          ? Colors.white
+                                          : (isDark ? Colors.white : Colors.black87),
+                                      fontStyle: msg.isDeleted ? FontStyle.italic : FontStyle.normal,
+                                    ),
+                                  ),
+                      ],
+                    ),
                   ),
+                  if (msg.reactions.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        alignment: isMe ? WrapAlignment.end : WrapAlignment.start,
+                        children: msg.reactions.map((r) {
+                          return GestureDetector(
+                            onTap: () => ref
+                                .read(communityChangeNotifierProvider)
+                                .toggleReaction(msg.id, r.emoji),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: r.reacted
+                                    ? AppColors.primaryGold.withValues(alpha: 0.22)
+                                    : (isDark ? AppColors.cardDark : Colors.white),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: r.reacted
+                                      ? AppColors.primaryGold
+                                      : (isDark
+                                          ? Colors.white.withValues(alpha: 0.12)
+                                          : Colors.black.withValues(alpha: 0.08)),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(r.emoji, style: const TextStyle(fontSize: 13)),
+                                  if (r.count > 1) ...[
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${r.count}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: r.reacted
+                                            ? AppColors.primaryGold
+                                            : (isDark ? Colors.white70 : Colors.black54),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
                   Padding(
                     padding: const EdgeInsets.only(top: 3, left: 4, right: 4),
                     child: Row(
@@ -1104,10 +1330,11 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                       ],
                     ),
                   ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1890,7 +2117,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     );
   }
 
-  void _showDeleteDialog(BuildContext context, ChatMessage msg) {
+  void _showMessageOptions(BuildContext context, ChatMessage msg, bool isMe) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
@@ -1908,15 +2135,57 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                 color: Colors.grey[400], borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: ['👍', '❤️', '🙏', '🔥', '😂', '👏'].map((emoji) {
+                  final isReacted = msg.reactions.any((r) => r.emoji == emoji && r.reacted);
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                      ref.read(communityChangeNotifierProvider).toggleReaction(msg.id, emoji);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isReacted
+                            ? AppColors.primaryGold.withValues(alpha: 0.22)
+                            : (isDark ? AppColors.backgroundDark : const Color(0xFFF5F5F5)),
+                        shape: BoxShape.circle,
+                        border: isReacted
+                            ? Border.all(color: AppColors.primaryGold, width: 1.5)
+                            : null,
+                      ),
+                      child: Text(emoji, style: const TextStyle(fontSize: 22)),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Divider(height: 1),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text('Delete message',
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
+              leading: const Icon(Icons.reply_rounded, color: AppColors.primaryGold),
+              title: Text('Reply',
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.w600)),
               onTap: () {
                 Navigator.pop(context);
-                ref.read(communityChangeNotifierProvider).deleteMessage(msg.id);
+                setState(() => _replyingTo = msg);
               },
             ),
+            if (isMe)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Delete message',
+                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
+                onTap: () {
+                  Navigator.pop(context);
+                  ref.read(communityChangeNotifierProvider).deleteMessage(msg.id);
+                },
+              ),
             ListTile(
               leading: Icon(Icons.close,
                   color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),

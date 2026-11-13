@@ -125,6 +125,8 @@ class ApiConstants {
       '/community/rooms/$roomId/messages/';
   static String communityDeleteMessage(int messageId) =>
       '/community/messages/$messageId/delete/';
+  static String communityReactMessage(int messageId) =>
+      '/community/messages/$messageId/react/';
   static String communityDm(int userId) => '/community/dm/$userId/';
   static String communityMessageUpload(int roomId) =>
       '/community/rooms/$roomId/messages/upload/';

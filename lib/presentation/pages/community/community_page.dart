@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/providers/community_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
@@ -16,16 +17,95 @@ class CommunityPage extends ConsumerStatefulWidget {
 
 class _CommunityPageState extends ConsumerState<CommunityPage> {
   String _searchQuery = '';
+  bool _checkingPolicy = true;
+  bool _policyAccepted = false;
+  bool _policyChecked = false;
+
+  String get _policyKey {
+    final userId = ref.read(authChangeNotifierProvider).user?.id ?? 'default';
+    return 'community_policy_accepted_v1_$userId';
+  }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final p = ref.read(communityChangeNotifierProvider);
-      p.fetchRooms();
-      p.fetchAllMembers();
-      p.startHeartbeat();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initCommunity());
+  }
+
+  Future<void> _initCommunity() async {
+    final prefs = await SharedPreferences.getInstance();
+    final accepted = prefs.getBool(_policyKey) ?? false;
+    if (!mounted) return;
+    setState(() {
+      _policyAccepted = accepted;
+      _checkingPolicy = false;
     });
+    if (accepted) {
+      _loadCommunityData();
+    }
+  }
+
+  void _loadCommunityData() {
+    final p = ref.read(communityChangeNotifierProvider);
+    p.fetchRooms();
+    p.fetchAllMembers();
+    p.startHeartbeat();
+  }
+
+  Future<void> _acceptPolicy() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_policyKey, true);
+    if (!mounted) return;
+    setState(() => _policyAccepted = true);
+    _loadCommunityData();
+  }
+
+  void _showPolicyDialog(bool isDark) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.verified_user_rounded, color: AppColors.primaryGold),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Community & Data Policy',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _policyBullet(isDark, '1. Respectful Fellowship',
+                  'Treat every member with Christian love and respect. Harassment, hate speech, spam, or offensive content is strictly prohibited.'),
+              _policyBullet(isDark, '2. Listen Together Etiquette',
+                  'Only one member may host a sermon per room at a time. Keep chat contributions uplifting and relevant.'),
+              _policyBullet(isDark, '3. Data Protection & Privacy (NDPR)',
+                  'Your name, profile photo, and online status are visible to authenticated church members. Messages, voice notes, and shared files are stored securely solely to provide community fellowship. Never share passwords, PINs, BVN/NIN, or bank details in chat.'),
+              _policyBullet(isDark, '4. Moderation & Control',
+                  'You can delete your own messages at any time. Admins may remove content or revoke access if these guidelines are violated.'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close', style: TextStyle(color: AppColors.primaryGold, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -45,10 +125,22 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
         title: 'Community',
         showBackButton: false,
         lightBackground: !isDark,
+        actions: [
+          if (_policyAccepted)
+            IconButton(
+              tooltip: 'Community & Data Policy',
+              icon: const Icon(Icons.verified_user_outlined, color: AppColors.primaryGold),
+              onPressed: () => _showPolicyDialog(isDark),
+            ),
+        ],
       ),
-      body: !p.hasAccess
-          ? _buildNoAccessScreen(isDark)
-          : RefreshIndicator(
+      body: _checkingPolicy
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGold))
+          : !_policyAccepted
+              ? _buildPolicyGate(isDark)
+              : !p.hasAccess
+                  ? _buildNoAccessScreen(isDark)
+                  : RefreshIndicator(
         color: AppColors.primaryGold,
         onRefresh: () async {
           await p.fetchRooms();
@@ -304,6 +396,179 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _policyBullet(bool isDark, String title, String body) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            body,
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.45,
+              color: isDark ? AppColors.textSecondaryDark : Colors.black54,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPolicyGate(bool isDark) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [const Color(0xFF2B2415), const Color(0xFF1C1912)]
+                    : [const Color(0xFFFFF8E7), const Color(0xFFFDF2D6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.4)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.verified_user_rounded,
+                      color: AppColors.primaryGold, size: 30),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Community Guidelines & Data Protection',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Welcome! Please review how our church community works and how your data is protected before joining.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: isDark ? AppColors.textSecondaryDark : Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.16)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _policyBullet(
+                  isDark,
+                  '1. Respectful Christian Fellowship',
+                  'Speak with grace, love, and respect. Harassment, hate speech, spam, or inappropriate content is strictly prohibited.',
+                ),
+                _policyBullet(
+                  isDark,
+                  '2. Listen Together & Room Etiquette',
+                  'Any member can join a group, host a sermon when no host is active, and contribute via text, voice notes, or reactions.',
+                ),
+                _policyBullet(
+                  isDark,
+                  '3. Data Protection & Privacy (NDPR)',
+                  'Your name, profile photo, and online status are visible to authenticated TCGC members. Messages, voice notes, and shared files are stored securely solely to deliver community fellowship. Never share passwords, PINs, BVN/NIN, or bank details in chat.',
+                ),
+                _policyBullet(
+                  isDark,
+                  '4. Your Control & Safety',
+                  'You can delete your own messages anytime. Admins may remove content or restrict access if these guidelines are violated.',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          InkWell(
+            onTap: () => setState(() => _policyChecked = !_policyChecked),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: _policyChecked,
+                    activeColor: AppColors.primaryGold,
+                    onChanged: (v) => setState(() => _policyChecked = v ?? false),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'I have read and agree to the Community Guidelines & Data Protection Policy.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _policyChecked ? _acceptPolicy : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGold,
+                disabledBackgroundColor: AppColors.primaryGold.withValues(alpha: 0.35),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Accept & Enter Community',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
