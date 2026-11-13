@@ -24,12 +24,12 @@ class BottomNavBar extends StatelessWidget {
     // Responsive sizing: on phones keep compact floating pill; on tablets scale up gracefully
     final barWidth = Responsive.value(
       context,
-      mobile: (screenWidth - 32).clamp(320.0, 390.0),
-      tablet: 520.0,
-      desktop: 580.0,
+      mobile: (screenWidth - 20).clamp(320.0, 420.0),
+      tablet: 560.0,
+      desktop: 620.0,
     );
     final barHeight = Responsive.value(context, mobile: 68.0, tablet: 76.0);
-    final iconSize = Responsive.value(context, mobile: 28.0, tablet: 32.0);
+    final iconSize = Responsive.value(context, mobile: showWallet ? 24.0 : 26.0, tablet: 30.0);
 
     return Center(
       child: Container(
@@ -55,32 +55,35 @@ class BottomNavBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: showWallet
               ? [
-                  _buildNavItem(0, Icons.home_outlined, Icons.home, iconSize),
-                  _buildNavItem(1, Icons.music_note_outlined, Icons.music_note, iconSize),
-                  _buildNavItem(2, Icons.play_circle_outline, Icons.play_circle, iconSize),
-                  _buildNavItem(3, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, iconSize),
-                  _buildNavItem(4, Icons.groups_outlined, Icons.groups, iconSize),
+                  _buildNavItem(0, Icons.home_outlined, Icons.home, iconSize, showWallet),
+                  _buildNavItem(1, Icons.music_note_outlined, Icons.music_note, iconSize, showWallet),
+                  _buildNavItem(2, Icons.play_circle_outline, Icons.play_circle, iconSize, showWallet),
+                  _buildNavItem(3, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, iconSize, showWallet),
+                  _buildNavItem(4, Icons.groups_outlined, Icons.groups, iconSize, showWallet),
+                  _buildNavItem(5, Icons.forum_outlined, Icons.forum, iconSize, showWallet),
                 ]
               : [
-                  _buildNavItem(0, Icons.home_outlined, Icons.home, iconSize),
-                  _buildNavItem(1, Icons.music_note_outlined, Icons.music_note, iconSize),
-                  _buildNavItem(2, Icons.play_circle_outline, Icons.play_circle, iconSize),
-                  _buildNavItem(3, Icons.groups_outlined, Icons.groups, iconSize),
+                  _buildNavItem(0, Icons.home_outlined, Icons.home, iconSize, showWallet),
+                  _buildNavItem(1, Icons.music_note_outlined, Icons.music_note, iconSize, showWallet),
+                  _buildNavItem(2, Icons.play_circle_outline, Icons.play_circle, iconSize, showWallet),
+                  _buildNavItem(3, Icons.groups_outlined, Icons.groups, iconSize, showWallet),
+                  _buildNavItem(4, Icons.forum_outlined, Icons.forum, iconSize, showWallet),
                 ],
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, IconData outlinedIcon, IconData filledIcon, double iconSize) {
+  Widget _buildNavItem(int index, IconData outlinedIcon, IconData filledIcon, double iconSize, bool showWallet) {
     final isSelected = currentIndex == index;
+    final itemPadding = showWallet ? 16.0 : 20.0;
     
     return GestureDetector(
       onTap: () => onTap(index),
       behavior: HitTestBehavior.opaque,
       child: Container(
-        width: iconSize + 22,
-        height: iconSize + 22,
+        width: iconSize + itemPadding,
+        height: iconSize + itemPadding,
         decoration: isSelected
             ? BoxDecoration(
                 color: AppColors.primaryGold.withValues(alpha: 0.15),

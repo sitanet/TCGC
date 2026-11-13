@@ -26,6 +26,7 @@ import 'presentation/pages/audio/audio_page.dart';
 import 'presentation/pages/livestream/livestream_page.dart';
 import 'presentation/pages/wallet/wallet_page.dart';
 import 'presentation/pages/teens/teens_page.dart';
+import 'presentation/pages/community/community_page.dart';
 import 'presentation/pages/get_started/get_started_page.dart';
 import 'presentation/pages/auth/sign_in_page.dart';
 import 'presentation/pages/auth/sign_up_page.dart';
@@ -512,6 +513,8 @@ class _MainScreenState extends ConsumerState<MainScreen>
           return const LiveStreamPage();
         case 3:
           return const TeensPage();
+        case 4:
+          return const CommunityPage();
         default:
           return const HomePage();
       }
@@ -528,6 +531,8 @@ class _MainScreenState extends ConsumerState<MainScreen>
         return const WalletPage();
       case 4:
         return const TeensPage();
+      case 5:
+        return const CommunityPage();
       default:
         return const HomePage();
     }
@@ -814,7 +819,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
       final prefs = await SharedPreferences.getInstance();
       final lastIndex = prefs.getInt(_lastTabKey) ?? 0;
       final showWallet = !ref.read(appConfigChangeNotifierProvider).config.walletPageDisabled;
-      final maxIndex = showWallet ? 4 : 3;
+      final maxIndex = showWallet ? 5 : 4;
       final safeIndex = (lastIndex >= 0 && lastIndex <= maxIndex) ? lastIndex : 0;
       if (mounted) {
         ref.read(mainTabIndexProvider.notifier).state = safeIndex;
@@ -934,7 +939,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
   Widget build(BuildContext context) {
     final appConfig = ref.watch(appConfigChangeNotifierProvider);
     final showWallet = !appConfig.config.walletPageDisabled;
-    final maxIndex = showWallet ? 4 : 3;
+    final maxIndex = showWallet ? 5 : 4;
     final safeIndex = _currentIndex > maxIndex ? 0 : _currentIndex;
 
     if (_showPromotion && _activePromotions.isNotEmpty) {
