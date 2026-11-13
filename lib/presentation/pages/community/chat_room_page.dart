@@ -85,55 +85,70 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
         decoration: BoxDecoration(
           color: isDark ? AppColors.cardDark : Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40, height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                borderRadius: BorderRadius.circular(2),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _attachOption(
-                  icon: Icons.headphones_rounded,
-                  label: 'Listen Together',
-                  color: AppColors.primaryGold,
-                  onTap: () { Navigator.pop(ctx); _openSermonPickerForListenTogether(); },
-                ),
-                _attachOption(
-                  icon: Icons.photo_library_rounded,
-                  label: 'Gallery',
-                  color: Colors.purple,
-                  onTap: () { Navigator.pop(ctx); _pickImage(ImageSource.gallery); },
-                ),
-                _attachOption(
-                  icon: Icons.camera_alt_rounded,
-                  label: 'Camera',
-                  color: Colors.blue,
-                  onTap: () { Navigator.pop(ctx); _pickImage(ImageSource.camera); },
-                ),
-                _attachOption(
-                  icon: Icons.insert_drive_file_rounded,
-                  label: 'Document',
-                  color: Colors.orange,
-                  onTap: () { Navigator.pop(ctx); _pickDocument(); },
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-          ],
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _attachOption(
+                      icon: Icons.headphones_rounded,
+                      label: 'Listen\nTogether',
+                      color: AppColors.primaryGold,
+                      onTap: () { Navigator.pop(ctx); _openSermonPickerForListenTogether(); },
+                    ),
+                  ),
+                  Expanded(
+                    child: _attachOption(
+                      icon: Icons.photo_library_rounded,
+                      label: 'Gallery',
+                      color: Colors.purple,
+                      onTap: () { Navigator.pop(ctx); _pickImage(ImageSource.gallery); },
+                    ),
+                  ),
+                  Expanded(
+                    child: _attachOption(
+                      icon: Icons.camera_alt_rounded,
+                      label: 'Camera',
+                      color: Colors.blue,
+                      onTap: () { Navigator.pop(ctx); _pickImage(ImageSource.camera); },
+                    ),
+                  ),
+                  Expanded(
+                    child: _attachOption(
+                      icon: Icons.insert_drive_file_rounded,
+                      label: 'Document',
+                      color: Colors.orange,
+                      onTap: () { Navigator.pop(ctx); _pickDocument(); },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -159,10 +174,12 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
             child: Icon(icon, color: color, size: 28),
           ),
           const SizedBox(height: 8),
-          Text(label, style: TextStyle(
-            fontSize: 12,
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-          )),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              )),
         ],
       ),
     );
@@ -1127,187 +1144,253 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   }
 
   Future<void> _openSermonPickerForListenTogether() async {
+    final listenState = ref.read(listenTogetherProvider);
+    final meId = int.tryParse(ref.read(authChangeNotifierProvider).user?.id ?? '');
+    final active = (listenState.isJoined && listenState.currentRoomId == widget.room.id)
+        ? listenState.session
+        : _activeSession;
+
+    if (active != null && active.isActive && active.hostId != meId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${active.hostName} is currently hosting in this room. You can host once they stop.'),
+          backgroundColor: Colors.orange[800],
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dataService = DataService();
+    final sermonsFuture = dataService.getMessages(forceRefresh: true);
+    String searchQuery = '';
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (sheetCtx) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.75,
-          minChildSize: 0.5,
-          maxChildSize: 0.92,
-          builder: (ctx, scrollCtrl) {
-            return Container(
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.cardDark : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(top: 10, bottom: 8),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white24 : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.8,
+              minChildSize: 0.5,
+              maxChildSize: 0.94,
+              builder: (ctx, scrollCtrl) {
+                return Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.cardDark : Colors.white,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                    child: Row(
+                  child: SafeArea(
+                    top: false,
+                    child: Column(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(8),
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(top: 10, bottom: 8),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryGold.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
+                            color: isDark ? Colors.white24 : Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
                           ),
-                          child: const Icon(Icons.headphones_rounded, color: AppColors.primaryGold, size: 20),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                          child: Row(
                             children: [
-                              Text(
-                                'Start Listen Session',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : Colors.black87,
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryGold.withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.headphones_rounded, color: AppColors.primaryGold, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Start Listen Session',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? Colors.white : Colors.black87,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Select a church sermon to listen with the room',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              Text(
-                                'Select a church sermon to listen with the room',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => Navigator.pop(sheetCtx),
                               ),
                             ],
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(sheetCtx),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                          child: TextField(
+                            onChanged: (val) => setSheetState(() => searchQuery = val.trim().toLowerCase()),
+                            style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: 'Search sermons or speakers...',
+                              hintStyle: TextStyle(
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                fontSize: 13,
+                              ),
+                              prefixIcon: const Icon(Icons.search, color: AppColors.primaryGold, size: 20),
+                              filled: true,
+                              fillColor: isDark ? AppColors.backgroundDark : const Color(0xFFF5F5F5),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        Expanded(
+                          child: FutureBuilder<List<Sermon>>(
+                            future: sermonsFuture,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator(color: AppColors.primaryGold));
+                              }
+                              final allSermons = (snapshot.data ?? [])
+                                  .where((s) => s.audioUrl != null && s.audioUrl!.isNotEmpty)
+                                  .toList();
+                              final sermons = searchQuery.isEmpty
+                                  ? allSermons
+                                  : allSermons.where((s) {
+                                      final title = s.title.toLowerCase();
+                                      final speaker = (s.speaker ?? '').toLowerCase();
+                                      final cat = s.categoryName.toLowerCase();
+                                      return title.contains(searchQuery) ||
+                                          speaker.contains(searchQuery) ||
+                                          cat.contains(searchQuery);
+                                    }).toList();
+
+                              if (sermons.isEmpty) {
+                                return Center(
+                                  child: Text(
+                                    searchQuery.isEmpty
+                                        ? 'No sermons available to play'
+                                        : 'No matching sermons found',
+                                    style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                                  ),
+                                );
+                              }
+
+                              return ListView.separated(
+                                controller: scrollCtrl,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                itemCount: sermons.length,
+                                separatorBuilder: (_, __) => Divider(
+                                  height: 1,
+                                  color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                                ),
+                                itemBuilder: (context, idx) {
+                                  final sermon = sermons[idx];
+                                  return ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                                    leading: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        width: 44,
+                                        height: 44,
+                                        color: AppColors.primaryGold.withValues(alpha: 0.15),
+                                        child: const Icon(Icons.music_note, color: AppColors.primaryGold),
+                                      ),
+                                    ),
+                                    title: Text(
+                                      sermon.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? Colors.white : Colors.black87,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      [
+                                        if (sermon.speaker != null && sermon.speaker!.isNotEmpty) sermon.speaker!,
+                                        if (sermon.categoryName.isNotEmpty) sermon.categoryName,
+                                      ].join(' • '),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                      ),
+                                    ),
+                                    trailing: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primaryGold,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: const Text(
+                                        'Host',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    onTap: () async {
+                                      Navigator.pop(sheetCtx);
+                                      final me = ref.read(authChangeNotifierProvider).user;
+
+                                      final ok = await ref.read(listenTogetherProvider.notifier).startAsHost(
+                                        roomId: widget.room.id,
+                                        resourceType: 'audio',
+                                        resourceId: int.tryParse(sermon.id) ?? 0,
+                                        resourceTitle: sermon.title,
+                                        audioUrl: sermon.audioUrl!,
+                                        hostId: int.tryParse(me?.id ?? '0') ?? 0,
+                                        hostName: me?.fullName ?? 'Host',
+                                      );
+
+                                      if (!mounted) return;
+                                      final errMsg = ref.read(listenTogetherProvider).errorMessage;
+                                      ScaffoldMessenger.of(this.context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            ok
+                                                ? 'Hosting "${sermon.title}" live! Room members can now join.'
+                                                : (errMsg ?? 'Could not start hosting.'),
+                                          ),
+                                          backgroundColor: ok ? AppColors.primaryGold : Colors.red,
+                                          duration: const Duration(seconds: 4),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: FutureBuilder<List<Sermon>>(
-                      future: dataService.getMessages(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator(color: AppColors.primaryGold));
-                        }
-                        final sermons = (snapshot.data ?? [])
-                            .where((s) => s.audioUrl != null && s.audioUrl!.isNotEmpty)
-                            .toList();
-
-                        if (sermons.isEmpty) {
-                          return Center(
-                            child: Text(
-                              'No sermons available to play',
-                              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
-                            ),
-                          );
-                        }
-
-                        return ListView.separated(
-                          controller: scrollCtrl,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          itemCount: sermons.length,
-                          separatorBuilder: (_, __) => Divider(
-                            height: 1,
-                            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                          ),
-                          itemBuilder: (context, idx) {
-                            final sermon = sermons[idx];
-                            return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  width: 44,
-                                  height: 44,
-                                  color: AppColors.primaryGold.withValues(alpha: 0.15),
-                                  child: const Icon(Icons.music_note, color: AppColors.primaryGold),
-                                ),
-                              ),
-                              title: Text(
-                                sermon.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? Colors.white : Colors.black87,
-                                ),
-                              ),
-                              subtitle: Text(
-                                [
-                                  if (sermon.speaker != null && sermon.speaker!.isNotEmpty) sermon.speaker!,
-                                  if (sermon.categoryName.isNotEmpty) sermon.categoryName,
-                                ].join(' • '),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                ),
-                              ),
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryGold,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: const Text(
-                                  'Host',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                              onTap: () async {
-                                Navigator.pop(sheetCtx);
-                                final me = ref.read(authChangeNotifierProvider).user;
-
-                                await ref.read(listenTogetherProvider.notifier).startAsHost(
-                                  roomId: widget.room.id,
-                                  resourceType: 'audio',
-                                  resourceId: int.tryParse(sermon.id) ?? 0,
-                                  resourceTitle: sermon.title,
-                                  audioUrl: sermon.audioUrl!,
-                                  hostId: int.tryParse(me?.id ?? '0') ?? 0,
-                                  hostName: me?.fullName ?? 'Host',
-                                );
-
-                                if (!mounted) return;
-                                ScaffoldMessenger.of(this.context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Hosting "${sermon.title}" live! Room members can now join.'),
-                                    backgroundColor: AppColors.primaryGold,
-                                    duration: const Duration(seconds: 4),
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             );
           },
         );

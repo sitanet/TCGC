@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
@@ -20,10 +21,14 @@ class ListenTogetherNotifier extends ChangeNotifier {
   bool _isJoined = false;
   bool _isLoading = false;
   bool _hasError = false;
+  String? _errorMessage;
 
   Timer? _syncTimer;
   DateTime? _lastLocalAction;
+  DateTime? _lastSeekTime;
+  bool _isSyncing = false;
   static const _localActionCooldown = Duration(seconds: 2);
+  static const _seekCooldown = Duration(seconds: 6);
 
   StreamSubscription? _posSub;
   StreamSubscription? _durSub;
@@ -36,6 +41,7 @@ class ListenTogetherNotifier extends ChangeNotifier {
   bool get isJoined => _isJoined;
   bool get isLoading => _isLoading;
   bool get hasError => _hasError;
+  String? get errorMessage => _errorMessage;
   bool get isPlaying => _player.playing;
   Duration get position => _player.position;
   Duration get duration => _player.duration ?? Duration.zero;
@@ -57,7 +63,17 @@ class ListenTogetherNotifier extends ChangeNotifier {
     });
   }
 
-  Future<void> startAsHost({
+  Future<void> _configureAudioSession() async {
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+      await session.setActive(true);
+    } catch (e) {
+      debugPrint('_configureAudioSession error: $e');
+    }
+  }
+
+  Future<bool> startAsHost({
     required int roomId,
     required String resourceType,
     required int resourceId,
@@ -68,6 +84,7 @@ class ListenTogetherNotifier extends ChangeNotifier {
   }) async {
     _isLoading = true;
     _hasError = false;
+    _errorMessage = null;
     notifyListeners();
 
     try {
@@ -80,31 +97,22 @@ class ListenTogetherNotifier extends ChangeNotifier {
         'position_seconds': 0,
       });
 
-      ListenSession session;
-      if (res.isSuccess) {
-        session = ListenSession.fromJson(res.data);
-      } else {
-        session = ListenSession(
-          id: 0,
-          roomId: roomId,
-          hostId: hostId,
-          hostName: hostName,
-          resourceType: resourceType,
-          resourceId: resourceId,
-          resourceTitle: resourceTitle,
-          audioUrl: audioUrl,
-          isPlaying: true,
-          positionSeconds: 0,
-          updatedAt: DateTime.now(),
-          isActive: true,
-        );
+      if (!res.isSuccess) {
+        _hasError = true;
+        _errorMessage = res.errorMessage ?? 'Another host is currently active in this room.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
       }
+
+      final session = ListenSession.fromJson(res.data);
 
       _session = session;
       _currentRoomId = roomId;
       _isHost = true;
       _isJoined = true;
 
+      await _configureAudioSession();
       await _player.setUrl(audioUrl);
       await _player.play();
 
@@ -113,11 +121,14 @@ class ListenTogetherNotifier extends ChangeNotifier {
 
       _isLoading = false;
       notifyListeners();
+      return true;
     } catch (e) {
       debugPrint('startAsHost error: $e');
       _hasError = true;
+      _errorMessage = 'Could not start hosting session.';
       _isLoading = false;
       notifyListeners();
+      return false;
     }
   }
 
@@ -135,9 +146,18 @@ class ListenTogetherNotifier extends ChangeNotifier {
     notifyListeners();
 
     try {
+      await _configureAudioSession();
       await _player.setUrl(session.audioUrl);
-      if (session.positionSeconds > 0) {
-        await _player.seek(Duration(milliseconds: (session.positionSeconds * 1000).round()));
+      var targetMs = (session.positionSeconds * 1000).round();
+      if (session.isPlaying) {
+        final ageMs = DateTime.now().toUtc().difference(session.updatedAt.toUtc()).inMilliseconds;
+        if (ageMs > 0 && ageMs < 15000) {
+          targetMs += ageMs;
+        }
+      }
+      if (targetMs > 0) {
+        await _player.seek(Duration(milliseconds: targetMs));
+        _lastSeekTime = DateTime.now();
       }
       if (session.isPlaying) {
         await _player.play();
@@ -180,12 +200,13 @@ class ListenTogetherNotifier extends ChangeNotifier {
   }
 
   Future<void> _pollAndSync() async {
-    if (!_isJoined || _currentRoomId == null) return;
+    if (!_isJoined || _currentRoomId == null || _isSyncing) return;
     if (_lastLocalAction != null &&
         DateTime.now().difference(_lastLocalAction!) < _localActionCooldown) {
       return;
     }
 
+    _isSyncing = true;
     try {
       final res = await _api.get(ApiConstants.communityListenSession(_currentRoomId!));
       if (!res.isSuccess) return;
@@ -201,17 +222,52 @@ class ListenTogetherNotifier extends ChangeNotifier {
         return;
       }
 
+      final previousAudioUrl = _session?.audioUrl;
       _session = updated;
 
-      // Sync position if drift > 3s
-      final remoteMs = (updated.positionSeconds * 1000).round();
-      final localMs = _player.position.inMilliseconds;
-      if ((remoteMs - localMs).abs() > 3000) {
-        await _player.seek(Duration(milliseconds: remoteMs));
+      // Estimate live host position by adding elapsed time since last server update
+      var estimatedRemoteMs = (updated.positionSeconds * 1000).round();
+      if (updated.isPlaying) {
+        final ageMs = DateTime.now().toUtc().difference(updated.updatedAt.toUtc()).inMilliseconds;
+        if (ageMs > 0 && ageMs < 15000) {
+          estimatedRemoteMs += ageMs;
+        }
+      }
+
+      // Reload if host switched audio OR if listener player dropped back to idle
+      final urlChanged = previousAudioUrl != updated.audioUrl && updated.audioUrl.isNotEmpty;
+      final playerIdle = _player.processingState == ProcessingState.idle && updated.audioUrl.isNotEmpty;
+      if (urlChanged || (updated.isPlaying && playerIdle)) {
+        await _configureAudioSession();
+        await _player.setUrl(updated.audioUrl);
+        if (estimatedRemoteMs > 0) {
+          await _player.seek(Duration(milliseconds: estimatedRemoteMs));
+          _lastSeekTime = DateTime.now();
+        }
+        if (updated.isPlaying) {
+          await _player.play();
+        }
+        notifyListeners();
+        return;
+      }
+
+      // Skip drift-seeking while buffering/loading or within seek cooldown to prevent re-buffer silence loops
+      final isBuffering = _player.processingState == ProcessingState.buffering ||
+          _player.processingState == ProcessingState.loading;
+      final inSeekCooldown = _lastSeekTime != null &&
+          DateTime.now().difference(_lastSeekTime!) < _seekCooldown;
+
+      if (!isBuffering && !inSeekCooldown) {
+        final localMs = _player.position.inMilliseconds;
+        if ((estimatedRemoteMs - localMs).abs() > 6000) {
+          await _player.seek(Duration(milliseconds: estimatedRemoteMs));
+          _lastSeekTime = DateTime.now();
+        }
       }
 
       // Sync play/pause
       if (updated.isPlaying && !_player.playing) {
+        await _configureAudioSession();
         await _player.play();
       } else if (!updated.isPlaying && _player.playing) {
         await _player.pause();
@@ -220,6 +276,8 @@ class ListenTogetherNotifier extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('_pollAndSync error: $e');
+    } finally {
+      _isSyncing = false;
     }
   }
 

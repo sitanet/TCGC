@@ -98,7 +98,10 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                               ),
                               const SizedBox(height: 12),
                               TextButton.icon(
-                                onPressed: () => p.fetchRooms(),
+                                onPressed: () {
+                                  p.fetchRooms();
+                                  p.fetchAllMembers();
+                                },
                                 icon: const Icon(Icons.refresh, color: AppColors.primaryGold, size: 18),
                                 label: const Text('Refresh', style: TextStyle(color: AppColors.primaryGold)),
                               ),

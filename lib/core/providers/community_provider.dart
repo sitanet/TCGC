@@ -154,15 +154,18 @@ class CommunityProvider extends ChangeNotifier {
     try {
       debugPrint('fetchAllMembers: calling API...');
       final res = await _api.get(ApiConstants.communityMembers)
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 30));
       debugPrint('fetchAllMembers: status=${res.statusCode}, success=${res.isSuccess}');
-      if (res.isSuccess) {
+      if (res.statusCode == 403) {
+        _hasAccess = false;
+      } else if (res.isSuccess) {
         final list = res.data['members'] as List? ?? [];
         _allMembers = list.map((e) => OnlineMember.fromJson(e)).toList();
         debugPrint('fetchAllMembers: loaded ${_allMembers.length} members');
-        notifyListeners();
       } else {
-        _error = 'Could not load members (${res.statusCode})';
+        _error = res.statusCode == 0
+            ? res.userFriendlyError
+            : 'Could not load members (${res.statusCode})';
         debugPrint('fetchAllMembers error: ${res.body}');
       }
     } on TimeoutException catch (_) {
@@ -201,14 +204,18 @@ class CommunityProvider extends ChangeNotifier {
     try {
       debugPrint('fetchRooms: calling API...');
       final res = await _api.get(ApiConstants.communityRooms)
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 30));
       debugPrint('fetchRooms: status=${res.statusCode}, success=${res.isSuccess}');
-      if (res.isSuccess) {
+      if (res.statusCode == 403) {
+        _hasAccess = false;
+      } else if (res.isSuccess) {
         final list = res.dataList;
         _rooms = list.map((e) => CommunityRoom.fromJson(e as Map<String, dynamic>)).toList();
         debugPrint('fetchRooms: loaded ${_rooms.length} rooms');
       } else {
-        _error = 'Server error (${res.statusCode}). Try again.';
+        _error = res.statusCode == 0
+            ? res.userFriendlyError
+            : 'Server error (${res.statusCode}). Try again.';
         debugPrint('fetchRooms: error=$_error, body=${res.body}');
       }
     } on TimeoutException catch (_) {
