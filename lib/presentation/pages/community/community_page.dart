@@ -56,6 +56,8 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
         },
         child: CustomScrollView(
           slivers: [
+            // Fellowship Header Banner
+            SliverToBoxAdapter(child: _buildHeroHeader(isDark, p)),
             // Search bar
             SliverToBoxAdapter(child: _buildSearchBar(isDark)),
             // Members Strip (all members with online/offline)
@@ -63,33 +65,64 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             // Section header
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-                child: Text('Chat Rooms',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87,
-                    )),
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
+                child: Row(
+                  children: [
+                    Text('Chat Rooms',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.2,
+                          color: isDark ? Colors.white : Colors.black87,
+                        )),
+                    const SizedBox(width: 8),
+                    if (p.rooms.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGold.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${p.rooms.length}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryGold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
             // Rooms list
             p.isLoading && p.rooms.isEmpty
                 ? const SliverFillRemaining(
                     child: Center(child: CircularProgressIndicator(color: AppColors.primaryGold)))
-                : p.rooms.isEmpty
+                : _filteredRooms(p.rooms).isEmpty
                     ? SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
                           child: Column(
                             children: [
-                              Icon(
-                                p.error != null ? Icons.cloud_off_rounded : Icons.forum_outlined,
-                                size: 48,
-                                color: AppColors.primaryGold.withValues(alpha: 0.5),
+                              Container(
+                                padding: const EdgeInsets.all(18),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryGold.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  p.error != null ? Icons.cloud_off_rounded : Icons.forum_outlined,
+                                  size: 40,
+                                  color: AppColors.primaryGold,
+                                ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 14),
                               Text(
-                                p.error ?? 'No chat rooms available yet.',
+                                _searchQuery.isNotEmpty
+                                    ? 'No rooms match "$_searchQuery"'
+                                    : (p.error ?? 'No chat rooms available yet.'),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 14,
@@ -111,8 +144,8 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                       )
                     : SliverList(
                         delegate: SliverChildBuilderDelegate(
-                          (ctx, i) => _buildRoomTile(context, isDark, p.rooms[i]),
-                          childCount: p.rooms.length,
+                          (ctx, i) => _buildRoomTile(context, isDark, _filteredRooms(p.rooms)[i]),
+                          childCount: _filteredRooms(p.rooms).length,
                         ),
                       ),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
@@ -122,14 +155,126 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     );
   }
 
+  List<CommunityRoom> _filteredRooms(List<CommunityRoom> rooms) {
+    if (_searchQuery.isEmpty) return rooms;
+    return rooms
+        .where((r) =>
+            r.name.toLowerCase().contains(_searchQuery) ||
+            (r.description ?? '').toLowerCase().contains(_searchQuery))
+        .toList();
+  }
+
+  Widget _buildHeroHeader(bool isDark, CommunityProvider p) {
+    final onlineCount = p.allMembers.where((m) => m.isOnline).length;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [const Color(0xFF2B2415), const Color(0xFF1C1912)]
+              : [const Color(0xFFFFF8E7), const Color(0xFFFDF2D6)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.primaryGold.withValues(alpha: isDark ? 0.35 : 0.45),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryGold.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.primaryGold, Color(0xFFB8941F)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryGold.withValues(alpha: 0.35),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.forum_rounded, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Fellowship & Lounge',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Chat with members & listen to sermons together',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? AppColors.textSecondaryDark : Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.green.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  '$onlineCount',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.greenAccent : Colors.green[800],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSearchBar(bool isDark) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       child: TextField(
         onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
         style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14),
         decoration: InputDecoration(
-          hintText: 'Search members...',
+          hintText: 'Search members or chat rooms...',
           hintStyle: TextStyle(
             color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
             fontSize: 14),
@@ -358,6 +503,12 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
       'headphones': Icons.headphones_rounded,
     };
     final icon = iconMap[room.icon] ?? Icons.chat_bubble_outline;
+    final badgeColor = room.isPublic
+        ? Colors.blue
+        : (room.roomType == 'group' ? Colors.teal : Colors.deepPurple);
+    final badgeIcon = room.isPublic
+        ? Icons.public_rounded
+        : (room.roomType == 'group' ? Icons.groups_rounded : Icons.lock_rounded);
 
     return GestureDetector(
       onTap: () => Navigator.push(
@@ -369,79 +520,158 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isDark ? AppColors.cardDark : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.16 : 0.14),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8, offset: const Offset(0, 2)),
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
           ],
         ),
         child: Row(
           children: [
             Container(
-              width: 48, height: 48,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
-                color: AppColors.primaryGold.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primaryGold.withValues(alpha: 0.22),
+                    AppColors.primaryGold.withValues(alpha: 0.08),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: AppColors.primaryGold.withValues(alpha: 0.3),
+                ),
               ),
-              child: Icon(icon, color: AppColors.primaryGold, size: 24),
+              child: Icon(icon, color: AppColors.primaryGold, size: 25),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(room.name,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          room.name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15.5,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(badgeIcon, size: 11, color: badgeColor),
+                            const SizedBox(width: 4),
+                            Text(
+                              room.roomType[0].toUpperCase() + room.roomType.substring(1),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? badgeColor.shade200 : badgeColor.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (room.description != null && room.description!.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      room.description!,
                       style: TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 15,
-                        color: isDark ? Colors.white : Colors.black87)),
-                  if (room.description != null) ...[
-                    const SizedBox(height: 2),
-                    Text(room.description!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
-                  ],
-                  const SizedBox(height: 4),
-                  Row(children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: room.isPublic
-                            ? Colors.blue.withValues(alpha: 0.12)
-                            : Colors.green.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
+                        fontSize: 12.5,
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                       ),
-                      child: Text(
-                        room.roomType[0].toUpperCase() + room.roomType.substring(1),
-                        style: TextStyle(
-                          fontSize: 10, fontWeight: FontWeight.w600,
-                          color: room.isPublic ? Colors.blue[700] : Colors.green[700]),
-                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    if (!room.isPublic && room.memberCount != null) ...[
-                      const SizedBox(width: 6),
-                      Text('${room.memberCount} members',
+                  ],
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if (!room.isPublic && room.memberCount != null) ...[
+                        Icon(
+                          Icons.people_outline_rounded,
+                          size: 13,
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${room.memberCount} members',
                           style: TextStyle(
                             fontSize: 11,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
+                            fontWeight: FontWeight.w500,
+                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                        if (room.lastMessage != null)
+                          Text(
+                            ' · ',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                      ],
+                      if (room.lastMessage != null)
+                        Expanded(
+                          child: Text(
+                            '${room.lastMessage!.senderName.split(' ').first}: ${room.lastMessage!.text}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? Colors.white70 : Colors.black54,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        )
+                      else if (room.isPublic || room.memberCount == null)
+                        Text(
+                          'Tap to join the conversation',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontStyle: FontStyle.italic,
+                            color: isDark ? Colors.white38 : Colors.black38,
+                          ),
+                        ),
                     ],
-                  ]),
-                  if (room.lastMessage != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      '${room.lastMessage!.senderName.split(' ').first}: ${room.lastMessage!.text}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                  ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+            const SizedBox(width: 8),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: AppColors.primaryGold.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.chevron_right_rounded, color: AppColors.primaryGold, size: 18),
+            ),
           ],
         ),
       ),

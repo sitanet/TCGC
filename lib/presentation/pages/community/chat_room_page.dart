@@ -5,6 +5,9 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/providers/community_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -43,9 +46,48 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   ListenSession? _activeSession;
   Timer? _sessionPollTimer;
 
+  // Voice note recording & playback
+  final AudioRecorder _recorder = AudioRecorder();
+  bool _isRecording = false;
+  int _recordSeconds = 0;
+  Timer? _recordTimer;
+  String? _recordingPath;
+  bool _hasText = false;
+
+  final AudioPlayer _voicePlayer = AudioPlayer();
+  int? _playingVoiceMsgId;
+  bool _voicePlaying = false;
+  Duration _voicePos = Duration.zero;
+  Duration _voiceDur = Duration.zero;
+  StreamSubscription? _voicePosSub;
+  StreamSubscription? _voiceDurSub;
+  StreamSubscription? _voiceStateSub;
+
   @override
   void initState() {
     super.initState();
+    _textController.addListener(() {
+      final has = _textController.text.trim().isNotEmpty;
+      if (has != _hasText && mounted) setState(() => _hasText = has);
+    });
+    _voicePosSub = _voicePlayer.positionStream.listen((pos) {
+      if (mounted) setState(() => _voicePos = pos);
+    });
+    _voiceDurSub = _voicePlayer.durationStream.listen((dur) {
+      if (mounted && dur != null) setState(() => _voiceDur = dur);
+    });
+    _voiceStateSub = _voicePlayer.playerStateStream.listen((state) {
+      if (!mounted) return;
+      if (state.processingState == ProcessingState.completed) {
+        setState(() {
+          _voicePlaying = false;
+          _voicePos = Duration.zero;
+          _playingVoiceMsgId = null;
+        });
+      } else {
+        setState(() => _voicePlaying = state.playing);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final p = ref.read(communityChangeNotifierProvider);
       p.fetchMessages(widget.room.id);
@@ -65,6 +107,12 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   @override
   void dispose() {
     _sessionPollTimer?.cancel();
+    _recordTimer?.cancel();
+    _voicePosSub?.cancel();
+    _voiceDurSub?.cancel();
+    _voiceStateSub?.cancel();
+    _recorder.dispose();
+    _voicePlayer.dispose();
     ref.read(communityChangeNotifierProvider).stopPolling();
     _textController.dispose();
     _scrollController.dispose();
@@ -317,6 +365,131 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
+  Future<void> _startRecording() async {
+    try {
+      final hasPerm = await _recorder.hasPermission();
+      if (!hasPerm) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Microphone permission is required to record voice notes.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (_voicePlaying) {
+        await _voicePlayer.pause();
+      }
+
+      final dir = await getTemporaryDirectory();
+      final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _recorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100),
+        path: path,
+      );
+
+      _recordTimer?.cancel();
+      setState(() {
+        _isRecording = true;
+        _recordSeconds = 0;
+        _recordingPath = path;
+      });
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _recordSeconds++);
+      });
+    } catch (e) {
+      debugPrint('_startRecording error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not start recording: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _cancelRecording() async {
+    _recordTimer?.cancel();
+    try {
+      await _recorder.stop();
+    } catch (_) {}
+    if (_recordingPath != null) {
+      try {
+        final f = File(_recordingPath!);
+        if (f.existsSync()) f.deleteSync();
+      } catch (_) {}
+    }
+    if (mounted) {
+      setState(() {
+        _isRecording = false;
+        _recordSeconds = 0;
+        _recordingPath = null;
+      });
+    }
+  }
+
+  Future<void> _stopAndSendRecording() async {
+    _recordTimer?.cancel();
+    String? path;
+    try {
+      path = await _recorder.stop();
+    } catch (e) {
+      debugPrint('_stopAndSendRecording stop error: $e');
+    }
+    final durationSecs = _recordSeconds;
+    if (mounted) {
+      setState(() {
+        _isRecording = false;
+        _recordSeconds = 0;
+        _recordingPath = null;
+      });
+    }
+    if (path == null || path.isEmpty) return;
+    final file = File(path);
+    if (!file.existsSync() || durationSecs < 1) {
+      if (file.existsSync()) {
+        try { file.deleteSync(); } catch (_) {}
+      }
+      if (mounted && durationSecs < 1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Hold or record for at least 1 second.'), duration: Duration(seconds: 2)),
+        );
+      }
+      return;
+    }
+    await _sendFile(file, 'voice');
+  }
+
+  Future<void> _toggleVoiceNote(ChatMessage msg) async {
+    if (msg.fileUrl == null || msg.fileUrl!.isEmpty) return;
+    try {
+      if (_playingVoiceMsgId == msg.id) {
+        if (_voicePlaying) {
+          await _voicePlayer.pause();
+        } else {
+          await _voicePlayer.play();
+        }
+        return;
+      }
+      setState(() {
+        _playingVoiceMsgId = msg.id;
+        _voicePos = Duration.zero;
+        _voiceDur = Duration.zero;
+      });
+      await _voicePlayer.setUrl(msg.fileUrl!);
+      await _voicePlayer.play();
+    } catch (e) {
+      debugPrint('_toggleVoiceNote error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not play voice note.'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -334,10 +507,17 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     });
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF5F5F5),
+      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF8F6F0),
       appBar: AppBar(
-        backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
         elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            height: 1,
+            color: AppColors.primaryGold.withValues(alpha: 0.16),
+          ),
+        ),
         systemOverlayStyle: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
@@ -381,22 +561,49 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                   ),
                 ],
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            : Row(
                 children: [
-                  Text(widget.room.name,
-                      style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87)),
-                  if (widget.room.description != null)
-                    Text(widget.room.description!,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGold.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.forum_rounded, color: AppColors.primaryGold, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.room.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87)),
+                        if (widget.room.description != null && widget.room.description!.isNotEmpty)
+                          Text(widget.room.description!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
+                      ],
+                    ),
+                  ),
                 ],
               ),
         actions: [
+          if (widget.dmUserName == null)
+            IconButton(
+              tooltip: 'Listen Together',
+              icon: const Icon(Icons.headphones_rounded, color: AppColors.primaryGold),
+              onPressed: _openSermonPickerForListenTogether,
+            ),
           IconButton(
+            tooltip: 'Refresh',
             icon: const Icon(Icons.refresh, color: AppColors.primaryGold),
             onPressed: () => p.fetchMessages(widget.room.id),
           ),
@@ -692,22 +899,55 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
 
   Widget _buildEmptyState(bool isDark) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.chat_bubble_outline,
-              size: 64, color: AppColors.primaryGold.withValues(alpha: 0.4)),
-          const SizedBox(height: 16),
-          Text('No messages yet',
-              style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w500,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
-          const SizedBox(height: 8),
-          Text('Be the first to say something!',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 82,
+              height: 82,
+              decoration: BoxDecoration(
+                color: AppColors.primaryGold.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.primaryGold.withValues(alpha: 0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: const Icon(Icons.chat_bubble_outline_rounded,
+                  size: 36, color: AppColors.primaryGold),
+            ),
+            const SizedBox(height: 18),
+            Text('No messages yet',
+                style: TextStyle(
+                  fontSize: 17, fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87)),
+            const SizedBox(height: 6),
+            Text(
+              'Start the conversation or tap the headphones icon to listen to a sermon together.',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
-        ],
+                height: 1.4,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+            ),
+            if (widget.dmUserName == null) ...[
+              const SizedBox(height: 18),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primaryGold,
+                  side: BorderSide(color: AppColors.primaryGold.withValues(alpha: 0.6)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                ),
+                onPressed: _openSermonPickerForListenTogether,
+                icon: const Icon(Icons.headphones_rounded, size: 18),
+                label: const Text('Host a Sermon', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -723,18 +963,26 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
       label = '${date.day}/${date.month}/${date.year}';
     }
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(children: [
-        Expanded(child: Divider(color: isDark ? AppColors.dividerDark : AppColors.dividerLight)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(label,
-              style: TextStyle(
-                fontSize: 11,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.07)
+                : AppColors.primaryGold.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white70 : Colors.black54,
+            ),
+          ),
         ),
-        Expanded(child: Divider(color: isDark ? AppColors.dividerDark : AppColors.dividerLight)),
-      ]),
+      ),
     );
   }
 
@@ -789,9 +1037,23 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
+                      gradient: isMe
+                          ? const LinearGradient(
+                              colors: [AppColors.primaryGold, Color(0xFFB8941F)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
                       color: isMe
-                          ? AppColors.primaryGold
+                          ? null
                           : (isDark ? AppColors.cardDark : Colors.white),
+                      border: isMe
+                          ? null
+                          : Border.all(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.06)
+                                  : Colors.black.withValues(alpha: 0.05),
+                            ),
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(18),
                         topRight: const Radius.circular(18),
@@ -800,8 +1062,12 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 4, offset: const Offset(0, 2)),
+                          color: isMe
+                              ? AppColors.primaryGold.withValues(alpha: 0.22)
+                              : Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
                       ],
                     ),
                     child: msg.hasResource
@@ -947,6 +1213,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
 
   Widget _buildFileCard(bool isDark, ChatMessage msg, bool isMe) {
     final isImage = msg.fileType == 'image';
+    final isVoice = msg.fileType == 'voice';
     final textColor = isMe ? Colors.white : (isDark ? Colors.white : Colors.black87);
     final subColor = isMe
         ? Colors.white.withValues(alpha: 0.7)
@@ -961,7 +1228,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
           Text(msg.text, style: TextStyle(fontSize: 14, color: textColor)),
           const SizedBox(height: 8),
         ],
-        if (isImage && msg.fileUrl != null)
+        if (isVoice && msg.fileUrl != null)
+          _buildVoiceNoteCard(isDark, msg, isMe, textColor, subColor)
+        else if (isImage && msg.fileUrl != null)
           // Image preview
           GestureDetector(
             onTap: () => _showFullImage(msg.fileUrl!),
@@ -1052,6 +1321,75 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildVoiceNoteCard(bool isDark, ChatMessage msg, bool isMe, Color textColor, Color subColor) {
+    final isActive = _playingVoiceMsgId == msg.id;
+    final isPlaying = isActive && _voicePlaying;
+    final pos = isActive ? _voicePos : Duration.zero;
+    final dur = isActive ? _voiceDur : Duration.zero;
+    final progress = dur.inMilliseconds > 0
+        ? (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
+
+    return SizedBox(
+      width: 220,
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => _toggleVoiceNote(msg),
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: isMe ? Colors.white : AppColors.primaryGold,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: isMe ? AppColors.primaryGold : Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 4,
+                    backgroundColor: isMe
+                        ? Colors.white.withValues(alpha: 0.3)
+                        : AppColors.primaryGold.withValues(alpha: 0.2),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      isMe ? Colors.white : AppColors.primaryGold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Icon(Icons.mic_rounded, size: 12, color: subColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      isActive && dur > Duration.zero
+                          ? '${_formatDuration(pos)} / ${_formatDuration(dur)}'
+                          : 'Voice note',
+                      style: TextStyle(fontSize: 11, color: subColor),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1402,6 +1740,11 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: AppColors.primaryGold.withValues(alpha: 0.14),
+          ),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
@@ -1412,73 +1755,136 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
         top: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-        children: [
-          // Attach button
-          GestureDetector(
-            onTap: _showAttachmentOptions,
-            child: Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.backgroundDark : const Color(0xFFF0F0F0),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.attach_file_rounded,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                size: 20,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.backgroundDark : const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: TextField(
-                controller: _textController,
-                maxLines: 4,
-                minLines: 1,
-                textCapitalization: TextCapitalization.sentences,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDark ? Colors.white : Colors.black87),
-                decoration: InputDecoration(
-                  hintText: 'Type a message...',
-                  hintStyle: TextStyle(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    fontSize: 14),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: _isRecording
+              ? Row(
+                  children: [
+                    GestureDetector(
+                      onTap: _cancelRecording,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Recording voice note · ${_formatDuration(Duration(seconds: _recordSeconds))}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: _stopAndSendRecording,
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [AppColors.primaryGold, Color(0xFFB8941F)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    // Attach button
+                    GestureDetector(
+                      onTap: _showAttachmentOptions,
+                      child: Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.backgroundDark : const Color(0xFFF0F0F0),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.attach_file_rounded,
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.backgroundDark : const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: TextField(
+                          controller: _textController,
+                          maxLines: 4,
+                          minLines: 1,
+                          textCapitalization: TextCapitalization.sentences,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark ? Colors.white : Colors.black87),
+                          decoration: InputDecoration(
+                            hintText: 'Type a message...',
+                            hintStyle: TextStyle(
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              fontSize: 14),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          ),
+                          onSubmitted: (_) => _sendMessage(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: _isSending
+                          ? null
+                          : (_hasText ? _sendMessage : _startRecording),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 44, height: 44,
+                        decoration: BoxDecoration(
+                          gradient: _isSending
+                              ? null
+                              : const LinearGradient(
+                                  colors: [AppColors.primaryGold, Color(0xFFB8941F)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                          color: _isSending
+                              ? AppColors.primaryGold.withValues(alpha: 0.5)
+                              : null,
+                          shape: BoxShape.circle,
+                        ),
+                        child: _isSending
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
+                            : Icon(
+                                _hasText ? Icons.send_rounded : Icons.mic_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
-                onSubmitted: (_) => _sendMessage(),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: _sendMessage,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 44, height: 44,
-              decoration: BoxDecoration(
-                color: _isSending
-                    ? AppColors.primaryGold.withValues(alpha: 0.5)
-                    : AppColors.primaryGold,
-                shape: BoxShape.circle,
-              ),
-              child: _isSending
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-            ),
-          ),
-        ],
-          ),
         ),
       ),
     );
