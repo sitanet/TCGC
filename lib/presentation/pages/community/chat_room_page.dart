@@ -1729,7 +1729,11 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dataService = DataService();
     final sermonsFuture = dataService.getMessages(forceRefresh: true);
+    final searchController = TextEditingController();
     String searchQuery = '';
+    String selectedCategory = 'All';
+    String selectedSpeaker = 'All';
+    bool sortNewestFirst = true;
 
     showModalBottomSheet(
       context: context,
@@ -1807,15 +1811,25 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                           child: TextField(
+                            controller: searchController,
                             onChanged: (val) => setSheetState(() => searchQuery = val.trim().toLowerCase()),
                             style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14),
                             decoration: InputDecoration(
-                              hintText: 'Search sermons or speakers...',
+                              hintText: 'Search sermons, speakers, or categories...',
                               hintStyle: TextStyle(
                                 color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                                 fontSize: 13,
                               ),
                               prefixIcon: const Icon(Icons.search, color: AppColors.primaryGold, size: 20),
+                              suffixIcon: searchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close, size: 18),
+                                      onPressed: () {
+                                        searchController.clear();
+                                        setSheetState(() => searchQuery = '');
+                                      },
+                                    )
+                                  : null,
                               filled: true,
                               fillColor: isDark ? AppColors.backgroundDark : const Color(0xFFF5F5F5),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1837,67 +1851,252 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                               final allSermons = (snapshot.data ?? [])
                                   .where((s) => s.audioUrl != null && s.audioUrl!.isNotEmpty)
                                   .toList();
-                              final sermons = searchQuery.isEmpty
-                                  ? allSermons
-                                  : allSermons.where((s) {
-                                      final title = s.title.toLowerCase();
-                                      final speaker = (s.speaker ?? '').toLowerCase();
-                                      final cat = s.categoryName.toLowerCase();
-                                      return title.contains(searchQuery) ||
-                                          speaker.contains(searchQuery) ||
-                                          cat.contains(searchQuery);
-                                    }).toList();
 
-                              if (sermons.isEmpty) {
-                                return Center(
-                                  child: Text(
-                                    searchQuery.isEmpty
-                                        ? 'No sermons available to play'
-                                        : 'No matching sermons found',
-                                    style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                              final categories = <String>[
+                                'All',
+                                ...{
+                                  for (final s in allSermons)
+                                    if (s.categoryName.trim().isNotEmpty) s.categoryName.trim(),
+                                }.toList()
+                                  ..sort(),
+                              ];
+                              final speakers = <String>[
+                                'All',
+                                ...{
+                                  for (final s in allSermons)
+                                    if ((s.speaker ?? '').trim().isNotEmpty) s.speaker!.trim(),
+                                }.toList()
+                                  ..sort(),
+                              ];
+
+                              final sermons = allSermons.where((s) {
+                                if (selectedCategory != 'All' &&
+                                    s.categoryName.trim() != selectedCategory) {
+                                  return false;
+                                }
+                                if (selectedSpeaker != 'All' &&
+                                    (s.speaker ?? '').trim() != selectedSpeaker) {
+                                  return false;
+                                }
+                                if (searchQuery.isEmpty) return true;
+                                final title = s.title.toLowerCase();
+                                final speaker = (s.speaker ?? '').toLowerCase();
+                                final cat = s.categoryName.toLowerCase();
+                                return title.contains(searchQuery) ||
+                                    speaker.contains(searchQuery) ||
+                                    cat.contains(searchQuery);
+                              }).toList()
+                                ..sort((a, b) => sortNewestFirst
+                                    ? b.date.compareTo(a.date)
+                                    : a.date.compareTo(b.date));
+
+                              final hasActiveFilter = selectedCategory != 'All' ||
+                                  selectedSpeaker != 'All' ||
+                                  searchQuery.isNotEmpty;
+
+                              return Column(
+                                children: [
+                                  if (categories.length > 1)
+                                    SizedBox(
+                                      height: 44,
+                                      child: ListView.separated(
+                                        scrollDirection: Axis.horizontal,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                        itemCount: categories.length,
+                                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                                        itemBuilder: (_, idx) {
+                                          final cat = categories[idx];
+                                          final isSelected = selectedCategory == cat;
+                                          return ChoiceChip(
+                                            label: Text(
+                                              cat,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                                color: isSelected
+                                                    ? Colors.black
+                                                    : (isDark ? Colors.white70 : Colors.black87),
+                                              ),
+                                            ),
+                                            selected: isSelected,
+                                            selectedColor: AppColors.primaryGold,
+                                            backgroundColor: isDark
+                                                ? AppColors.backgroundDark
+                                                : const Color(0xFFF2F2F2),
+                                            side: BorderSide.none,
+                                            visualDensity: VisualDensity.compact,
+                                            onSelected: (_) => setSheetState(() => selectedCategory = cat),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          '${sermons.length} ${sermons.length == 1 ? 'message' : 'messages'}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: isDark
+                                                ? AppColors.textSecondaryDark
+                                                : AppColors.textSecondaryLight,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        if (speakers.length > 2)
+                                          PopupMenuButton<String>(
+                                            initialValue: selectedSpeaker,
+                                            onSelected: (val) => setSheetState(() => selectedSpeaker = val),
+                                            itemBuilder: (_) => speakers
+                                                .map((sp) => PopupMenuItem<String>(
+                                                      value: sp,
+                                                      child: Text(sp == 'All' ? 'All Speakers' : sp),
+                                                    ))
+                                                .toList(),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                              decoration: BoxDecoration(
+                                                color: selectedSpeaker != 'All'
+                                                    ? AppColors.primaryGold.withValues(alpha: 0.18)
+                                                    : (isDark ? AppColors.backgroundDark : const Color(0xFFF2F2F2)),
+                                                borderRadius: BorderRadius.circular(16),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.person_outline,
+                                                    size: 14,
+                                                    color: selectedSpeaker != 'All'
+                                                        ? AppColors.primaryGold
+                                                        : (isDark ? Colors.white70 : Colors.black54),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  ConstrainedBox(
+                                                    constraints: const BoxConstraints(maxWidth: 110),
+                                                    child: Text(
+                                                      selectedSpeaker == 'All' ? 'Speaker' : selectedSpeaker,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: selectedSpeaker != 'All'
+                                                            ? FontWeight.w600
+                                                            : FontWeight.normal,
+                                                        color: selectedSpeaker != 'All'
+                                                            ? AppColors.primaryGold
+                                                            : (isDark ? Colors.white70 : Colors.black87),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const Icon(Icons.arrow_drop_down, size: 16),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        const SizedBox(width: 6),
+                                        InkWell(
+                                          borderRadius: BorderRadius.circular(16),
+                                          onTap: () => setSheetState(() => sortNewestFirst = !sortNewestFirst),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                            decoration: BoxDecoration(
+                                              color: isDark ? AppColors.backgroundDark : const Color(0xFFF2F2F2),
+                                              borderRadius: BorderRadius.circular(16),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.sort, size: 14, color: AppColors.primaryGold),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  sortNewestFirst ? 'Newest' : 'Oldest',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: isDark ? Colors.white70 : Colors.black87,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        if (hasActiveFilter) ...[
+                                          const SizedBox(width: 6),
+                                          GestureDetector(
+                                            onTap: () {
+                                              searchController.clear();
+                                              setSheetState(() {
+                                                searchQuery = '';
+                                                selectedCategory = 'All';
+                                                selectedSpeaker = 'All';
+                                              });
+                                            },
+                                            child: const Text(
+                                              'Reset',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.primaryGold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ),
-                                );
-                              }
-
-                              return ListView.separated(
-                                controller: scrollCtrl,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                itemCount: sermons.length,
-                                separatorBuilder: (_, __) => Divider(
-                                  height: 1,
-                                  color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-                                ),
-                                itemBuilder: (context, idx) {
-                                  final sermon = sermons[idx];
-                                  return ListTile(
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                                    leading: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Container(
-                                        width: 44,
-                                        height: 44,
-                                        color: AppColors.primaryGold.withValues(alpha: 0.15),
-                                        child: const Icon(Icons.music_note, color: AppColors.primaryGold),
-                                      ),
-                                    ),
-                                    title: Text(
-                                      sermon.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: isDark ? Colors.white : Colors.black87,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      [
-                                        if (sermon.speaker != null && sermon.speaker!.isNotEmpty) sermon.speaker!,
-                                        if (sermon.categoryName.isNotEmpty) sermon.categoryName,
-                                      ].join(' • '),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
+                                  const Divider(height: 1),
+                                  Expanded(
+                                    child: sermons.isEmpty
+                                        ? Center(
+                                            child: Text(
+                                              hasActiveFilter
+                                                  ? 'No matching sermons found'
+                                                  : 'No sermons available to play',
+                                              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                                            ),
+                                          )
+                                        : ListView.separated(
+                                            controller: scrollCtrl,
+                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                            itemCount: sermons.length,
+                                            separatorBuilder: (_, __) => Divider(
+                                              height: 1,
+                                              color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                                            ),
+                                            itemBuilder: (context, idx) {
+                                              final sermon = sermons[idx];
+                                              return ListTile(
+                                                contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                                                leading: ClipRRect(
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  child: Container(
+                                                    width: 44,
+                                                    height: 44,
+                                                    color: AppColors.primaryGold.withValues(alpha: 0.15),
+                                                    child: const Icon(Icons.music_note, color: AppColors.primaryGold),
+                                                  ),
+                                                ),
+                                                title: Text(
+                                                  sermon.title,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: isDark ? Colors.white : Colors.black87,
+                                                  ),
+                                                ),
+                                                subtitle: Text(
+                                                  [
+                                                    if (sermon.speaker != null && sermon.speaker!.isNotEmpty)
+                                                      sermon.speaker!,
+                                                    if (sermon.categoryName.isNotEmpty) sermon.categoryName,
+                                                  ].join(' • '),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(
                                         fontSize: 12,
                                         color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                                       ),
@@ -1947,6 +2146,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                                     },
                                   );
                                 },
+                              ),
+                                  ),
+                                ],
                               );
                             },
                           ),
@@ -1960,7 +2162,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
           },
         );
       },
-    );
+    ).whenComplete(searchController.dispose);
   }
 
   Widget _buildInputBar(bool isDark) {
