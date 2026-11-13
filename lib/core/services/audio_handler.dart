@@ -24,6 +24,7 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
   String? _currentUrl;
   MediaItem? _currentMediaItem;
   Duration _lastPosition = Duration.zero;
+  bool _pausedByInterruption = false;
 
   AudioPlayer get player => _player;
 
@@ -70,7 +71,12 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
               break;
             case AudioInterruptionType.pause:
             case AudioInterruptionType.unknown:
-              pause();
+              // Only remember interruption if audio was actively playing so we
+              // never auto-start playback when an interruption ends while paused/idle.
+              if (_player.playing) {
+                pause();
+                _pausedByInterruption = true;
+              }
               break;
           }
         } else {
@@ -79,9 +85,13 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
               _player.setVolume(1.0);
               break;
             case AudioInterruptionType.pause:
-              play();
+              if (_pausedByInterruption) {
+                _pausedByInterruption = false;
+                play();
+              }
               break;
             case AudioInterruptionType.unknown:
+              _pausedByInterruption = false;
               break;
           }
         }
@@ -216,6 +226,7 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> play() async {
+    _pausedByInterruption = false;
     // If player is in idle state, the source was released by system - reload it
     if (_player.processingState == ProcessingState.idle) {
       debugPrint('Player in idle state, reloading source...');
@@ -237,12 +248,14 @@ class MyAudioHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> pause() async {
+    _pausedByInterruption = false;
     _lastPosition = _player.position; // Save position before pause
     await _player.pause();
   }
 
   @override
   Future<void> stop() async {
+    _pausedByInterruption = false;
     _lastPosition = _player.position; // Save position before stop
     try {
       await _player.stop();
