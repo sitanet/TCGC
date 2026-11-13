@@ -59,14 +59,14 @@ class BottomNavBar extends StatelessWidget {
                   _buildNavItem(1, Icons.music_note_outlined, Icons.music_note, iconSize, showWallet),
                   _buildNavItem(2, Icons.play_circle_outline, Icons.play_circle, iconSize, showWallet),
                   _buildNavItem(3, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, iconSize, showWallet),
-                  _buildNavItem(4, Icons.school_outlined, Icons.school, iconSize, showWallet),
+                  _buildNavItem(4, Icons.people_outline, Icons.people, iconSize, showWallet),
                   _buildNavItem(5, Icons.groups_outlined, Icons.groups, iconSize, showWallet),
                 ]
               : [
                   _buildNavItem(0, Icons.home_outlined, Icons.home, iconSize, showWallet),
                   _buildNavItem(1, Icons.music_note_outlined, Icons.music_note, iconSize, showWallet),
                   _buildNavItem(2, Icons.play_circle_outline, Icons.play_circle, iconSize, showWallet),
-                  _buildNavItem(3, Icons.school_outlined, Icons.school, iconSize, showWallet),
+                  _buildNavItem(3, Icons.people_outline, Icons.people, iconSize, showWallet),
                   _buildNavItem(4, Icons.groups_outlined, Icons.groups, iconSize, showWallet),
                 ],
         ),
