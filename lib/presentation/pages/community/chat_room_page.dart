@@ -1317,10 +1317,6 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
 
   Widget _buildInputBar(bool isDark) {
     return Container(
-      padding: EdgeInsets.only(
-        left: 12, right: 12, top: 10,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : Colors.white,
         boxShadow: [
@@ -1329,7 +1325,11 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
             blurRadius: 8, offset: const Offset(0, -2)),
         ],
       ),
-      child: Row(
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
         children: [
           // Attach button
           GestureDetector(
@@ -1395,6 +1395,8 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
             ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }
