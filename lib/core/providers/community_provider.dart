@@ -417,6 +417,7 @@ String formatLastSeen(String? lastSeenIso) {
 
 class ListenSession {
   final int id;
+  final int? roomId;
   final int hostId;
   final String hostName;
   final String resourceType;
@@ -430,6 +431,7 @@ class ListenSession {
 
   ListenSession({
     required this.id,
+    this.roomId,
     required this.hostId,
     required this.hostName,
     required this.resourceType,
@@ -444,6 +446,7 @@ class ListenSession {
 
   factory ListenSession.fromJson(Map<String, dynamic> j) => ListenSession(
         id: j['id'],
+        roomId: j['room_id'],
         hostId: j['host_id'],
         hostName: j['host_name'] ?? '',
         resourceType: j['resource_type'] ?? '',

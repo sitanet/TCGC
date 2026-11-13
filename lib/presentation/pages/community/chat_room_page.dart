@@ -11,6 +11,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../../widgets/app_image.dart';
 import 'listen_together_page.dart';
+import '../../../core/providers/listen_together_provider.dart';
+import '../../../data/services/data_service.dart';
+import '../../../domain/entities/sermon.dart';
 class ChatRoomPage extends ConsumerStatefulWidget {
   final CommunityRoom room;
   final String? dmUserName;
@@ -103,6 +106,12 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
+                _attachOption(
+                  icon: Icons.headphones_rounded,
+                  label: 'Listen Together',
+                  color: AppColors.primaryGold,
+                  onTap: () { Navigator.pop(ctx); _openSermonPickerForListenTogether(); },
+                ),
                 _attachOption(
                   icon: Icons.photo_library_rounded,
                   label: 'Gallery',
@@ -296,6 +305,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final p = ref.watch(communityChangeNotifierProvider);
     final me = ref.read(authChangeNotifierProvider).user;
+    final listenState = ref.watch(listenTogetherProvider);
 
     // Scroll to bottom when new messages arrive
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -377,9 +387,13 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
       ),
       body: Column(
         children: [
-          // Active listen-together session banner
-          if (_activeSession != null && _activeSession!.isActive)
-            _buildSessionBanner(),
+          // Active listen-together session docked player or join banner
+          if (listenState.isJoined &&
+              listenState.session != null &&
+              listenState.currentRoomId == widget.room.id)
+            _buildDockedPlayer(listenState, isDark)
+          else if (_activeSession != null && _activeSession!.isActive)
+            _buildJoinBanner(_activeSession!, isDark),
           // Messages
           Expanded(
             child: p.isLoading && p.messages.isEmpty
@@ -413,66 +427,248 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     );
   }
 
-  Widget _buildSessionBanner() {
-    final session = _activeSession!;
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final h = d.inHours;
+    if (h > 0) return '$h:$m:$s';
+    return '$m:$s';
+  }
+
+  void _showEndSessionDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('End Session for All?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text(
+          'This will stop playback and end the listening session for everyone in the room.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(listenTogetherProvider.notifier).endSession();
+            },
+            child: const Text('End for All', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDockedPlayer(ListenTogetherNotifier listenState, bool isDark) {
+    final session = listenState.session;
+    if (session == null) return const SizedBox.shrink();
+
+    final isHost = listenState.isHost;
+    final position = listenState.position;
+    final duration = listenState.duration;
+    final progress = duration.inMilliseconds > 0
+        ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.5), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryGold.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              // Play/Pause button
+              GestureDetector(
+                onTap: () {
+                  ref.read(listenTogetherProvider.notifier).togglePlayPause();
+                },
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryGold.withValues(alpha: 0.3),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    listenState.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: Colors.black,
+                    size: 22,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Titles and host info
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => ListenTogetherPage(roomId: widget.room.id),
+                    ));
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: Colors.greenAccent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              session.resourceTitle.isNotEmpty ? session.resourceTitle : 'Sermon Audio',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isHost
+                            ? 'You are hosting · ${_formatDuration(position)} / ${_formatDuration(duration)}'
+                            : '${session.hostName} hosting · ${_formatDuration(position)} / ${_formatDuration(duration)}',
+                        style: const TextStyle(fontSize: 11, color: AppColors.primaryGold, fontWeight: FontWeight.w500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Fullscreen/Expand button
+              IconButton(
+                tooltip: 'Fullscreen Player',
+                icon: const Icon(Icons.open_in_full_rounded, color: AppColors.primaryGold, size: 19),
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => ListenTogetherPage(roomId: widget.room.id),
+                  ));
+                },
+              ),
+              // Leave / End button
+              IconButton(
+                tooltip: isHost ? 'End Session' : 'Leave Session',
+                icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20),
+                onPressed: () {
+                  if (isHost) {
+                    _showEndSessionDialog();
+                  } else {
+                    ref.read(listenTogetherProvider.notifier).leaveSession();
+                  }
+                },
+              ),
+            ],
+          ),
+          // Mini progress bar
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: isDark ? Colors.white12 : Colors.black12,
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryGold),
+                minHeight: 3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJoinBanner(ListenSession session, bool isDark) {
     final me = ref.read(authChangeNotifierProvider).user;
     final isHost = me != null && session.hostId.toString() == me.id;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(context, MaterialPageRoute(
-          builder: (_) => ListenTogetherPage(
-            roomId: widget.room.id,
-            initialSession: session,
-            isHost: isHost,
-            myUserId: me?.id,
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.primaryGold.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.headphones_rounded, color: AppColors.primaryGold, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isHost ? 'Your listen session is live' : '${session.hostName} started a listen session',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                Text(
+                  session.resourceTitle.isNotEmpty ? session.resourceTitle : 'Listen Together',
+                  style: const TextStyle(fontSize: 11, color: AppColors.primaryGold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
-        ));
-      },
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.primaryGold.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.4)),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.headphones_rounded, color: AppColors.primaryGold, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isHost ? 'Your listen session is live' : '${session.hostName} started a listen session',
-                    style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : Colors.black87),
-                  ),
-                  Text(
-                    session.resourceTitle.isNotEmpty ? session.resourceTitle : 'Tap to join',
-                    style: const TextStyle(fontSize: 11, color: AppColors.primaryGold),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGold,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              elevation: 0,
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.primaryGold,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                isHost ? 'Open' : 'Join',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
-              ),
+            icon: const Icon(Icons.play_arrow_rounded, size: 18),
+            label: Text(
+              isHost ? 'Open' : 'Join',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
-          ],
-        ),
+            onPressed: () {
+              ref.read(listenTogetherProvider.notifier).joinAsListener(
+                roomId: widget.room.id,
+                session: session,
+                myUserId: int.tryParse(me?.id ?? '0') ?? 0,
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -909,31 +1105,214 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     }
 
     final me = ref.read(authChangeNotifierProvider).user;
-    final p = ref.read(communityChangeNotifierProvider);
 
-    final session = await p.startListenSession(
-      widget.room.id,
+    await ref.read(listenTogetherProvider.notifier).startAsHost(
+      roomId: widget.room.id,
       resourceType: msg.resourceType!,
       resourceId: msg.resourceId!,
-      resourceTitle: msg.resourceTitle ?? '',
+      resourceTitle: msg.resourceTitle ?? 'Audio Sermon',
       audioUrl: audioUrl,
+      hostId: int.tryParse(me?.id ?? '0') ?? 0,
+      hostName: me?.fullName ?? 'Host',
     );
 
     if (!mounted) return;
-    if (session == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not start session'), backgroundColor: Colors.red));
-      return;
-    }
-
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => ListenTogetherPage(
-        roomId: widget.room.id,
-        initialSession: session,
-        isHost: true,
-        myUserId: me?.id,
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Hosting "${msg.resourceTitle ?? 'Audio'}" live! Room members can now join.'),
+        backgroundColor: AppColors.primaryGold,
+        duration: const Duration(seconds: 4),
       ),
-    ));
+    );
+  }
+
+  Future<void> _openSermonPickerForListenTogether() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dataService = DataService();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.5,
+          maxChildSize: 0.92,
+          builder: (ctx, scrollCtrl) {
+            return Container(
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.cardDark : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(top: 10, bottom: 8),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGold.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.headphones_rounded, color: AppColors.primaryGold, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Start Listen Session',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                'Select a church sermon to listen with the room',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(sheetCtx),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: FutureBuilder<List<Sermon>>(
+                      future: dataService.getMessages(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator(color: AppColors.primaryGold));
+                        }
+                        final sermons = (snapshot.data ?? [])
+                            .where((s) => s.audioUrl != null && s.audioUrl!.isNotEmpty)
+                            .toList();
+
+                        if (sermons.isEmpty) {
+                          return Center(
+                            child: Text(
+                              'No sermons available to play',
+                              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                            ),
+                          );
+                        }
+
+                        return ListView.separated(
+                          controller: scrollCtrl,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          itemCount: sermons.length,
+                          separatorBuilder: (_, __) => Divider(
+                            height: 1,
+                            color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
+                          ),
+                          itemBuilder: (context, idx) {
+                            final sermon = sermons[idx];
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  color: AppColors.primaryGold.withValues(alpha: 0.15),
+                                  child: const Icon(Icons.music_note, color: AppColors.primaryGold),
+                                ),
+                              ),
+                              title: Text(
+                                sermon.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                              subtitle: Text(
+                                [
+                                  if (sermon.speaker != null && sermon.speaker!.isNotEmpty) sermon.speaker!,
+                                  if (sermon.categoryName.isNotEmpty) sermon.categoryName,
+                                ].join(' • '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                ),
+                              ),
+                              trailing: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryGold,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Text(
+                                  'Host',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              onTap: () async {
+                                Navigator.pop(sheetCtx);
+                                final me = ref.read(authChangeNotifierProvider).user;
+
+                                await ref.read(listenTogetherProvider.notifier).startAsHost(
+                                  roomId: widget.room.id,
+                                  resourceType: 'audio',
+                                  resourceId: int.tryParse(sermon.id) ?? 0,
+                                  resourceTitle: sermon.title,
+                                  audioUrl: sermon.audioUrl!,
+                                  hostId: int.tryParse(me?.id ?? '0') ?? 0,
+                                  hostName: me?.fullName ?? 'Host',
+                                );
+
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(this.context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Hosting "${sermon.title}" live! Room members can now join.'),
+                                    backgroundColor: AppColors.primaryGold,
+                                    duration: const Duration(seconds: 4),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildInputBar(bool isDark) {

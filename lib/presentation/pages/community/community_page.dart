@@ -322,6 +322,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
       'volunteer_activism': Icons.volunteer_activism,
       'auto_awesome': Icons.auto_awesome,
       'menu_book': Icons.menu_book,
+      'headphones': Icons.headphones_rounded,
     };
     final icon = iconMap[room.icon] ?? Icons.chat_bubble_outline;
 
