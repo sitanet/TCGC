@@ -64,6 +64,18 @@ class ListenTogetherNotifier extends ChangeNotifier {
     });
   }
 
+  static String _normalizeAudioUrl(String url) {
+    var trimmed = url.trim();
+    if (trimmed.startsWith('ttps://')) {
+      trimmed = 'https://${trimmed.substring(7)}';
+    } else if (trimmed.startsWith('ttp://')) {
+      trimmed = 'http://${trimmed.substring(6)}';
+    } else if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+      trimmed = 'https://tcgc.thecitygatechurch.org$trimmed';
+    }
+    return trimmed.contains(' ') ? Uri.encodeFull(trimmed) : trimmed;
+  }
+
   Future<void> _configureAudioSession() async {
     try {
       final session = await AudioSession.instance;
@@ -108,14 +120,19 @@ class ListenTogetherNotifier extends ChangeNotifier {
 
       final session = ListenSession.fromJson(res.data);
 
+      final normalizedUrl = _normalizeAudioUrl(audioUrl);
       _session = session;
       _currentRoomId = roomId;
       _isHost = true;
       _isJoined = true;
 
       await _configureAudioSession();
-      await _player.setUrl(audioUrl);
-      await _player.play();
+      await _player.setUrl(normalizedUrl);
+      // Do NOT await _player.play() — just_audio's play() Future only completes
+      // when playback finishes or pauses, which would block _syncTimer and _isLoading.
+      unawaited(_player.play().catchError((e) {
+        debugPrint('startAsHost play error: $e');
+      }));
 
       _syncTimer?.cancel();
       _syncTimer = Timer.periodic(const Duration(seconds: 2), (_) => _pushState());
@@ -148,7 +165,7 @@ class ListenTogetherNotifier extends ChangeNotifier {
 
     try {
       await _configureAudioSession();
-      await _player.setUrl(session.audioUrl);
+      await _player.setUrl(_normalizeAudioUrl(session.audioUrl));
       var targetMs = (session.positionSeconds * 1000).round();
       if (session.isPlaying) {
         final ageMs = DateTime.now().toUtc().difference(session.updatedAt.toUtc()).inMilliseconds;
@@ -161,7 +178,9 @@ class ListenTogetherNotifier extends ChangeNotifier {
         _lastSeekTime = DateTime.now();
       }
       if (session.isPlaying) {
-        await _player.play();
+        unawaited(_player.play().catchError((e) {
+          debugPrint('joinAsListener play error: $e');
+        }));
       } else {
         await _player.pause();
       }
@@ -260,13 +279,15 @@ class ListenTogetherNotifier extends ChangeNotifier {
       final playerIdle = _player.processingState == ProcessingState.idle && updated.audioUrl.isNotEmpty;
       if (urlChanged || (updated.isPlaying && playerIdle)) {
         await _configureAudioSession();
-        await _player.setUrl(updated.audioUrl);
+        await _player.setUrl(_normalizeAudioUrl(updated.audioUrl));
         if (estimatedRemoteMs > 0) {
           await _player.seek(Duration(milliseconds: estimatedRemoteMs));
           _lastSeekTime = DateTime.now();
         }
         if (updated.isPlaying) {
-          await _player.play();
+          unawaited(_player.play().catchError((e) {
+            debugPrint('_pollAndSync play error: $e');
+          }));
         }
         notifyListeners();
         return;
@@ -289,7 +310,9 @@ class ListenTogetherNotifier extends ChangeNotifier {
       // Sync play/pause
       if (updated.isPlaying && !_player.playing) {
         await _configureAudioSession();
-        await _player.play();
+        unawaited(_player.play().catchError((e) {
+          debugPrint('_pollAndSync resume error: $e');
+        }));
       } else if (!updated.isPlaying && _player.playing) {
         await _player.pause();
       }
@@ -308,7 +331,9 @@ class ListenTogetherNotifier extends ChangeNotifier {
     _lastLocalAction = DateTime.now();
     final willPlay = !_player.playing;
     if (willPlay) {
-      await _player.play();
+      unawaited(_player.play().catchError((e) {
+        debugPrint('togglePlayPause play error: $e');
+      }));
     } else {
       await _player.pause();
     }

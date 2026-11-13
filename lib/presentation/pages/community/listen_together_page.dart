@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/listen_together_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../main.dart';
 
 class ListenTogetherPage extends ConsumerWidget {
   final int roomId;
@@ -67,10 +68,20 @@ class ListenTogetherPage extends ConsumerWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              ref.read(listenTogetherProvider.notifier).leaveSession();
-              Navigator.pop(context);
+              final me = ref.read(authChangeNotifierProvider).user;
+              final memberName = (me?.fullName ?? '').trim().isNotEmpty
+                  ? me!.fullName.trim()
+                  : 'A member';
+              await ref.read(listenTogetherProvider.notifier).leaveSession();
+              await ref.read(communityChangeNotifierProvider).sendMessage(
+                roomId,
+                '🎧 $memberName left listening',
+              );
+              if (context.mounted) {
+                Navigator.pop(context);
+              }
             },
             child: const Text('Leave', style: TextStyle(color: Colors.white)),
           ),

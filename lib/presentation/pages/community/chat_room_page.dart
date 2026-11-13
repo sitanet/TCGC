@@ -851,11 +851,19 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
               IconButton(
                 tooltip: isHost ? 'End Session' : 'Leave Session',
                 icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20),
-                onPressed: () {
+                onPressed: () async {
                   if (isHost) {
                     _showEndSessionDialog();
                   } else {
-                    ref.read(listenTogetherProvider.notifier).leaveSession();
+                    final me = ref.read(authChangeNotifierProvider).user;
+                    final memberName = (me?.fullName ?? '').trim().isNotEmpty
+                        ? me!.fullName.trim()
+                        : 'A member';
+                    await ref.read(listenTogetherProvider.notifier).leaveSession();
+                    await ref.read(communityChangeNotifierProvider).sendMessage(
+                      widget.room.id,
+                      '🎧 $memberName left listening',
+                    );
                   }
                 },
               ),
@@ -1113,7 +1121,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
       bool isMe, bool showAvatar, String? myId) {
     if (!msg.isDeleted &&
         msg.text.startsWith('🎧 ') &&
-        msg.text.endsWith(' joined to listen')) {
+        (msg.text.endsWith(' joined to listen') || msg.text.endsWith(' left listening'))) {
       return Center(
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 6),
