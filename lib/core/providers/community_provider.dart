@@ -204,8 +204,8 @@ class CommunityProvider extends ChangeNotifier {
           .timeout(const Duration(seconds: 8));
       debugPrint('fetchRooms: status=${res.statusCode}, success=${res.isSuccess}');
       if (res.isSuccess) {
-        final list = res.data as List? ?? [];
-        _rooms = list.map((e) => CommunityRoom.fromJson(e)).toList();
+        final list = res.dataList;
+        _rooms = list.map((e) => CommunityRoom.fromJson(e as Map<String, dynamic>)).toList();
         debugPrint('fetchRooms: loaded ${_rooms.length} rooms');
       } else {
         _error = 'Server error (${res.statusCode}). Try again.';

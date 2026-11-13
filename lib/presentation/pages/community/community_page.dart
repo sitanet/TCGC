@@ -76,12 +76,42 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             p.isLoading && p.rooms.isEmpty
                 ? const SliverFillRemaining(
                     child: Center(child: CircularProgressIndicator(color: AppColors.primaryGold)))
-                : SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (ctx, i) => _buildRoomTile(context, isDark, p.rooms[i]),
-                      childCount: p.rooms.length,
-                    ),
-                  ),
+                : p.rooms.isEmpty
+                    ? SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+                          child: Column(
+                            children: [
+                              Icon(
+                                p.error != null ? Icons.cloud_off_rounded : Icons.forum_outlined,
+                                size: 48,
+                                color: AppColors.primaryGold.withValues(alpha: 0.5),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                p.error ?? 'No chat rooms available yet.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextButton.icon(
+                                onPressed: () => p.fetchRooms(),
+                                icon: const Icon(Icons.refresh, color: AppColors.primaryGold, size: 18),
+                                label: const Text('Refresh', style: TextStyle(color: AppColors.primaryGold)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (ctx, i) => _buildRoomTile(context, isDark, p.rooms[i]),
+                          childCount: p.rooms.length,
+                        ),
+                      ),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
