@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
@@ -250,44 +252,10 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
           if (window._flutterStreamBridgeInstalled) return;
           window._flutterStreamBridgeInstalled = true;
 
-          // Mute HTML5 audio element so sound plays exclusively via Flutter's native background AudioService
+          // Ensure audio element is completely unmuted so sound plays directly in WebView
           if (audioPlayer) {
-            audioPlayer.muted = true;
-            audioPlayer.volume = 0;
-          }
-
-          function sendPlayMessage() {
-            var titleEl = document.getElementById('radioProgramTitle');
-            var artEl = document.getElementById('radioArtworkImg');
-            var title = titleEl ? titleEl.textContent.trim() : 'Live Broadcast';
-            var art = artEl ? artEl.src : '';
-            var streamUrl = (typeof currentStreamUrl !== 'undefined' && currentStreamUrl) ? currentStreamUrl : (audioPlayer ? audioPlayer.src : '');
-
-            if (window.FlutterLiveStream) {
-              window.FlutterLiveStream.postMessage(JSON.stringify({
-                action: 'play',
-                streamUrl: streamUrl,
-                title: title,
-                artworkUrl: art
-              }));
-            }
-
-            // Silence and pause HTML5 audio so it does not download duplicate data
-            // or trigger browser-level pause when screen blanks / phone locks
-            if (audioPlayer) {
-              try {
-                audioPlayer.muted = true;
-                audioPlayer.pause();
-              } catch(e) {}
-            }
-          }
-
-          function sendPauseMessage() {
-            if (window.FlutterLiveStream) {
-              window.FlutterLiveStream.postMessage(JSON.stringify({
-                action: 'pause'
-              }));
-            }
+            audioPlayer.muted = false;
+            audioPlayer.volume = 1.0;
           }
 
           if (playBtn) {
@@ -295,23 +263,21 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
               setTimeout(function() {
                 var isPlayingNow = typeof isPlaying !== 'undefined' ? isPlaying : false;
                 if (isPlayingNow) {
-                  sendPlayMessage();
+                  // Ensure audio remains unmuted
+                  if (audioPlayer) {
+                    audioPlayer.muted = false;
+                    audioPlayer.volume = 1.0;
+                  }
+                  if (window.FlutterLiveStream) {
+                    window.FlutterLiveStream.postMessage(JSON.stringify({ action: 'play' }));
+                  }
                 } else {
-                  sendPauseMessage();
+                  if (window.FlutterLiveStream) {
+                    window.FlutterLiveStream.postMessage(JSON.stringify({ action: 'pause' }));
+                  }
                 }
-              }, 120);
+              }, 100);
             });
-          }
-
-          // If the webpage starts play directly
-          if (audioPlayer) {
-            audioPlayer.addEventListener('play', function() {
-              sendPlayMessage();
-            });
-            // NOTE: We intentionally do NOT listen to audioPlayer 'pause' event here.
-            // When the Android screen blanks or activity pauses, the WebView freezes
-            // and automatically pauses HTML5 <audio>, which would erroneously pause
-            // Flutter's background native AudioService.
           }
         }
         attachBridge();
@@ -325,29 +291,9 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
       final action = data['action'] as String?;
 
       if (action == 'play') {
-        var streamUrl = data['streamUrl'] as String?;
-        if (streamUrl == null || streamUrl.trim().isEmpty) {
-          streamUrl = 'https://listen.mixlr.com/d0f784be72d6e96ef254f2a5b696a9bd';
-        }
-        final title = data['title'] as String? ?? 'Live Broadcast';
-        final artworkUrl = data['artworkUrl'] as String?;
-
-        try {
-          await ref.read(audioPlayerChangeNotifierProvider).playLiveStream(
-            streamUrl,
-            title: title,
-            artworkUrl: artworkUrl,
-          );
-        } catch (e) {
-          debugPrint('Live stream native play failed: $e, falling back to web audio');
-          // Fallback: unmute web audio player so user still hears audio if native stream fails
-          _webViewController?.runJavaScript(
-            "var a = document.getElementById('nativeAudioPlayer'); if (a) { a.muted = false; a.play(); }"
-          );
-        }
-      } else if (action == 'pause') {
-        final currentSermon = ref.read(audioPlayerChangeNotifierProvider).currentSermon;
-        if (currentSermon?.id == 'livestream') {
+        // Pause any background sermon playback so it doesn't overlap with live stream
+        final audioState = ref.read(audioPlayerChangeNotifierProvider);
+        if (audioState.isPlaying && audioState.currentSermon?.id != 'livestream') {
           await ref.read(audioPlayerChangeNotifierProvider).pause();
         }
       }
@@ -359,7 +305,24 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
   void _initializeStreamLiveWebView() {
     if (_streamLiveInitialized) return;
     _streamLiveInitialized = true;
-    _webViewController = WebViewController()
+
+    late final PlatformWebViewControllerCreationParams params;
+    if (WebViewPlatform.instance is WebKitWebViewPlatform) {
+      params = WebKitWebViewControllerCreationParams(
+        allowsInlineMediaPlayback: true,
+        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
+      );
+    } else {
+      params = const PlatformWebViewControllerCreationParams();
+    }
+
+    final controller = WebViewController.fromPlatformCreationParams(params);
+    if (controller.platform is AndroidWebViewController) {
+      (controller.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
+    }
+
+    _webViewController = controller
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.white)
       ..addJavaScriptChannel(
@@ -517,22 +480,6 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(audioPlayerChangeNotifierProvider, (previous, next) {
-      if (next.currentSermon?.id == 'livestream') {
-        if (previous?.isPlaying != next.isPlaying) {
-          if (next.isPlaying) {
-            _webViewController?.runJavaScript(
-              "if (typeof setPlaybackState === 'function' && typeof isPlaying !== 'undefined' && !isPlaying) setPlaybackState(true);"
-            );
-          } else {
-            _webViewController?.runJavaScript(
-              "if (typeof setPlaybackState === 'function' && typeof isPlaying !== 'undefined' && isPlaying) setPlaybackState(false);"
-            );
-          }
-        }
-      }
-    });
-
     final targetSubIndex = ref.watch(liveStreamSubTabIndexProvider);
 
     if (_tabController.index != targetSubIndex) {
