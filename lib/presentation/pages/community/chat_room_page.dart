@@ -45,6 +45,10 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   bool _isSending = false;
   ListenSession? _activeSession;
   Timer? _sessionPollTimer;
+  Timer? _typingStopTimer;
+  DateTime? _lastTypingSentAt;
+  bool _isCurrentlyTyping = false;
+  int _lastMessageCount = 0;
   ChatMessage? _replyingTo;
 
   // Voice note recording & playback
@@ -70,6 +74,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     _textController.addListener(() {
       final has = _textController.text.trim().isNotEmpty;
       if (has != _hasText && mounted) setState(() => _hasText = has);
+      _onTypingChanged(has);
     });
     _voicePosSub = _voicePlayer.positionStream.listen((pos) {
       if (mounted) setState(() => _voicePos = pos);
@@ -98,15 +103,47 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   }
 
   void _startSessionPolling() {
-    _sessionPollTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+    _sessionPollTimer = Timer.periodic(const Duration(seconds: 6), (_) async {
+      final listenState = ref.read(listenTogetherProvider);
+      if (listenState.isJoined && listenState.currentRoomId == widget.room.id) {
+        return;
+      }
       final session = await ref.read(communityChangeNotifierProvider)
           .pollListenSession(widget.room.id);
       if (mounted) setState(() => _activeSession = session);
     });
   }
 
+  void _onTypingChanged(bool hasText) {
+    if (!hasText) {
+      _stopTyping();
+      return;
+    }
+    final now = DateTime.now();
+    if (!_isCurrentlyTyping ||
+        _lastTypingSentAt == null ||
+        now.difference(_lastTypingSentAt!) >= const Duration(seconds: 3)) {
+      _isCurrentlyTyping = true;
+      _lastTypingSentAt = now;
+      ref.read(communityChangeNotifierProvider).setTyping(widget.room.id, true);
+    }
+    _typingStopTimer?.cancel();
+    _typingStopTimer = Timer(const Duration(seconds: 4), _stopTyping);
+  }
+
+  void _stopTyping() {
+    _typingStopTimer?.cancel();
+    _typingStopTimer = null;
+    if (_isCurrentlyTyping) {
+      _isCurrentlyTyping = false;
+      _lastTypingSentAt = null;
+      ref.read(communityChangeNotifierProvider).setTyping(widget.room.id, false);
+    }
+  }
+
   @override
   void dispose() {
+    _stopTyping();
     _sessionPollTimer?.cancel();
     _recordTimer?.cancel();
     _voicePosSub?.cancel();
@@ -365,13 +402,32 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
       _isSending = true;
       _replyingTo = null;
     });
+    _stopTyping();
     _textController.clear();
 
+    bool ok = false;
     final p = ref.read(communityChangeNotifierProvider);
-    await p.sendMessage(widget.room.id, text, replyToId: replyToId);
-
-    setState(() => _isSending = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    try {
+      ok = await p.sendMessage(widget.room.id, text, replyToId: replyToId);
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
+    if (!mounted) return;
+    if (ok) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    } else {
+      if (_textController.text.isEmpty) {
+        _textController.text = text;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(p.error ?? 'Failed to send message. Please try again.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   Future<void> _startRecording() async {
@@ -535,14 +591,24 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
       }
     });
 
-    // Scroll to bottom when new messages arrive
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients &&
-          _scrollController.position.pixels >=
-              _scrollController.position.maxScrollExtent - 200) {
-        _scrollToBottom();
+    // Only auto-scroll to bottom when new messages actually arrive (not on every rebuild)
+    final currentCount = p.messages.length;
+    if (currentCount != _lastMessageCount) {
+      final wasEmpty = _lastMessageCount == 0;
+      final hasNewMessages = currentCount > _lastMessageCount;
+      _lastMessageCount = currentCount;
+      if (hasNewMessages) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_scrollController.hasClients) return;
+          final pos = _scrollController.position;
+          if (wasEmpty ||
+              (!pos.isScrollingNotifier.value &&
+                  pos.pixels >= pos.maxScrollExtent - 200)) {
+            _scrollToBottom();
+          }
+        });
       }
-    });
+    }
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF8F6F0),
@@ -682,6 +748,8 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                         },
                       ),
           ),
+          // Typing indicator
+          _buildTypingIndicator(p.typingUsers, me?.fullName, isDark),
           // Reply preview bar
           if (_replyingTo != null) _buildReplyPreviewBar(isDark),
           // Input bar
@@ -1054,6 +1122,57 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     if (msg.hasFile) return '📎 ${msg.fileName ?? "File"}';
     if (msg.hasResource) return '🎧 ${msg.resourceTitle ?? "Shared resource"}';
     return msg.text;
+  }
+
+  Widget _buildTypingIndicator(
+    List<String> typingUsers,
+    String? myName,
+    bool isDark,
+  ) {
+    final normalizedMe = (myName ?? '').trim().toLowerCase();
+    final others = typingUsers
+        .where((name) => name.trim().toLowerCase() != normalizedMe)
+        .toList();
+    if (others.isEmpty) return const SizedBox.shrink();
+
+    final String label;
+    if (others.length == 1) {
+      label = '${others.first} is typing...';
+    } else if (others.length == 2) {
+      label = '${others[0]} and ${others[1]} are typing...';
+    } else {
+      label = '${others[0]}, ${others[1]} and ${others.length - 2} others are typing...';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.8,
+              color: AppColors.primaryGold,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildReplyPreviewBar(bool isDark) {

@@ -26,10 +26,15 @@ class ListenTogetherNotifier extends ChangeNotifier {
   Timer? _syncTimer;
   DateTime? _lastLocalAction;
   DateTime? _lastSeekTime;
+  DateTime? _lastServerUpdatedAt;
+  int _lastServerPositionMs = 0;
+  DateTime? _lastSnapshotReceivedAt;
+  DateTime? _rateLimitedUntil;
   bool _isSyncing = false;
   bool _isPushing = false;
   static const _localActionCooldown = Duration(seconds: 2);
   static const _seekCooldown = Duration(seconds: 6);
+  static const _staleSnapshotThresholdMs = 10000;
 
   StreamSubscription? _posSub;
   StreamSubscription? _durSub;
@@ -166,7 +171,11 @@ class ListenTogetherNotifier extends ChangeNotifier {
     try {
       await _configureAudioSession();
       await _player.setUrl(_normalizeAudioUrl(session.audioUrl));
-      var targetMs = (session.positionSeconds * 1000).round();
+      _lastServerUpdatedAt = session.updatedAt;
+      _lastServerPositionMs = (session.positionSeconds * 1000).round();
+      _lastSnapshotReceivedAt = DateTime.now();
+
+      var targetMs = _lastServerPositionMs;
       if (session.isPlaying) {
         final ageMs = DateTime.now().toUtc().difference(session.updatedAt.toUtc()).inMilliseconds;
         if (ageMs > 0 && ageMs < 15000) {
@@ -189,8 +198,8 @@ class ListenTogetherNotifier extends ChangeNotifier {
       if (_isHost) {
         _syncTimer = Timer.periodic(const Duration(seconds: 2), (_) => _pushState());
       } else {
-        // Poll sub-second so host pause/play propagates to listeners right away
-        _syncTimer = Timer.periodic(const Duration(milliseconds: 800), (_) => _pollAndSync());
+        // Poll every 1.5s to stay responsive while avoiding 429 rate limits
+        _syncTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) => _pollAndSync());
       }
 
       _isLoading = false;
@@ -241,6 +250,9 @@ class ListenTogetherNotifier extends ChangeNotifier {
 
   Future<void> _pollAndSync() async {
     if (!_isJoined || _currentRoomId == null || _isSyncing) return;
+    if (_rateLimitedUntil != null && DateTime.now().isBefore(_rateLimitedUntil!)) {
+      return;
+    }
     if (_lastLocalAction != null &&
         DateTime.now().difference(_lastLocalAction!) < _localActionCooldown) {
       return;
@@ -249,6 +261,10 @@ class ListenTogetherNotifier extends ChangeNotifier {
     _isSyncing = true;
     try {
       final res = await _api.get(ApiConstants.communityListenSession(_currentRoomId!));
+      if (res.statusCode == 429) {
+        _rateLimitedUntil = DateTime.now().add(const Duration(seconds: 5));
+        return;
+      }
       if (!res.isSuccess) return;
       final data = res.data['session'];
       if (data == null) {
@@ -265,13 +281,25 @@ class ListenTogetherNotifier extends ChangeNotifier {
       final previousAudioUrl = _session?.audioUrl;
       _session = updated;
 
-      // Estimate live host position by adding elapsed time since last server update
-      var estimatedRemoteMs = (updated.positionSeconds * 1000).round();
-      if (updated.isPlaying) {
-        final ageMs = DateTime.now().toUtc().difference(updated.updatedAt.toUtc()).inMilliseconds;
-        if (ageMs > 0 && ageMs < 15000) {
-          estimatedRemoteMs += ageMs;
-        }
+      final serverPosMs = (updated.positionSeconds * 1000).round();
+      final isFreshSnapshot = _lastSnapshotReceivedAt == null ||
+          updated.updatedAt != _lastServerUpdatedAt ||
+          serverPosMs != _lastServerPositionMs;
+      if (isFreshSnapshot) {
+        _lastServerUpdatedAt = updated.updatedAt;
+        _lastServerPositionMs = serverPosMs;
+        _lastSnapshotReceivedAt = DateTime.now();
+      }
+
+      // Estimate live host position using local elapsed time since this snapshot arrived
+      // (avoids device-vs-server clock skew and never snaps backwards when ageMs >= 15s).
+      final localElapsedMs = _lastSnapshotReceivedAt != null
+          ? DateTime.now().difference(_lastSnapshotReceivedAt!).inMilliseconds
+          : 0;
+      final isSnapshotRecent = localElapsedMs < _staleSnapshotThresholdMs;
+      var estimatedRemoteMs = _lastServerPositionMs;
+      if (updated.isPlaying && localElapsedMs > 0) {
+        estimatedRemoteMs += localElapsedMs;
       }
 
       // Reload if host switched audio OR if listener player dropped back to idle
@@ -293,13 +321,13 @@ class ListenTogetherNotifier extends ChangeNotifier {
         return;
       }
 
-      // Skip drift-seeking while buffering/loading or within seek cooldown to prevent re-buffer silence loops
+      // Skip drift-seeking while buffering/loading, within seek cooldown, or if host updates stalled
       final isBuffering = _player.processingState == ProcessingState.buffering ||
           _player.processingState == ProcessingState.loading;
       final inSeekCooldown = _lastSeekTime != null &&
           DateTime.now().difference(_lastSeekTime!) < _seekCooldown;
 
-      if (!isBuffering && !inSeekCooldown) {
+      if (isSnapshotRecent && !isBuffering && !inSeekCooldown) {
         final localMs = _player.position.inMilliseconds;
         if ((estimatedRemoteMs - localMs).abs() > 6000) {
           await _player.seek(Duration(milliseconds: estimatedRemoteMs));
@@ -353,16 +381,24 @@ class ListenTogetherNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _resetSessionState() {
+    _isJoined = false;
+    _session = null;
+    _currentRoomId = null;
+    _isHost = false;
+    _lastServerUpdatedAt = null;
+    _lastServerPositionMs = 0;
+    _lastSnapshotReceivedAt = null;
+    _lastSeekTime = null;
+  }
+
   Future<void> leaveSession() async {
     _syncTimer?.cancel();
     _syncTimer = null;
     try {
       await _player.stop();
     } catch (_) {}
-    _isJoined = false;
-    _session = null;
-    _currentRoomId = null;
-    _isHost = false;
+    _resetSessionState();
     notifyListeners();
   }
 
@@ -377,10 +413,7 @@ class ListenTogetherNotifier extends ChangeNotifier {
     try {
       await _player.stop();
     } catch (_) {}
-    _isJoined = false;
-    _session = null;
-    _currentRoomId = null;
-    _isHost = false;
+    _resetSessionState();
     notifyListeners();
   }
 

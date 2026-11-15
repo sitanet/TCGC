@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/providers/community_provider.dart';
+import '../../../core/providers/listen_together_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -273,35 +274,87 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                     : SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (ctx, i) {
-                            final rooms = _filteredRooms(p.rooms);
+                            final listenState = ref.watch(listenTogetherProvider);
+                            final activeLocalRoomId =
+                                listenState.isJoined ? listenState.currentRoomId : null;
+                            final rooms = _filteredRooms(p.rooms, p, activeLocalRoomId);
                             final room = rooms[i];
+                            final isHosting =
+                                _isRoomCurrentlyHosting(room, p, activeLocalRoomId);
                             final catLabel = room.categoryName ?? 'General';
-                            final showCategoryHeader = _selectedCategory == 'All' &&
-                                _roomCategories(p.rooms).length > 1 &&
-                                (i == 0 || (rooms[i - 1].categoryName ?? 'General') != catLabel);
-                            if (!showCategoryHeader) {
-                              return _buildRoomTile(context, isDark, room);
+                            final prevIsHosting = i > 0 &&
+                                _isRoomCurrentlyHosting(rooms[i - 1], p, activeLocalRoomId);
+
+                            String? sectionHeader;
+                            if (isHosting) {
+                              if (i == 0) sectionHeader = 'LIVE HOSTING';
+                            } else if (_selectedCategory == 'All' &&
+                                _roomCategories(p.rooms).length > 1) {
+                              final prevCat =
+                                  i > 0 ? (rooms[i - 1].categoryName ?? 'General') : null;
+                              if (i == 0 || prevIsHosting || prevCat != catLabel) {
+                                sectionHeader = catLabel.toUpperCase();
+                              }
+                            }
+
+                            if (sectionHeader == null) {
+                              return _buildRoomTile(
+                                context,
+                                isDark,
+                                room,
+                                p,
+                                isHosting: isHosting,
+                              );
                             }
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
-                                  child: Text(
-                                    catLabel.toUpperCase(),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.9,
-                                      color: AppColors.primaryGold.withValues(alpha: 0.9),
-                                    ),
+                                  child: Row(
+                                    children: [
+                                      if (isHosting) ...[
+                                        Container(
+                                          width: 7,
+                                          height: 7,
+                                          margin: const EdgeInsets.only(right: 6),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.greenAccent,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                      ],
+                                      Text(
+                                        sectionHeader,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.9,
+                                          color: isHosting
+                                              ? Colors.green
+                                              : AppColors.primaryGold.withValues(alpha: 0.9),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                _buildRoomTile(context, isDark, room),
+                                _buildRoomTile(
+                                  context,
+                                  isDark,
+                                  room,
+                                  p,
+                                  isHosting: isHosting,
+                                ),
                               ],
                             );
                           },
-                          childCount: _filteredRooms(p.rooms).length,
+                          childCount: _filteredRooms(
+                            p.rooms,
+                            p,
+                            ref.watch(listenTogetherProvider).isJoined
+                                ? ref.watch(listenTogetherProvider).currentRoomId
+                                : null,
+                          ).length,
                         ),
                       ),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
@@ -325,8 +378,21 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     return ['All', ...ordered, if (hasUncategorized) 'General'];
   }
 
-  List<CommunityRoom> _filteredRooms(List<CommunityRoom> rooms) {
-    return rooms.where((r) {
+  bool _isRoomCurrentlyHosting(
+    CommunityRoom room,
+    CommunityProvider p,
+    int? activeLocalRoomId,
+  ) {
+    return p.isRoomHosting(room.id) ||
+        (activeLocalRoomId != null && room.id == activeLocalRoomId);
+  }
+
+  List<CommunityRoom> _filteredRooms(
+    List<CommunityRoom> rooms, [
+    CommunityProvider? p,
+    int? activeLocalRoomId,
+  ]) {
+    final filtered = rooms.where((r) {
       if (_selectedCategory != 'All') {
         final cat = (r.categoryName != null && r.categoryName!.isNotEmpty)
             ? r.categoryName!
@@ -338,6 +404,20 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
           (r.description ?? '').toLowerCase().contains(_searchQuery) ||
           (r.categoryName ?? '').toLowerCase().contains(_searchQuery);
     }).toList();
+
+    if (p != null) {
+      final hosting = <CommunityRoom>[];
+      final others = <CommunityRoom>[];
+      for (final r in filtered) {
+        if (_isRoomCurrentlyHosting(r, p, activeLocalRoomId)) {
+          hosting.add(r);
+        } else {
+          others.add(r);
+        }
+      }
+      return [...hosting, ...others];
+    }
+    return filtered;
   }
 
   Widget _buildHeroHeader(bool isDark, CommunityProvider p) {
@@ -843,7 +923,13 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     }
   }
 
-  Widget _buildRoomTile(BuildContext context, bool isDark, CommunityRoom room) {
+  Widget _buildRoomTile(
+    BuildContext context,
+    bool isDark,
+    CommunityRoom room,
+    CommunityProvider p, {
+    bool isHosting = false,
+  }) {
     final iconMap = {
       'chat_bubble_outline': Icons.chat_bubble_outline,
       'volunteer_activism': Icons.volunteer_activism,
@@ -860,10 +946,13 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
         : (room.roomType == 'group' ? Icons.groups_rounded : Icons.lock_rounded);
 
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ChatRoomPage(room: room)),
-      ),
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ChatRoomPage(room: room)),
+        );
+        p.refreshHostingRooms();
+      },
       child: Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         padding: const EdgeInsets.all(16),
@@ -871,7 +960,10 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
           color: isDark ? AppColors.cardDark : Colors.white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.16 : 0.14),
+            color: isHosting
+                ? Colors.green.withValues(alpha: 0.55)
+                : AppColors.primaryGold.withValues(alpha: isDark ? 0.16 : 0.14),
+            width: isHosting ? 1.5 : 1,
           ),
           boxShadow: [
             BoxShadow(
@@ -921,6 +1013,31 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (isHosting) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.headphones_rounded, size: 11, color: Colors.green),
+                              SizedBox(width: 3),
+                              Text(
+                                'LIVE',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
