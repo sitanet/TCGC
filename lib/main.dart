@@ -48,6 +48,7 @@ import 'data/services/biometric_service.dart';
 import 'core/providers/community_provider.dart';
 import 'core/services/image_cache_service.dart';
 import 'presentation/bloc/ask_wing_ai/ask_wing_ai_cubit.dart';
+import 'presentation/widgets/auth_required_sheet.dart';
 import 'data/services/ask_wing_ai_service.dart';
 import 'core/services/token_service.dart';
 import 'core/utils/error_handler.dart';
@@ -386,8 +387,8 @@ class _MyAppState extends ConsumerState<MyApp> {
 
     Widget homeWidget;
 
-    // 1. If authenticated, show main app
-    if (authProvider.isAuthenticated) {
+    // 1. If authenticated or continuing as guest, show main app
+    if (authProvider.isAuthenticated || authProvider.isGuestMode) {
       homeWidget = const NetworkAwareWidget(child: MainScreen());
     }
     // 2. If user registered or attempted login but email is unverified,
@@ -437,6 +438,9 @@ class _MyAppState extends ConsumerState<MyApp> {
             _showGetStarted = false;
             _showSignUp = true;
           });
+        },
+        onContinueAsGuest: () {
+          authProvider.continueAsGuest();
         },
       );
     } else if (_showSignUp) {
@@ -1019,6 +1023,29 @@ class _MainScreenState extends ConsumerState<MainScreen>
               currentIndex: safeIndex,
               showWallet: showWallet,
               onTap: (index) {
+                final auth = ref.read(authChangeNotifierProvider);
+                if (!auth.isAuthenticated) {
+                  if (showWallet && index == 3) {
+                    AuthRequiredSheet.show(
+                      context,
+                      title: 'TCGC Wallet & Giving',
+                      message: 'Sign in to access your digital wallet, give tithes & offerings, and manage contributions securely.',
+                      featureIcon: Icons.account_balance_wallet_outlined,
+                    );
+                    return;
+                  }
+                  final communityIndex = showWallet ? 5 : 4;
+                  if (index == communityIndex) {
+                    AuthRequiredSheet.show(
+                      context,
+                      title: 'Join Church Community',
+                      message: 'Sign in to join community rooms, chat with church units, and participate in Listen Together audio sessions.',
+                      featureIcon: Icons.groups_outlined,
+                    );
+                    return;
+                  }
+                }
+
                 if (showWallet && index == 3) {
                   _handleWalletTap();
                 } else {

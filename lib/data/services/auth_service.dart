@@ -12,6 +12,30 @@ import 'local_database_service.dart';
 class AuthService {
   final ApiService _api = ApiService();
   static const String _pendingVerificationEmailKey = 'pending_verification_email';
+  static const String _isGuestModeKey = 'is_guest_mode';
+
+  Future<bool> getIsGuestMode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_isGuestModeKey) ?? false;
+    } catch (e) {
+      debugPrint('Failed to get guest mode: $e');
+      return false;
+    }
+  }
+
+  Future<void> setGuestMode(bool isGuest) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (isGuest) {
+        await prefs.setBool(_isGuestModeKey, true);
+      } else {
+        await prefs.remove(_isGuestModeKey);
+      }
+    } catch (e) {
+      debugPrint('Failed to set guest mode: $e');
+    }
+  }
 
   Future<void> savePendingVerificationEmail(String email) async {
     try {

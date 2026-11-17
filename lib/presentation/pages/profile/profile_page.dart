@@ -15,6 +15,8 @@ import '../audio/playlists_page.dart';
 import '../../../data/services/favorites_service.dart';
 import '../../../data/services/download_service.dart';
 import '../../../data/services/playlist_service.dart';
+import '../auth/auth_flow_page.dart';
+import '../../widgets/auth_required_sheet.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -203,7 +205,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                             icon: Icons.person_outline_rounded,
                             title: 'Edit Profile',
                             subtitle: 'Name, email, and personal information',
-                            onTap: () => _authenticateAndNavigateToEditProfile(context, isDark),
+                            onTap: () {
+                              if (!authProvider.isAuthenticated) {
+                                AuthRequiredSheet.show(
+                                  context,
+                                  title: 'Member Profile',
+                                  message:
+                                      'Sign in to view and update your church profile and personal details.',
+                                  featureIcon: Icons.person_outline_rounded,
+                                );
+                                return;
+                              }
+                              _authenticateAndNavigateToEditProfile(context, isDark);
+                            },
                           ),
                           if (showWallet)
                             _MenuItemConfig(
@@ -211,6 +225,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               title: 'TCGC Wallet',
                               subtitle: 'Transactions and payment options',
                               onTap: () {
+                                if (!authProvider.isAuthenticated) {
+                                  AuthRequiredSheet.show(
+                                    context,
+                                    title: 'TCGC Wallet & Giving',
+                                    message:
+                                        'Sign in to access your digital wallet, tithes, offerings, and giving history.',
+                                    featureIcon: Icons.account_balance_wallet_outlined,
+                                  );
+                                  return;
+                                }
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (_) => const WalletPage()),
@@ -222,6 +246,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                             title: 'Password & Biometrics',
                             subtitle: 'Face ID, fingerprint, and login security',
                             onTap: () {
+                              if (!authProvider.isAuthenticated) {
+                                AuthRequiredSheet.show(
+                                  context,
+                                  title: 'Security Settings',
+                                  message:
+                                      'Sign in to configure password security and biometric login.',
+                                  featureIcon: Icons.security_rounded,
+                                );
+                                return;
+                              }
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(builder: (_) => const SettingsPage()),
@@ -249,6 +283,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                             title: 'Notifications & Audio',
                             subtitle: 'Sermon alerts, streaming quality',
                             onTap: () {
+                              if (!authProvider.isAuthenticated) {
+                                AuthRequiredSheet.show(
+                                  context,
+                                  title: 'Notification Preferences',
+                                  message:
+                                      'Sign in to customize sermon alerts and notification settings.',
+                                  featureIcon: Icons.notifications_none_rounded,
+                                );
+                                return;
+                              }
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(builder: (_) => const SettingsPage()),
@@ -270,6 +314,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                             title: 'Chat with Us',
                             subtitle: 'Pastoral assistance and inquiries',
                             onTap: () {
+                              if (!authProvider.isAuthenticated) {
+                                AuthRequiredSheet.show(
+                                  context,
+                                  title: 'Pastoral Inquiries',
+                                  message:
+                                      'Sign in to send inquiries and receive pastoral assistance from church leadership.',
+                                  featureIcon: Icons.chat_bubble_outline_rounded,
+                                );
+                                return;
+                              }
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(builder: (_) => const ComplaintPage()),
@@ -291,11 +345,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       ),
                       SizedBox(height: spacing * 1.5),
 
-                      // Section D: Account Actions (Logout & Delete)
+                      // Section D: Account Actions (Logout & Delete / Guest Actions)
                       if (authProvider.isAuthenticated) ...[
                         _buildLogoutButton(context, isDark),
                         SizedBox(height: spacing * 0.8),
                         _buildDeleteAccountButton(context, isDark),
+                      ] else ...[
+                        _buildExitGuestButton(context, isDark),
                       ],
                     ],
                   ),
@@ -313,14 +369,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   // ── 1. Profile Header ─────────────────────────────────────────────
   Widget _buildProfileHeader(BuildContext context, bool isDark, bool isTablet) {
     final authProvider = ref.watch(authChangeNotifierProvider);
+    final isGuest = !authProvider.isAuthenticated;
     final user = authProvider.user;
-    final displayName = user != null && user.fullName.trim().isNotEmpty
-        ? user.fullName
-        : (user?.email ?? 'Beloved Member');
-    final email = user?.email ?? '';
-    final role = user != null && user.role.isNotEmpty
-        ? user.role.toUpperCase()
-        : 'TCGC MEMBER';
+    final displayName = isGuest
+        ? 'Welcome, Beloved Guest'
+        : (user != null && user.fullName.trim().isNotEmpty
+            ? user.fullName
+            : (user?.email ?? 'Beloved Member'));
+    final email = isGuest
+        ? 'Sign in or register to unlock all member features'
+        : (user?.email ?? '');
+    final role = isGuest
+        ? 'EXPLORE MODE'
+        : (user != null && user.role.isNotEmpty
+            ? user.role.toUpperCase()
+            : 'TCGC MEMBER');
     final statusBarHeight = MediaQuery.of(context).padding.top;
     final avatarRadius = isTablet ? 56.0 : 46.0;
 
@@ -386,7 +449,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
           // Avatar with Gold Accent Ring & Edit Badge
           GestureDetector(
-            onTap: () => _authenticateAndNavigateToEditProfile(context, isDark),
+            onTap: isGuest
+                ? () => AuthFlowPage.open(context)
+                : () => _authenticateAndNavigateToEditProfile(context, isDark),
             child: Stack(
               alignment: Alignment.bottomRight,
               children: [
@@ -410,11 +475,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   child: CircleAvatar(
                     radius: avatarRadius,
                     backgroundColor: isDark ? AppColors.cardDark : Colors.grey[200],
-                    backgroundImage: user?.photoUrl != null && user!.photoUrl!.isNotEmpty
+                    backgroundImage: !isGuest && user?.photoUrl != null && user!.photoUrl!.isNotEmpty
                         ? NetworkImage(user.photoUrl!)
                         : null,
-                    child: user?.photoUrl == null || user!.photoUrl!.isEmpty
-                        ? Icon(Icons.person, size: avatarRadius * 1.1, color: AppColors.primaryGold)
+                    child: isGuest || user?.photoUrl == null || user!.photoUrl!.isEmpty
+                        ? Icon(
+                            isGuest ? Icons.person_outline_rounded : Icons.person,
+                            size: avatarRadius * 1.1,
+                            color: AppColors.primaryGold,
+                          )
                         : null,
                   ),
                 ),
@@ -431,7 +500,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.edit_rounded, size: 13, color: Colors.white),
+                  child: Icon(
+                    isGuest ? Icons.login_rounded : Icons.edit_rounded,
+                    size: 13,
+                    color: Colors.white,
+                  ),
                 ),
               ],
             ),
@@ -481,7 +554,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.verified_rounded, size: 14, color: AppColors.primaryGold),
+                Icon(
+                  isGuest ? Icons.explore_outlined : Icons.verified_rounded,
+                  size: 14,
+                  color: AppColors.primaryGold,
+                ),
                 const SizedBox(width: 5),
                 Text(
                   role,
@@ -495,6 +572,30 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               ],
             ),
           ),
+          if (isGuest) ...[
+            const SizedBox(height: 14),
+            ElevatedButton.icon(
+              onPressed: () => AuthFlowPage.open(context),
+              icon: const Icon(Icons.login_rounded, size: 16, color: Colors.black),
+              label: const Text(
+                'Sign In or Register',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGold,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                elevation: 2,
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
         ],
       ),
@@ -503,6 +604,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   // ── 2. Personal Library Stats Strip ──────────────────────────────
   Widget _buildStatsStrip(BuildContext context, bool isDark, bool isTablet) {
+    final authProvider = ref.watch(authChangeNotifierProvider);
     return ListenableBuilder(
       listenable: Listenable.merge([_favoritesService, _downloadService, _playlistService]),
       builder: (context, _) {
@@ -521,6 +623,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 count: favoritesCount,
                 label: 'Favorites',
                 onTap: () {
+                  if (!authProvider.isAuthenticated) {
+                    AuthRequiredSheet.show(
+                      context,
+                      title: 'Favorites',
+                      message:
+                          'Sign in or create an account to save and access your favorite sermons.',
+                      featureIcon: Icons.favorite_rounded,
+                    );
+                    return;
+                  }
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const FavoritesPage()),
@@ -538,6 +650,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 count: downloadsCount,
                 label: 'Downloads',
                 onTap: () {
+                  if (!authProvider.isAuthenticated) {
+                    AuthRequiredSheet.show(
+                      context,
+                      title: 'Downloads',
+                      message:
+                          'Sign in or create an account to download sermons for offline listening.',
+                      featureIcon: Icons.download_rounded,
+                    );
+                    return;
+                  }
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const DownloadsPage()),
@@ -555,6 +677,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 count: playlistsCount,
                 label: 'Playlists',
                 onTap: () {
+                  if (!authProvider.isAuthenticated) {
+                    AuthRequiredSheet.show(
+                      context,
+                      title: 'Playlists',
+                      message:
+                          'Sign in or create an account to create and manage personal playlists.',
+                      featureIcon: Icons.playlist_play_rounded,
+                    );
+                    return;
+                  }
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const PlaylistsPage()),
@@ -787,6 +919,62 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   // ── 5. Logout & Delete Account Actions ─────────────────────────────
+  Widget _buildExitGuestButton(BuildContext context, bool isDark) {
+    final bodyFontSize = Responsive.bodyFontSize(context);
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton.icon(
+            onPressed: () => AuthFlowPage.open(context),
+            icon: const Icon(Icons.login_rounded, color: Colors.black, size: 18),
+            label: Text(
+              'Sign In to Your Account',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: bodyFontSize,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGold,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 46,
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              await ref.read(authChangeNotifierProvider).exitGuestMode();
+            },
+            icon: const Icon(Icons.arrow_back_rounded, color: AppColors.primaryGold, size: 18),
+            label: Text(
+              'Exit Guest Mode',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+                fontSize: bodyFontSize,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColors.primaryGold, width: 1.2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildLogoutButton(BuildContext context, bool isDark) {
     final bodyFontSize = Responsive.bodyFontSize(context);
 

@@ -17,6 +17,7 @@ import '../../widgets/custom_app_bar.dart';
 import '../../widgets/password_input_field.dart';
 import '../../widgets/animated_play_button.dart';
 import '../../widgets/resume_playback_sheet.dart';
+import '../../widgets/auth_required_sheet.dart';
 
 class AudioPlayerPage extends ConsumerStatefulWidget {
   final Sermon sermon;
@@ -243,6 +244,16 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     );
 
     if (!canAccess) {
+      if (!authProvider.isAuthenticated) {
+        AuthRequiredSheet.show(
+          context,
+          title: 'Sign In to Access',
+          message:
+              'This message is reserved for church members. Sign in or create an account to listen.',
+          featureIcon: Icons.lock_outline_rounded,
+        );
+        return;
+      }
       _showAccessDeniedDialog();
     } else {
       _handlePlayback();
@@ -1493,6 +1504,16 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                 isActive: isFavorite,
                 onTap: () async {
                   HapticFeedback.lightImpact();
+                  if (!ref.read(authChangeNotifierProvider).isAuthenticated) {
+                    AuthRequiredSheet.show(
+                      context,
+                      title: 'Sign In to Save Favorites',
+                      message:
+                          'Create a free account or sign in to save your favorite messages and access them anywhere.',
+                      featureIcon: Icons.favorite_rounded,
+                    );
+                    return;
+                  }
                   await _favoritesService.toggleFavorite(widget.sermon);
                   _trackMessageStat('favorite', !isFavorite);
                   if (context.mounted) {
@@ -1540,6 +1561,16 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                     ? null
                     : () {
                         HapticFeedback.lightImpact();
+                        if (!ref.read(authChangeNotifierProvider).isAuthenticated) {
+                          AuthRequiredSheet.show(
+                            context,
+                            title: 'Sign In to Download',
+                            message:
+                                'Sign in to download messages for offline listening without an internet connection.',
+                            featureIcon: Icons.download_rounded,
+                          );
+                          return;
+                        }
                         if (isDownloaded) {
                           _showDeleteDownloadDialog(context, isDark);
                         } else {
@@ -1552,6 +1583,16 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                 label: 'Playlist',
                 onTap: () {
                   HapticFeedback.lightImpact();
+                  if (!ref.read(authChangeNotifierProvider).isAuthenticated) {
+                    AuthRequiredSheet.show(
+                      context,
+                      title: 'Sign In for Playlists',
+                      message:
+                          'Sign in to create, edit, and organize custom message playlists.',
+                      featureIcon: Icons.playlist_add_rounded,
+                    );
+                    return;
+                  }
                   _showPlaylistBottomSheet(context, isDark);
                 },
               ),
@@ -2170,6 +2211,17 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                     isFavorite ? 'Remove from Favorites' : 'Add to Favorites',
                   ),
                   onTap: () async {
+                    if (!ref.read(authChangeNotifierProvider).isAuthenticated) {
+                      Navigator.pop(context);
+                      AuthRequiredSheet.show(
+                        context,
+                        title: 'Sign In to Save Favorites',
+                        message:
+                            'Create a free account or sign in to save your favorite messages and access them anywhere.',
+                        featureIcon: Icons.favorite_rounded,
+                      );
+                      return;
+                    }
                     await _favoritesService.toggleFavorite(widget.sermon);
                     // Track favorite action to backend
                     _trackMessageStat('favorite', !isFavorite);
@@ -2195,6 +2247,16 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                   title: const Text('Add to Playlist'),
                   onTap: () {
                     Navigator.pop(context);
+                    if (!ref.read(authChangeNotifierProvider).isAuthenticated) {
+                      AuthRequiredSheet.show(
+                        context,
+                        title: 'Sign In for Playlists',
+                        message:
+                            'Sign in to create, edit, and organize custom message playlists.',
+                        featureIcon: Icons.playlist_add_rounded,
+                      );
+                      return;
+                    }
                     _showPlaylistBottomSheet(context, isDark);
                   },
                 ),
@@ -2218,6 +2280,16 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                       ? null
                       : () {
                           Navigator.pop(context);
+                          if (!ref.read(authChangeNotifierProvider).isAuthenticated) {
+                            AuthRequiredSheet.show(
+                              context,
+                              title: 'Sign In to Download',
+                              message:
+                                  'Sign in to download messages for offline listening without an internet connection.',
+                              featureIcon: Icons.download_rounded,
+                            );
+                            return;
+                          }
                           if (isDownloaded) {
                             _showDeleteDownloadDialog(context, isDark);
                           } else {
@@ -2318,6 +2390,17 @@ Listen now: $shareUrl''';
   }
 
   void _showDownloadProgressDialog(BuildContext context, bool isDark) {
+    if (!ref.read(authChangeNotifierProvider).isAuthenticated) {
+      AuthRequiredSheet.show(
+        context,
+        title: 'Sign In to Download',
+        message:
+            'Sign in to download messages for offline listening without an internet connection.',
+        featureIcon: Icons.download_rounded,
+      );
+      return;
+    }
+
     // Start the download
     _downloadService.downloadSermon(widget.sermon);
 
@@ -2510,6 +2593,17 @@ Listen now: $shareUrl''';
   }
 
   void _showPlaylistBottomSheet(BuildContext context, bool isDark) {
+    if (!ref.read(authChangeNotifierProvider).isAuthenticated) {
+      AuthRequiredSheet.show(
+        context,
+        title: 'Sign In for Playlists',
+        message:
+            'Sign in to create, edit, and organize custom message playlists.',
+        featureIcon: Icons.playlist_add_rounded,
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,

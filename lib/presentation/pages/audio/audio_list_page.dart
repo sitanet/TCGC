@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_player_page.dart';
 import '../../widgets/resume_playback_sheet.dart';
+import '../../widgets/auth_required_sheet.dart';
 
 enum FilterType { category, speaker, date }
 
@@ -185,6 +186,18 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
   }
   
   void _showLockedMessage(BuildContext context, bool isDark) {
+    final auth = ref.read(authChangeNotifierProvider);
+    if (!auth.isAuthenticated) {
+      AuthRequiredSheet.show(
+        context,
+        title: 'Sign In to Access',
+        message:
+            'This message is reserved for church members. Sign in or create an account to listen.',
+        featureIcon: Icons.lock_outline_rounded,
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(

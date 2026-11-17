@@ -23,6 +23,8 @@ import '../../bloc/ask_wing_ai/ask_wing_ai_cubit.dart';
 import '../../widgets/ask_wing_ai/ai_consent_dialog.dart';
 import '../../../data/services/church_announcement_service.dart';
 import '../../widgets/church_announcement_dialog.dart';
+import '../../widgets/auth_required_sheet.dart';
+import '../auth/auth_flow_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -479,6 +481,16 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         floatingActionButton: GestureDetector(
           onTap: () async {
+            final auth = ref.read(authChangeNotifierProvider);
+            if (!auth.isAuthenticated) {
+              AuthRequiredSheet.show(
+                context,
+                title: 'Ask Wing AI Assistant',
+                message: 'Sign in to ask questions about church sermons, study scripture, and receive AI-guided spiritual answers.',
+                featureIcon: Icons.auto_awesome_rounded,
+              );
+              return;
+            }
             final hasConsent = await AIConsentDialog.hasConsented();
             if (!context.mounted) return;
             if (!hasConsent) {
@@ -706,18 +718,59 @@ class _HomePageState extends ConsumerState<HomePage> {
                         final user = authProvider.user;
                         final displayName = user != null
                             ? '${user.firstName} ${user.lastName}'.trim()
-                            : 'Guest';
+                            : 'Welcome, Guest';
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              displayName.isNotEmpty ? displayName : 'Welcome',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: nameFontSize,
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  displayName.isNotEmpty ? displayName : 'Welcome',
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: nameFontSize,
+                                      ),
+                                ),
+                                if (user == null) ...[
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () => AuthFlowPage.open(context),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primaryGold.withValues(alpha: 0.25),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: AppColors.primaryGold,
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Sign in',
+                                            style: TextStyle(
+                                              color: AppColors.primaryGold,
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          SizedBox(width: 3),
+                                          Icon(
+                                            Icons.arrow_forward_ios_rounded,
+                                            color: AppColors.primaryGold,
+                                            size: 9,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
+                                ],
+                              ],
                             ),
                             // Profile avatar
                             GestureDetector(
@@ -774,6 +827,17 @@ class _HomePageState extends ConsumerState<HomePage> {
 
                   return GestureDetector(
                     onTap: () {
+                      final auth = ref.read(authChangeNotifierProvider);
+                      if (!auth.isAuthenticated) {
+                        AuthRequiredSheet.show(
+                          context,
+                          title: 'Notifications',
+                          message:
+                              'Sign in to view your church notifications and personal alerts.',
+                          featureIcon: Icons.notifications_none_rounded,
+                        );
+                        return;
+                      }
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -1986,6 +2050,16 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   void _showLockedMessage(BuildContext context, bool isDark) {
+    final auth = ref.read(authChangeNotifierProvider);
+    if (!auth.isAuthenticated) {
+      AuthRequiredSheet.show(
+        context,
+        title: 'Sign In to Access',
+        message: 'This message is reserved for church members and fellowship groups. Sign in with your account to listen.',
+        featureIcon: Icons.lock_outline_rounded,
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(

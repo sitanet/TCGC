@@ -8,6 +8,7 @@ import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_image.dart';
 import 'chat_room_page.dart';
+import '../auth/auth_flow_page.dart';
 
 class CommunityPage extends ConsumerStatefulWidget {
   const CommunityPage({super.key});
@@ -136,7 +137,9 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             ),
         ],
       ),
-      body: _checkingPolicy
+      body: !ref.watch(authChangeNotifierProvider).isAuthenticated
+          ? _buildGuestPreview(isDark)
+          : _checkingPolicy
           ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGold))
           : !_policyAccepted
               ? _buildPolicyGate(isDark)
@@ -586,6 +589,195 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
               height: 1.45,
               color: isDark ? AppColors.textSecondaryDark : Colors.black54,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuestPreview(bool isDark) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icon badge
+            Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primaryGold.withValues(alpha: 0.25),
+                    AppColors.primaryGold.withValues(alpha: 0.08),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primaryGold.withValues(alpha: 0.18),
+                    blurRadius: 24,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.groups_rounded,
+                size: 44,
+                color: AppColors.primaryGold,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Join Our Community',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+                letterSpacing: 0.3,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Connect with fellow church members, join chat rooms, share prayer requests, and listen to sermons together in real time.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              ),
+            ),
+            const SizedBox(height: 28),
+            // Feature highlights
+            _buildGuestFeatureRow(
+              isDark,
+              Icons.forum_rounded,
+              'Chat Rooms',
+              'Fellowship with church units & groups',
+            ),
+            const SizedBox(height: 12),
+            _buildGuestFeatureRow(
+              isDark,
+              Icons.headphones_rounded,
+              'Listen Together',
+              'Stream sermons in sync with members',
+            ),
+            const SizedBox(height: 12),
+            _buildGuestFeatureRow(
+              isDark,
+              Icons.people_rounded,
+              'Online Members',
+              'See who is online & connect live',
+            ),
+            const SizedBox(height: 32),
+            // Sign In button
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () => AuthFlowPage.open(context),
+                icon: const Icon(Icons.login_rounded, size: 18, color: Colors.black),
+                label: const Text(
+                  'Sign In to Join Community',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGold,
+                  foregroundColor: Colors.black,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Create account button
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton.icon(
+                onPressed: () => AuthFlowPage.open(context, isSignUp: true),
+                icon: const Icon(Icons.person_add_rounded, size: 18, color: AppColors.primaryGold),
+                label: const Text(
+                  'Create Free Account',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryGold,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primaryGold, width: 1.2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGuestFeatureRow(bool isDark, IconData icon, String title, String subtitle) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : Colors.grey.shade200,
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.primaryGold.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: AppColors.primaryGold, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.lock_outline_rounded,
+            size: 16,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
           ),
         ],
       ),

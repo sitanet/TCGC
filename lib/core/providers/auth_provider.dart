@@ -16,15 +16,29 @@ class AuthProvider extends ChangeNotifier {
   bool _isInitialized = false;
   bool _requiresEmailConfirmation = false;
   String? _pendingVerificationEmail;
+  bool _isGuestMode = false;
 
   AppUser? get user => _user;
   bool get isLoading => _isLoading;
   String? get error => _error;
   String? get message => _message;
   bool get isAuthenticated => _user != null;
+  bool get isGuestMode => _isGuestMode && !isAuthenticated;
   bool get isInitialized => _isInitialized;
   bool get requiresEmailConfirmation => _requiresEmailConfirmation;
   String? get pendingVerificationEmail => _pendingVerificationEmail;
+
+  Future<void> continueAsGuest() async {
+    _isGuestMode = true;
+    await _authService.setGuestMode(true);
+    notifyListeners();
+  }
+
+  Future<void> exitGuestMode() async {
+    _isGuestMode = false;
+    await _authService.setGuestMode(false);
+    notifyListeners();
+  }
 
   Future<void> setPendingVerificationEmail(String email) async {
     _pendingVerificationEmail = email.trim().toLowerCase();
@@ -85,6 +99,7 @@ class AuthProvider extends ChangeNotifier {
       if (_pendingVerificationEmail != null && _pendingVerificationEmail!.isNotEmpty) {
         _checkVerificationInBackground(_pendingVerificationEmail!);
       }
+      _isGuestMode = await _authService.getIsGuestMode();
     }
 
     _isLoading = false;
@@ -134,6 +149,8 @@ class AuthProvider extends ChangeNotifier {
       print('[AUTH] Login successful, fetching profile...');
       _pendingVerificationEmail = null;
       _requiresEmailConfirmation = false;
+      _isGuestMode = false;
+      await _authService.setGuestMode(false);
       _user = await _authService.getProfile();
       _isLoading = false;
 
@@ -243,6 +260,8 @@ class AuthProvider extends ChangeNotifier {
     _user = null;
     _pendingVerificationEmail = null;
     _requiresEmailConfirmation = false;
+    _isGuestMode = false;
+    await _authService.setGuestMode(false);
     notifyListeners();
   }
 
@@ -251,6 +270,8 @@ class AuthProvider extends ChangeNotifier {
     _user = null;
     _pendingVerificationEmail = null;
     _requiresEmailConfirmation = false;
+    _isGuestMode = false;
+    _authService.setGuestMode(false);
     _error = null;
     _message = null;
     notifyListeners();

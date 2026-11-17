@@ -9,6 +9,7 @@ import '../../widgets/password_input_field.dart';
 import '../../providers/feature_toggle_provider.dart';
 import 'give_page.dart';
 import 'set_transaction_pin_page.dart';
+import '../auth/auth_flow_page.dart';
 
 class WalletPage extends ConsumerStatefulWidget {
   const WalletPage({super.key});
@@ -662,12 +663,219 @@ class _WalletPageState extends ConsumerState<WalletPage>
       );
     }
 
+    // Guest mode: show preview instead of triggering authentication
+    final authProvider = ref.watch(authChangeNotifierProvider);
+    if (!authProvider.isAuthenticated) {
+      return _buildGuestWalletPreview(context);
+    }
+
     if (!_hasInitialized) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _startAuthentication();
       });
     }
     return _buildWalletUI(context);
+  }
+
+  Widget _buildGuestWalletPreview(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final horizontalPadding = Responsive.horizontalPadding(context);
+
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      appBar: CustomAppBar(
+        title: 'Wallet & Giving',
+        showBackButton: true,
+        lightBackground: !isDark,
+        onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Icon badge
+              Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primaryGold.withValues(alpha: 0.25),
+                      AppColors.primaryGold.withValues(alpha: 0.08),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryGold.withValues(alpha: 0.18),
+                      blurRadius: 24,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_rounded,
+                  size: 44,
+                  color: AppColors.primaryGold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'TCGC Digital Wallet',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Sign in to access your digital wallet for seamless tithes, offerings, and giving. Track your contributions and manage payment options.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+              const SizedBox(height: 28),
+              // Feature highlights
+              _buildWalletFeatureRow(
+                isDark,
+                Icons.volunteer_activism_rounded,
+                'Tithes & Offerings',
+                'Give securely with multiple payment options',
+              ),
+              const SizedBox(height: 12),
+              _buildWalletFeatureRow(
+                isDark,
+                Icons.history_rounded,
+                'Giving History',
+                'Track all your contributions in one place',
+              ),
+              const SizedBox(height: 12),
+              _buildWalletFeatureRow(
+                isDark,
+                Icons.security_rounded,
+                'Secure & Private',
+                'PIN & biometric-protected transactions',
+              ),
+              const SizedBox(height: 32),
+              // Sign In button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: () => AuthFlowPage.open(context),
+                  icon: const Icon(Icons.login_rounded, size: 18, color: Colors.black),
+                  label: const Text(
+                    'Sign In to Access Wallet',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGold,
+                    foregroundColor: Colors.black,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Create account button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: () => AuthFlowPage.open(context, isSignUp: true),
+                  icon: const Icon(Icons.person_add_rounded, size: 18, color: AppColors.primaryGold),
+                  label: const Text(
+                    'Create Free Account',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryGold,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.primaryGold, width: 1.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWalletFeatureRow(bool isDark, IconData icon, String title, String subtitle) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : Colors.grey.shade200,
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.primaryGold.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: AppColors.primaryGold, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.lock_outline_rounded,
+            size: 16,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildMaintenancePage(BuildContext context, String message) {

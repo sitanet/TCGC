@@ -5,8 +5,14 @@ import '../../../core/utils/responsive.dart';
 class GetStartedPage extends StatelessWidget {
   final VoidCallback onSignIn;
   final VoidCallback onSignUp;
+  final VoidCallback? onContinueAsGuest;
 
-  const GetStartedPage({super.key, required this.onSignIn, required this.onSignUp});
+  const GetStartedPage({
+    super.key,
+    required this.onSignIn,
+    required this.onSignUp,
+    this.onContinueAsGuest,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +92,35 @@ class GetStartedPage extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (onContinueAsGuest != null) ...[
+                    SizedBox(height: spacing * 1.2),
+                    TextButton(
+                      onPressed: onContinueAsGuest,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Explore Messages as Guest',
+                            style: TextStyle(
+                              fontSize: fontSize * 0.95,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(
+                            Icons.arrow_forward_rounded,
+                            color: AppColors.primaryGold,
+                            size: 18,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   SizedBox(height: Responsive.hp(context, 8)),
                 ],
               ),
