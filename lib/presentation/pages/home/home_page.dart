@@ -716,9 +716,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                           authChangeNotifierProvider,
                         );
                         final user = authProvider.user;
-                        final displayName = user != null
+                        final displayName = user != null &&
+                                '${user.firstName} ${user.lastName}'.trim().isNotEmpty
                             ? '${user.firstName} ${user.lastName}'.trim()
-                            : 'Welcome, Guest';
+                            : 'Hi there';
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -726,7 +727,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  displayName.isNotEmpty ? displayName : 'Welcome',
+                                  displayName,
                                   style: Theme.of(context).textTheme.titleMedium
                                       ?.copyWith(
                                         color: Colors.white,
