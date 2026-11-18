@@ -671,7 +671,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             ),
             const SizedBox(height: 10),
             Text(
-              'Connect with fellow church members, join chat rooms, share prayer requests, and listen to sermons together in real time.',
+              'Connect with fellow members, join chat rooms, share prayer requests, and listen to messages together in real time.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
@@ -685,14 +685,14 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
               isDark,
               Icons.forum_rounded,
               'Chat Rooms',
-              'Fellowship with church units & groups',
+              'Fellowship with units & groups',
             ),
             const SizedBox(height: 12),
             _buildGuestFeatureRow(
               isDark,
               Icons.headphones_rounded,
               'Listen Together',
-              'Stream sermons in sync with members',
+              'Stream messages in sync with members',
             ),
             const SizedBox(height: 12),
             _buildGuestFeatureRow(

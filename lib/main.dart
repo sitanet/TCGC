@@ -1038,8 +1038,8 @@ class _MainScreenState extends ConsumerState<MainScreen>
                   if (index == communityIndex) {
                     AuthRequiredSheet.show(
                       context,
-                      title: 'Join Church Community',
-                      message: 'Sign in to join community rooms, chat with church units, and participate in Listen Together audio sessions.',
+                      title: 'Join Community',
+                      message: 'Sign in to join community rooms, chat with units, and participate in Listen Together audio sessions.',
                       featureIcon: Icons.groups_outlined,
                     );
                     return;

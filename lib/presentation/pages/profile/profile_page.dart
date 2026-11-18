@@ -619,7 +619,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       context,
                       title: 'Favorites',
                       message:
-                          'Sign in or create an account to save and access your favorite sermons.',
+                          'Sign in or create an account to save and access your favorite messages.',
                       featureIcon: Icons.favorite_rounded,
                     );
                     return;
@@ -646,7 +646,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       context,
                       title: 'Downloads',
                       message:
-                          'Sign in or create an account to download sermons for offline listening.',
+                          'Sign in or create an account to download messages for offline listening.',
                       featureIcon: Icons.download_rounded,
                     );
                     return;

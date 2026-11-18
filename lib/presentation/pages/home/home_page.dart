@@ -507,7 +507,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               AuthRequiredSheet.show(
                 context,
                 title: 'Ask Wing AI Assistant',
-                message: 'Sign in to ask questions about church sermons, study scripture, and receive AI-guided spiritual answers.',
+                message: 'Sign in to ask questions about messages, study scripture, and receive AI-guided spiritual answers.',
                 featureIcon: Icons.auto_awesome_rounded,
               );
               return;
