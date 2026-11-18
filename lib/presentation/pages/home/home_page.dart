@@ -67,6 +67,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   static List<Sermon> _staticTrendingSermons = [];
   static List<Sermon> _staticCitygateSongs = [];
   static List<Sermon> _staticRecentlyPlayedSermons = [];
+  static AudioRestreamInfo? _staticActiveRestream;
 
   List<Sermon> _sermons = [];
   List<BeginnerCategory> _beginnerCategories = [];
@@ -82,6 +83,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   void initState() {
     super.initState();
+    _activeRestream = _staticActiveRestream;
     // 1. Immediately show cached data from memory if previously loaded (instant 0ms)
     if (_staticSermons.isNotEmpty) {
       _sermons = _staticSermons;
@@ -141,10 +143,12 @@ class _HomePageState extends ConsumerState<HomePage> {
 
 
   Future<void> _loadActiveRestream() async {
-    final active = await RestreamService().fetchActiveRestream();
+    final result = await RestreamService().fetchActiveRestreamResult();
+    if (!result.requestSucceeded) return;
+    _staticActiveRestream = result.info;
     if (mounted) {
       setState(() {
-        _activeRestream = active;
+        _activeRestream = result.info;
       });
     }
   }

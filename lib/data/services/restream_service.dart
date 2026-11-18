@@ -40,6 +40,13 @@ class AudioRestreamInfo {
   }
 }
 
+class RestreamFetchResult {
+  final AudioRestreamInfo? info;
+  final bool requestSucceeded;
+
+  const RestreamFetchResult({this.info, required this.requestSucceeded});
+}
+
 class RestreamService {
   static final RestreamService _instance = RestreamService._internal();
   factory RestreamService() => _instance;
@@ -47,18 +54,29 @@ class RestreamService {
 
   final ApiService _api = ApiService();
 
-  Future<AudioRestreamInfo?> fetchActiveRestream() async {
+  Future<RestreamFetchResult> fetchActiveRestreamResult() async {
     try {
       final res = await _api
           .get(ApiConstants.audioRestreamActive)
           .timeout(const Duration(seconds: 12));
-      if (res.isSuccess && res.data['is_live'] == true && res.data['sermon'] != null) {
-        return AudioRestreamInfo.fromJson(res.data);
+      if (res.isSuccess) {
+        if (res.data['is_live'] == true && res.data['sermon'] != null) {
+          return RestreamFetchResult(
+            info: AudioRestreamInfo.fromJson(res.data),
+            requestSucceeded: true,
+          );
+        }
+        return const RestreamFetchResult(info: null, requestSucceeded: true);
       }
     } catch (e) {
       debugPrint('RestreamService.fetchActiveRestream error: $e');
     }
-    return null;
+    return const RestreamFetchResult(info: null, requestSucceeded: false);
+  }
+
+  Future<AudioRestreamInfo?> fetchActiveRestream() async {
+    final result = await fetchActiveRestreamResult();
+    return result.info;
   }
 
   Future<int?> sendHeartbeat(int restreamId) async {
