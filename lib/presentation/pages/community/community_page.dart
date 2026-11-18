@@ -262,14 +262,35 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              TextButton.icon(
-                                onPressed: () {
-                                  p.fetchRooms();
-                                  p.fetchAllMembers();
-                                },
-                                icon: const Icon(Icons.refresh, color: AppColors.primaryGold, size: 18),
-                                label: const Text('Refresh', style: TextStyle(color: AppColors.primaryGold)),
-                              ),
+                              if (p.authExpired)
+                                ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final ok = await AuthFlowPage.open(context);
+                                    if (ok == true && mounted) {
+                                      _loadCommunityData();
+                                    }
+                                  },
+                                  icon: const Icon(Icons.login_rounded, size: 18, color: Colors.black),
+                                  label: const Text(
+                                    'Sign In Again',
+                                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primaryGold,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                )
+                              else
+                                TextButton.icon(
+                                  onPressed: () {
+                                    p.fetchRooms();
+                                    p.fetchAllMembers();
+                                  },
+                                  icon: const Icon(Icons.refresh, color: AppColors.primaryGold, size: 18),
+                                  label: const Text('Refresh', style: TextStyle(color: AppColors.primaryGold)),
+                                ),
                             ],
                           ),
                         ),

@@ -152,6 +152,7 @@ class CommunityProvider extends ChangeNotifier {
   bool _isSending = false;
   String? _error;
   bool _hasAccess = true; // assume true until backend says otherwise
+  bool _authExpired = false;
   Timer? _heartbeatTimer;
   Timer? _pollTimer;
   Timer? _typingPollTimer;
@@ -169,6 +170,7 @@ class CommunityProvider extends ChangeNotifier {
   bool get isSending => _isSending;
   String? get error => _error;
   bool get hasAccess => _hasAccess;
+  bool get authExpired => _authExpired;
 
   bool isRoomHosting(int roomId) {
     if (_activeSessionsByRoom[roomId]?.isActive == true) return true;
@@ -215,9 +217,14 @@ class CommunityProvider extends ChangeNotifier {
       final res = await _api.get(ApiConstants.communityMembers)
           .timeout(const Duration(seconds: 30));
       debugPrint('fetchAllMembers: status=${res.statusCode}, success=${res.isSuccess}');
-      if (res.statusCode == 403) {
+      if (res.statusCode == 401) {
+        _authExpired = true;
+        _heartbeatTimer?.cancel();
+        _error = 'Your session expired. Please sign in again.';
+      } else if (res.statusCode == 403) {
         _hasAccess = false;
       } else if (res.isSuccess) {
+        _authExpired = false;
         final list = res.data['members'] as List? ?? [];
         _allMembers = list.map((e) => OnlineMember.fromJson(e)).toList();
         debugPrint('fetchAllMembers: loaded ${_allMembers.length} members');
@@ -271,9 +278,14 @@ class CommunityProvider extends ChangeNotifier {
             .timeout(const Duration(seconds: 30));
       }
       debugPrint('fetchRooms: status=${res.statusCode}, success=${res.isSuccess}');
-      if (res.statusCode == 403) {
+      if (res.statusCode == 401) {
+        _authExpired = true;
+        _heartbeatTimer?.cancel();
+        _error = 'Your session expired. Please sign in again.';
+      } else if (res.statusCode == 403) {
         _hasAccess = false;
       } else if (res.isSuccess) {
+        _authExpired = false;
         final list = res.dataList;
         _rooms = list.map((e) => CommunityRoom.fromJson(e as Map<String, dynamic>)).toList();
         debugPrint('fetchRooms: loaded ${_rooms.length} rooms');
