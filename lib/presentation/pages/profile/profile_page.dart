@@ -390,18 +390,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? [
-                  const Color(0xFF1A1F2C),
-                  const Color(0xFF11141C),
-                ]
-              : [
-                  const Color(0xFF1E232F),
-                  const Color(0xFF0F131D),
-                ],
+        image: const DecorationImage(
+          image: AssetImage('assets/images/home_page.png'),
+          fit: BoxFit.cover,
         ),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(32),
