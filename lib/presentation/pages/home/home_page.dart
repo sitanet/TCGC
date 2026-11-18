@@ -484,8 +484,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                   SizedBox(height: spacing),
                   _buildLiveRestreamBanner(context, isDark),
                 ],
-                SizedBox(height: spacing),
-                _buildConferenceInviteCard(context, isDark),
+                if (ConferenceInviteSheet.isConferenceWindowActive) ...[
+                  SizedBox(height: spacing),
+                  _buildConferenceInviteCard(context, isDark),
+                ],
                 SizedBox(height: spacing * 1.5),
                 _buildBeginnerCategories(context, isDark),
                 SizedBox(height: spacing * 1.5),

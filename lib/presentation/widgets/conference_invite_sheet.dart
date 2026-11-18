@@ -17,6 +17,14 @@ class ConferenceInviteSheet extends ConsumerStatefulWidget {
     this.initialStreamType = ConferenceStreamType.audio,
   });
 
+  /// Shows the conference invite only from November 18 to November 30, 2026.
+  static bool get isConferenceWindowActive {
+    final now = DateTime.now();
+    final start = DateTime(2026, 11, 18, 0, 0, 0);
+    final end = DateTime(2026, 11, 30, 23, 59, 59);
+    return !now.isBefore(start) && !now.isAfter(end);
+  }
+
   static Future<void> show(
     BuildContext context, {
     ConferenceStreamType initialStreamType = ConferenceStreamType.audio,

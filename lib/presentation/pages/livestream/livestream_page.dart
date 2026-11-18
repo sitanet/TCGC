@@ -4,7 +4,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -98,7 +97,7 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
         var s = document.createElement('style');
         s.id = styleId;
         s.innerHTML = `
-          .radio-top-bar, .radio-mode-switcher { display: none !important; }
+          .radio-top-bar, .radio-mode-switcher, #radioInfoBtn, .radio-drawer, .radio-drawer-backdrop { display: none !important; }
           .radio-mobile-container {
             padding-top: 4px !important;
             padding-bottom: 24px !important;
@@ -424,20 +423,6 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
     }
   }
 
-  Future<void> _handleShare() async {
-    HapticFeedback.lightImpact();
-    final isVideo = _tabController.index == 1;
-    final streamType = isVideo ? 'Video' : 'Audio';
-    final shareUrl = isVideo ? _watchLiveWebUrl : _liveStreamWebUrl;
-
-    await Share.share(
-      'Join us live for an impactful service with The City Gate Church ($streamType broadcast)!\n\n'
-      'Watch/Listen here: $shareUrl\n\n'
-      'Experience worship, God\'s Word, and divine transformation.',
-      subject: 'TCGC Live Broadcast',
-    );
-  }
-
   Future<void> _handleOpenInBrowser() async {
     HapticFeedback.lightImpact();
     final isVideo = _tabController.index == 1;
@@ -508,13 +493,9 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
         ),
         onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
         actions: [
-          IconButton(
-            tooltip: 'Share Live Broadcast',
-            icon: Icon(Icons.share_outlined, size: 21, color: fgColor),
-            onPressed: _handleShare,
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
+          if (ConferenceInviteSheet.isConferenceWindowActive)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
             child: TextButton.icon(
               onPressed: () {
                 ConferenceInviteSheet.show(
