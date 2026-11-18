@@ -10,6 +10,7 @@ import '../../data/services/playback_position_service.dart';
 import '../../data/services/download_service.dart';
 import '../../data/services/played_audio_service.dart';
 import '../../data/services/app_rating_service.dart';
+import '../../data/services/restream_service.dart';
 import '../services/audio_handler.dart';
 
 MyAudioHandler? _audioHandler;
@@ -119,6 +120,44 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   String? get errorMessage => _errorMessage;
   bool get hasAudio => _currentSermon != null;
   double get playbackSpeed => _playbackSpeed;
+
+  bool _isLiveRestream = false;
+  int? _restreamId;
+  String? _restreamTitle;
+  Timer? _restreamHeartbeatTimer;
+
+  bool get isLiveRestream => _isLiveRestream;
+  int? get restreamId => _restreamId;
+  String? get restreamTitle => _restreamTitle;
+
+  void _clearRestreamState() {
+    _isLiveRestream = false;
+    _restreamId = null;
+    _restreamTitle = null;
+    _restreamHeartbeatTimer?.cancel();
+    _restreamHeartbeatTimer = null;
+  }
+
+  Future<void> playRestream(AudioRestreamInfo restream) async {
+    _restreamHeartbeatTimer?.cancel();
+    _isLiveRestream = true;
+    _restreamId = restream.id;
+    _restreamTitle = restream.title;
+
+    // Send immediate heartbeat & keep alive every 30s while listening
+    RestreamService().sendHeartbeat(restream.id);
+    _restreamHeartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (_isLiveRestream && _restreamId != null && _isPlaying) {
+        RestreamService().sendHeartbeat(_restreamId!);
+      }
+    });
+
+    await playSermonFromPosition(
+      restream.sermon,
+      Duration(seconds: restream.offsetSeconds),
+      preserveRestream: true,
+    );
+  }
   
   static const List<double> availableSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
   
@@ -420,8 +459,8 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   String _sanitizeFileName(String id) => id.replaceAll(RegExp(r'[^\w\-]'), '_');
 
   Future<void> playSermon(Sermon sermon) async {
-    // Toggle play/pause if same sermon AND it is actually loaded
-    if (_currentSermon?.id == sermon.id) {
+    // Toggle play/pause if same sermon AND it is actually loaded (and not switching out of restream)
+    if (_currentSermon?.id == sermon.id && !_isLiveRestream) {
       if (_isLoading) return; // already loading - don't interrupt
       final state = _useAudioService && _audioHandler != null
           ? _audioHandler!.processingState
@@ -442,6 +481,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
 
     // Mark audio as played (removes "NEW" badge)
     _playedAudioService.markAsPlayed(sermon.id);
+    _clearRestreamState();
 
     // Update UI immediately - no loading state for pre-buffered content
     _errorMessage = null;
@@ -642,6 +682,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> stop() async {
     await _saveCurrentPosition();
+    _clearRestreamState();
     if (_useAudioService && _audioHandler != null) {
       await _audioHandler!.stop();
     } else {
@@ -700,7 +741,14 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
     await _positionService.clearPosition(sermonId);
   }
   
-  Future<void> playSermonFromPosition(Sermon sermon, Duration startPosition) async {
+  Future<void> playSermonFromPosition(
+    Sermon sermon,
+    Duration startPosition, {
+    bool preserveRestream = false,
+  }) async {
+    if (!preserveRestream) {
+      _clearRestreamState();
+    }
     _errorMessage = null;
     _currentSermon = sermon;
     _position = startPosition;

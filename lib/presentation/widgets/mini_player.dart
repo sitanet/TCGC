@@ -88,13 +88,42 @@ class MiniPlayer extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              sermon.id == 'livestream' ? sermon.title : '${_formatDate(sermon.date)} - ${sermon.title}',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
+                            Row(
+                              children: [
+                                if (audioProvider.isLiveRestream) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    margin: const EdgeInsets.only(right: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.redAccent,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      '● LIVE',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.4,
+                                      ),
+                                    ),
                                   ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                                ],
+                                Expanded(
+                                  child: Text(
+                                    audioProvider.isLiveRestream
+                                        ? (audioProvider.restreamTitle ?? sermon.title)
+                                        : (sermon.id == 'livestream'
+                                            ? sermon.title
+                                            : '${_formatDate(sermon.date)} - ${sermon.title}'),
+                                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 2),
                             Text(

@@ -1640,18 +1640,50 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
         ? duration - position
         : Duration.zero;
 
+    final isLive = audioProvider.isLiveRestream;
+
     return Column(
       children: [
+        if (isLive)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.redAccent.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.circle, color: Colors.redAccent, size: 8),
+                SizedBox(width: 6),
+                Text(
+                  'LIVE REBROADCAST',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
+          ),
         SliderTheme(
           data: SliderThemeData(
             trackHeight: 4.5,
-            thumbShape: const RoundSliderThumbShape(
-              enabledThumbRadius: 7,
-              elevation: 3,
+            thumbShape: RoundSliderThumbShape(
+              enabledThumbRadius: isLive ? 0 : 7,
+              elevation: isLive ? 0 : 3,
             ),
             overlayShape: const RoundSliderOverlayShape(overlayRadius: 15),
-            activeTrackColor: AppColors.primaryGold,
+            activeTrackColor: isLive ? Colors.redAccent : AppColors.primaryGold,
+            disabledActiveTrackColor: Colors.redAccent,
             inactiveTrackColor: isDark
+                ? AppColors.dividerDark
+                : AppColors.dividerLight,
+            disabledInactiveTrackColor: isDark
                 ? AppColors.dividerDark
                 : AppColors.dividerLight,
             thumbColor: AppColors.primaryGold,
@@ -1659,12 +1691,14 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
           ),
           child: Slider(
             value: sliderValue,
-            onChanged: (value) {
-              final newPosition = Duration(
-                milliseconds: (value * durationMs).toInt(),
-              );
-              audioProvider.seek(newPosition);
-            },
+            onChanged: isLive
+                ? null
+                : (value) {
+                    final newPosition = Duration(
+                      milliseconds: (value * durationMs).toInt(),
+                    );
+                    audioProvider.seek(newPosition);
+                  },
           ),
         ),
         Padding(

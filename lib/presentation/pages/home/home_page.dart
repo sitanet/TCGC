@@ -25,6 +25,8 @@ import '../../../data/services/church_announcement_service.dart';
 import '../../widgets/church_announcement_dialog.dart';
 import '../../widgets/auth_required_sheet.dart';
 import '../auth/auth_flow_page.dart';
+import '../../../data/services/restream_service.dart';
+import '../audio/audio_player_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -72,6 +74,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   List<Sermon> _trendingSermons = [];
   List<Sermon> _citygateSongs = [];
   List<Sermon> _recentlyPlayedSermons = [];
+  AudioRestreamInfo? _activeRestream;
   bool _isLoading = true;
   late final ScrollController _homeScrollController;
   bool _isScrolledPastHeader = false;
@@ -137,7 +140,17 @@ class _HomePageState extends ConsumerState<HomePage> {
 
 
 
+  Future<void> _loadActiveRestream() async {
+    final active = await RestreamService().fetchActiveRestream();
+    if (mounted) {
+      setState(() {
+        _activeRestream = active;
+      });
+    }
+  }
+
   Future<void> _loadData({bool forceRefresh = false}) async {
+    _loadActiveRestream();
     if (!mounted) return;
     // Only show full loading spinner if we have NO cached data at all
     if (_sermons.isEmpty && _staticSermons.isEmpty) {
@@ -462,6 +475,10 @@ class _HomePageState extends ConsumerState<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeaderBanner(context, isDark),
+                if (_activeRestream != null && _activeRestream!.isLive) ...[
+                  SizedBox(height: spacing),
+                  _buildLiveRestreamBanner(context, isDark),
+                ],
                 SizedBox(height: spacing * 1.5),
                 _buildBeginnerCategories(context, isDark),
                 SizedBox(height: spacing * 1.5),
@@ -904,6 +921,186 @@ class _HomePageState extends ConsumerState<HomePage> {
     ),
   );
 }
+
+  Widget _buildLiveRestreamBanner(BuildContext context, bool isDark) {
+    final restream = _activeRestream;
+    if (restream == null || !restream.isLive) return const SizedBox.shrink();
+
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    final audioProvider = ref.watch(audioPlayerChangeNotifierProvider);
+    final isCurrentlyTunedIn =
+        audioProvider.isLiveRestream && audioProvider.restreamId == restream.id;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () async {
+            final latest = await RestreamService().fetchActiveRestream() ?? restream;
+            if (!context.mounted) return;
+            await ref.read(audioPlayerChangeNotifierProvider).playRestream(latest);
+            if (!context.mounted) return;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AudioPlayerPage(sermon: latest.sermon),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [const Color(0xFF282012), const Color(0xFF171410)]
+                    : [const Color(0xFF1E232F), const Color(0xFF10141E)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: AppColors.primaryGold.withValues(alpha: 0.55),
+                width: 1.1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryGold.withValues(alpha: 0.16),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppColors.primaryGold.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.podcasts_rounded,
+                    color: AppColors.primaryGold,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.circle, color: Colors.white, size: 6),
+                                SizedBox(width: 4),
+                                Text(
+                                  'LIVE REBROADCAST',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (restream.listenerCount > 0) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              '${restream.listenerCount} listening',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.65),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        restream.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (restream.sermon.speaker != null &&
+                          restream.sermon.speaker!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          restream.sermon.speaker!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isCurrentlyTunedIn
+                            ? Icons.graphic_eq_rounded
+                            : Icons.play_arrow_rounded,
+                        color: Colors.black,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isCurrentlyTunedIn ? 'Listening' : 'Tune In',
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   // [REMOVED] Upcoming Events section removed from Home Page
 

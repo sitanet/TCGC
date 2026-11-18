@@ -117,6 +117,11 @@ class ApiConstants {
   static const String checkAppUpdate = '/app/check-update/';
   static const String appConfig = '/app/config/';
 
+  // Audio Restream (Live Rebroadcast)
+  static const String audioRestreamActive = '/audio-restream/active/';
+  static String audioRestreamHeartbeat(int id) =>
+      '/audio-restream/$id/heartbeat/';
+
   // Community
   static const String communityOnline = '/community/online/';
   static const String communityMembers = '/community/members/';
