@@ -36,6 +36,13 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
   }
 
   Future<void> _initCommunity() async {
+    if (!ref.read(authChangeNotifierProvider).isAuthenticated) {
+      if (!mounted) return;
+      setState(() => _checkingPolicy = false);
+      return;
+    }
+    final p = ref.read(communityChangeNotifierProvider);
+    await p.loadCachedData();
     final prefs = await SharedPreferences.getInstance();
     final accepted = prefs.getBool(_policyKey) ?? false;
     if (!mounted) return;
@@ -50,6 +57,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
 
   void _loadCommunityData() {
     final p = ref.read(communityChangeNotifierProvider);
+    // Refresh in the background without blocking cached UI
     p.fetchRooms();
     p.fetchAllMembers();
     p.startHeartbeat();

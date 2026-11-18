@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/services/api_service.dart';
 import '../constants/api_constants.dart';
 class OnlineMember {
@@ -158,6 +160,10 @@ class CommunityProvider extends ChangeNotifier {
   Timer? _typingPollTimer;
   DateTime? _lastHostingRefreshAt;
   DateTime? _rateLimitedUntil;
+  bool _cacheLoaded = false;
+
+  static const String _roomsCacheKey = 'cached_community_rooms_v1';
+  static const String _membersCacheKey = 'cached_community_members_v1';
 
   List<OnlineMember> get onlineMembers => _onlineMembers;
   int get onlineCount => _onlineCount;
@@ -178,6 +184,48 @@ class CommunityProvider extends ChangeNotifier {
   }
 
   ListenSession? activeSessionForRoom(int roomId) => _activeSessionsByRoom[roomId];
+
+  /// Immediately restore cached rooms/categories and members from disk so
+  /// the Community page renders instantaneously without waiting on network.
+  Future<void> loadCachedData() async {
+    if (_cacheLoaded && _rooms.isNotEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final roomsJson = prefs.getString(_roomsCacheKey);
+      if (roomsJson != null && roomsJson.isNotEmpty && _rooms.isEmpty) {
+        final List<dynamic> decoded = jsonDecode(roomsJson);
+        _rooms = decoded
+            .map((e) => CommunityRoom.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      final membersJson = prefs.getString(_membersCacheKey);
+      if (membersJson != null && membersJson.isNotEmpty && _allMembers.isEmpty) {
+        final List<dynamic> decoded = jsonDecode(membersJson);
+        _allMembers = decoded
+            .map((e) => OnlineMember.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      _cacheLoaded = true;
+      if (_rooms.isNotEmpty || _allMembers.isNotEmpty) {
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('loadCachedData error: $e');
+    }
+  }
+
+  Future<void> clearCache() async {
+    _rooms = [];
+    _allMembers = [];
+    _onlineMembers = [];
+    _cacheLoaded = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_roomsCacheKey);
+      await prefs.remove(_membersCacheKey);
+    } catch (_) {}
+    notifyListeners();
+  }
 
   Future<void> fetchOnlineMembers() async {
     try {
@@ -228,17 +276,27 @@ class CommunityProvider extends ChangeNotifier {
         final list = res.data['members'] as List? ?? [];
         _allMembers = list.map((e) => OnlineMember.fromJson(e)).toList();
         debugPrint('fetchAllMembers: loaded ${_allMembers.length} members');
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_membersCacheKey, jsonEncode(list));
+        } catch (_) {}
       } else {
-        _error = res.statusCode == 0
-            ? res.userFriendlyError
-            : 'Could not load members (${res.statusCode})';
+        if (_allMembers.isEmpty && _rooms.isEmpty) {
+          _error = res.statusCode == 0
+              ? res.userFriendlyError
+              : 'Could not load members (${res.statusCode})';
+        }
         debugPrint('fetchAllMembers error: ${res.body}');
       }
     } on TimeoutException catch (_) {
-      _error = 'Request timed out. Check your connection.';
+      if (_allMembers.isEmpty && _rooms.isEmpty) {
+        _error = 'Request timed out. Check your connection.';
+      }
       debugPrint('fetchAllMembers: timed out');
     } catch (e) {
-      _error = 'Failed to load members: $e';
+      if (_allMembers.isEmpty && _rooms.isEmpty) {
+        _error = 'Failed to load members: $e';
+      }
       debugPrint('fetchAllMembers: $e');
     }
     notifyListeners();
@@ -264,9 +322,15 @@ class CommunityProvider extends ChangeNotifier {
   }
 
   Future<void> fetchRooms() async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    // Only show loading spinner if we don't already have cached rooms;
+    // otherwise update silently in the background.
+    if (_rooms.isEmpty) {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+    } else {
+      _error = null;
+    }
     try {
       debugPrint('fetchRooms: calling API...');
       var res = await _api.get(ApiConstants.communityRooms)
@@ -289,6 +353,10 @@ class CommunityProvider extends ChangeNotifier {
         final list = res.dataList;
         _rooms = list.map((e) => CommunityRoom.fromJson(e as Map<String, dynamic>)).toList();
         debugPrint('fetchRooms: loaded ${_rooms.length} rooms');
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_roomsCacheKey, jsonEncode(list));
+        } catch (_) {}
         // Only poll individual rooms if backend didn't already include hosting flags
         final backendIncludedHosting = _rooms.any((r) => r.isHosting);
         if (_rooms.isNotEmpty && !backendIncludedHosting) {
@@ -296,19 +364,27 @@ class CommunityProvider extends ChangeNotifier {
         }
       } else if (res.statusCode == 429) {
         _rateLimitedUntil = DateTime.now().add(const Duration(seconds: 15));
-        _error = 'Server is busy (429). Please wait a moment and try again.';
+        if (_rooms.isEmpty) {
+          _error = 'Server is busy (429). Please wait a moment and try again.';
+        }
         debugPrint('fetchRooms: rate limited (429)');
       } else {
-        _error = res.statusCode == 0
-            ? res.userFriendlyError
-            : 'Server error (${res.statusCode}). Try again.';
+        if (_rooms.isEmpty) {
+          _error = res.statusCode == 0
+              ? res.userFriendlyError
+              : 'Server error (${res.statusCode}). Try again.';
+        }
         debugPrint('fetchRooms: error=$_error, body=${res.body}');
       }
     } on TimeoutException catch (_) {
-      _error = 'Request timed out. Check your connection.';
+      if (_rooms.isEmpty) {
+        _error = 'Request timed out. Check your connection.';
+      }
       debugPrint('fetchRooms: timed out');
     } catch (e) {
-      _error = 'Failed to load rooms: $e';
+      if (_rooms.isEmpty) {
+        _error = 'Failed to load rooms: $e';
+      }
       debugPrint('fetchRooms exception: $e');
     }
     _isLoading = false;
