@@ -139,14 +139,17 @@ class _AudioPageState extends ConsumerState<AudioPage>
         _staticTranscripts = transcripts;
         _staticSpeakers = speakers;
 
-        // Pre-warm minister portraits in small batches so they appear instantly
+        // Pre-warm & silently refresh minister portraits in background
         final speakerPhotoUrls = speakers
             .map((s) => s.photoUrl)
             .whereType<String>()
             .where((u) => u.isNotEmpty)
             .toList();
         if (speakerPhotoUrls.isNotEmpty) {
-          ImageCacheService().preCacheUrlsThrottled(speakerPhotoUrls);
+          ImageCacheService().preCacheUrlsThrottled(
+            speakerPhotoUrls,
+            backgroundRefresh: true,
+          );
         }
 
         // Pre-buffer in background
@@ -215,14 +218,17 @@ class _AudioPageState extends ConsumerState<AudioPage>
         _staticTranscripts = transcripts;
         _staticSpeakers = speakers;
 
-        // Pre-warm minister portraits in small batches so they appear instantly
+        // Pre-warm & silently refresh minister portraits in background
         final speakerPhotoUrls = speakers
             .map((s) => s.photoUrl)
             .whereType<String>()
             .where((u) => u.isNotEmpty)
             .toList();
         if (speakerPhotoUrls.isNotEmpty) {
-          ImageCacheService().preCacheUrlsThrottled(speakerPhotoUrls);
+          ImageCacheService().preCacheUrlsThrottled(
+            speakerPhotoUrls,
+            backgroundRefresh: true,
+          );
         }
       }
 
@@ -1631,7 +1637,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
                       Positioned.fill(
                         child: CachedNetworkImage(
                           imageUrl: speaker.photoUrl!,
-                          cacheManager: CustomImageCacheManager.instance,
+                          cacheManager: CustomImageCacheManager.ministersInstance,
                           width: double.infinity,
                           height: double.infinity,
                           fit: BoxFit.cover,

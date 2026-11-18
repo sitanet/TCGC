@@ -975,7 +975,7 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
                         : photoUrl != null && photoUrl.isNotEmpty
                             ? CachedNetworkImage(
                                 imageUrl: photoUrl,
-                                cacheManager: CustomImageCacheManager.instance,
+                                cacheManager: CustomImageCacheManager.ministersInstance,
                                 fit: BoxFit.cover,
                                 alignment: Alignment.topCenter,
                                 memCacheWidth: 108,

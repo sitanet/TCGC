@@ -18,16 +18,20 @@ class ImageCacheService {
     return;
   }
 
-  /// Safely pre-warms a bounded list of image URLs (e.g. minister portraits)
-  /// into disk cache in small batches so UI rendering stays smooth.
+  /// Safely pre-warms a bounded list of minister portrait URLs into the
+  /// dedicated persistent minister disk cache + RAM, and silently refreshes
+  /// stale portraits in the background without ever showing a loading state.
   Future<void> preCacheUrlsThrottled(
     List<String> urls, {
     int batchSize = 3,
+    bool backgroundRefresh = false,
   }) async {
     final pending = urls
-        .where((u) => u.startsWith('http') && !_warmedUrls.contains(u))
+        .where((u) => u.startsWith('http') && (backgroundRefresh || !_warmedUrls.contains(u)))
         .toList();
     if (pending.isEmpty) return;
+
+    final cache = CustomImageCacheManager.ministersInstance;
 
     for (var i = 0; i < pending.length; i += batchSize) {
       final batch = pending.skip(i).take(batchSize).toList();
@@ -35,7 +39,22 @@ class ImageCacheService {
         batch.map((url) async {
           _warmedUrls.add(url);
           try {
-            await CustomImageCacheManager.instance.getSingleFile(url);
+            final cached = await cache.getFileFromCache(url);
+            if (cached == null) {
+              await cache.getSingleFile(url);
+            } else if (backgroundRefresh) {
+              // Refresh in background if older than 12 hours
+              final age = cached.validTill.difference(DateTime.now());
+              // validTill is now + 90d on fresh fetch; refresh if >12h has elapsed
+              if (age < const Duration(days: 89, hours: 12)) {
+                await cache.downloadFile(url, force: true);
+              }
+            }
+            // Warm RAM image cache so portrait cards paint instantaneously
+            CachedNetworkImageProvider(
+              url,
+              cacheManager: cache,
+            ).resolve(ImageConfiguration.empty);
           } catch (e) {
             _warmedUrls.remove(url);
             debugPrint('ImageCacheService: Failed to pre-warm $url: $e');
