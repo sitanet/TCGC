@@ -786,7 +786,12 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () {
               Navigator.pop(ctx);
-              ref.read(listenTogetherProvider.notifier).endSession();
+              final notifier = ref.read(listenTogetherProvider.notifier);
+              if (ref.read(listenTogetherProvider).isHost) {
+                notifier.endSession();
+              } else {
+                notifier.forceEndRoomSession(widget.room.id);
+              }
             },
             child: const Text('End for All', style: TextStyle(color: Colors.white)),
           ),
@@ -917,13 +922,29 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
               ),
               // Leave / End button
               IconButton(
-                tooltip: isHost ? 'End Session' : 'Leave Session',
+                tooltip: (isHost ||
+                        const [
+                          'super_admin',
+                          'admin',
+                          'admin_operational',
+                          'media',
+                          'pastorate',
+                        ].contains(ref.read(authChangeNotifierProvider).user?.role))
+                    ? 'End Session'
+                    : 'Leave Session',
                 icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20),
                 onPressed: () async {
-                  if (isHost) {
+                  final me = ref.read(authChangeNotifierProvider).user;
+                  final isPrivileged = const [
+                    'super_admin',
+                    'admin',
+                    'admin_operational',
+                    'media',
+                    'pastorate',
+                  ].contains(me?.role);
+                  if (isHost || isPrivileged) {
                     _showEndSessionDialog();
                   } else {
-                    final me = ref.read(authChangeNotifierProvider).user;
                     final memberName = (me?.fullName ?? '').trim().isNotEmpty
                         ? me!.fullName.trim()
                         : 'A member';

@@ -1144,6 +1144,52 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     }
   }
 
+  Future<void> _confirmStopHosting(
+    BuildContext context,
+    CommunityRoom room,
+    CommunityProvider p,
+  ) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Stop Live Hosting?'),
+        content: Text(
+          'This will end the live hosted message in "${room.name}" so it is no longer live.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Stop Hosting'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final ok = await ref
+        .read(listenTogetherProvider.notifier)
+        .forceEndRoomSession(room.id);
+    if (ok && mounted) {
+      await p.fetchRooms();
+      await p.refreshHostingRooms();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Stopped live hosting in "${room.name}"')),
+        );
+      }
+    }
+  }
+
   Widget _buildRoomTile(
     BuildContext context,
     bool isDark,
@@ -1258,6 +1304,44 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                             ],
                           ),
                         ),
+                        if (const [
+                          'super_admin',
+                          'admin',
+                          'admin_operational',
+                          'media',
+                          'pastorate',
+                        ].contains(ref.read(authChangeNotifierProvider).user?.role)) ...[
+                          const SizedBox(width: 5),
+                          GestureDetector(
+                            onTap: () => _confirmStopHosting(context, room, p),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent.withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.redAccent.withValues(alpha: 0.45),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.stop_circle_rounded, size: 11, color: Colors.redAccent),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'Stop',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                       const SizedBox(width: 8),
                       Container(

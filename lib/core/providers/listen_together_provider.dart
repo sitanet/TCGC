@@ -417,6 +417,28 @@ class ListenTogetherNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Force-stop an active Listen Together session in [roomId] (for host or admin).
+  Future<bool> forceEndRoomSession(int roomId) async {
+    try {
+      final res = await _api.post(
+        ApiConstants.communityListenSession(roomId),
+        {'end_session': true},
+      );
+      if (_currentRoomId == roomId) {
+        _syncTimer?.cancel();
+        _syncTimer = null;
+        try {
+          await _player.stop();
+        } catch (_) {}
+        _resetSessionState();
+        notifyListeners();
+      }
+      return res.isSuccess;
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   void dispose() {
     _syncTimer?.cancel();
