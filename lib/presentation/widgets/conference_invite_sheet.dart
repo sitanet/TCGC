@@ -45,6 +45,7 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
   late ConferenceStreamType _streamType;
   late final TextEditingController _messageController;
   bool _userEdited = false;
+  bool _isEditingMessage = false;
 
   @override
   void initState() {
@@ -208,56 +209,11 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
 
               // Session selector
               Text(
-                'Select Session',
+                'Which session?',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _buildChip(
-                    isDark,
-                    label: 'Mon–Sun (All)',
-                    selected: _session == ConferenceSession.all,
-                    onTap: () => setState(() {
-                      _session = ConferenceSession.all;
-                      _updateTemplateIfNotEdited();
-                    }),
-                  ),
-                  _buildChip(
-                    isDark,
-                    label: 'Morning Session',
-                    selected: _session == ConferenceSession.morning,
-                    onTap: () => setState(() {
-                      _session = ConferenceSession.morning;
-                      _updateTemplateIfNotEdited();
-                    }),
-                  ),
-                  _buildChip(
-                    isDark,
-                    label: 'Evening Session',
-                    selected: _session == ConferenceSession.evening,
-                    onTap: () => setState(() {
-                      _session = ConferenceSession.evening;
-                      _updateTemplateIfNotEdited();
-                    }),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Stream type selector
-              Text(
-                'Stream Link Destination',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: isDark ? Colors.white : Colors.black87,
                 ),
               ),
               const SizedBox(height: 8),
@@ -266,7 +222,59 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
                   Expanded(
                     child: _buildChip(
                       isDark,
-                      label: '🎧 Listen Live (Audio)',
+                      label: 'All Days',
+                      selected: _session == ConferenceSession.all,
+                      onTap: () => setState(() {
+                        _session = ConferenceSession.all;
+                        _updateTemplateIfNotEdited();
+                      }),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildChip(
+                      isDark,
+                      label: 'Morning',
+                      selected: _session == ConferenceSession.morning,
+                      onTap: () => setState(() {
+                        _session = ConferenceSession.morning;
+                        _updateTemplateIfNotEdited();
+                      }),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildChip(
+                      isDark,
+                      label: 'Evening',
+                      selected: _session == ConferenceSession.evening,
+                      onTap: () => setState(() {
+                        _session = ConferenceSession.evening;
+                        _updateTemplateIfNotEdited();
+                      }),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Stream type selector
+              Text(
+                'How should they join?',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildChip(
+                      isDark,
+                      icon: Icons.headphones_rounded,
+                      label: 'Listen (Audio)',
                       selected: _streamType == ConferenceStreamType.audio,
                       onTap: () => setState(() {
                         _streamType = ConferenceStreamType.audio;
@@ -278,7 +286,8 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
                   Expanded(
                     child: _buildChip(
                       isDark,
-                      label: '📺 Watch Live (Video)',
+                      icon: Icons.videocam_rounded,
+                      label: 'Watch (Video)',
                       selected: _streamType == ConferenceStreamType.video,
                       onTap: () => setState(() {
                         _streamType = ConferenceStreamType.video;
@@ -290,70 +299,115 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
               ),
               const SizedBox(height: 16),
 
-              // Editable message box
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Customize Your Invite Message',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    ),
+              // Simple preview with optional Edit toggle
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.04)
+                      : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isDark ? Colors.white12 : Colors.grey.shade300,
                   ),
-                  if (_userEdited)
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _userEdited = false;
-                          _messageController.text = _buildDefaultMessage();
-                        });
-                      },
-                      child: const Text(
-                        'Reset',
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Invite Preview',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_userEdited) ...[
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _userEdited = false;
+                                    _messageController.text = _buildDefaultMessage();
+                                  });
+                                },
+                                child: const Text(
+                                  'Reset',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primaryGold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                            ],
+                            GestureDetector(
+                              onTap: () => setState(() {
+                                _isEditingMessage = !_isEditingMessage;
+                              }),
+                              child: Text(
+                                _isEditingMessage ? 'Done' : 'Edit message',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primaryGold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (_isEditingMessage)
+                      TextField(
+                        controller: _messageController,
+                        maxLines: 6,
+                        minLines: 4,
+                        onChanged: (_) => _userEdited = true,
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primaryGold,
+                          fontSize: 13,
+                          height: 1.45,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: isDark
+                              ? Colors.black.withValues(alpha: 0.25)
+                              : Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(
+                              color: AppColors.primaryGold.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: AppColors.primaryGold),
+                          ),
+                          contentPadding: const EdgeInsets.all(10),
+                        ),
+                      )
+                    else
+                      Text(
+                        '${_senderName()} is inviting a friend to Image & Glory Conference 2026 '
+                        '(${_session == ConferenceSession.morning ? 'Morning Session' : _session == ConferenceSession.evening ? 'Evening Session' : 'All Sessions'} • '
+                        '${_streamType == ConferenceStreamType.video ? 'Video' : 'Audio'}) with the live link and App Store / Google Play download links.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.45,
+                          color: isDark ? Colors.white70 : Colors.black87,
                         ),
                       ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _messageController,
-                maxLines: 6,
-                minLines: 4,
-                onChanged: (_) => _userEdited = true,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.45,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: isDark
-                      ? Colors.black.withValues(alpha: 0.25)
-                      : Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: AppColors.primaryGold.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: isDark ? Colors.white12 : Colors.grey.shade300,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: AppColors.primaryGold),
-                  ),
-                  contentPadding: const EdgeInsets.all(12),
+                  ],
                 ),
               ),
               const SizedBox(height: 18),
@@ -363,16 +417,16 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
                 children: [
                   Expanded(
                     child: SizedBox(
-                      height: 48,
+                      height: 50,
                       child: ElevatedButton.icon(
                         onPressed: _shareOnWhatsApp,
-                        icon: const Icon(Icons.share_rounded, color: Colors.black, size: 18),
+                        icon: const Icon(Icons.send_rounded, color: Colors.black, size: 18),
                         label: const Text(
-                          'Invite on WhatsApp',
+                          'Send on WhatsApp',
                           style: TextStyle(
                             color: Colors.black,
                             fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                            fontSize: 15,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
@@ -387,7 +441,7 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
                   ),
                   const SizedBox(width: 10),
                   SizedBox(
-                    height: 48,
+                    height: 50,
                     child: OutlinedButton(
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: _messageController.text));
@@ -417,6 +471,7 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
 
   Widget _buildChip(
     bool isDark, {
+    IconData? icon,
     required String label,
     required bool selected,
     required VoidCallback onTap,
@@ -424,7 +479,7 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primaryGold
@@ -436,16 +491,36 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
                 : (isDark ? Colors.white12 : Colors.grey.shade300),
           ),
         ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: selected
-                ? Colors.black
-                : (isDark ? Colors.white70 : Colors.black87),
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 16,
+                color: selected
+                    ? Colors.black
+                    : (isDark ? Colors.white70 : Colors.black87),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: selected
+                      ? Colors.black
+                      : (isDark ? Colors.white70 : Colors.black87),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
