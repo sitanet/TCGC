@@ -27,6 +27,8 @@ import 'presentation/pages/livestream/livestream_page.dart';
 import 'presentation/pages/wallet/wallet_page.dart';
 import 'presentation/pages/teens/teens_page.dart';
 import 'presentation/pages/community/community_page.dart';
+import 'presentation/pages/community/chat_room_page.dart';
+import 'presentation/pages/auth/auth_flow_page.dart';
 import 'presentation/pages/get_started/get_started_page.dart';
 import 'presentation/pages/auth/sign_in_page.dart';
 import 'presentation/pages/auth/sign_up_page.dart';
@@ -668,6 +670,17 @@ class _MainScreenState extends ConsumerState<MainScreen>
       return;
     }
 
+    // Check for community group deep link: /app/community/<id> or tcgc://community/<id>
+    final communityMatch = RegExp(r'community[/\\]?(\d+)').firstMatch(path);
+    if (communityMatch != null) {
+      _navigateToCommunityRoom(communityMatch.group(1)!);
+      return;
+    }
+    if (host == 'community' && uri.pathSegments.isNotEmpty) {
+      _navigateToCommunityRoom(uri.pathSegments.first);
+      return;
+    }
+
     // Check for transcript deep link: /app/transcript/<id> or tcgc://transcript/<id>
     final transcriptMatch = RegExp(r'transcript[/\\]?(\d+)').firstMatch(path);
     if (transcriptMatch != null) {
@@ -729,6 +742,46 @@ class _MainScreenState extends ConsumerState<MainScreen>
     } catch (e) {
       debugPrint('Error navigating to message: $e');
       ref.read(mainTabIndexProvider.notifier).state = 1;
+    }
+  }
+
+  Future<void> _navigateToCommunityRoom(String roomIdStr) async {
+    final roomId = int.tryParse(roomIdStr);
+    if (roomId == null) return;
+
+    final showWallet = !ref.read(appConfigChangeNotifierProvider).config.walletPageDisabled;
+    final communityTabIndex = showWallet ? 5 : 4;
+
+    if (!ref.read(authChangeNotifierProvider).isAuthenticated) {
+      if (!mounted) return;
+      final signedIn = await AuthFlowPage.open(context);
+      if (signedIn != true || !mounted) {
+        ref.read(mainTabIndexProvider.notifier).state = communityTabIndex;
+        return;
+      }
+    }
+
+    ref.read(mainTabIndexProvider.notifier).state = communityTabIndex;
+
+    try {
+      final p = ref.read(communityChangeNotifierProvider);
+      await p.loadCachedData();
+      if (!p.rooms.any((r) => r.id == roomId)) {
+        await p.fetchRooms();
+      }
+      final targetRoom = p.rooms.where((r) => r.id == roomId).firstOrNull;
+      if (targetRoom != null && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatRoomPage(
+              room: targetRoom,
+              autoJoinListenSession: true,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error navigating to community room $roomId: $e');
     }
   }
 

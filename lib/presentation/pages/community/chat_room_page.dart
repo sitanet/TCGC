@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/providers/community_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -24,6 +25,7 @@ class ChatRoomPage extends ConsumerStatefulWidget {
   final int? dmUserId;
   final bool? dmUserOnline;
   final String? dmUserLastSeen;
+  final bool autoJoinListenSession;
 
   const ChatRoomPage({
     super.key,
@@ -33,6 +35,7 @@ class ChatRoomPage extends ConsumerStatefulWidget {
     this.dmUserId,
     this.dmUserOnline,
     this.dmUserLastSeen,
+    this.autoJoinListenSession = false,
   });
 
   @override
@@ -99,7 +102,51 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
       p.fetchMessages(widget.room.id);
       p.startPolling(widget.room.id);
       _startSessionPolling();
+      if (widget.autoJoinListenSession) {
+        _autoJoinIfRequested();
+      }
     });
+  }
+
+  Future<void> _autoJoinIfRequested() async {
+    final listenState = ref.read(listenTogetherProvider);
+    if (listenState.isJoined && listenState.currentRoomId == widget.room.id) {
+      return;
+    }
+    final session = await ref
+        .read(communityChangeNotifierProvider)
+        .pollListenSession(widget.room.id);
+    if (!mounted || session == null || !session.isActive) return;
+
+    setState(() => _activeSession = session);
+    final me = ref.read(authChangeNotifierProvider).user;
+    final myId = int.tryParse(me?.id ?? '0') ?? 0;
+    await ref.read(listenTogetherProvider.notifier).joinAsListener(
+          roomId: widget.room.id,
+          session: session,
+          myUserId: myId,
+        );
+    if (session.hostId != myId) {
+      final memberName = (me?.fullName ?? '').trim().isNotEmpty
+          ? me!.fullName.trim()
+          : 'A member';
+      await ref.read(communityChangeNotifierProvider).sendMessage(
+            widget.room.id,
+            '🎧 $memberName joined to listen',
+          );
+    }
+  }
+
+  void _shareRoomLink() {
+    final url = 'https://tcgc.thecitygatechurch.org/app/community/${widget.room.id}/';
+    final listenState = ref.read(listenTogetherProvider);
+    final active = (listenState.isJoined && listenState.currentRoomId == widget.room.id)
+        ? listenState.session
+        : _activeSession;
+    final text = (active != null && active.isActive)
+        ? '🎧 Listen Together LIVE in "${widget.room.name}"!\nNow playing: ${active.resourceTitle}\n\nTap to join the group & listen live:\n$url'
+        : 'Join "${widget.room.name}" on Citygate Mobile:\n$url';
+    Share.share(text);
   }
 
   void _startSessionPolling() {
@@ -700,12 +747,18 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                 ],
               ),
         actions: [
-          if (widget.dmUserName == null)
+          if (widget.dmUserName == null) ...[
+            IconButton(
+              tooltip: 'Share Group Link',
+              icon: const Icon(Icons.share_rounded, color: AppColors.primaryGold),
+              onPressed: _shareRoomLink,
+            ),
             IconButton(
               tooltip: 'Listen Together',
               icon: const Icon(Icons.headphones_rounded, color: AppColors.primaryGold),
               onPressed: _openSermonPickerForListenTogether,
             ),
+          ],
           IconButton(
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh, color: AppColors.primaryGold),
@@ -909,6 +962,12 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                     ],
                   ),
                 ),
+              ),
+              // Share link button
+              IconButton(
+                tooltip: 'Share to WhatsApp',
+                icon: const Icon(Icons.share_rounded, color: AppColors.primaryGold, size: 19),
+                onPressed: _shareRoomLink,
               ),
               // Fullscreen/Expand button
               IconButton(

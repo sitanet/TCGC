@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/providers/community_provider.dart';
 import '../../../core/providers/listen_together_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -1302,6 +1303,46 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        GestureDetector(
+                          onTap: () {
+                            final url = 'https://tcgc.thecitygatechurch.org/app/community/${room.id}/';
+                            final session = p.activeSessionForRoom(room.id);
+                            final title = (session != null && session.resourceTitle.isNotEmpty)
+                                ? session.resourceTitle
+                                : null;
+                            final text = title != null
+                                ? '🎧 Listen Together LIVE in "${room.name}"!\nNow playing: $title\n\nTap to join the group & listen live:\n$url'
+                                : '🎧 Join "${room.name}" — Listen Together LIVE on Citygate Mobile!\n\nTap to join & listen:\n$url';
+                            Share.share(text);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryGold.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.primaryGold.withValues(alpha: 0.45),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.share_rounded, size: 11, color: AppColors.primaryGold),
+                                SizedBox(width: 3),
+                                Text(
+                                  'Share',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primaryGold,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                         if (const [
