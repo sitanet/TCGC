@@ -1169,7 +1169,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Text(
-                            'MON – SUN • MORNING & EVENING',
+                            'MORNING & EVENING SESSIONS',
                             style: TextStyle(
                               color: AppColors.primaryGold,
                               fontSize: 9.5,

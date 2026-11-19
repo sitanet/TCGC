@@ -83,7 +83,7 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
     final sessionText = switch (_session) {
       ConferenceSession.morning => 'the *Morning Session*',
       ConferenceSession.evening => 'the *Evening Session*',
-      ConferenceSession.all => 'the *Morning & Evening Sessions* (Monday – Sunday)',
+      ConferenceSession.all => 'the *Morning & Evening Sessions*',
     };
     final isVideo = _streamType == ConferenceStreamType.video;
     final actionVerb = isVideo ? 'watch' : 'listen';
@@ -222,7 +222,7 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
                   Expanded(
                     child: _buildChip(
                       isDark,
-                      label: 'All Days',
+                      label: 'All Sessions',
                       selected: _session == ConferenceSession.all,
                       onTap: () => setState(() {
                         _session = ConferenceSession.all;
