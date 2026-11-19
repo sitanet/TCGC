@@ -102,7 +102,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
               _policyBullet(isDark, '1. Respectful Fellowship',
                   'Treat every member with Christian love and respect. Harassment, hate speech, spam, or offensive content is strictly prohibited.'),
               _policyBullet(isDark, '2. Listen Together Etiquette',
-                  'Only one member may host a sermon per room at a time. Keep chat contributions uplifting and relevant.'),
+                  'Only one member may host a message per room at a time. Keep chat contributions uplifting and relevant.'),
               _policyBullet(isDark, '3. Data Protection & Privacy (NDPR)',
                   'Your name, profile photo, and online status are visible to authenticated church members. Messages, voice notes, and shared files are stored securely solely to provide community fellowship. Never share passwords, PINs, BVN/NIN, or bank details in chat.'),
               _policyBullet(isDark, '4. Moderation & Control',
@@ -215,23 +215,51 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                     itemBuilder: (_, idx) {
                       final cat = _roomCategories(p.rooms)[idx];
                       final isSelected = _selectedCategory == cat;
-                      return ChoiceChip(
-                        label: Text(
-                          cat,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      return GestureDetector(
+                        onTap: () => setState(() => _selectedCategory = cat),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                          decoration: BoxDecoration(
+                            gradient: isSelected
+                                ? const LinearGradient(
+                                    colors: [AppColors.primaryGold, Color(0xFFB58E24)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : null,
                             color: isSelected
-                                ? Colors.black
-                                : (isDark ? Colors.white70 : Colors.black87),
+                                ? null
+                                : (isDark ? AppColors.cardDark : Colors.white),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.primaryGold
+                                  : AppColors.primaryGold.withValues(alpha: isDark ? 0.2 : 0.25),
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: AppColors.primaryGold.withValues(alpha: 0.28),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Center(
+                            child: Text(
+                              cat,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                color: isSelected
+                                    ? Colors.black
+                                    : (isDark ? Colors.white70 : Colors.black87),
+                              ),
+                            ),
                           ),
                         ),
-                        selected: isSelected,
-                        selectedColor: AppColors.primaryGold,
-                        backgroundColor: isDark ? AppColors.cardDark : const Color(0xFFF2F2F2),
-                        side: BorderSide.none,
-                        visualDensity: VisualDensity.compact,
-                        onSelected: (_) => setState(() => _selectedCategory = cat),
                       );
                     },
                   ),
@@ -455,100 +483,156 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
 
   Widget _buildHeroHeader(bool isDark, CommunityProvider p) {
     final onlineCount = p.allMembers.where((m) => m.isOnline).length;
+    final liveRoomsCount = p.rooms.where((r) => p.isRoomHosting(r.id)).length;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isDark
-              ? [const Color(0xFF2B2415), const Color(0xFF1C1912)]
-              : [const Color(0xFFFFF8E7), const Color(0xFFFDF2D6)],
+              ? [const Color(0xFF282012), const Color(0xFF16130E)]
+              : [const Color(0xFFFFFDF7), const Color(0xFFF7EED9)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: AppColors.primaryGold.withValues(alpha: isDark ? 0.35 : 0.45),
+          color: AppColors.primaryGold.withValues(alpha: isDark ? 0.38 : 0.5),
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryGold.withValues(alpha: 0.08),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.1 : 0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.primaryGold, Color(0xFFB8941F)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primaryGold, Color(0xFFA68118)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryGold.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.forum_rounded, color: Colors.black, size: 25),
               ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primaryGold.withValues(alpha: 0.35),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Fellowship & Lounge',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.2,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Chat with members & listen to messages together',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: isDark ? AppColors.textSecondaryDark : Colors.black54,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: const Icon(Icons.forum_rounded, color: Colors.white, size: 24),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Fellowship & Lounge',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _heroStatPill(
+                isDark,
+                dotColor: Colors.green,
+                label: '$onlineCount Online',
+                textColor: isDark ? Colors.greenAccent : Colors.green[800]!,
+                bgColor: Colors.green.withValues(alpha: 0.13),
+                borderColor: Colors.green.withValues(alpha: 0.3),
+              ),
+              _heroStatPill(
+                isDark,
+                icon: Icons.groups_rounded,
+                label: '${p.rooms.length} Rooms',
+                textColor: isDark ? AppColors.primaryGold : const Color(0xFF7D5F10),
+                bgColor: AppColors.primaryGold.withValues(alpha: 0.15),
+                borderColor: AppColors.primaryGold.withValues(alpha: 0.35),
+              ),
+              if (liveRoomsCount > 0)
+                _heroStatPill(
+                  isDark,
+                  icon: Icons.headphones_rounded,
+                  label: '$liveRoomsCount Live Listening',
+                  textColor: isDark ? Colors.greenAccent : Colors.green[800]!,
+                  bgColor: Colors.green.withValues(alpha: 0.13),
+                  borderColor: Colors.green.withValues(alpha: 0.35),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  'Chat with members & listen to sermons together',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? AppColors.textSecondaryDark : Colors.black54,
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+        ],
+      ),
+    );
+  }
+
+  Widget _heroStatPill(
+    bool isDark, {
+    Color? dotColor,
+    IconData? icon,
+    required String label,
+    required Color textColor,
+    required Color bgColor,
+    required Color borderColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (dotColor != null) ...[
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  '$onlineCount',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.greenAccent : Colors.green[800],
-                  ),
-                ),
-              ],
+            const SizedBox(width: 6),
+          ] else if (icon != null) ...[
+            Icon(icon, size: 13, color: textColor),
+            const SizedBox(width: 5),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: textColor,
             ),
           ),
         ],
@@ -557,8 +641,18 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
   }
 
   Widget _buildSearchBar(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: TextField(
         onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
         style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14),
@@ -566,30 +660,34 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
           hintText: 'Search members or chat rooms...',
           hintStyle: TextStyle(
             color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-            fontSize: 14),
-          prefixIcon: const Icon(Icons.search, color: AppColors.primaryGold, size: 20),
+            fontSize: 14,
+          ),
+          prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primaryGold, size: 20),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close,
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                      size: 18),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    size: 18,
+                  ),
                   onPressed: () => setState(() => _searchQuery = ''),
                 )
               : null,
           filled: true,
           fillColor: isDark ? AppColors.cardDark : Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide(
-              color: AppColors.primaryGold.withValues(alpha: 0.2)),
+              color: AppColors.primaryGold.withValues(alpha: isDark ? 0.22 : 0.24),
+            ),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             borderSide: const BorderSide(color: AppColors.primaryGold, width: 1.5),
           ),
         ),
@@ -995,37 +1093,60 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             .toList();
     final onlineCount = filtered.where((m) => m.isOnline).length;
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.primaryGold.withValues(alpha: isDark ? 0.16 : 0.18),
+        ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryGold.withValues(alpha: 0.08),
-            blurRadius: 12, offset: const Offset(0, 4)),
+            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.06 : 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Container(
-              width: 8, height: 8,
-              decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '$onlineCount online · ${filtered.length} members',
-              style: TextStyle(
-                fontWeight: FontWeight.w600, fontSize: 14,
-                color: isDark ? Colors.white : Colors.black87),
-            ),
-          ]),
+          Row(
+            children: [
+              const Icon(Icons.people_alt_rounded, size: 17, color: AppColors.primaryGold),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  'Fellowship Members',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$onlineCount / ${filtered.length} online',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.greenAccent : Colors.green[800],
+                  ),
+                ),
+              ),
+            ],
+          ),
           if (filtered.isNotEmpty) ...[
             const SizedBox(height: 12),
             SizedBox(
-              height: 70,
+              height: 76,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: filtered.length,
@@ -1036,9 +1157,11 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             const SizedBox(height: 8),
             Text(
               _searchQuery.isNotEmpty ? 'No members found' : 'No members yet',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              ),
+            ),
           ],
         ],
       ),
@@ -1054,51 +1177,71 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
           children: [
             Stack(
               children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: AppColors.primaryGold.withValues(alpha: 0.2),
-                  child: m.photoUrl != null
-                      ? ClipOval(child: AppImage(imagePath: m.photoUrl!, width: 48, height: 48))
-                      : Text(
-                          m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
-                          style: const TextStyle(
-                            color: AppColors.primaryGold,
-                            fontWeight: FontWeight.bold, fontSize: 18)),
+                Container(
+                  padding: const EdgeInsets.all(2.2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: m.isOnline
+                        ? const LinearGradient(
+                            colors: [AppColors.primaryGold, Colors.green],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    border: m.isOnline
+                        ? null
+                        : Border.all(
+                            color: isDark ? Colors.white12 : Colors.grey.shade300,
+                            width: 1.5,
+                          ),
+                  ),
+                  child: CircleAvatar(
+                    radius: 22,
+                    backgroundColor: AppColors.primaryGold.withValues(alpha: 0.16),
+                    child: m.photoUrl != null
+                        ? ClipOval(child: AppImage(imagePath: m.photoUrl!, width: 44, height: 44))
+                        : Text(
+                            m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                            style: const TextStyle(
+                              color: AppColors.primaryGold,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 17,
+                            ),
+                          ),
+                  ),
                 ),
                 Positioned(
-                  bottom: 0, right: 0,
+                  bottom: 0,
+                  right: 0,
                   child: Container(
-                    width: 12, height: 12,
+                    width: 12,
+                    height: 12,
                     decoration: BoxDecoration(
-                      color: m.isOnline ? Colors.green : Colors.grey,
+                      color: m.isOnline ? Colors.green : Colors.grey.shade400,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isDark ? AppColors.cardDark : Colors.white, width: 2)),
+                        color: isDark ? AppColors.cardDark : Colors.white,
+                        width: 2,
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 5),
             SizedBox(
               width: 56,
-              child: Column(
-                children: [
-                  Text(
-                    m.name.split(' ').first,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    m.isOnline ? 'Online' : 'Offline',
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: m.isOnline ? Colors.green : Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+              child: Text(
+                m.name.split(' ').first,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: m.isOnline ? FontWeight.w600 : FontWeight.normal,
+                  color: isDark
+                      ? (m.isOnline ? Colors.white : AppColors.textSecondaryDark)
+                      : (m.isOnline ? Colors.black87 : AppColors.textSecondaryLight),
+                ),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -1207,8 +1350,13 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     };
     final icon = iconMap[room.icon] ?? Icons.chat_bubble_outline;
     final badgeColor = room.isPublic
-        ? Colors.blue
-        : (room.roomType == 'group' ? Colors.teal : Colors.deepPurple);
+        ? AppColors.primaryGold
+        : (room.roomType == 'group' ? const Color(0xFFB58E24) : const Color(0xFF78716C));
+    final badgeTextColor = room.isPublic
+        ? (isDark ? AppColors.primaryGold : const Color(0xFF8C6B14))
+        : (room.roomType == 'group'
+            ? (isDark ? const Color(0xFFE5C86E) : const Color(0xFF7C5D10))
+            : (isDark ? Colors.white70 : const Color(0xFF57534E)));
     final badgeIcon = room.isPublic
         ? Icons.public_rounded
         : (room.roomType == 'group' ? Icons.groups_rounded : Icons.lock_rounded);
@@ -1223,21 +1371,31 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
       },
       child: Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: isDark ? AppColors.cardDark : Colors.white,
+          gradient: isHosting
+              ? LinearGradient(
+                  colors: isDark
+                      ? [const Color(0xFF152419), AppColors.cardDark]
+                      : [const Color(0xFFF3FBF5), Colors.white],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: isHosting ? null : (isDark ? AppColors.cardDark : Colors.white),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isHosting
                 ? Colors.green.withValues(alpha: 0.55)
-                : AppColors.primaryGold.withValues(alpha: isDark ? 0.16 : 0.14),
-            width: isHosting ? 1.5 : 1,
+                : AppColors.primaryGold.withValues(alpha: isDark ? 0.18 : 0.2),
+            width: isHosting ? 1.4 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+              color: (isHosting ? Colors.green : Colors.black)
+                  .withValues(alpha: isDark ? 0.18 : 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -1248,19 +1406,29 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
               height: 52,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    AppColors.primaryGold.withValues(alpha: 0.22),
-                    AppColors.primaryGold.withValues(alpha: 0.08),
-                  ],
+                  colors: isHosting
+                      ? [
+                          Colors.green.withValues(alpha: 0.24),
+                          Colors.green.withValues(alpha: 0.08),
+                        ]
+                      : [
+                          AppColors.primaryGold.withValues(alpha: 0.24),
+                          AppColors.primaryGold.withValues(alpha: 0.08),
+                        ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color: AppColors.primaryGold.withValues(alpha: 0.3),
+                  color: (isHosting ? Colors.green : AppColors.primaryGold)
+                      .withValues(alpha: 0.35),
                 ),
               ),
-              child: Icon(icon, color: AppColors.primaryGold, size: 25),
+              child: Icon(
+                isHosting ? Icons.headphones_rounded : icon,
+                color: isHosting ? Colors.green : AppColors.primaryGold,
+                size: 25,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -1273,7 +1441,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                         child: Text(
                           room.name,
                           style: TextStyle(
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w700,
                             fontSize: 15.5,
                             color: isDark ? Colors.white : Colors.black87,
                           ),
@@ -1281,10 +1449,43 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (isHosting) ...[
-                        const SizedBox(width: 6),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withValues(alpha: 0.13),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: badgeColor.withValues(alpha: 0.28),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(badgeIcon, size: 11, color: badgeTextColor),
+                            const SizedBox(width: 4),
+                            Text(
+                              room.roomType[0].toUpperCase() + room.roomType.substring(1),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: badgeTextColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (isHosting) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: Colors.green.withValues(alpha: 0.16),
                             borderRadius: BorderRadius.circular(8),
@@ -1293,7 +1494,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Icons.headphones_rounded, size: 11, color: Colors.green),
-                              SizedBox(width: 3),
+                              SizedBox(width: 4),
                               Text(
                                 'LIVE',
                                 style: TextStyle(
@@ -1305,7 +1506,6 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 5),
                         GestureDetector(
                           onTap: () {
                             final url = 'https://tcgc.thecitygatechurch.org/app/community/${room.id}/';
@@ -1319,7 +1519,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                             Share.share(text);
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
                               color: AppColors.primaryGold.withValues(alpha: 0.16),
                               borderRadius: BorderRadius.circular(8),
@@ -1332,7 +1532,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(Icons.share_rounded, size: 11, color: AppColors.primaryGold),
-                                SizedBox(width: 3),
+                                SizedBox(width: 4),
                                 Text(
                                   'Share',
                                   style: TextStyle(
@@ -1351,12 +1551,11 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                           'admin_operational',
                           'media',
                           'pastorate',
-                        ].contains(ref.read(authChangeNotifierProvider).user?.role)) ...[
-                          const SizedBox(width: 5),
+                        ].contains(ref.read(authChangeNotifierProvider).user?.role))
                           GestureDetector(
                             onTap: () => _confirmStopHosting(context, room, p),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
                                 color: Colors.redAccent.withValues(alpha: 0.14),
                                 borderRadius: BorderRadius.circular(8),
@@ -1369,7 +1568,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.stop_circle_rounded, size: 11, color: Colors.redAccent),
-                                  SizedBox(width: 3),
+                                  SizedBox(width: 4),
                                   Text(
                                     'Stop',
                                     style: TextStyle(
@@ -1382,33 +1581,9 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                               ),
                             ),
                           ),
-                        ],
                       ],
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: badgeColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(badgeIcon, size: 11, color: badgeColor),
-                            const SizedBox(width: 4),
-                            Text(
-                              room.roomType[0].toUpperCase() + room.roomType.substring(1),
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? badgeColor.shade200 : badgeColor.shade700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                   if (room.description != null && room.description!.isNotEmpty) ...[
                     const SizedBox(height: 3),
                     Text(
