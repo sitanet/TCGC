@@ -172,7 +172,7 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(14),
                     child: Image.asset(
-                      'assets/images/imgc_2026_banner.jpg',
+                      'assets/images/tcgc_logo.png',
                       width: 52,
                       height: 52,
                       fit: BoxFit.cover,
