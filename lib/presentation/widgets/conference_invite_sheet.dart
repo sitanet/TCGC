@@ -37,9 +37,9 @@ class ConferenceInviteSheet extends ConsumerStatefulWidget {
 
 class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
   static const String _playStoreUrl =
-      'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
+      'https://tcgc.thecitygatechurch.org/play';
   static const String _appStoreUrl =
-      'https://apps.apple.com/app/citygate-mobile/id6821748352';
+      'https://tcgc.thecitygatechurch.org/ios';
 
   ConferenceSession _session = ConferenceSession.all;
   late ConferenceStreamType _streamType;
