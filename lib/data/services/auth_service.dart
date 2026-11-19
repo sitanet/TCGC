@@ -106,12 +106,25 @@ class AuthService {
       return AuthResult(success: true, email: normalizedEmail);
     }
 
+    if (response.statusCode == 0) {
+      return AuthResult(
+        success: false,
+        error: 'No internet connection. Please check your network and try again.',
+        email: normalizedEmail,
+      );
+    }
+
+    Map<String, dynamic>? parsedBody;
+    try {
+      parsedBody = response.data;
+    } catch (_) {}
+
     // Check if email is not verified (status 403 or email_not_verified flag)
     if (response.statusCode == 403 ||
-        (response.data is Map && response.data['email_not_verified'] == true)) {
+        (parsedBody != null && parsedBody['email_not_verified'] == true)) {
       await savePendingVerificationEmail(normalizedEmail);
-      final detail = response.data is Map && response.data['detail'] != null
-          ? response.data['detail'].toString()
+      final detail = parsedBody != null && parsedBody['detail'] != null
+          ? parsedBody['detail'].toString()
           : 'Please confirm your email address before logging in.';
       return AuthResult(
         success: false,
@@ -126,9 +139,8 @@ class AuthService {
     // Provide user-friendly messages for common status codes
     if (response.statusCode == 401) {
       errorMessage = 'Invalid email or password. Please try again.';
-    } else if (response.statusCode == 0) {
-      errorMessage =
-          'Unable to connect to server. Please check your internet connection.';
+    } else if (response.statusCode >= 500) {
+      errorMessage = 'Server is temporarily unavailable. Please try again shortly.';
     }
 
     return AuthResult(success: false, error: errorMessage, email: normalizedEmail);

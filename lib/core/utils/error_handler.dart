@@ -70,16 +70,43 @@ class ErrorHandler {
       return 'Server is experiencing issues. Please try again later.';
     }
     
-    // Connection errors
-    if (errorMessage.contains('connection') || 
+    // Connection & network errors (including http.ClientException wrapping SocketException)
+    if (errorMessage.contains('socketexception') ||
+        errorMessage.contains('failed host lookup') ||
+        errorMessage.contains('network is unreachable') ||
+        errorMessage.contains('no internet') ||
+        errorMessage.contains('clientexception') ||
+        errorMessage.contains('handshake') ||
+        errorMessage.contains('connection refused') ||
+        errorMessage.contains('connection reset') ||
+        errorMessage.contains('connection closed') ||
+        errorMessage.contains('software caused connection abort') ||
+        errorMessage.contains('broken pipe') ||
+        errorMessage.contains('unable to connect')) {
+      return 'No internet connection. Please check your network and try again.';
+    }
+
+    if (errorMessage.contains('connection') ||
         errorMessage.contains('network')) {
       return 'Connection problem. Please check your internet and try again.';
     }
-    
+
     // Timeout errors
-    if (errorMessage.contains('timeout') || 
+    if (errorMessage.contains('timeout') ||
         errorMessage.contains('timed out')) {
-      return 'Request took too long. Please try again.';
+      return 'Request took too long. Please check your internet and try again.';
+    }
+
+    // Login & profile errors (preserve explicit user-friendly auth messages)
+    if (errorMessage.contains('invalid email or password') ||
+        errorMessage.contains('invalid credentials') ||
+        errorMessage.contains('no active account')) {
+      return 'Invalid email or password. Please try again.';
+    }
+
+    if (errorMessage.contains('failed to load profile') ||
+        errorMessage.contains('unable to load your profile')) {
+      return 'Unable to load your profile. Please check your internet connection and try again.';
     }
     
     // Payment/wallet errors

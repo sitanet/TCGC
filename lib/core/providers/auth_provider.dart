@@ -139,7 +139,15 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
-    final result = await _authService.login(email, password);
+    late final AuthResult result;
+    try {
+      result = await _authService.login(email, password);
+    } catch (e) {
+      _isLoading = false;
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
 
     print(
       '[AUTH] Login result: success=${result.success}, error=${result.error}, requiresEmailConfirmation=${result.requiresEmailConfirmation}',
