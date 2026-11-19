@@ -37,7 +37,7 @@ class ConferenceInviteSheet extends ConsumerStatefulWidget {
 
 class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
   static const String _playStoreUrl =
-      'https://tcgc.thecitygatechurch.org/play';
+      'https://tcgc.thecitygatechurch.org/android';
   static const String _appStoreUrl =
       'https://tcgc.thecitygatechurch.org/ios';
 
