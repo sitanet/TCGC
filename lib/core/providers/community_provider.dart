@@ -148,6 +148,7 @@ class CommunityProvider extends ChangeNotifier {
   Map<int, ListenSession> _activeSessionsByRoom = {};
   List<ChatMessage> _messages = [];
   List<String> _typingUsers = [];
+  List<String> _recordingUsers = [];
   int? _currentRoomId = 0;
   int _messagesFetchVersion = 0;
   bool _isLoading = false;
@@ -171,6 +172,7 @@ class CommunityProvider extends ChangeNotifier {
   List<CommunityRoom> get rooms => _rooms;
   List<ChatMessage> get messages => _messages;
   List<String> get typingUsers => _typingUsers;
+  List<String> get recordingUsers => _recordingUsers;
   int? get currentRoomId => _currentRoomId;
   bool get isLoading => _isLoading;
   bool get isSending => _isSending;
@@ -455,6 +457,7 @@ class CommunityProvider extends ChangeNotifier {
     if (_currentRoomId != roomId) {
       _messages = [];
       _typingUsers = [];
+      _recordingUsers = [];
       _currentRoomId = roomId;
     }
     final fetchVersion = ++_messagesFetchVersion;
@@ -477,27 +480,42 @@ class CommunityProvider extends ChangeNotifier {
 
   void _updateTypingUsersFromRaw(dynamic raw) {
     if (raw is! List) return;
-    final parsed = <String>[];
+    final parsedTyping = <String>[];
+    final parsedRecording = <String>[];
     for (final item in raw) {
       if (item is String && item.trim().isNotEmpty) {
-        parsed.add(item.trim());
+        parsedTyping.add(item.trim());
       } else if (item is Map) {
         final name = (item['name'] ?? item['full_name'] ?? item['username'] ?? '')
             .toString()
             .trim();
-        if (name.isNotEmpty) parsed.add(name);
+        final activity = (item['activity'] ?? 'typing').toString().trim().toLowerCase();
+        if (name.isNotEmpty) {
+          if (activity == 'recording') {
+            parsedRecording.add(name);
+          } else {
+            parsedTyping.add(name);
+          }
+        }
       }
     }
-    if (!listEquals(_typingUsers, parsed)) {
-      _typingUsers = parsed;
+    if (!listEquals(_typingUsers, parsedTyping) ||
+        !listEquals(_recordingUsers, parsedRecording)) {
+      _typingUsers = parsedTyping;
+      _recordingUsers = parsedRecording;
       notifyListeners();
     }
   }
 
-  Future<void> setTyping(int roomId, bool isTyping) async {
+  Future<void> setTyping(
+    int roomId,
+    bool isTyping, {
+    String activity = 'typing',
+  }) async {
     try {
       await _api.post(ApiConstants.communityTyping(roomId), {
         'is_typing': isTyping,
+        'activity': activity,
       });
     } catch (_) {}
   }
@@ -522,13 +540,14 @@ class CommunityProvider extends ChangeNotifier {
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!_isRateLimited) fetchMessages(roomId);
     });
-    _typingPollTimer = Timer.periodic(const Duration(seconds: 3), (_) => fetchTypingUsers(roomId));
+    _typingPollTimer = Timer.periodic(const Duration(seconds: 2), (_) => fetchTypingUsers(roomId));
   }
 
   void stopPolling() {
     _pollTimer?.cancel();
     _typingPollTimer?.cancel();
     _typingUsers = [];
+    _recordingUsers = [];
   }
 
   Future<bool> sendFileMessage(int roomId, File file, String fileType, {String? text, int? replyToId}) async {

@@ -536,8 +536,21 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
         _recordSeconds = 0;
         _recordingPath = path;
       });
+      ref.read(communityChangeNotifierProvider).setTyping(
+        widget.room.id,
+        true,
+        activity: 'recording',
+      );
       _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted) setState(() => _recordSeconds++);
+        if (!mounted) return;
+        setState(() => _recordSeconds++);
+        if (_recordSeconds % 3 == 0) {
+          ref.read(communityChangeNotifierProvider).setTyping(
+            widget.room.id,
+            true,
+            activity: 'recording',
+          );
+        }
       });
     } catch (e) {
       debugPrint('_startRecording error: $e');
@@ -551,6 +564,11 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
 
   Future<void> _cancelRecording() async {
     _recordTimer?.cancel();
+    ref.read(communityChangeNotifierProvider).setTyping(
+      widget.room.id,
+      false,
+      activity: 'recording',
+    );
     try {
       await _recorder.stop();
     } catch (_) {}
@@ -571,6 +589,11 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
 
   Future<void> _stopAndSendRecording() async {
     _recordTimer?.cancel();
+    ref.read(communityChangeNotifierProvider).setTyping(
+      widget.room.id,
+      false,
+      activity: 'recording',
+    );
     String? path;
     try {
       path = await _recorder.stop();
@@ -927,8 +950,13 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
               },
             ),
           ),
-          // Typing indicator
-          _buildTypingIndicator(p.typingUsers, me?.fullName, isDark),
+          // Typing & recording indicator
+          _buildTypingIndicator(
+            p.typingUsers,
+            p.recordingUsers,
+            me?.fullName,
+            isDark,
+          ),
           // Reply preview bar
           if (_replyingTo != null) _buildReplyPreviewBar(isDark),
           // Input bar
@@ -1332,22 +1360,32 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
 
   Widget _buildTypingIndicator(
     List<String> typingUsers,
+    List<String> recordingUsers,
     String? myName,
     bool isDark,
   ) {
     final normalizedMe = (myName ?? '').trim().toLowerCase();
-    final others = typingUsers
+    final otherTyping = typingUsers
         .where((name) => name.trim().toLowerCase() != normalizedMe)
         .toList();
-    if (others.isEmpty) return const SizedBox.shrink();
+    final otherRecording = recordingUsers
+        .where((name) => name.trim().toLowerCase() != normalizedMe)
+        .toList();
+    if (otherTyping.isEmpty && otherRecording.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final bool isRecordingActivity = otherRecording.isNotEmpty;
+    final activeList = isRecordingActivity ? otherRecording : otherTyping;
+    final verb = isRecordingActivity ? 'recording audio...' : 'typing...';
 
     final String label;
-    if (others.length == 1) {
-      label = '${others.first} is typing...';
-    } else if (others.length == 2) {
-      label = '${others[0]} and ${others[1]} are typing...';
+    if (activeList.length == 1) {
+      label = '${activeList.first} is $verb';
+    } else if (activeList.length == 2) {
+      label = '${activeList[0]} and ${activeList[1]} are $verb';
     } else {
-      label = '${others[0]}, ${others[1]} and ${others.length - 2} others are typing...';
+      label = '${activeList[0]}, ${activeList[1]} and ${activeList.length - 2} others are $verb';
     }
 
     return Container(
@@ -1355,14 +1393,17 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         children: [
-          const SizedBox(
-            width: 12,
-            height: 12,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.8,
-              color: AppColors.primaryGold,
+          if (isRecordingActivity)
+            const Icon(Icons.mic_rounded, size: 14, color: Colors.redAccent)
+          else
+            const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.8,
+                color: AppColors.primaryGold,
+              ),
             ),
-          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1371,7 +1412,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                 fontSize: 12,
                 fontStyle: FontStyle.italic,
                 fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white70 : Colors.black54,
+                color: isRecordingActivity
+                    ? Colors.redAccent
+                    : (isDark ? Colors.white70 : Colors.black54),
               ),
               overflow: TextOverflow.ellipsis,
             ),
