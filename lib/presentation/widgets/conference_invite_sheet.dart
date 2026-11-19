@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
+import '../../main.dart';
 
 enum ConferenceSession { all, morning, evening }
 enum ConferenceStreamType { audio, video }
 
-class ConferenceInviteSheet extends StatefulWidget {
+class ConferenceInviteSheet extends ConsumerStatefulWidget {
   final ConferenceStreamType initialStreamType;
 
   const ConferenceInviteSheet({
@@ -30,10 +32,15 @@ class ConferenceInviteSheet extends StatefulWidget {
   }
 
   @override
-  State<ConferenceInviteSheet> createState() => _ConferenceInviteSheetState();
+  ConsumerState<ConferenceInviteSheet> createState() => _ConferenceInviteSheetState();
 }
 
-class _ConferenceInviteSheetState extends State<ConferenceInviteSheet> {
+class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
+  static const String _playStoreUrl =
+      'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
+  static const String _appStoreUrl =
+      'https://apps.apple.com/app/citygate-mobile/id0000000000';
+
   ConferenceSession _session = ConferenceSession.all;
   late ConferenceStreamType _streamType;
   late final TextEditingController _messageController;
@@ -52,6 +59,15 @@ class _ConferenceInviteSheetState extends State<ConferenceInviteSheet> {
     super.dispose();
   }
 
+  String _senderName() {
+    final user = ref.read(authChangeNotifierProvider).user;
+    if (user != null) {
+      final fullName = '${user.firstName} ${user.lastName}'.trim();
+      if (fullName.isNotEmpty) return fullName;
+    }
+    return 'A friend';
+  }
+
   String _buildStreamLink() {
     final base = _streamType == ConferenceStreamType.video
         ? 'https://tcgc.thecitygatechurch.org/app/video/'
@@ -62,20 +78,28 @@ class _ConferenceInviteSheetState extends State<ConferenceInviteSheet> {
   }
 
   String _buildDefaultMessage() {
+    final senderName = _senderName();
     final sessionText = switch (_session) {
-      ConferenceSession.morning => 'the Morning Session',
-      ConferenceSession.evening => 'the Evening Session',
-      ConferenceSession.all => 'the Morning & Evening Sessions (Monday – Sunday)',
+      ConferenceSession.morning => 'the *Morning Session*',
+      ConferenceSession.evening => 'the *Evening Session*',
+      ConferenceSession.all => 'the *Morning & Evening Sessions* (Monday – Sunday)',
     };
-    final actionText = _streamType == ConferenceStreamType.video
-        ? 'Watch live'
-        : 'Listen live';
+    final isVideo = _streamType == ConferenceStreamType.video;
+    final actionVerb = isVideo ? 'watch' : 'listen';
+    final actionTitle = isVideo ? '📺 *Watch live with me here:*' : '🎧 *Listen live with me here:*';
     final link = _buildStreamLink();
 
-    return '🙏 Hello! You are warmly invited to *Image & Glory Conference 2026* by *The CityGate Church*.\n\n'
-        '✨ *Theme:* True Worshipper\n'
-        '📅 *Joining:* $sessionText\n\n'
-        '$actionText with me on the Citygate Mobile app:\n$link';
+    return 'Hello!\n\n'
+        '*$senderName* warmly invites you to *Image & Glory Conference 2026*.\n\n'
+        '*Theme: The Rise of True Worshippers*\n\n'
+        'I\'ll be joining $sessionText, and I\'d love for you to join me!\n\n'
+        'Let\'s $actionVerb together live on the CityGate Mobile App and share in this wonderful experience.\n\n'
+        '$actionTitle\n'
+        '$link\n\n'
+        '📱 *Download the CityGate Mobile App:*\n'
+        '• Google Play: $_playStoreUrl\n'
+        '• App Store: $_appStoreUrl\n\n'
+        'Looking forward to having you join me! 🙌';
   }
 
   void _updateTemplateIfNotEdited() {
@@ -144,16 +168,13 @@ class _ConferenceInviteSheetState extends State<ConferenceInviteSheet> {
               // Header
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryGold.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.campaign_rounded,
-                      color: AppColors.primaryGold,
-                      size: 24,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.asset(
+                      'assets/images/imgc_2026_banner.jpg',
+                      width: 52,
+                      height: 52,
+                      fit: BoxFit.cover,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -171,7 +192,7 @@ class _ConferenceInviteSheetState extends State<ConferenceInviteSheet> {
                         ),
                         const SizedBox(height: 2),
                         const Text(
-                          'Theme: True Worshipper • The CityGate Church',
+                          'Theme: The Rise of True Worshippers • The CityGate Church',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,

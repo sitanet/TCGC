@@ -1145,21 +1145,13 @@ class _HomePageState extends ConsumerState<HomePage> {
               padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.primaryGold, Color(0xFF9C7B16)],
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.campaign_rounded,
-                      color: Colors.black,
-                      size: 26,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.asset(
+                      'assets/images/imgc_2026_banner.jpg',
+                      width: 54,
+                      height: 54,
+                      fit: BoxFit.cover,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1199,7 +1191,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Theme: True Worshipper • Invite friends on WhatsApp',
+                          'Theme: The Rise of True Worshippers • Invite friends on WhatsApp',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
