@@ -67,13 +67,29 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   bool _voicePlaying = false;
   Duration _voicePos = Duration.zero;
   Duration _voiceDur = Duration.zero;
+  double _voiceSpeed = 1.0;
   StreamSubscription? _voicePosSub;
   StreamSubscription? _voiceDurSub;
   StreamSubscription? _voiceStateSub;
 
+  // WhatsApp-style in-chat search & scroll-to-bottom FAB
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _chatSearchQuery = '';
+  bool _showScrollToBottom = false;
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(() {
+      if (!_scrollController.hasClients) return;
+      final distFromBottom =
+          _scrollController.position.maxScrollExtent - _scrollController.position.pixels;
+      final shouldShow = distFromBottom > 240;
+      if (shouldShow != _showScrollToBottom && mounted) {
+        setState(() => _showScrollToBottom = shouldShow);
+      }
+    });
     _textController.addListener(() {
       final has = _textController.text.trim().isNotEmpty;
       if (has != _hasText && mounted) setState(() => _hasText = has);
@@ -200,8 +216,19 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     _voicePlayer.dispose();
     ref.read(communityChangeNotifierProvider).stopPolling();
     _textController.dispose();
+    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _cycleVoiceSpeed() async {
+    final next = _voiceSpeed == 1.0
+        ? 1.5
+        : (_voiceSpeed == 1.5 ? 2.0 : 1.0);
+    setState(() => _voiceSpeed = next);
+    try {
+      await _voicePlayer.setSpeed(next);
+    } catch (_) {}
   }
 
   void _scrollToBottom() {
@@ -679,7 +706,22 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
               color: isDark ? Colors.white : Colors.black87, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: widget.dmUserName != null
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                onChanged: (v) => setState(() => _chatSearchQuery = v.trim().toLowerCase()),
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 15),
+                decoration: InputDecoration(
+                  hintText: 'Search messages...',
+                  hintStyle: TextStyle(
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    fontSize: 14,
+                  ),
+                  border: InputBorder.none,
+                ),
+              )
+            : widget.dmUserName != null
             ? Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -747,23 +789,42 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                 ],
               ),
         actions: [
-          if (widget.dmUserName == null) ...[
+          if (_isSearching)
             IconButton(
-              tooltip: 'Share Group Link',
-              icon: const Icon(Icons.share_rounded, color: AppColors.primaryGold),
-              onPressed: _shareRoomLink,
+              tooltip: 'Close Search',
+              icon: const Icon(Icons.close_rounded, color: AppColors.primaryGold),
+              onPressed: () {
+                setState(() {
+                  _isSearching = false;
+                  _searchController.clear();
+                  _chatSearchQuery = '';
+                });
+              },
+            )
+          else ...[
+            IconButton(
+              tooltip: 'Search Messages',
+              icon: const Icon(Icons.search_rounded, color: AppColors.primaryGold),
+              onPressed: () => setState(() => _isSearching = true),
             ),
+            if (widget.dmUserName == null) ...[
+              IconButton(
+                tooltip: 'Share Group Link',
+                icon: const Icon(Icons.share_rounded, color: AppColors.primaryGold),
+                onPressed: _shareRoomLink,
+              ),
+              IconButton(
+                tooltip: 'Listen Together',
+                icon: const Icon(Icons.headphones_rounded, color: AppColors.primaryGold),
+                onPressed: _openSermonPickerForListenTogether,
+              ),
+            ],
             IconButton(
-              tooltip: 'Listen Together',
-              icon: const Icon(Icons.headphones_rounded, color: AppColors.primaryGold),
-              onPressed: _openSermonPickerForListenTogether,
+              tooltip: 'Refresh',
+              icon: const Icon(Icons.refresh, color: AppColors.primaryGold),
+              onPressed: () => p.fetchMessages(widget.room.id),
             ),
           ],
-          IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh, color: AppColors.primaryGold),
-            onPressed: () => p.fetchMessages(widget.room.id),
-          ),
         ],
       ),
       body: Column(
@@ -777,29 +838,94 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
             _buildJoinBanner(_activeSession!, isDark),
           // Messages
           Expanded(
-            child: p.isLoading && p.messages.isEmpty
-                ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGold))
-                : p.messages.isEmpty
-                    ? _buildEmptyState(isDark)
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        itemCount: p.messages.length,
-                        itemBuilder: (ctx, i) {
-                          final msg = p.messages[i];
-                          final isMe = me != null && msg.senderId == int.tryParse(me.id);
-                          final showAvatar = i == 0 ||
-                              p.messages[i - 1].senderId != msg.senderId;
-                          final showDate = i == 0 ||
-                              !_isSameDay(p.messages[i - 1].createdAt, msg.createdAt);
-                          return Column(
-                            children: [
-                              if (showDate) _buildDateDivider(msg.createdAt, isDark),
-                              _buildMessageBubble(context, isDark, msg, isMe, showAvatar, me?.id),
-                            ],
-                          );
-                        },
+            child: Builder(
+              builder: (context) {
+                final displayMessages = _chatSearchQuery.isEmpty
+                    ? p.messages
+                    : p.messages
+                        .where((m) =>
+                            m.text.toLowerCase().contains(_chatSearchQuery) ||
+                            m.senderName.toLowerCase().contains(_chatSearchQuery) ||
+                            (m.fileName ?? '').toLowerCase().contains(_chatSearchQuery))
+                        .toList();
+
+                if (p.isLoading && p.messages.isEmpty) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: AppColors.primaryGold),
+                  );
+                }
+                if (p.messages.isEmpty) {
+                  return _buildEmptyState(isDark);
+                }
+                if (displayMessages.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'No messages match "$_chatSearchQuery"',
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
+                    ),
+                  );
+                }
+
+                return Stack(
+                  children: [
+                    ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      itemCount: displayMessages.length,
+                      itemBuilder: (ctx, i) {
+                        final msg = displayMessages[i];
+                        final isMe = me != null && msg.senderId == int.tryParse(me.id);
+                        final showAvatar = i == 0 ||
+                            displayMessages[i - 1].senderId != msg.senderId;
+                        final showDate = i == 0 ||
+                            !_isSameDay(displayMessages[i - 1].createdAt, msg.createdAt);
+                        return Column(
+                          children: [
+                            if (showDate) _buildDateDivider(msg.createdAt, isDark),
+                            _buildMessageBubble(context, isDark, msg, isMe, showAvatar, me?.id),
+                          ],
+                        );
+                      },
+                    ),
+                    if (_showScrollToBottom && _chatSearchQuery.isEmpty)
+                      Positioned(
+                        right: 14,
+                        bottom: 12,
+                        child: GestureDetector(
+                          onTap: _scrollToBottom,
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: isDark ? AppColors.cardDark : Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.primaryGold.withValues(alpha: 0.5),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.18),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: AppColors.primaryGold,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
           // Typing indicator
           _buildTypingIndicator(p.typingUsers, me?.fullName, isDark),
@@ -1864,12 +1990,38 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                   children: [
                     Icon(Icons.mic_rounded, size: 12, color: subColor),
                     const SizedBox(width: 4),
-                    Text(
-                      isActive && dur > Duration.zero
-                          ? '${_formatDuration(pos)} / ${_formatDuration(dur)}'
-                          : 'Voice note',
-                      style: TextStyle(fontSize: 11, color: subColor),
+                    Expanded(
+                      child: Text(
+                        isActive && dur > Duration.zero
+                            ? '${_formatDuration(pos)} / ${_formatDuration(dur)}'
+                            : 'Voice note',
+                        style: TextStyle(fontSize: 11, color: subColor),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
+                    if (isActive)
+                      GestureDetector(
+                        onTap: _cycleVoiceSpeed,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isMe
+                                ? Colors.white.withValues(alpha: 0.24)
+                                : AppColors.primaryGold.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            _voiceSpeed == 1.0
+                                ? '1x'
+                                : (_voiceSpeed == 1.5 ? '1.5x' : '2x'),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: isMe ? Colors.white : AppColors.primaryGold,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ],
@@ -2638,6 +2790,47 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                 setState(() => _replyingTo = msg);
               },
             ),
+            if (msg.text.trim().isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.copy_rounded, color: AppColors.primaryGold),
+                title: Text('Copy',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
+                      fontWeight: FontWeight.w600)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Clipboard.setData(ClipboardData(text: msg.text));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Message copied')),
+                  );
+                },
+              ),
+            if (msg.text.trim().isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.forward_rounded, color: AppColors.primaryGold),
+                title: Text('Forward to Room',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
+                      fontWeight: FontWeight.w600)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showForwardRoomSheet(msg);
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.share_rounded, color: AppColors.primaryGold),
+              title: Text('Share',
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(context);
+                final shareText = msg.text.trim().isNotEmpty
+                    ? '${msg.senderName}: ${msg.text}'
+                    : (msg.fileUrl ?? _messagePreviewText(msg));
+                Share.share(shareText);
+              },
+            ),
             if (isMe)
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.red),
@@ -2656,6 +2849,99 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                     color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
               onTap: () => Navigator.pop(context),
             ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showForwardRoomSheet(ChatMessage msg) {
+    final p = ref.read(communityChangeNotifierProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final targetRooms = p.rooms.where((r) => r.id != widget.room.id).toList();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[400],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Forward Message To...',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (targetRooms.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'No other chat rooms available.',
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: targetRooms.length,
+                  itemBuilder: (_, i) {
+                    final r = targetRooms[i];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.primaryGold.withValues(alpha: 0.16),
+                        child: const Icon(Icons.forum_rounded,
+                            color: AppColors.primaryGold, size: 18),
+                      ),
+                      title: Text(
+                        r.name,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        final ok = await p.sendMessage(
+                          r.id,
+                          '↪ Forwarded from ${msg.senderName}:\n${msg.text}',
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(ok
+                                  ? 'Forwarded to ${r.name}'
+                                  : 'Failed to forward message'),
+                            ),
+                          );
+                        }
+                      },
+                    );
+                  },
+                ),
+              ),
             const SizedBox(height: 8),
           ],
         ),
