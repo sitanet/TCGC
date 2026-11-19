@@ -71,10 +71,10 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
 
   String _buildStreamLink() {
     final base = _streamType == ConferenceStreamType.video
-        ? 'https://tcgc.thecitygatechurch.org/app/video/'
-        : 'https://tcgc.thecitygatechurch.org/app/audio/';
-    if (_session == ConferenceSession.morning) return '$base?session=morning';
-    if (_session == ConferenceSession.evening) return '$base?session=evening';
+        ? 'https://tcgc.thecitygatechurch.org/video'
+        : 'https://tcgc.thecitygatechurch.org/audio';
+    if (_session == ConferenceSession.morning) return '$base/morning';
+    if (_session == ConferenceSession.evening) return '$base/evening';
     return base;
   }
 
