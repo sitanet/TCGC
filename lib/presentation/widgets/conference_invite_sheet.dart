@@ -39,7 +39,7 @@ class _ConferenceInviteSheetState extends ConsumerState<ConferenceInviteSheet> {
   static const String _playStoreUrl =
       'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
   static const String _appStoreUrl =
-      'https://apps.apple.com/app/citygate-mobile/id0000000000';
+      'https://apps.apple.com/app/citygate-mobile/id6821748352';
 
   ConferenceSession _session = ConferenceSession.all;
   late ConferenceStreamType _streamType;
