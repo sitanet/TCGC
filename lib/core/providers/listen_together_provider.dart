@@ -403,18 +403,25 @@ class ListenTogetherNotifier extends ChangeNotifier {
   }
 
   Future<void> endSession() async {
+    final roomId = _currentRoomId;
+    final wasHost = _isHost;
     _syncTimer?.cancel();
     _syncTimer = null;
-    if (_currentRoomId != null && _isHost) {
-      try {
-        await _api.post(ApiConstants.communityListenSession(_currentRoomId!), {'end_session': true});
-      } catch (_) {}
-    }
+
+    // Stop playback and reset UI immediately so the user never waits on network latency
     try {
       await _player.stop();
     } catch (_) {}
     _resetSessionState();
     notifyListeners();
+
+    if (roomId != null && wasHost) {
+      try {
+        await _api
+            .post(ApiConstants.communityListenSession(roomId), {'end_session': true})
+            .timeout(const Duration(seconds: 8));
+      } catch (_) {}
+    }
   }
 
   /// Force-stop an active Listen Together session in [roomId] (for host or admin).

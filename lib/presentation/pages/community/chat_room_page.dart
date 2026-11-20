@@ -993,11 +993,20 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () {
               Navigator.pop(ctx);
+              setState(() => _activeSession = null);
               final notifier = ref.read(listenTogetherProvider.notifier);
               if (ref.read(listenTogetherProvider).isHost) {
-                notifier.endSession();
+                notifier.endSession().then((_) {
+                  if (mounted) {
+                    ref.read(communityChangeNotifierProvider).refreshHostingRooms();
+                  }
+                });
               } else {
-                notifier.forceEndRoomSession(widget.room.id);
+                notifier.forceEndRoomSession(widget.room.id).then((_) {
+                  if (mounted) {
+                    ref.read(communityChangeNotifierProvider).refreshHostingRooms();
+                  }
+                });
               }
             },
             child: const Text('End for All', style: TextStyle(color: Colors.white)),
