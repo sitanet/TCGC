@@ -78,6 +78,10 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   String _chatSearchQuery = '';
   bool _showScrollToBottom = false;
 
+  // Draggable mini-player state
+  Offset _miniPlayerOffset = const Offset(12, 8);
+  bool _miniPlayerMinimized = false;
+
   @override
   void initState() {
     super.initState();
@@ -850,118 +854,157 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
           ],
         ],
       ),
-      body: Column(
-        children: [
-          // Active listen-together session docked player or join banner
-          if (listenState.isJoined &&
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isPlayerVisible = listenState.isJoined &&
               listenState.session != null &&
-              listenState.currentRoomId == widget.room.id)
-            _buildDockedPlayer(listenState, isDark)
-          else if (_activeSession != null && _activeSession!.isActive)
-            _buildJoinBanner(_activeSession!, isDark),
-          // Messages
-          Expanded(
-            child: Builder(
-              builder: (context) {
-                final displayMessages = _chatSearchQuery.isEmpty
-                    ? p.messages
-                    : p.messages
-                        .where((m) =>
-                            m.text.toLowerCase().contains(_chatSearchQuery) ||
-                            m.senderName.toLowerCase().contains(_chatSearchQuery) ||
-                            (m.fileName ?? '').toLowerCase().contains(_chatSearchQuery))
-                        .toList();
+              listenState.currentRoomId == widget.room.id;
+          final expandedWidth = (constraints.maxWidth - 24).clamp(240.0, 440.0);
+          final playerWidth = _miniPlayerMinimized ? 196.0 : expandedWidth;
+          final playerHeight = _miniPlayerMinimized ? 46.0 : 88.0;
+          final maxX = (constraints.maxWidth - playerWidth - 8).clamp(8.0, 2000.0);
+          final maxY = (constraints.maxHeight - playerHeight - 76).clamp(8.0, 2000.0);
+          final clampedLeft = _miniPlayerOffset.dx.clamp(8.0, maxX);
+          final clampedTop = _miniPlayerOffset.dy.clamp(8.0, maxY);
 
-                if (p.isLoading && p.messages.isEmpty) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppColors.primaryGold),
-                  );
-                }
-                if (p.messages.isEmpty) {
-                  return _buildEmptyState(isDark);
-                }
-                if (displayMessages.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No messages match "$_chatSearchQuery"',
-                      style: TextStyle(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
-                    ),
-                  );
-                }
+          return Stack(
+            children: [
+              Column(
+                children: [
+                  // Join banner when someone else is hosting and user hasn't joined yet
+                  if (!isPlayerVisible && _activeSession != null && _activeSession!.isActive)
+                    _buildJoinBanner(_activeSession!, isDark),
+                  // Messages
+                  Expanded(
+                    child: Builder(
+                      builder: (context) {
+                        final displayMessages = _chatSearchQuery.isEmpty
+                            ? p.messages
+                            : p.messages
+                                .where((m) =>
+                                    m.text.toLowerCase().contains(_chatSearchQuery) ||
+                                    m.senderName.toLowerCase().contains(_chatSearchQuery) ||
+                                    (m.fileName ?? '').toLowerCase().contains(_chatSearchQuery))
+                                .toList();
 
-                return Stack(
-                  children: [
-                    ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      itemCount: displayMessages.length,
-                      itemBuilder: (ctx, i) {
-                        final msg = displayMessages[i];
-                        final isMe = me != null && msg.senderId == int.tryParse(me.id);
-                        final showAvatar = i == 0 ||
-                            displayMessages[i - 1].senderId != msg.senderId;
-                        final showDate = i == 0 ||
-                            !_isSameDay(displayMessages[i - 1].createdAt, msg.createdAt);
-                        return Column(
+                        if (p.isLoading && p.messages.isEmpty) {
+                          return const Center(
+                            child: CircularProgressIndicator(color: AppColors.primaryGold),
+                          );
+                        }
+                        if (p.messages.isEmpty) {
+                          return _buildEmptyState(isDark);
+                        }
+                        if (displayMessages.isEmpty) {
+                          return Center(
+                            child: Text(
+                              'No messages match "$_chatSearchQuery"',
+                              style: TextStyle(
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          );
+                        }
+
+                        return Stack(
                           children: [
-                            if (showDate) _buildDateDivider(msg.createdAt, isDark),
-                            _buildMessageBubble(context, isDark, msg, isMe, showAvatar, me?.id),
+                            ListView.builder(
+                              controller: _scrollController,
+                              padding: EdgeInsets.fromLTRB(
+                                12,
+                                isPlayerVisible && !_miniPlayerMinimized ? 96 : 8,
+                                12,
+                                8,
+                              ),
+                              itemCount: displayMessages.length,
+                              itemBuilder: (ctx, i) {
+                                final msg = displayMessages[i];
+                                final isMe = me != null && msg.senderId == int.tryParse(me.id);
+                                final showAvatar = i == 0 ||
+                                    displayMessages[i - 1].senderId != msg.senderId;
+                                final showDate = i == 0 ||
+                                    !_isSameDay(displayMessages[i - 1].createdAt, msg.createdAt);
+                                return Column(
+                                  children: [
+                                    if (showDate) _buildDateDivider(msg.createdAt, isDark),
+                                    _buildMessageBubble(context, isDark, msg, isMe, showAvatar, me?.id),
+                                  ],
+                                );
+                              },
+                            ),
+                            if (_showScrollToBottom && _chatSearchQuery.isEmpty)
+                              Positioned(
+                                right: 14,
+                                bottom: 12,
+                                child: GestureDetector(
+                                  onTap: _scrollToBottom,
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: isDark ? AppColors.cardDark : Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: AppColors.primaryGold.withValues(alpha: 0.5),
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.18),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      color: AppColors.primaryGold,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         );
                       },
                     ),
-                    if (_showScrollToBottom && _chatSearchQuery.isEmpty)
-                      Positioned(
-                        right: 14,
-                        bottom: 12,
-                        child: GestureDetector(
-                          onTap: _scrollToBottom,
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: isDark ? AppColors.cardDark : Colors.white,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.primaryGold.withValues(alpha: 0.5),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.18),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: AppColors.primaryGold,
-                              size: 24,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-          ),
-          // Typing & recording indicator
-          _buildTypingIndicator(
-            p.typingUsers,
-            p.recordingUsers,
-            me?.fullName,
-            isDark,
-          ),
-          // Reply preview bar
-          if (_replyingTo != null) _buildReplyPreviewBar(isDark),
-          // Input bar
-          _buildInputBar(isDark),
-        ],
+                  ),
+                  // Typing & recording indicator
+                  _buildTypingIndicator(
+                    p.typingUsers,
+                    p.recordingUsers,
+                    me?.fullName,
+                    isDark,
+                  ),
+                  // Reply preview bar
+                  if (_replyingTo != null) _buildReplyPreviewBar(isDark),
+                  // Input bar
+                  _buildInputBar(isDark),
+                ],
+              ),
+              if (isPlayerVisible)
+                Positioned(
+                  left: clampedLeft,
+                  top: clampedTop,
+                  child: GestureDetector(
+                    onPanUpdate: (details) {
+                      setState(() {
+                        _miniPlayerOffset = Offset(
+                          (_miniPlayerOffset.dx + details.delta.dx).clamp(8.0, maxX),
+                          (_miniPlayerOffset.dy + details.delta.dy).clamp(8.0, maxY),
+                        );
+                      });
+                    },
+                    child: SizedBox(
+                      width: playerWidth,
+                      child: _buildDockedPlayer(listenState, isDark),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1027,173 +1070,291 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
         ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primaryGold.withValues(alpha: 0.5), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryGold.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+    if (_miniPlayerMinimized) {
+      return Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isDark
+                  ? [const Color(0xFF282012), const Color(0xFF171410)]
+                  : [const Color(0xFFFFFDF7), const Color(0xFFF7EED9)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: AppColors.primaryGold, width: 1.4),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.16),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Play/Pause button (host controls playback for everyone)
               GestureDetector(
-                onTap: listenState.isHost
+                onTap: isHost
                     ? () => ref.read(listenTogetherProvider.notifier).togglePlayPause()
                     : null,
                 child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: listenState.isHost
-                        ? AppColors.primaryGold
-                        : AppColors.primaryGold.withValues(alpha: 0.4),
+                  width: 30,
+                  height: 30,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppColors.primaryGold, Color(0xFFB58E24)],
+                    ),
                     shape: BoxShape.circle,
-                    boxShadow: listenState.isHost
-                        ? [
-                            BoxShadow(
-                              color: AppColors.primaryGold.withValues(alpha: 0.3),
-                              blurRadius: 6,
-                            ),
-                          ]
-                        : [],
                   ),
                   child: Icon(
                     listenState.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                     color: Colors.black,
-                    size: 22,
+                    size: 18,
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              // Titles and host info
+              const SizedBox(width: 8),
               Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => ListenTogetherPage(roomId: widget.room.id),
-                    ));
-                  },
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: Colors.greenAccent,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              session.resourceTitle.isNotEmpty ? session.resourceTitle : 'Sermon Audio',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : Colors.black87,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        isHost
-                            ? 'You are hosting · ${_formatDuration(position)} / ${_formatDuration(duration)}'
-                            : '${session.hostName} hosting · ${_formatDuration(position)} / ${_formatDuration(duration)}',
-                        style: const TextStyle(fontSize: 11, color: AppColors.primaryGold, fontWeight: FontWeight.w500),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                child: Text(
+                  _formatDuration(position),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : Colors.black87,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              // Share link button
               IconButton(
-                tooltip: 'Share to WhatsApp',
-                icon: const Icon(Icons.share_rounded, color: AppColors.primaryGold, size: 19),
-                onPressed: _shareRoomLink,
-              ),
-              // Fullscreen/Expand button
-              IconButton(
-                tooltip: 'Fullscreen Player',
-                icon: const Icon(Icons.open_in_full_rounded, color: AppColors.primaryGold, size: 19),
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => ListenTogetherPage(roomId: widget.room.id),
-                  ));
-                },
-              ),
-              // Leave / End button
-              IconButton(
-                tooltip: (isHost ||
-                        const [
-                          'super_admin',
-                          'admin',
-                          'admin_operational',
-                          'media',
-                          'pastorate',
-                        ].contains(ref.read(authChangeNotifierProvider).user?.role))
-                    ? 'End Session'
-                    : 'Leave Session',
-                icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20),
-                onPressed: () async {
-                  final me = ref.read(authChangeNotifierProvider).user;
-                  final isPrivileged = const [
-                    'super_admin',
-                    'admin',
-                    'admin_operational',
-                    'media',
-                    'pastorate',
-                  ].contains(me?.role);
-                  if (isHost || isPrivileged) {
-                    _showEndSessionDialog();
-                  } else {
-                    final memberName = (me?.fullName ?? '').trim().isNotEmpty
-                        ? me!.fullName.trim()
-                        : 'A member';
-                    await ref.read(listenTogetherProvider.notifier).leaveSession();
-                    await ref.read(communityChangeNotifierProvider).sendMessage(
-                      widget.room.id,
-                      '🎧 $memberName left listening',
-                    );
-                  }
-                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: 'Expand Mini Player',
+                icon: const Icon(Icons.open_in_full_rounded, color: AppColors.primaryGold, size: 17),
+                onPressed: () => setState(() => _miniPlayerMinimized = false),
               ),
             ],
           ),
-          // Mini progress bar
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: LinearProgressIndicator(
-                value: progress,
-                backgroundColor: isDark ? Colors.white12 : Colors.black12,
-                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryGold),
-                minHeight: 3,
+        ),
+      );
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 6, 8, 8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? [const Color(0xFF282012), const Color(0xFF171410)]
+                : [const Color(0xFFFFFDF7), const Color(0xFFFBF4E4)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: AppColors.primaryGold.withValues(alpha: 0.65),
+            width: 1.3,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.14),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle bar
+            Center(
+              child: Container(
+                width: 34,
+                height: 3.5,
+                margin: const EdgeInsets.only(bottom: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
-        ],
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: isHost
+                      ? () => ref.read(listenTogetherProvider.notifier).togglePlayPause()
+                      : null,
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isHost
+                            ? const [AppColors.primaryGold, Color(0xFFB58E24)]
+                            : [
+                                AppColors.primaryGold.withValues(alpha: 0.45),
+                                AppColors.primaryGold.withValues(alpha: 0.35),
+                              ],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: isHost
+                          ? [
+                              BoxShadow(
+                                color: AppColors.primaryGold.withValues(alpha: 0.32),
+                                blurRadius: 8,
+                              ),
+                            ]
+                          : [],
+                    ),
+                    child: Icon(
+                      listenState.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      color: Colors.black,
+                      size: 22,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ListenTogetherPage(roomId: widget.room.id),
+                        ),
+                      );
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Colors.greenAccent,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                session.resourceTitle.isNotEmpty
+                                    ? session.resourceTitle
+                                    : 'Message Audio',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isHost
+                              ? 'Hosting · ${_formatDuration(position)} / ${_formatDuration(duration)}'
+                              : '${session.hostName} · ${_formatDuration(position)} / ${_formatDuration(duration)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.primaryGold,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                  tooltip: 'Share to WhatsApp',
+                  icon: const Icon(Icons.share_rounded, color: AppColors.primaryGold, size: 18),
+                  onPressed: _shareRoomLink,
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                  tooltip: 'Minimize',
+                  icon: const Icon(Icons.keyboard_arrow_up_rounded, color: AppColors.primaryGold, size: 20),
+                  onPressed: () => setState(() => _miniPlayerMinimized = true),
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                  tooltip: 'Fullscreen Player',
+                  icon: const Icon(Icons.open_in_full_rounded, color: AppColors.primaryGold, size: 17),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ListenTogetherPage(roomId: widget.room.id),
+                      ),
+                    );
+                  },
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                  tooltip: (isHost ||
+                          const [
+                            'super_admin',
+                            'admin',
+                            'admin_operational',
+                            'media',
+                            'pastorate',
+                          ].contains(ref.read(authChangeNotifierProvider).user?.role))
+                      ? 'End Session'
+                      : 'Leave Session',
+                  icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 19),
+                  onPressed: () async {
+                    final me = ref.read(authChangeNotifierProvider).user;
+                    final isPrivileged = const [
+                      'super_admin',
+                      'admin',
+                      'admin_operational',
+                      'media',
+                      'pastorate',
+                    ].contains(me?.role);
+                    if (isHost || isPrivileged) {
+                      _showEndSessionDialog();
+                    } else {
+                      final memberName = (me?.fullName ?? '').trim().isNotEmpty
+                          ? me!.fullName.trim()
+                          : 'A member';
+                      await ref.read(listenTogetherProvider.notifier).leaveSession();
+                      await ref.read(communityChangeNotifierProvider).sendMessage(
+                        widget.room.id,
+                        '🎧 $memberName left listening',
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  backgroundColor: isDark ? Colors.white12 : Colors.black12,
+                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryGold),
+                  minHeight: 3,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
