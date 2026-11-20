@@ -2183,7 +2183,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dataService = DataService();
-    final sermonsFuture = dataService.getMessages(forceRefresh: true);
+    var sermonsFuture = dataService.getMessages(forceRefresh: false);
     final searchController = TextEditingController();
     String searchQuery = '';
     String selectedCategory = 'All';
@@ -2247,7 +2247,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                                       ),
                                     ),
                                     Text(
-                                      'Select a church sermon to listen with the room',
+                                      'Select a message to listen with the room',
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
@@ -2255,6 +2255,13 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                                     ),
                                   ],
                                 ),
+                              ),
+                              IconButton(
+                                tooltip: 'Refresh Messages',
+                                icon: const Icon(Icons.refresh_rounded, color: AppColors.primaryGold),
+                                onPressed: () => setSheetState(() {
+                                  sermonsFuture = dataService.getMessages(forceRefresh: true);
+                                }),
                               ),
                               IconButton(
                                 icon: const Icon(Icons.close),
