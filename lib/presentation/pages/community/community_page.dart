@@ -539,7 +539,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Fellowship & Lounge',
+                      'TCGC Community Fellowship',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
