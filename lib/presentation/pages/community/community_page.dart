@@ -132,7 +132,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     final p = ref.watch(communityChangeNotifierProvider);
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      backgroundColor: isDark ? const Color(0xFF12100C) : const Color(0xFFF9F3E3),
       appBar: CustomAppBar(
         title: 'Community',
         showBackButton: false,
@@ -146,7 +146,17 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             ),
         ],
       ),
-      body: !ref.watch(authChangeNotifierProvider).isAuthenticated
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDark
+                ? [const Color(0xFF14110C), const Color(0xFF0E0D0A)]
+                : [const Color(0xFFFCF7EA), const Color(0xFFF4EAD2)],
+          ),
+        ),
+        child: !ref.watch(authChangeNotifierProvider).isAuthenticated
           ? _buildGuestPreview(isDark)
           : _checkingPolicy
           ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGold))
@@ -422,6 +432,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -488,22 +499,20 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
       margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [const Color(0xFF282012), const Color(0xFF16130E)]
-              : [const Color(0xFFFFFDF7), const Color(0xFFF7EED9)],
+        gradient: const LinearGradient(
+          colors: [Color(0xFF231D12), Color(0xFF12100B)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: AppColors.primaryGold.withValues(alpha: isDark ? 0.38 : 0.5),
-          width: 1.2,
+          color: AppColors.primaryGold.withValues(alpha: 0.65),
+          width: 1.3,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.1 : 0.12),
-            blurRadius: 16,
+            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.16 : 0.24),
+            blurRadius: 18,
             offset: const Offset(0, 6),
           ),
         ],
@@ -518,7 +527,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                 height: 50,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [AppColors.primaryGold, Color(0xFFA68118)],
+                    colors: [AppColors.goldVariant1, AppColors.primaryGold],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -534,7 +543,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                 child: const Icon(Icons.forum_rounded, color: Colors.black, size: 25),
               ),
               const SizedBox(width: 14),
-              Expanded(
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -544,15 +553,15 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.2,
-                        color: isDark ? Colors.white : Colors.black87,
+                        color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    SizedBox(height: 3),
                     Text(
                       'Chat with members & listen to messages together',
                       style: TextStyle(
                         fontSize: 12.5,
-                        color: isDark ? AppColors.textSecondaryDark : Colors.black54,
+                        color: AppColors.goldVariant2,
                       ),
                     ),
                   ],
@@ -567,28 +576,28 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             children: [
               _heroStatPill(
                 isDark,
-                dotColor: Colors.green,
+                dotColor: Colors.greenAccent,
                 label: '$onlineCount Online',
-                textColor: isDark ? Colors.greenAccent : Colors.green[800]!,
-                bgColor: Colors.green.withValues(alpha: 0.13),
-                borderColor: Colors.green.withValues(alpha: 0.3),
+                textColor: Colors.greenAccent,
+                bgColor: Colors.green.withValues(alpha: 0.18),
+                borderColor: Colors.greenAccent.withValues(alpha: 0.35),
               ),
               _heroStatPill(
                 isDark,
                 icon: Icons.groups_rounded,
                 label: '${p.rooms.length} Rooms',
-                textColor: isDark ? AppColors.primaryGold : const Color(0xFF7D5F10),
-                bgColor: AppColors.primaryGold.withValues(alpha: 0.15),
-                borderColor: AppColors.primaryGold.withValues(alpha: 0.35),
+                textColor: AppColors.goldVariant2,
+                bgColor: AppColors.primaryGold.withValues(alpha: 0.18),
+                borderColor: AppColors.primaryGold.withValues(alpha: 0.45),
               ),
               if (liveRoomsCount > 0)
                 _heroStatPill(
                   isDark,
                   icon: Icons.headphones_rounded,
                   label: '$liveRoomsCount Live Listening',
-                  textColor: isDark ? Colors.greenAccent : Colors.green[800]!,
-                  bgColor: Colors.green.withValues(alpha: 0.13),
-                  borderColor: Colors.green.withValues(alpha: 0.35),
+                  textColor: Colors.greenAccent,
+                  bgColor: Colors.green.withValues(alpha: 0.18),
+                  borderColor: Colors.greenAccent.withValues(alpha: 0.4),
                 ),
             ],
           ),
