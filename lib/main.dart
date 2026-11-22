@@ -745,7 +745,10 @@ class _MainScreenState extends ConsumerState<MainScreen>
     }
   }
 
-  Future<void> _navigateToCommunityRoom(String roomIdStr) async {
+  Future<void> _navigateToCommunityRoom(
+    String roomIdStr, {
+    bool autoJoin = true,
+  }) async {
     final roomId = int.tryParse(roomIdStr);
     if (roomId == null) return;
 
@@ -775,7 +778,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
           MaterialPageRoute(
             builder: (_) => ChatRoomPage(
               room: targetRoom,
-              autoJoinListenSession: true,
+              autoJoinListenSession: autoJoin,
             ),
           ),
         );
@@ -816,6 +819,14 @@ class _MainScreenState extends ConsumerState<MainScreen>
   Future<void> _handleNotificationNavigation(Map<String, dynamic> data) async {
     final type = data['type']?.toString();
     final url = (data['url'] ?? data['deep_link'] ?? data['link'] ?? '').toString();
+
+    if (type == 'community_message' && data['room_id'] != null) {
+      await _navigateToCommunityRoom(
+        data['room_id'].toString(),
+        autoJoin: false,
+      );
+      return;
+    }
 
     if (type == 'livestream' ||
         type == 'live' ||
