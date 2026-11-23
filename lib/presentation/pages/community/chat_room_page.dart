@@ -10,13 +10,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../core/constants/api_constants.dart';
 import '../../../core/providers/community_provider.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../data/services/api_service.dart';
 import '../../../main.dart';
 import '../../widgets/app_image.dart';
-import 'group_call_page.dart';
 import 'listen_together_page.dart';
 import '../../../core/providers/listen_together_provider.dart';
 import '../../../data/services/data_service.dart';
@@ -84,9 +81,6 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   // Draggable mini-player state
   Offset _miniPlayerOffset = const Offset(12, 8);
   bool _miniPlayerMinimized = false;
-
-  // Active group call state
-  Map<String, dynamic>? _activeCall;
 
   @override
   void initState() {
@@ -176,9 +170,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   }
 
   void _startSessionPolling() {
-    _pollActiveCall();
     _sessionPollTimer = Timer.periodic(const Duration(seconds: 6), (_) async {
-      _pollActiveCall();
       final listenState = ref.read(listenTogetherProvider);
       if (listenState.isJoined && listenState.currentRoomId == widget.room.id) {
         return;
@@ -187,35 +179,6 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
           .pollListenSession(widget.room.id);
       if (mounted) setState(() => _activeSession = session);
     });
-  }
-
-  Future<void> _pollActiveCall() async {
-    try {
-      final res = await ApiService().get(ApiConstants.communityGroupCall(widget.room.id));
-      if (res.isSuccess && mounted) {
-        final active = res.data['active_call'];
-        setState(() {
-          _activeCall = active is Map<String, dynamic> ? active : null;
-        });
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _openGroupCall({
-    required String callType,
-    bool isJoiningExisting = false,
-  }) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => GroupCallPage(
-          room: widget.room,
-          callType: callType,
-          isJoiningExisting: isJoiningExisting,
-        ),
-      ),
-    );
-    _pollActiveCall();
   }
 
   void _onTypingChanged(bool hasText) {
@@ -867,49 +830,27 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
             )
           else ...[
             IconButton(
-              tooltip: 'Voice Call',
-              icon: const Icon(Icons.call_rounded, color: AppColors.primaryGold),
-              onPressed: () => _openGroupCall(
-                callType: 'audio',
-                isJoiningExisting: _activeCall != null,
-              ),
-            ),
-            IconButton(
-              tooltip: 'Video Call',
-              icon: const Icon(Icons.videocam_rounded, color: AppColors.primaryGold),
-              onPressed: () => _openGroupCall(
-                callType: 'video',
-                isJoiningExisting: _activeCall != null,
-              ),
-            ),
-            IconButton(
               tooltip: 'Search Messages',
               icon: const Icon(Icons.search_rounded, color: AppColors.primaryGold),
               onPressed: () => setState(() => _isSearching = true),
             ),
             if (widget.dmUserName == null) ...[
               IconButton(
+                tooltip: 'Share Group Link',
+                icon: const Icon(Icons.share_rounded, color: AppColors.primaryGold),
+                onPressed: _shareRoomLink,
+              ),
+              IconButton(
                 tooltip: 'Listen Together',
                 icon: const Icon(Icons.headphones_rounded, color: AppColors.primaryGold),
                 onPressed: _openSermonPickerForListenTogether,
               ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert_rounded, color: AppColors.primaryGold),
-                onSelected: (val) {
-                  if (val == 'share') _shareRoomLink();
-                  if (val == 'refresh') p.fetchMessages(widget.room.id);
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'share', child: Text('Share Group Link')),
-                  PopupMenuItem(value: 'refresh', child: Text('Refresh Messages')),
-                ],
-              ),
-            ] else
-              IconButton(
-                tooltip: 'Refresh',
-                icon: const Icon(Icons.refresh, color: AppColors.primaryGold),
-                onPressed: () => p.fetchMessages(widget.room.id),
-              ),
+            ],
+            IconButton(
+              tooltip: 'Refresh',
+              icon: const Icon(Icons.refresh, color: AppColors.primaryGold),
+              onPressed: () => p.fetchMessages(widget.room.id),
+            ),
           ],
         ],
       ),
@@ -930,9 +871,6 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
             children: [
               Column(
                 children: [
-                  // Active group call banner
-                  if (_activeCall != null)
-                    _buildActiveCallBanner(_activeCall!, isDark),
                   // Join banner when someone else is hosting and user hasn't joined yet
                   if (!isPlayerVisible && _activeSession != null && _activeSession!.isActive)
                     _buildJoinBanner(_activeSession!, isDark),
@@ -1417,81 +1355,6 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildActiveCallBanner(Map<String, dynamic> call, bool isDark) {
-    final callType = (call['call_type'] ?? 'audio').toString();
-    final count = call['participant_count'] ?? 1;
-    final initiator = (call['initiator_name'] ?? 'A member').toString();
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 6, 12, 2),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.green.withValues(alpha: isDark ? 0.25 : 0.14),
-            Colors.green.withValues(alpha: isDark ? 0.12 : 0.06),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.green.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              callType == 'video' ? Icons.videocam_rounded : Icons.call_rounded,
-              color: Colors.green,
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  callType == 'video' ? 'Group Video Call Active' : 'Group Voice Call Active',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
-                Text(
-                  '$initiator · $count in call',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: isDark ? Colors.greenAccent : Colors.green[800],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => _openGroupCall(
-              callType: callType,
-              isJoiningExisting: true,
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              minimumSize: const Size(0, 32),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              elevation: 0,
-            ),
-            child: const Text('Join', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }

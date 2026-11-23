@@ -1,9 +1,6 @@
 class ApiConstants {
   static const String baseUrl = 'https://tcgc.thecitygatechurch.org/api';
   static const String webBaseUrl = 'https://tcgc.thecitygatechurch.org';
-
-  // Agora App ID — get from https://console.agora.io
-  static const String agoraAppId = 'f348f64924b048ef9f9fcb44bd0409e8';
   // static const String webBaseUrl = 'http://192.168.43.57:8000'; // Local development
 
   // Web pages (for WebView)
@@ -139,8 +136,6 @@ class ApiConstants {
       '/community/rooms/$roomId/listen-session/';
   static String communityTyping(int roomId) =>
       '/community/rooms/$roomId/typing/';
-  static String communityGroupCall(int roomId) =>
-      '/community/rooms/$roomId/call/';
 
   // KYC Verification (Legacy)
   static const String verifyNin = '/kyc/verify-nin/';
