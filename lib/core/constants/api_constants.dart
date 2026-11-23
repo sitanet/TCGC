@@ -139,6 +139,8 @@ class ApiConstants {
       '/community/rooms/$roomId/listen-session/';
   static String communityTyping(int roomId) =>
       '/community/rooms/$roomId/typing/';
+  static String communityGroupCall(int roomId) =>
+      '/community/rooms/$roomId/call/';
 
   // KYC Verification (Legacy)
   static const String verifyNin = '/kyc/verify-nin/';

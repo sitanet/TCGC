@@ -820,7 +820,8 @@ class _MainScreenState extends ConsumerState<MainScreen>
     final type = data['type']?.toString();
     final url = (data['url'] ?? data['deep_link'] ?? data['link'] ?? '').toString();
 
-    if (type == 'community_message' && data['room_id'] != null) {
+    if ((type == 'community_message' || type == 'group_call') &&
+        data['room_id'] != null) {
       await _navigateToCommunityRoom(
         data['room_id'].toString(),
         autoJoin: false,
