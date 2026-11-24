@@ -18,6 +18,8 @@ import 'listen_together_page.dart';
 import '../../../core/providers/listen_together_provider.dart';
 import '../../../data/services/data_service.dart';
 import '../../../domain/entities/sermon.dart';
+import '../audio/audio_player_page.dart';
+import '../audio/transcript_list_page.dart';
 class ChatRoomPage extends ConsumerStatefulWidget {
   final CommunityRoom room;
   final String? dmUserName;
@@ -1959,6 +1961,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     final iconMap = {'audio': Icons.headphones, 'event': Icons.event, 'transcript': Icons.article};
     final icon = iconMap[msg.resourceType] ?? Icons.link;
     final isAudio = msg.resourceType == 'audio';
+    final isTranscript = msg.resourceType == 'transcript';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1999,11 +2002,75 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                   ),
                 ],
               ),
-              // Listen Together button — only for audio resources
+              // Action buttons for audio & transcript resources
               if (isAudio && msg.resourceId != null) ...[
                 const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _openSharedAudio(msg),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isMe
+                              ? Colors.white.withValues(alpha: 0.22)
+                              : (isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.08)),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.play_arrow_rounded,
+                                size: 15,
+                                color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black87)),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Listen',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black87),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => _startListenTogether(msg),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isMe
+                              ? Colors.white.withValues(alpha: 0.25)
+                              : AppColors.primaryGold,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.headphones_rounded,
+                                size: 14,
+                                color: isMe ? Colors.white : Colors.black87),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Listen Together',
+                              style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w600,
+                                color: isMe ? Colors.white : Colors.black87),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ] else if (isTranscript && msg.resourceId != null) ...[
+                const SizedBox(height: 8),
                 GestureDetector(
-                  onTap: () => _startListenTogether(msg),
+                  onTap: () => _openSharedTranscript(msg),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
@@ -2015,15 +2082,17 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.headphones_rounded,
+                        Icon(Icons.menu_book_rounded,
                             size: 14,
                             color: isMe ? Colors.white : Colors.black87),
                         const SizedBox(width: 6),
                         Text(
-                          'Listen Together',
+                          'Read Transcript',
                           style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600,
-                            color: isMe ? Colors.white : Colors.black87),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isMe ? Colors.white : Colors.black87,
+                          ),
                         ),
                       ],
                     ),
@@ -2295,6 +2364,46 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
         );
       }
     }
+  }
+
+  Future<void> _openSharedAudio(ChatMessage msg) async {
+    if (msg.resourceId == null) return;
+    final sermon = await DataService().getMessageById(msg.resourceId.toString());
+    if (!mounted) return;
+    if (sermon == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Message not found'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AudioPlayerPage(sermon: sermon)),
+    );
+  }
+
+  Future<void> _openSharedTranscript(ChatMessage msg) async {
+    if (msg.resourceId == null) return;
+    final transcript =
+        await DataService().getTranscriptById(msg.resourceId.toString());
+    if (!mounted) return;
+    if (transcript == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transcript not found'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => TranscriptViewPage(transcript: transcript)),
+    );
   }
 
   Future<void> _startListenTogether(ChatMessage msg) async {

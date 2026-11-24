@@ -18,6 +18,7 @@ import '../../widgets/password_input_field.dart';
 import '../../widgets/animated_play_button.dart';
 import '../../widgets/resume_playback_sheet.dart';
 import '../../widgets/auth_required_sheet.dart';
+import '../../widgets/community/share_to_community_sheet.dart';
 
 class AudioPlayerPage extends ConsumerStatefulWidget {
   final Sermon sermon;
@@ -1825,6 +1826,14 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                 },
               ),
               _buildQuickActionButton(
+                icon: Icons.forum_outlined,
+                label: 'Discuss',
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _discussInCommunity();
+                },
+              ),
+              _buildQuickActionButton(
                 icon: Icons.share_outlined,
                 label: 'Share',
                 onTap: () {
@@ -2559,6 +2568,15 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                     _showSleepTimerBottomSheet(isDark, audioProvider);
                   },
                 ),
+                // Discuss in Community
+                ListTile(
+                  leading: const Icon(Icons.forum_outlined, color: AppColors.primaryGold),
+                  title: const Text('Discuss in Community'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _discussInCommunity();
+                  },
+                ),
                 // Share
                 ListTile(
                   leading: const Icon(Icons.share),
@@ -2587,6 +2605,17 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     } catch (e) {
       debugPrint('Failed to track message stat: $e');
     }
+  }
+
+  void _discussInCommunity() {
+    final sermon = widget.sermon;
+    ShareToCommunitySheet.show(
+      context,
+      resourceType: 'audio',
+      resourceId: int.tryParse(sermon.id),
+      resourceTitle: sermon.title,
+      fallbackUrl: 'https://tcgc.thecitygatechurch.org/app/message/${sermon.id}/',
+    );
   }
 
   void _shareSermon() {

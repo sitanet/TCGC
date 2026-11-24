@@ -18,6 +18,7 @@ import '../../../data/services/data_service.dart';
 import '../../../data/services/transcript_cache_service.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../../widgets/community/share_to_community_sheet.dart';
 
 String _stripHtml(String text) {
   return text
@@ -1953,6 +1954,21 @@ class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
     return '<!DOCTYPE html><html><head>$injection</head><body>$out</body></html>';
   }
 
+  void _discussInCommunity() {
+    final title = widget.overrideTitle ?? widget.transcript?.title ?? 'Transcript';
+    final transcriptId = widget.transcript?.id ?? '';
+    final shareUrl = transcriptId.isNotEmpty
+        ? 'https://tcgc.thecitygatechurch.org/app/transcript/$transcriptId'
+        : widget.overrideUrl;
+    ShareToCommunitySheet.show(
+      context,
+      resourceType: 'transcript',
+      resourceId: int.tryParse(transcriptId),
+      resourceTitle: title,
+      fallbackUrl: shareUrl,
+    );
+  }
+
   Future<void> _shareTranscript() async {
     const playStoreLink = 'https://play.google.com/store/apps/details?id=com.tcgc.tcgc';
     final title = widget.overrideTitle ?? widget.transcript?.title ?? 'Sermon Transcript';
@@ -2057,6 +2073,11 @@ $playStoreLink''';
                     : (isDark ? Colors.white : Colors.black),
               ),
               onPressed: _toggleReadAloud,
+            ),
+            IconButton(
+              tooltip: 'Discuss in Community',
+              icon: Icon(Icons.forum_outlined, color: isDark ? Colors.white : Colors.black),
+              onPressed: _discussInCommunity,
             ),
             IconButton(
               icon: Icon(Icons.share, color: isDark ? Colors.white : Colors.black),
@@ -2370,6 +2391,11 @@ $playStoreLink''';
         title: widget.overrideTitle ?? widget.transcript?.title ?? 'Transcript',
         showBackButton: true,
         actions: [
+          IconButton(
+            tooltip: 'Discuss in Community',
+            icon: Icon(Icons.forum_outlined, color: isDark ? Colors.white : Colors.black),
+            onPressed: _discussInCommunity,
+          ),
           IconButton(
             icon: Icon(Icons.share, color: isDark ? Colors.white : Colors.black),
             onPressed: _shareTranscript,
