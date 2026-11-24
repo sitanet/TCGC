@@ -74,6 +74,7 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
   String? _selectedSpeaker;
   List<String> _speakers = [];
   List<SpeakerModel> _speakerModels = [];
+  bool _isHeroBioExpanded = false;
   int _preBufferedUpTo = 0;
   bool _isRefreshing = false;
   Timer? _autoRefreshTimer;
@@ -393,6 +394,7 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
       _selectedSpeaker = speaker == 'All' ? null : speaker;
       _selectedCategory = 'All';
       _selectedCategoryId = null;
+      _isHeroBioExpanded = false;
       _filteredItems = _getFilteredItems(query);
     });
   }
@@ -850,15 +852,68 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
           ),
           if (description != null && description.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text(
-              _stripHtml(description),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark ? Colors.white70 : Colors.black87,
-                height: 1.3,
-              ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final cleanBio = _stripHtml(description!).trim();
+                final textStyle = TextStyle(
+                  fontSize: 12.5,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                  height: 1.4,
+                );
+                final tp = TextPainter(
+                  text: TextSpan(text: cleanBio, style: textStyle),
+                  maxLines: 3,
+                  textDirection: TextDirection.ltr,
+                )..layout(maxWidth: constraints.maxWidth);
+                final isOverflowing = tp.didExceedMaxLines;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeInOut,
+                      alignment: Alignment.topCenter,
+                      child: Text(
+                        cleanBio,
+                        maxLines: _isHeroBioExpanded ? null : 3,
+                        overflow: _isHeroBioExpanded
+                            ? TextOverflow.visible
+                            : TextOverflow.ellipsis,
+                        style: textStyle,
+                      ),
+                    ),
+                    if (isOverflowing) ...[
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: () => setState(
+                            () => _isHeroBioExpanded = !_isHeroBioExpanded),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _isHeroBioExpanded ? 'Show less' : 'Read more',
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primaryGold,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Icon(
+                              _isHeroBioExpanded
+                                  ? Icons.keyboard_arrow_up_rounded
+                                  : Icons.keyboard_arrow_down_rounded,
+                              size: 16,
+                              color: AppColors.primaryGold,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              },
             ),
           ],
           const SizedBox(height: 14),
