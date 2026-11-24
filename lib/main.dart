@@ -506,6 +506,23 @@ class _MainScreenState extends ConsumerState<MainScreen>
   late AskWingAICubit _askWingAICubit;
 
   static const String _lastTabKey = 'last_tab_index';
+  bool _liveStreamVisited = false;
+
+  Widget _buildBody(int safeIndex, bool showWallet) {
+    if (safeIndex == 2) {
+      _liveStreamVisited = true;
+    }
+    return Stack(
+      children: [
+        if (safeIndex != 2) _buildPage(safeIndex, showWallet),
+        if (_liveStreamVisited)
+          Offstage(
+            offstage: safeIndex != 2,
+            child: const LiveStreamPage(),
+          ),
+      ],
+    );
+  }
 
   // Pages are built lazily to prevent ANR from heavy pages like LiveStreamPage
   Widget _buildPage(int index, bool showWallet) {
@@ -1016,7 +1033,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
         child: Stack(
           children: [
             Scaffold(
-              body: _buildPage(safeIndex, showWallet),
+              body: _buildBody(safeIndex, showWallet),
               bottomNavigationBar: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1050,7 +1067,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
         child: Stack(
           children: [
             Scaffold(
-              body: _buildPage(safeIndex, showWallet),
+              body: _buildBody(safeIndex, showWallet),
               bottomNavigationBar: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1078,7 +1095,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
     return BlocProvider<AskWingAICubit>(
       create: (context) => _askWingAICubit,
       child: Scaffold(
-        body: _buildPage(safeIndex, showWallet),
+        body: _buildBody(safeIndex, showWallet),
         bottomNavigationBar: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
