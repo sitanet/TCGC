@@ -1500,16 +1500,27 @@ class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
           final locale = (v['locale'] ?? '').toString().trim();
           final lowerLoc = locale.toLowerCase();
           if (name.isNotEmpty &&
-              (lowerLoc.startsWith('en') || lowerLoc.contains('ng'))) {
+              (lowerLoc.startsWith('en') ||
+                  lowerLoc.contains('ng') ||
+                  lowerLoc.startsWith('pcm') ||
+                  lowerLoc.startsWith('yo') ||
+                  lowerLoc.startsWith('ig') ||
+                  lowerLoc.startsWith('ha'))) {
             voices.add({'name': name, 'locale': locale});
           }
         }
       }
 
-      // Prioritize Nigerian English first, then UK/US, then others
+      // Prioritize Nigerian languages & Nigerian English first, then UK/US, then others
       int priority(String loc) {
         final l = loc.toLowerCase();
-        if (l.contains('ng')) return 0;
+        if (l.contains('ng') ||
+            l.startsWith('pcm') ||
+            l.startsWith('yo') ||
+            l.startsWith('ig') ||
+            l.startsWith('ha')) {
+          return 0;
+        }
         if (l == 'en-gb' || l == 'en_gb') return 1;
         if (l == 'en-us' || l == 'en_us') return 2;
         return 3;
@@ -1546,7 +1557,20 @@ class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
 
   String _friendlyVoiceLabel(Map<String, String> voice, int indexInLocale) {
     final loc = (voice['locale'] ?? '').toLowerCase();
+    final name = (voice['name'] ?? '').toLowerCase();
     final suffix = indexInLocale > 1 ? ' $indexInLocale' : '';
+    if (loc.startsWith('pcm') || name.contains('pidgin')) {
+      return 'Nigerian Pidgin$suffix';
+    }
+    if (loc.startsWith('yo') || name.contains('yoruba')) {
+      return 'Yoruba (Nigeria)$suffix';
+    }
+    if (loc.startsWith('ig') || name.contains('igbo')) {
+      return 'Igbo (Nigeria)$suffix';
+    }
+    if (loc.startsWith('ha') || name.contains('hausa')) {
+      return 'Hausa (Nigeria)$suffix';
+    }
     if (loc.contains('ng')) return 'Nigerian English$suffix';
     if (loc.contains('gb')) return 'British English (UK)$suffix';
     if (loc.contains('us')) return 'American English (US)$suffix';
@@ -1560,6 +1584,11 @@ class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
 
   String _shortVoiceTag() {
     final loc = (_selectedVoice?['locale'] ?? 'en-US').toLowerCase();
+    final name = (_selectedVoice?['name'] ?? '').toLowerCase();
+    if (loc.startsWith('pcm') || name.contains('pidgin')) return 'Pidgin';
+    if (loc.startsWith('yo') || name.contains('yoruba')) return 'Yoruba';
+    if (loc.startsWith('ig') || name.contains('igbo')) return 'Igbo';
+    if (loc.startsWith('ha') || name.contains('hausa')) return 'Hausa';
     if (loc.contains('ng')) return 'NG';
     if (loc.contains('gb')) return 'UK';
     if (loc.contains('us')) return 'US';
