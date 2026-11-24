@@ -1095,11 +1095,15 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
   }
 
   Widget _buildMembersStrip(BuildContext context, bool isDark, CommunityProvider p) {
-    final filtered = _searchQuery.isEmpty
-        ? p.allMembers
-        : p.allMembers
-            .where((m) => m.name.toLowerCase().contains(_searchQuery))
-            .toList();
+    final filtered = (_searchQuery.isEmpty
+            ? p.allMembers
+            : p.allMembers
+                .where((m) => m.name.toLowerCase().contains(_searchQuery)))
+        .toList()
+      ..sort((a, b) {
+        if (a.isOnline == b.isOnline) return 0;
+        return a.isOnline ? -1 : 1;
+      });
     final onlineCount = filtered.where((m) => m.isOnline).length;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -1155,11 +1159,29 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
           if (filtered.isNotEmpty) ...[
             const SizedBox(height: 12),
             SizedBox(
-              height: 76,
+              height: 92,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: filtered.length,
-                itemBuilder: (ctx, i) => _buildMemberAvatar(isDark, filtered[i]),
+                itemBuilder: (ctx, i) {
+                  final member = filtered[i];
+                  final showDivider =
+                      i > 0 && !member.isOnline && filtered[i - 1].isOnline;
+                  if (!showDivider) return _buildMemberAvatar(isDark, member);
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 1,
+                        height: 52,
+                        margin: const EdgeInsets.only(right: 12, bottom: 8),
+                        color: isDark ? Colors.white12 : Colors.grey.shade300,
+                      ),
+                      _buildMemberAvatar(isDark, member),
+                    ],
+                  );
+                },
               ),
             ),
           ] else ...[
@@ -1178,84 +1200,116 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
   }
 
   Widget _buildMemberAvatar(bool isDark, OnlineMember m) {
-    return GestureDetector(
-      onTap: () => _openDm(m),
-      child: Padding(
-        padding: const EdgeInsets.only(right: 12),
-        child: Column(
-          children: [
-            Stack(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(2.2),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: m.isOnline
-                        ? const LinearGradient(
-                            colors: [AppColors.primaryGold, Colors.green],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          )
-                        : null,
-                    border: m.isOnline
-                        ? null
-                        : Border.all(
-                            color: isDark ? Colors.white12 : Colors.grey.shade300,
-                            width: 1.5,
-                          ),
-                  ),
-                  child: CircleAvatar(
-                    radius: 22,
-                    backgroundColor: AppColors.primaryGold.withValues(alpha: 0.16),
-                    child: m.photoUrl != null
-                        ? ClipOval(child: AppImage(imagePath: m.photoUrl!, width: 44, height: 44))
-                        : Text(
-                            m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
-                            style: const TextStyle(
-                              color: AppColors.primaryGold,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 17,
-                            ),
-                          ),
-                  ),
+    final isOnline = m.isOnline;
+    final content = Container(
+      margin: EdgeInsets.only(right: isOnline ? 10 : 8),
+      padding: EdgeInsets.symmetric(horizontal: isOnline ? 8 : 4, vertical: 6),
+      decoration: isOnline
+          ? BoxDecoration(
+              color: Colors.green.withValues(alpha: isDark ? 0.14 : 0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.green.withValues(alpha: isDark ? 0.45 : 0.35),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.green.withValues(alpha: isDark ? 0.12 : 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: m.isOnline ? Colors.green : Colors.grey.shade400,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isDark ? AppColors.cardDark : Colors.white,
-                        width: 2,
-                      ),
+              ],
+            )
+          : null,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            children: [
+              Container(
+                padding: EdgeInsets.all(isOnline ? 2.5 : 1.5),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: isOnline
+                      ? const LinearGradient(
+                          colors: [Color(0xFF22C55E), AppColors.primaryGold],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  border: isOnline
+                      ? null
+                      : Border.all(
+                          color: isDark ? Colors.white12 : Colors.grey.shade300,
+                          width: 1.5,
+                        ),
+                ),
+                child: CircleAvatar(
+                  radius: 22,
+                  backgroundColor: isOnline
+                      ? AppColors.primaryGold.withValues(alpha: 0.2)
+                      : (isDark ? Colors.white10 : Colors.grey.shade200),
+                  child: m.photoUrl != null
+                      ? ClipOval(
+                          child: AppImage(
+                              imagePath: m.photoUrl!, width: 44, height: 44))
+                      : Text(
+                          m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                          style: TextStyle(
+                            color: isOnline
+                                ? AppColors.primaryGold
+                                : (isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 17,
+                          ),
+                        ),
+                ),
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  width: isOnline ? 13 : 11,
+                  height: isOnline ? 13 : 11,
+                  decoration: BoxDecoration(
+                    color: isOnline
+                        ? const Color(0xFF22C55E)
+                        : Colors.grey.shade400,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isDark ? AppColors.cardDark : Colors.white,
+                      width: 2,
                     ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 5),
-            SizedBox(
-              width: 56,
-              child: Text(
-                m.name.split(' ').first,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: m.isOnline ? FontWeight.w600 : FontWeight.normal,
-                  color: isDark
-                      ? (m.isOnline ? Colors.white : AppColors.textSecondaryDark)
-                      : (m.isOnline ? Colors.black87 : AppColors.textSecondaryLight),
-                ),
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
               ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          SizedBox(
+            width: 56,
+            child: Text(
+              m.name.split(' ').first,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: isOnline ? FontWeight.w700 : FontWeight.normal,
+                color: isDark
+                    ? (isOnline ? Colors.white : AppColors.textSecondaryDark)
+                    : (isOnline ? Colors.black87 : AppColors.textSecondaryLight),
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+
+    return GestureDetector(
+      onTap: () => _openDm(m),
+      child: isOnline ? content : Opacity(opacity: 0.58, child: content),
     );
   }
 
