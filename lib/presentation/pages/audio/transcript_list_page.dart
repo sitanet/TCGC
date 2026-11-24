@@ -1847,7 +1847,7 @@ $playStoreLink''';
             Positioned(
               left: 16,
               right: 16,
-              bottom: hasPdf ? bottomInset + 64 : bottomInset,
+              bottom: hasPdf ? bottomInset + 76 : bottomInset,
               child: _buildTtsBar(isDark),
             ),
           
@@ -1996,16 +1996,25 @@ $playStoreLink''';
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [AppColors.primaryGold, Color(0xFFB8860B)],
+          colors: [Color(0xFF231D12), Color(0xFF14110C)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.primaryGold.withValues(alpha: 0.75),
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 12,
+            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.16 : 0.22),
+            blurRadius: 16,
             offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -2013,39 +2022,78 @@ $playStoreLink''';
         color: Colors.transparent,
         child: InkWell(
           onTap: _openPdf,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(8),
+                    gradient: const LinearGradient(
+                      colors: [AppColors.goldVariant1, AppColors.primaryGold],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
-                    Icons.picture_as_pdf,
-                    color: Colors.white,
-                    size: 20,
+                    Icons.picture_as_pdf_rounded,
+                    color: Colors.black,
+                    size: 21,
                   ),
                 ),
                 const SizedBox(width: 12),
                 const Expanded(
-                  child: Text(
-                    'View PDF Version',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'View PDF Transcript',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 1),
+                      Text(
+                        'Open formatted printable document',
+                        style: TextStyle(
+                          color: AppColors.goldVariant2,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const Icon(
-                  Icons.open_in_new,
-                  color: Colors.white,
-                  size: 18,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Open',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        color: Colors.black,
+                        size: 14,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
