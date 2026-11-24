@@ -1807,59 +1807,67 @@ $playStoreLink''';
       return _buildFallbackView(context, isDark, hasPdf, bottomInset);
     }
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
-      appBar: CustomAppBar(
-        title: widget.overrideTitle ?? widget.transcript?.title ?? 'Transcript',
-        showBackButton: true,
-        actions: [
-          IconButton(
-            tooltip: _ttsPlaying ? 'Pause Voice Reader' : 'Listen to Transcript',
-            icon: Icon(
-              _ttsPlaying
-                  ? Icons.pause_circle_filled_rounded
-                  : Icons.record_voice_over_rounded,
-              color: (_ttsPanelVisible || _ttsPlaying)
-                  ? AppColors.primaryGold
-                  : (isDark ? Colors.white : Colors.black),
-            ),
-            onPressed: _toggleReadAloud,
-          ),
-          IconButton(
-            icon: Icon(Icons.share, color: isDark ? Colors.white : Colors.black),
-            onPressed: _shareTranscript,
-          ),
-        ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
-      body: Stack(
-        children: [
-          // WebView content (full screen)
-          WebViewWidget(controller: _webViewController),
-          
-          // Loading indicator
-          if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(color: AppColors.primaryGold),
+      child: Scaffold(
+        backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
+        appBar: CustomAppBar(
+          title: widget.overrideTitle ?? widget.transcript?.title ?? 'Transcript',
+          showBackButton: true,
+          lightBackground: !isDark,
+          actions: [
+            IconButton(
+              tooltip: _ttsPlaying ? 'Pause Voice Reader' : 'Listen to Transcript',
+              icon: Icon(
+                _ttsPlaying
+                    ? Icons.pause_circle_filled_rounded
+                    : Icons.record_voice_over_rounded,
+                color: (_ttsPanelVisible || _ttsPlaying)
+                    ? AppColors.primaryGold
+                    : (isDark ? Colors.white : Colors.black),
+              ),
+              onPressed: _toggleReadAloud,
             ),
+            IconButton(
+              icon: Icon(Icons.share, color: isDark ? Colors.white : Colors.black),
+              onPressed: _shareTranscript,
+            ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            // WebView content (full screen)
+            WebViewWidget(controller: _webViewController),
+            
+            // Loading indicator
+            if (_isLoading)
+              const Center(
+                child: CircularProgressIndicator(color: AppColors.primaryGold),
+              ),
 
-          // Voice reader bar
-          if (_ttsPanelVisible)
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: hasPdf ? bottomInset + 76 : bottomInset,
-              child: _buildTtsBar(isDark),
-            ),
-          
-          // Floating PDF button at bottom (if PDF exists)
-          if (hasPdf)
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: bottomInset,
-              child: _buildFloatingPdfButton(isDark),
-            ),
-        ],
+            // Voice reader bar
+            if (_ttsPanelVisible)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: hasPdf ? bottomInset + 76 : bottomInset,
+                child: _buildTtsBar(isDark),
+              ),
+            
+            // Floating PDF button at bottom (if PDF exists)
+            if (hasPdf)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: bottomInset,
+                child: _buildFloatingPdfButton(isDark),
+              ),
+          ],
+        ),
       ),
     );
   }
