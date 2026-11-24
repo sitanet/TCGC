@@ -5,9 +5,14 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/providers/community_provider.dart';
 import '../../../core/providers/listen_together_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/services/data_service.dart';
+import '../../../domain/entities/sermon.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/app_image.dart';
+import '../../widgets/community/share_to_community_sheet.dart';
+import '../audio/audio_player_page.dart';
+import '../audio/transcript_list_page.dart';
 import 'chat_room_page.dart';
 import '../auth/auth_flow_page.dart';
 
@@ -24,6 +29,8 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
   bool _checkingPolicy = true;
   bool _policyAccepted = false;
   bool _policyChecked = false;
+  Sermon? _featuredMessage;
+  bool _featuredStudied = false;
 
   String get _policyKey {
     final userId = ref.read(authChangeNotifierProvider).user?.id ?? 'default';
@@ -62,6 +69,38 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     p.fetchRooms();
     p.fetchAllMembers();
     p.startHeartbeat();
+    _loadFeaturedMessage();
+  }
+
+  Future<void> _loadFeaturedMessage() async {
+    try {
+      final messages = await DataService().getMessages(forceRefresh: false);
+      final publicMessages = messages
+          .where((s) =>
+              !s.isServiceTeamOnly &&
+              !s.isGeneralMarriedOnly &&
+              !s.isInHouseMarriedOnly)
+          .toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
+      if (publicMessages.isEmpty || !mounted) return;
+      final latest = publicMessages.first;
+      final prefs = await SharedPreferences.getInstance();
+      final studied = prefs.getBool('studied_message_${latest.id}') ?? false;
+      if (!mounted) return;
+      setState(() {
+        _featuredMessage = latest;
+        _featuredStudied = studied;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _toggleFeaturedStudied() async {
+    final msg = _featuredMessage;
+    if (msg == null) return;
+    final next = !_featuredStudied;
+    setState(() => _featuredStudied = next);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('studied_message_${msg.id}', next);
   }
 
   Future<void> _acceptPolicy() async {
@@ -178,6 +217,10 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             SliverToBoxAdapter(child: _buildSearchBar(isDark)),
             // Members Strip (all members with online/offline)
             SliverToBoxAdapter(child: _buildMembersStrip(context, isDark, p)),
+            // Pinned Message of the Week + Takeaway Prompt
+            if (_featuredMessage != null)
+              SliverToBoxAdapter(
+                  child: _buildFeaturedMessageCard(context, isDark)),
             // Section header
             SliverToBoxAdapter(
               child: Padding(
@@ -1090,6 +1133,297 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFeaturedMessageCard(BuildContext context, bool isDark) {
+    final sermon = _featuredMessage!;
+    final hasTranscript =
+        sermon.transcript != null && sermon.transcript!.trim().isNotEmpty;
+    final dateStr =
+        '${sermon.date.day}/${sermon.date.month}/${sermon.date.year}';
+    final subtitleParts = <String>[
+      if (sermon.speaker != null && sermon.speaker!.trim().isNotEmpty)
+        sermon.speaker!.trim(),
+      dateStr,
+    ];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.primaryGold.withValues(alpha: isDark ? 0.28 : 0.25),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.08 : 0.09),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.auto_awesome_rounded,
+                        size: 13, color: AppColors.primaryGold),
+                    SizedBox(width: 5),
+                    Text(
+                      'MESSAGE OF THE WEEK',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: AppColors.primaryGold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: _toggleFeaturedStudied,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _featuredStudied
+                        ? Colors.green.withValues(alpha: 0.14)
+                        : (isDark
+                            ? Colors.white.withValues(alpha: 0.06)
+                            : Colors.grey.shade100),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _featuredStudied
+                          ? Colors.green.withValues(alpha: 0.5)
+                          : (isDark ? Colors.white12 : Colors.grey.shade300),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _featuredStudied
+                            ? Icons.check_circle_rounded
+                            : Icons.radio_button_unchecked_rounded,
+                        size: 14,
+                        color: _featuredStudied
+                            ? (isDark ? Colors.greenAccent : Colors.green[700])
+                            : (isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        _featuredStudied ? 'Studied' : 'Mark Studied',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _featuredStudied
+                              ? (isDark
+                                  ? Colors.greenAccent
+                                  : Colors.green[800])
+                              : (isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: sermon.imageUrl != null && sermon.imageUrl!.isNotEmpty
+                    ? AppImage(
+                        imagePath: sermon.imageUrl!,
+                        width: 52,
+                        height: 52,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        width: 52,
+                        height: 52,
+                        color: AppColors.primaryGold.withValues(alpha: 0.15),
+                        child: const Icon(Icons.headphones_rounded,
+                            color: AppColors.primaryGold, size: 26),
+                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      sermon.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitleParts.join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'What stood out to you most? Listen and share your takeaway with the fellowship.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.35,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AudioPlayerPage(sermon: sermon),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.play_arrow_rounded,
+                    size: 16, color: Colors.black),
+                label: const Text(
+                  'Listen',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGold,
+                  elevation: 0,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ),
+              if (hasTranscript)
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TranscriptViewPage(
+                          overrideUrl: sermon.transcript,
+                          overrideTitle: sermon.title,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: Icon(
+                    Icons.article_outlined,
+                    size: 15,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                  label: Text(
+                    'Transcript',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                      color: isDark ? Colors.white24 : Colors.grey.shade300,
+                    ),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
+              TextButton.icon(
+                onPressed: () {
+                  ShareToCommunitySheet.show(
+                    context,
+                    resourceType: 'audio',
+                    resourceId: int.tryParse(sermon.id),
+                    resourceTitle: sermon.title,
+                    fallbackUrl:
+                        'https://tcgc.thecitygatechurch.org/app/message/${sermon.id}/',
+                  );
+                },
+                icon: const Icon(Icons.forum_outlined,
+                    size: 15, color: AppColors.primaryGold),
+                label: const Text(
+                  'Share Takeaway',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primaryGold,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor:
+                      AppColors.primaryGold.withValues(alpha: 0.12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
