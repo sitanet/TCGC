@@ -1440,6 +1440,8 @@ class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
   List<String> _ttsChunks = [];
   int _ttsChunkIndex = 0;
   int _ttsGeneration = 0;
+  List<Map<String, String>> _availableVoices = [];
+  Map<String, String>? _selectedVoice;
 
   @override
   void initState() {
@@ -1460,6 +1462,7 @@ class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
       await _tts.setLanguage('en-US');
       await _tts.setSpeechRate(_rateForMultiplier(_ttsSpeedMultiplier));
       await _tts.setPitch(1.0);
+      await _loadAvailableVoices();
       _tts.setCompletionHandler(() {
         if (!mounted || !_ttsPlaying) return;
         final gen = _ttsGeneration;
@@ -1480,6 +1483,229 @@ class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
     } catch (e) {
       debugPrint('TTS init error: $e');
     }
+  }
+
+  Future<void> _loadAvailableVoices() async {
+    try {
+      final rawVoices = await _tts.getVoices;
+      if (rawVoices is! List) return;
+
+      final voices = <Map<String, String>>[];
+      for (final v in rawVoices) {
+        if (v is Map) {
+          final name = (v['name'] ?? '').toString().trim();
+          final locale = (v['locale'] ?? '').toString().trim();
+          final lowerLoc = locale.toLowerCase();
+          if (name.isNotEmpty &&
+              (lowerLoc.startsWith('en') || lowerLoc.contains('ng'))) {
+            voices.add({'name': name, 'locale': locale});
+          }
+        }
+      }
+
+      // Prioritize Nigerian English first, then UK/US, then others
+      int priority(String loc) {
+        final l = loc.toLowerCase();
+        if (l.contains('ng')) return 0;
+        if (l == 'en-gb' || l == 'en_gb') return 1;
+        if (l == 'en-us' || l == 'en_us') return 2;
+        return 3;
+      }
+
+      voices.sort((a, b) => priority(a['locale']!).compareTo(priority(b['locale']!)));
+
+      final prefs = await SharedPreferences.getInstance();
+      final savedName = prefs.getString('tts_voice_name');
+      final savedLocale = prefs.getString('tts_voice_locale');
+
+      Map<String, String>? chosen;
+      if (savedName != null && savedLocale != null) {
+        chosen = voices.where((v) => v['name'] == savedName && v['locale'] == savedLocale).firstOrNull;
+      }
+      chosen ??= voices.where((v) => v['locale']!.toLowerCase().contains('ng')).firstOrNull;
+      chosen ??= voices.isNotEmpty ? voices.first : null;
+
+      if (chosen != null) {
+        await _tts.setLanguage(chosen['locale']!);
+        await _tts.setVoice(chosen);
+      }
+
+      if (mounted) {
+        setState(() {
+          _availableVoices = voices;
+          _selectedVoice = chosen;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load TTS voices: $e');
+    }
+  }
+
+  String _friendlyVoiceLabel(Map<String, String> voice, int indexInLocale) {
+    final loc = (voice['locale'] ?? '').toLowerCase();
+    final suffix = indexInLocale > 1 ? ' $indexInLocale' : '';
+    if (loc.contains('ng')) return 'Nigerian English$suffix';
+    if (loc.contains('gb')) return 'British English (UK)$suffix';
+    if (loc.contains('us')) return 'American English (US)$suffix';
+    if (loc.contains('au')) return 'Australian English$suffix';
+    if (loc.contains('in')) return 'Indian English$suffix';
+    if (loc.contains('za')) return 'South African English$suffix';
+    if (loc.contains('gh')) return 'Ghanaian English$suffix';
+    if (loc.contains('ke')) return 'Kenyan English$suffix';
+    return 'English (${voice['locale']})$suffix';
+  }
+
+  String _shortVoiceTag() {
+    final loc = (_selectedVoice?['locale'] ?? 'en-US').toLowerCase();
+    if (loc.contains('ng')) return 'NG';
+    if (loc.contains('gb')) return 'UK';
+    if (loc.contains('us')) return 'US';
+    if (loc.contains('au')) return 'AU';
+    if (loc.contains('in')) return 'IN';
+    return 'Voice';
+  }
+
+  Future<void> _selectVoice(Map<String, String> voice) async {
+    setState(() => _selectedVoice = voice);
+    try {
+      await _tts.setLanguage(voice['locale']!);
+      await _tts.setVoice(voice);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('tts_voice_name', voice['name']!);
+      await prefs.setString('tts_voice_locale', voice['locale']!);
+    } catch (e) {
+      debugPrint('Failed to set voice: $e');
+    }
+    if (_ttsPlaying) {
+      _ttsGeneration++;
+      final gen = _ttsGeneration;
+      await _tts.stop();
+      await _speakCurrentChunk(gen);
+    }
+  }
+
+  void _showVoicePickerSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (_availableVoices.isEmpty) {
+      _loadAvailableVoices();
+    }
+
+    // Deduplicate display list up to 3 voices per accent so the list stays clean
+    final counts = <String, int>{};
+    final items = <({Map<String, String> voice, String label})>[];
+    for (final v in _availableVoices) {
+      final locKey = (v['locale'] ?? '').toLowerCase();
+      final count = (counts[locKey] ?? 0) + 1;
+      if (count <= 3) {
+        counts[locKey] = count;
+        items.add((voice: v, label: _friendlyVoiceLabel(v, count)));
+      }
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.cardDark : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[400],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Choose Reader Voice',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Pick an accent you understand best',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (items.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Using default device voice. Check your phone Text-to-Speech settings to download more accents (e.g. Nigerian English).',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: items.length,
+                  itemBuilder: (_, i) {
+                    final item = items[i];
+                    final isSelected =
+                        _selectedVoice?['name'] == item.voice['name'] &&
+                        _selectedVoice?['locale'] == item.voice['locale'];
+                    return ListTile(
+                      leading: Icon(
+                        Icons.record_voice_over_rounded,
+                        color: isSelected
+                            ? AppColors.primaryGold
+                            : (isDark ? Colors.white60 : Colors.black54),
+                      ),
+                      title: Text(
+                        item.label,
+                        style: TextStyle(
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      subtitle: Text(
+                        item.voice['locale'] ?? '',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                      trailing: isSelected
+                          ? const Icon(Icons.check_circle_rounded,
+                              color: AppColors.primaryGold)
+                          : null,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _selectVoice(item.voice);
+                      },
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   double _rateForMultiplier(double mult) {
@@ -1953,6 +2179,32 @@ $playStoreLink''';
                 constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                 icon: const Icon(Icons.skip_next_rounded, color: AppColors.primaryGold, size: 22),
                 onPressed: _ttsChunkIndex + 1 < total ? () => _skipTtsChunk(1) : null,
+              ),
+              GestureDetector(
+                onTap: _showVoicePickerSheet,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.language_rounded, size: 12, color: AppColors.primaryGold),
+                      const SizedBox(width: 3),
+                      Text(
+                        _shortVoiceTag(),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryGold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
               GestureDetector(
                 onTap: _cycleTtsSpeed,
