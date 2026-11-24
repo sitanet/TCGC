@@ -24,6 +24,10 @@
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
+        <!-- Text-to-Speech service query (required on Android 11+) -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
         <!-- Support opening web URLs -->
         <intent>
             <action android:name="android.intent.action.VIEW" />

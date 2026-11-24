@@ -1462,7 +1462,9 @@ class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
     try {
       await _tts.setLanguage('en-US');
       await _tts.setSpeechRate(_rateForMultiplier(_ttsSpeedMultiplier));
+      await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);
+      await _tts.awaitSpeakCompletion(false);
       await _loadAvailableVoices();
       _tts.setCompletionHandler(() {
         if (!mounted || !_ttsPlaying) return;
@@ -1757,10 +1759,21 @@ class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
   Future<void> _speakCurrentChunk(int expectedGen) async {
     if (!mounted || expectedGen != _ttsGeneration) return;
     if (_ttsChunkIndex < 0 || _ttsChunkIndex >= _ttsChunks.length) return;
+    final text = _ttsChunks[_ttsChunkIndex];
     try {
-      await _tts.speak(_ttsChunks[_ttsChunkIndex]);
+      await _tts.setVolume(1.0);
+      final res = await _tts.speak(text);
+      if (res != 1 && mounted && expectedGen == _ttsGeneration) {
+        // Fallback to default en-US if selected voice engine/locale failed
+        await _tts.setLanguage('en-US');
+        await _tts.speak(text);
+      }
     } catch (e) {
       debugPrint('TTS speak error: $e');
+      try {
+        await _tts.setLanguage('en-US');
+        await _tts.speak(text);
+      } catch (_) {}
     }
   }
 
@@ -2127,7 +2140,7 @@ $playStoreLink''';
         : '${_ttsSpeedMultiplier}x';
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isDark
@@ -2172,14 +2185,18 @@ $playStoreLink''';
                   children: [
                     Text(
                       _ttsPlaying ? 'Reading Transcript...' : 'Voice Reader Paused',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.w700,
                         color: isDark ? Colors.white : Colors.black87,
                       ),
                     ),
                     Text(
                       'Part ${_ttsChunkIndex + 1} of $total',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.primaryGold,
@@ -2191,74 +2208,17 @@ $playStoreLink''';
               ),
               IconButton(
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                icon: const Icon(Icons.skip_previous_rounded, color: AppColors.primaryGold, size: 22),
-                onPressed: _ttsChunkIndex > 0 ? () => _skipTtsChunk(-1) : null,
-              ),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                icon: const Icon(Icons.skip_next_rounded, color: AppColors.primaryGold, size: 22),
-                onPressed: _ttsChunkIndex + 1 < total ? () => _skipTtsChunk(1) : null,
-              ),
-              GestureDetector(
-                onTap: _showVoicePickerSheet,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryGold.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.language_rounded, size: 12, color: AppColors.primaryGold),
-                      const SizedBox(width: 3),
-                      Text(
-                        _shortVoiceTag(),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primaryGold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: _cycleTtsSpeed,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryGold.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    speedLabel,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primaryGold,
-                    ),
-                  ),
-                ),
-              ),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 icon: Icon(
                   Icons.close_rounded,
                   color: isDark ? Colors.white60 : Colors.black54,
-                  size: 19,
+                  size: 20,
                 ),
                 onPressed: _stopAndHideTts,
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(2),
             child: LinearProgressIndicator(
@@ -2267,6 +2227,87 @@ $playStoreLink''';
               backgroundColor: isDark ? Colors.white12 : Colors.black12,
               valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryGold),
             ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: Icon(
+                  Icons.skip_previous_rounded,
+                  color: _ttsChunkIndex > 0
+                      ? AppColors.primaryGold
+                      : AppColors.primaryGold.withValues(alpha: 0.35),
+                  size: 22,
+                ),
+                onPressed: _ttsChunkIndex > 0 ? () => _skipTtsChunk(-1) : null,
+              ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: Icon(
+                  Icons.skip_next_rounded,
+                  color: _ttsChunkIndex + 1 < total
+                      ? AppColors.primaryGold
+                      : AppColors.primaryGold.withValues(alpha: 0.35),
+                  size: 22,
+                ),
+                onPressed: _ttsChunkIndex + 1 < total ? () => _skipTtsChunk(1) : null,
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: _showVoicePickerSheet,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppColors.primaryGold.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.language_rounded,
+                          size: 13, color: AppColors.primaryGold),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_shortVoiceTag()} Voice',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryGold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _cycleTtsSpeed,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppColors.primaryGold.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Text(
+                    speedLabel,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryGold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
