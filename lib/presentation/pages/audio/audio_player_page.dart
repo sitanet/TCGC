@@ -59,6 +59,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
   List<Sermon> _relatedCategoryMessages = [];
   bool _isLoadingRelatedCategory = true;
   bool _showRemainingTime = true;
+  bool _isBioExpanded = false;
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
@@ -70,9 +71,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     _initializeServices();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAccessAndPlay();
-      Future.delayed(const Duration(milliseconds: 1500), () {
+      _loadSpeakerInfo();
+      Future.delayed(const Duration(milliseconds: 1200), () {
         if (!mounted) return;
-        _loadSpeakerInfo();
         _loadRelatedCategoryMessages();
       });
     });
@@ -446,11 +447,222 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                   if (errorMessage != null)
                     _buildCompactDownloadNotice(isDark, audioProvider),
                   const SizedBox(height: 24),
+                  _buildSpeakerProfileSection(isDark),
+                  const SizedBox(height: 24),
                   _buildRelatedCategorySection(isDark),
                 ],
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSpeakerProfileSection(bool isDark) {
+    final speaker = _speaker;
+    final bio = speaker?.bio?.trim() ?? '';
+    if (speaker == null || bio.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final textStyle = TextStyle(
+      fontSize: 13.5,
+      height: 1.55,
+      color: isDark ? Colors.white.withValues(alpha: 0.88) : Colors.black87,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [const Color(0xFF231D12), const Color(0xFF14110C)]
+              : [const Color(0xFFFFFDF7), const Color(0xFFF7EED9)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.primaryGold.withValues(alpha: isDark ? 0.4 : 0.55),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.12 : 0.14),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Minister header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.primaryGold, width: 1.8),
+                ),
+                child: ClipOval(
+                  child: speaker.photoUrl != null && speaker.photoUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: speaker.photoUrl!,
+                          cacheManager: CustomImageCacheManager.instance,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => _buildMiniSpeakerInitial(speaker.fullName),
+                          errorWidget: (_, __, ___) => _buildMiniSpeakerInitial(speaker.fullName),
+                        )
+                      : _buildMiniSpeakerInitial(speaker.fullName),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGold.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'MINISTER PROFILE',
+                        style: TextStyle(
+                          color: AppColors.primaryGold,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      speaker.fullName,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (speaker.title != null && speaker.title!.isNotEmpty) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        speaker.title!,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryGold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Divider(
+            height: 1,
+            color: AppColors.primaryGold.withValues(alpha: 0.22),
+          ),
+          const SizedBox(height: 12),
+          // Bio with 5-line preview & Read more pull-down
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final painter = TextPainter(
+                text: TextSpan(text: bio, style: textStyle),
+                maxLines: 5,
+                textDirection: TextDirection.ltr,
+              )..layout(maxWidth: constraints.maxWidth);
+              final hasOverflow = painter.didExceedMaxLines;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeInOut,
+                    alignment: Alignment.topCenter,
+                    child: Text(
+                      bio,
+                      style: textStyle,
+                      maxLines: _isBioExpanded ? null : 5,
+                      overflow: _isBioExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (hasOverflow) ...[
+                    const SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _isBioExpanded = !_isBioExpanded);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGold.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: AppColors.primaryGold.withValues(alpha: 0.45),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _isBioExpanded ? 'Show less' : 'Read more',
+                              style: const TextStyle(
+                                color: AppColors.primaryGold,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              _isBioExpanded
+                                  ? Icons.keyboard_arrow_up_rounded
+                                  : Icons.keyboard_arrow_down_rounded,
+                              color: AppColors.primaryGold,
+                              size: 16,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniSpeakerInitial(String name) {
+    return Container(
+      width: 50,
+      height: 50,
+      color: AppColors.primaryGold.withValues(alpha: 0.2),
+      alignment: Alignment.center,
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : '?',
+        style: const TextStyle(
+          color: AppColors.primaryGold,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
