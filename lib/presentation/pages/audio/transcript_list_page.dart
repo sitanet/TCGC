@@ -8,6 +8,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tts/flutter_tts.dart' hide ErrorHandler;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/image_cache_manager.dart';
@@ -1431,10 +1432,195 @@ class _TranscriptViewPageState extends ConsumerState<TranscriptViewPage> {
   final TranscriptCacheService _cacheService = TranscriptCacheService();
   bool _isLoading = true;
 
+  // Text-to-Speech (Read Aloud) state
+  final FlutterTts _tts = FlutterTts();
+  bool _ttsPanelVisible = false;
+  bool _ttsPlaying = false;
+  double _ttsSpeedMultiplier = 1.0;
+  List<String> _ttsChunks = [];
+  int _ttsChunkIndex = 0;
+  int _ttsGeneration = 0;
+
   @override
   void initState() {
     super.initState();
+    _initTts();
     _initializeWebView();
+  }
+
+  @override
+  void dispose() {
+    _ttsGeneration++;
+    _tts.stop();
+    super.dispose();
+  }
+
+  Future<void> _initTts() async {
+    try {
+      await _tts.setLanguage('en-US');
+      await _tts.setSpeechRate(_rateForMultiplier(_ttsSpeedMultiplier));
+      await _tts.setPitch(1.0);
+      _tts.setCompletionHandler(() {
+        if (!mounted || !_ttsPlaying) return;
+        final gen = _ttsGeneration;
+        if (_ttsChunkIndex + 1 < _ttsChunks.length) {
+          setState(() => _ttsChunkIndex++);
+          _speakCurrentChunk(gen);
+        } else {
+          setState(() {
+            _ttsPlaying = false;
+            _ttsChunkIndex = 0;
+          });
+        }
+      });
+      _tts.setErrorHandler((msg) {
+        debugPrint('TTS error: $msg');
+        if (mounted) setState(() => _ttsPlaying = false);
+      });
+    } catch (e) {
+      debugPrint('TTS init error: $e');
+    }
+  }
+
+  double _rateForMultiplier(double mult) {
+    if (mult <= 0.85) return 0.40;
+    if (mult <= 1.05) return 0.50;
+    if (mult <= 1.30) return 0.62;
+    return 0.74;
+  }
+
+  List<String> _splitIntoChunks(String raw) {
+    final normalized = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.isEmpty) return [];
+    final sentences = normalized.split(RegExp(r'(?<=[.!?])\s+'));
+    final chunks = <String>[];
+    final buf = StringBuffer();
+    for (final s in sentences) {
+      if (buf.length + s.length + 1 > 450 && buf.isNotEmpty) {
+        chunks.add(buf.toString().trim());
+        buf.clear();
+      }
+      if (buf.isNotEmpty) buf.write(' ');
+      buf.write(s);
+    }
+    if (buf.isNotEmpty) chunks.add(buf.toString().trim());
+    return chunks;
+  }
+
+  Future<String> _extractReadableText() async {
+    try {
+      final result = await _webViewController.runJavaScriptReturningResult(
+        "(document.body ? document.body.innerText : '') || ''",
+      );
+      String text = result.toString();
+      if (text.startsWith('"') && text.endsWith('"')) {
+        try {
+          text = jsonDecode(text).toString();
+        } catch (_) {}
+      }
+      if (text.trim().isNotEmpty && text != 'null') {
+        return text.trim();
+      }
+    } catch (e) {
+      debugPrint('Failed to extract WebView text: $e');
+    }
+    return _stripHtml(widget.transcript?.content ?? '');
+  }
+
+  Future<void> _speakCurrentChunk(int expectedGen) async {
+    if (!mounted || expectedGen != _ttsGeneration) return;
+    if (_ttsChunkIndex < 0 || _ttsChunkIndex >= _ttsChunks.length) return;
+    try {
+      await _tts.speak(_ttsChunks[_ttsChunkIndex]);
+    } catch (e) {
+      debugPrint('TTS speak error: $e');
+    }
+  }
+
+  Future<void> _toggleReadAloud() async {
+    if (_ttsPlaying) {
+      await _pauseTts();
+      return;
+    }
+
+    if (_ttsChunks.isEmpty) {
+      final text = await _extractReadableText();
+      final chunks = _splitIntoChunks(text);
+      if (chunks.isEmpty) {
+        if (mounted) {
+          ErrorHandler.showWarning(context, 'Transcript text is not ready yet.');
+        }
+        return;
+      }
+      _ttsChunks = chunks;
+      _ttsChunkIndex = 0;
+    }
+
+    // Pause background sermon audio if playing so voices don't overlap
+    final audioState = ref.read(audioPlayerChangeNotifierProvider);
+    if (audioState.isPlaying) {
+      await ref.read(audioPlayerChangeNotifierProvider).pause();
+    }
+
+    _ttsGeneration++;
+    final gen = _ttsGeneration;
+    setState(() {
+      _ttsPanelVisible = true;
+      _ttsPlaying = true;
+    });
+    await _tts.setSpeechRate(_rateForMultiplier(_ttsSpeedMultiplier));
+    await _speakCurrentChunk(gen);
+  }
+
+  Future<void> _pauseTts() async {
+    _ttsGeneration++;
+    setState(() => _ttsPlaying = false);
+    try {
+      await _tts.stop();
+    } catch (_) {}
+  }
+
+  Future<void> _stopAndHideTts() async {
+    _ttsGeneration++;
+    setState(() {
+      _ttsPlaying = false;
+      _ttsPanelVisible = false;
+      _ttsChunkIndex = 0;
+    });
+    try {
+      await _tts.stop();
+    } catch (_) {}
+  }
+
+  Future<void> _skipTtsChunk(int delta) async {
+    if (_ttsChunks.isEmpty) return;
+    final next = (_ttsChunkIndex + delta).clamp(0, _ttsChunks.length - 1);
+    if (next == _ttsChunkIndex) return;
+    _ttsGeneration++;
+    final gen = _ttsGeneration;
+    try {
+      await _tts.stop();
+    } catch (_) {}
+    setState(() => _ttsChunkIndex = next);
+    if (_ttsPlaying) {
+      await _speakCurrentChunk(gen);
+    }
+  }
+
+  Future<void> _cycleTtsSpeed() async {
+    final next = _ttsSpeedMultiplier == 1.0
+        ? 1.25
+        : (_ttsSpeedMultiplier == 1.25
+            ? 1.5
+            : (_ttsSpeedMultiplier == 1.5 ? 0.8 : 1.0));
+    setState(() => _ttsSpeedMultiplier = next);
+    await _tts.setSpeechRate(_rateForMultiplier(next));
+    if (_ttsPlaying) {
+      _ttsGeneration++;
+      final gen = _ttsGeneration;
+      await _tts.stop();
+      await _speakCurrentChunk(gen);
+    }
   }
 
   void _initializeWebView() {
@@ -1628,6 +1814,18 @@ $playStoreLink''';
         showBackButton: true,
         actions: [
           IconButton(
+            tooltip: _ttsPlaying ? 'Pause Voice Reader' : 'Listen to Transcript',
+            icon: Icon(
+              _ttsPlaying
+                  ? Icons.pause_circle_filled_rounded
+                  : Icons.record_voice_over_rounded,
+              color: (_ttsPanelVisible || _ttsPlaying)
+                  ? AppColors.primaryGold
+                  : (isDark ? Colors.white : Colors.black),
+            ),
+            onPressed: _toggleReadAloud,
+          ),
+          IconButton(
             icon: Icon(Icons.share, color: isDark ? Colors.white : Colors.black),
             onPressed: _shareTranscript,
           ),
@@ -1643,6 +1841,15 @@ $playStoreLink''';
             const Center(
               child: CircularProgressIndicator(color: AppColors.primaryGold),
             ),
+
+          // Voice reader bar
+          if (_ttsPanelVisible)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: hasPdf ? bottomInset + 64 : bottomInset,
+              child: _buildTtsBar(isDark),
+            ),
           
           // Floating PDF button at bottom (if PDF exists)
           if (hasPdf)
@@ -1652,6 +1859,134 @@ $playStoreLink''';
               bottom: bottomInset,
               child: _buildFloatingPdfButton(isDark),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTtsBar(bool isDark) {
+    final total = _ttsChunks.isEmpty ? 1 : _ttsChunks.length;
+    final progress = (_ttsChunkIndex + 1) / total;
+    final speedLabel = _ttsSpeedMultiplier == 1.0
+        ? '1x'
+        : '${_ttsSpeedMultiplier}x';
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [const Color(0xFF231D12), const Color(0xFF14110C)]
+              : [const Color(0xFFFFFDF7), const Color(0xFFF7EED9)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primaryGold, width: 1.3),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.14),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              GestureDetector(
+                onTap: _toggleReadAloud,
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primaryGold,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _ttsPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: Colors.black,
+                    size: 22,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _ttsPlaying ? 'Reading Transcript...' : 'Voice Reader Paused',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    Text(
+                      'Part ${_ttsChunkIndex + 1} of $total',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.primaryGold,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                icon: const Icon(Icons.skip_previous_rounded, color: AppColors.primaryGold, size: 22),
+                onPressed: _ttsChunkIndex > 0 ? () => _skipTtsChunk(-1) : null,
+              ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                icon: const Icon(Icons.skip_next_rounded, color: AppColors.primaryGold, size: 22),
+                onPressed: _ttsChunkIndex + 1 < total ? () => _skipTtsChunk(1) : null,
+              ),
+              GestureDetector(
+                onTap: _cycleTtsSpeed,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    speedLabel,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryGold,
+                    ),
+                  ),
+                ),
+              ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                icon: Icon(
+                  Icons.close_rounded,
+                  color: isDark ? Colors.white60 : Colors.black54,
+                  size: 19,
+                ),
+                onPressed: _stopAndHideTts,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: progress.clamp(0.0, 1.0),
+              minHeight: 3,
+              backgroundColor: isDark ? Colors.white12 : Colors.black12,
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryGold),
+            ),
+          ),
         ],
       ),
     );
