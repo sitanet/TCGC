@@ -1899,10 +1899,13 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                                 .toggleFollowMember(member.id);
                             if (!mounted) return;
                             if (res == null) {
+                              final err = sheetRef
+                                      .read(communityChangeNotifierProvider)
+                                      .error ??
+                                  'Could not update follow status';
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(p.error ??
-                                      'Could not update follow status'),
+                                  content: Text(err),
                                   backgroundColor: Colors.red,
                                 ),
                               );

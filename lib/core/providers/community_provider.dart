@@ -350,10 +350,11 @@ class CommunityProvider extends ChangeNotifier {
         }
         return isFollowing;
       }
-      _error = res.errorMessage ?? 'Could not update follow status';
+      _error = res.errorMessage ??
+          'Could not update follow status (${res.statusCode})';
     } catch (e) {
       debugPrint('toggleFollowMember: $e');
-      _error = 'Could not update follow status';
+      _error = 'Could not update follow status: $e';
     }
 
     // Revert optimistic update on failure
