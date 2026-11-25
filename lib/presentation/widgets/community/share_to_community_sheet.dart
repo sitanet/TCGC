@@ -53,6 +53,20 @@ class _ShareToCommunitySheetState extends ConsumerState<ShareToCommunitySheet> {
   bool _sending = false;
   bool _loadingRooms = false;
 
+  IconData _roomIcon(String key) {
+    const iconMap = {
+      'chat_bubble_outline': Icons.chat_bubble_outline_rounded,
+      'volunteer_activism': Icons.volunteer_activism_rounded,
+      'auto_awesome': Icons.auto_awesome_rounded,
+      'menu_book': Icons.menu_book_rounded,
+      'headphones': Icons.headphones_rounded,
+      'church': Icons.church_rounded,
+      'groups': Icons.groups_rounded,
+      'forum': Icons.forum_rounded,
+    };
+    return iconMap[key] ?? Icons.forum_rounded;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -389,9 +403,19 @@ class _ShareToCommunitySheetState extends ConsumerState<ShareToCommunitySheet> {
                         ),
                         child: Row(
                           children: [
-                            Text(
-                              room.icon.isNotEmpty ? room.icon : '💬',
-                              style: const TextStyle(fontSize: 20),
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryGold
+                                    .withValues(alpha: selected ? 0.22 : 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                _roomIcon(room.icon),
+                                size: 19,
+                                color: AppColors.primaryGold,
+                              ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
