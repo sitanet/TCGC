@@ -159,6 +159,361 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     }
   }
 
+  void _showGroupMembersSheet() {
+    final provider = ref.read(communityChangeNotifierProvider);
+    if (provider.allMembers.isEmpty) {
+      provider.fetchAllMembers();
+    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final meId =
+        int.tryParse(ref.read(authChangeNotifierProvider).user?.id ?? '');
+    final memberSearchController = TextEditingController();
+    String memberQuery = '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Consumer(
+              builder: (cCtx, sheetRef, _) {
+                final p = sheetRef.watch(communityChangeNotifierProvider);
+                final members = p.allMembers
+                    .where((m) =>
+                        memberQuery.isEmpty ||
+                        m.name.toLowerCase().contains(memberQuery))
+                    .toList()
+                  ..sort((a, b) {
+                    if (a.isOnline == b.isOnline) {
+                      return a.name
+                          .toLowerCase()
+                          .compareTo(b.name.toLowerCase());
+                    }
+                    return a.isOnline ? -1 : 1;
+                  });
+                final onlineCount = members.where((m) => m.isOnline).length;
+                final bottomPad = MediaQuery.of(ctx).padding.bottom;
+
+                return Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(ctx).size.height * 0.82,
+                  ),
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + bottomPad),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.cardDark : Colors.white,
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color:
+                              isDark ? Colors.white24 : Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color:
+                                  AppColors.primaryGold.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(Icons.forum_rounded,
+                                color: AppColors.primaryGold, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.room.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 16.5,
+                                    fontWeight: FontWeight.w700,
+                                    color:
+                                        isDark ? Colors.white : Colors.black87,
+                                  ),
+                                ),
+                                Text(
+                                  '${members.length} members · $onlineCount online',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.close_rounded,
+                                color:
+                                    isDark ? Colors.white60 : Colors.black54),
+                            onPressed: () => Navigator.pop(sheetCtx),
+                          ),
+                        ],
+                      ),
+                      if (widget.room.description != null &&
+                          widget.room.description!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            widget.room.description!.trim(),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: isDark
+                                  ? Colors.white70
+                                  : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: memberSearchController,
+                        onChanged: (v) => setSheetState(
+                            () => memberQuery = v.trim().toLowerCase()),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Search members...',
+                          hintStyle: TextStyle(
+                            fontSize: 13.5,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              size: 19, color: AppColors.primaryGold),
+                          filled: true,
+                          fillColor: isDark
+                              ? Colors.white.withValues(alpha: 0.06)
+                              : Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (members.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 28),
+                          child: Text(
+                            p.allMembers.isEmpty
+                                ? 'Loading group members...'
+                                : 'No members match "$memberQuery"',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        )
+                      else
+                        Flexible(
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: members.length,
+                            separatorBuilder: (_, __) => Divider(
+                              height: 1,
+                              color: isDark
+                                  ? Colors.white10
+                                  : Colors.grey.shade200,
+                            ),
+                            itemBuilder: (_, i) {
+                              final m = members[i];
+                              final isSelf = meId != null && m.id == meId;
+                              return ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 2),
+                                leading: Stack(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 21,
+                                      backgroundColor: AppColors.primaryGold
+                                          .withValues(alpha: 0.16),
+                                      child: m.photoUrl != null
+                                          ? ClipOval(
+                                              child: AppImage(
+                                                imagePath: m.photoUrl!,
+                                                width: 42,
+                                                height: 42,
+                                              ),
+                                            )
+                                          : Text(
+                                              m.name.isNotEmpty
+                                                  ? m.name[0].toUpperCase()
+                                                  : '?',
+                                              style: const TextStyle(
+                                                color: AppColors.primaryGold,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                    ),
+                                    Positioned(
+                                      bottom: 0,
+                                      right: 0,
+                                      child: Container(
+                                        width: 11,
+                                        height: 11,
+                                        decoration: BoxDecoration(
+                                          color: m.isOnline
+                                              ? const Color(0xFF22C55E)
+                                              : Colors.grey.shade400,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: isDark
+                                                ? AppColors.cardDark
+                                                : Colors.white,
+                                            width: 1.8,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                title: Text(
+                                  isSelf ? '${m.name} (You)' : m.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color:
+                                        isDark ? Colors.white : Colors.black87,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  m.isOnline
+                                      ? 'Online'
+                                      : (m.department != null &&
+                                              m.department!.isNotEmpty
+                                          ? m.department!
+                                          : m.statusText),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: m.isOnline
+                                        ? Colors.green
+                                        : (isDark
+                                            ? AppColors.textSecondaryDark
+                                            : AppColors.textSecondaryLight),
+                                  ),
+                                ),
+                                trailing: isSelf
+                                    ? null
+                                    : TextButton(
+                                        onPressed: () async {
+                                          final ok = await ref
+                                              .read(
+                                                  communityChangeNotifierProvider)
+                                              .toggleFollowMember(m.id);
+                                          if (ok == null && mounted) {
+                                            final err = ref
+                                                    .read(
+                                                        communityChangeNotifierProvider)
+                                                    .error ??
+                                                'Could not update follow status';
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(err),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        style: TextButton.styleFrom(
+                                          backgroundColor: m.isFollowing
+                                              ? AppColors.primaryGold
+                                                  .withValues(alpha: 0.16)
+                                              : (isDark
+                                                  ? Colors.white10
+                                                  : Colors.grey.shade100),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 6),
+                                          minimumSize: Size.zero,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                          ),
+                                        ),
+                                        child: Text(
+                                          m.isFollowing ? 'Following' : 'Follow',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: m.isFollowing
+                                                ? AppColors.primaryGold
+                                                : (isDark
+                                                    ? Colors.white
+                                                    : Colors.black87),
+                                          ),
+                                        ),
+                                      ),
+                                onTap: isSelf
+                                    ? null
+                                    : () async {
+                                        Navigator.pop(sheetCtx);
+                                        final room = await ref
+                                            .read(
+                                                communityChangeNotifierProvider)
+                                            .openDm(m.id);
+                                        if (!mounted) return;
+                                        if (room != null) {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => ChatRoomPage(
+                                                room: room,
+                                                dmUserName: m.name,
+                                                dmUserPhoto: m.photoUrl,
+                                                dmUserId: m.id,
+                                                dmUserOnline: m.isOnline,
+                                                dmUserLastSeen: m.lastSeen,
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      },
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    ).whenComplete(memberSearchController.dispose);
+  }
+
   void _shareRoomLink() {
     final url = 'https://tcgc.thecitygatechurch.org/app/community/${widget.room.id}/';
     final listenState = ref.read(listenTogetherProvider);
@@ -785,39 +1140,46 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                   ),
                 ],
               )
-            : Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryGold.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(10),
+            : GestureDetector(
+                onTap: _showGroupMembersSheet,
+                behavior: HitTestBehavior.opaque,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGold.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.forum_rounded, color: AppColors.primaryGold, size: 18),
                     ),
-                    child: const Icon(Icons.forum_rounded, color: AppColors.primaryGold, size: 18),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(widget.room.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : Colors.black87)),
-                        if (widget.room.description != null && widget.room.description!.isNotEmpty)
-                          Text(widget.room.description!,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(widget.room.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 11,
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
-                      ],
+                                fontSize: 16, fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : Colors.black87)),
+                          Text(
+                            (widget.room.description != null && widget.room.description!.isNotEmpty)
+                                ? widget.room.description!
+                                : 'Tap here for group members',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
         actions: [
           if (_isSearching)
@@ -832,30 +1194,96 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                 });
               },
             )
-          else ...[
-            IconButton(
-              tooltip: 'Search Messages',
-              icon: const Icon(Icons.search_rounded, color: AppColors.primaryGold),
-              onPressed: () => setState(() => _isSearching = true),
-            ),
-            if (widget.dmUserName == null) ...[
-              IconButton(
-                tooltip: 'Share Group Link',
-                icon: const Icon(Icons.share_rounded, color: AppColors.primaryGold),
-                onPressed: _shareRoomLink,
+          else
+            PopupMenuButton<String>(
+              tooltip: 'More options',
+              icon: Icon(
+                Icons.more_vert_rounded,
+                color: isDark ? Colors.white : Colors.black87,
               ),
-              IconButton(
-                tooltip: 'Listen Together',
-                icon: const Icon(Icons.headphones_rounded, color: AppColors.primaryGold),
-                onPressed: _openSermonPickerForListenTogether,
+              color: isDark ? AppColors.cardDark : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
               ),
-            ],
-            IconButton(
-              tooltip: 'Refresh',
-              icon: const Icon(Icons.refresh, color: AppColors.primaryGold),
-              onPressed: () => p.fetchMessages(widget.room.id),
+              onSelected: (value) {
+                switch (value) {
+                  case 'search':
+                    setState(() => _isSearching = true);
+                    break;
+                  case 'members':
+                    _showGroupMembersSheet();
+                    break;
+                  case 'listen':
+                    _openSermonPickerForListenTogether();
+                    break;
+                  case 'share':
+                    _shareRoomLink();
+                    break;
+                  case 'refresh':
+                    p.fetchMessages(widget.room.id);
+                    break;
+                }
+              },
+              itemBuilder: (ctx) => [
+                PopupMenuItem(
+                  value: 'search',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search_rounded, size: 19, color: AppColors.primaryGold),
+                      const SizedBox(width: 10),
+                      Text('Search Messages',
+                          style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                    ],
+                  ),
+                ),
+                if (widget.dmUserName == null) ...[
+                  PopupMenuItem(
+                    value: 'members',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.group_rounded, size: 19, color: AppColors.primaryGold),
+                        const SizedBox(width: 10),
+                        Text('Group Members',
+                            style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'listen',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.headphones_rounded, size: 19, color: AppColors.primaryGold),
+                        const SizedBox(width: 10),
+                        Text('Listen Together',
+                            style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'share',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.share_rounded, size: 19, color: AppColors.primaryGold),
+                        const SizedBox(width: 10),
+                        Text('Share Group Link',
+                            style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                      ],
+                    ),
+                  ),
+                ],
+                PopupMenuItem(
+                  value: 'refresh',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.refresh_rounded, size: 19, color: AppColors.primaryGold),
+                      const SizedBox(width: 10),
+                      Text('Refresh',
+                          style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
         ],
       ),
       body: LayoutBuilder(
