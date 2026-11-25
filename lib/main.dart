@@ -93,6 +93,13 @@ void main() async {
     debugPrint('Stack trace: ${details.stack}');
   };
 
+  // Catch uncaught platform / isolate errors so they don't terminate the app
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Platform error: $error');
+    debugPrint('Stack trace: $stack');
+    return true;
+  };
+
   // Run the app with error zone for async errors
   runZonedGuarded(
     () async {
