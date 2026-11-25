@@ -23,15 +23,18 @@ class ImageCacheService {
   /// stale portraits in the background without ever showing a loading state.
   Future<void> preCacheUrlsThrottled(
     List<String> urls, {
-    int batchSize = 3,
+    int batchSize = 5,
     bool backgroundRefresh = false,
+    bool useMinistersCache = true,
   }) async {
     final pending = urls
         .where((u) => u.startsWith('http') && (backgroundRefresh || !_warmedUrls.contains(u)))
         .toList();
     if (pending.isEmpty) return;
 
-    final cache = CustomImageCacheManager.ministersInstance;
+    final cache = useMinistersCache
+        ? CustomImageCacheManager.ministersInstance
+        : CustomImageCacheManager.instance;
 
     for (var i = 0; i < pending.length; i += batchSize) {
       final batch = pending.skip(i).take(batchSize).toList();

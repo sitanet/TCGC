@@ -15,6 +15,7 @@ import '../../../core/utils/image_cache_manager.dart';
 import '../../../core/utils/error_handler.dart';
 import '../../../domain/entities/transcript.dart';
 import '../../../data/services/data_service.dart';
+import '../../../data/services/image_cache_service.dart';
 import '../../../data/services/transcript_cache_service.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -112,8 +113,14 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
         setState(() {
           _speakerModels = speakers;
         });
+        ImageCacheService().preCacheUrlsThrottled(
+          speakers
+              .map((s) => s.photoUrl ?? '')
+              .where((u) => u.isNotEmpty)
+              .toList(),
+        );
       }
-      
+
       // Fetch fresh data from API
       final transcripts = await _dataService.getTranscripts(forceRefresh: true);
       if (mounted && transcripts.isNotEmpty) {
@@ -124,6 +131,15 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
           _filteredItems = _getFilteredItems('');
           _isLoading = false;
         });
+        // Pre-warm top transcript thumbnails for instant scrolling
+        ImageCacheService().preCacheUrlsThrottled(
+          transcripts
+              .take(15)
+              .map((t) => t.imageUrl ?? '')
+              .where((u) => u.isNotEmpty)
+              .toList(),
+          useMinistersCache: false,
+        );
         // Cache the transcripts
         _cacheTranscripts(transcripts);
       }
@@ -523,10 +539,13 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
                   child: imageUrl != null && imageUrl.isNotEmpty
                       ? CachedNetworkImage(
                           imageUrl: imageUrl,
-                          cacheManager: CustomImageCacheManager.instance,
+                          cacheManager: isSpeakerMode
+                              ? CustomImageCacheManager.ministersInstance
+                              : CustomImageCacheManager.instance,
                           fit: BoxFit.cover,
                           alignment: Alignment.topCenter,
                           memCacheWidth: 152,
+                          useOldImageOnUrlChange: true,
                           fadeInDuration: Duration.zero,
                           fadeOutDuration: Duration.zero,
                           placeholder: (_, __) => _buildHeroPlaceholder(isSpeakerMode, isDark),
@@ -1237,6 +1256,7 @@ class _TranscriptListItem extends StatelessWidget {
         fit: BoxFit.cover,
         alignment: Alignment.topCenter,
         memCacheWidth: 120,
+        useOldImageOnUrlChange: true,
         fadeInDuration: Duration.zero,
         fadeOutDuration: Duration.zero,
         placeholder: (_, __) => fallback,

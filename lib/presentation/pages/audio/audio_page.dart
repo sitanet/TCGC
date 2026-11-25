@@ -14,7 +14,6 @@ import '../../../domain/entities/transcript.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
 import 'audio_list_page.dart';
-import 'audio_player_page.dart';
 import '../../widgets/resume_playback_sheet.dart';
 import 'favorites_page.dart';
 import 'playlists_page.dart';
@@ -152,6 +151,18 @@ class _AudioPageState extends ConsumerState<AudioPage>
           );
         }
 
+        // Pre-warm top visible message & category thumbnails
+        final thumbUrls = <String>[
+          ...sermons.take(12).map((s) => s.imageUrl ?? ''),
+          ...categories.take(8).map((c) => c.imageUrl ?? ''),
+        ].where((u) => u.isNotEmpty).toSet().toList();
+        if (thumbUrls.isNotEmpty) {
+          ImageCacheService().preCacheUrlsThrottled(
+            thumbUrls,
+            useMinistersCache: false,
+          );
+        }
+
         // Pre-buffer in background
         _audioCacheService.preBufferCategory(sermons, count: 3);
       }
@@ -228,6 +239,18 @@ class _AudioPageState extends ConsumerState<AudioPage>
           ImageCacheService().preCacheUrlsThrottled(
             speakerPhotoUrls,
             backgroundRefresh: true,
+          );
+        }
+
+        // Pre-warm top visible message & category thumbnails
+        final thumbUrls = <String>[
+          ...sermons.take(12).map((s) => s.imageUrl ?? ''),
+          ...categories.take(8).map((c) => c.imageUrl ?? ''),
+        ].where((u) => u.isNotEmpty).toSet().toList();
+        if (thumbUrls.isNotEmpty) {
+          ImageCacheService().preCacheUrlsThrottled(
+            thumbUrls,
+            useMinistersCache: false,
           );
         }
       }
@@ -816,6 +839,9 @@ class _AudioPageState extends ConsumerState<AudioPage>
                       fit: BoxFit.cover,
                       alignment: Alignment.topCenter,
                       memCacheWidth: 104,
+                      useOldImageOnUrlChange: true,
+                      fadeInDuration: Duration.zero,
+                      fadeOutDuration: Duration.zero,
                       placeholder: (_, __) => Container(
                         width: 52,
                         height: 52,
