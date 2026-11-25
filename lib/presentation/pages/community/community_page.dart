@@ -161,7 +161,9 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
 
   @override
   void dispose() {
-    ref.read(communityChangeNotifierProvider).stopHeartbeat();
+    try {
+      ref.read(communityChangeNotifierProvider).stopHeartbeat();
+    } catch (_) {}
     super.dispose();
   }
 
@@ -1894,14 +1896,13 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () async {
-                            final res = await sheetRef
-                                .read(communityChangeNotifierProvider)
-                                .toggleFollowMember(member.id);
+                            final provider =
+                                ref.read(communityChangeNotifierProvider);
+                            final res =
+                                await provider.toggleFollowMember(member.id);
                             if (!mounted) return;
                             if (res == null) {
-                              final err = sheetRef
-                                      .read(communityChangeNotifierProvider)
-                                      .error ??
+                              final err = provider.error ??
                                   'Could not update follow status';
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(

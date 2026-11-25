@@ -220,7 +220,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     _voiceStateSub?.cancel();
     _recorder.dispose();
     _voicePlayer.dispose();
-    ref.read(communityChangeNotifierProvider).stopPolling();
+    try {
+      ref.read(communityChangeNotifierProvider).stopPolling();
+    } catch (_) {}
     _textController.dispose();
     _searchController.dispose();
     _scrollController.dispose();
