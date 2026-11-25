@@ -80,10 +80,67 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     });
   }
 
+  String _normalizeSpeakerName(String input) {
+    return input
+        .toLowerCase()
+        .replaceAll(RegExp(r'[.,]+'), ' ')
+        .replaceAll(
+          RegExp(r'\b(pastor|pst|rev|reverend|dr|minister|elder|evang|bishop|apostle|deacon|bro|sis)\b'),
+          ' ',
+        )
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  SpeakerModel? _matchSpeaker(List<SpeakerModel> speakers, String rawName) {
+    final sermonSpeaker = rawName.toLowerCase().trim();
+    final normSermon = _normalizeSpeakerName(rawName);
+    if (sermonSpeaker.isEmpty) return null;
+
+    // 1. Exact match
+    for (final s in speakers) {
+      final fullNameLower = s.fullName.toLowerCase().trim();
+      final nameLower = s.name.toLowerCase().trim();
+      if ((fullNameLower.isNotEmpty && fullNameLower == sermonSpeaker) ||
+          (nameLower.isNotEmpty && nameLower == sermonSpeaker)) {
+        return s;
+      }
+    }
+
+    // 2. Normalized exact match (ignoring titles like Pastor/Pst./Rev.)
+    if (normSermon.isNotEmpty) {
+      for (final s in speakers) {
+        final normFull = _normalizeSpeakerName(s.fullName);
+        final normName = _normalizeSpeakerName(s.name);
+        if ((normFull.isNotEmpty && normFull == normSermon) ||
+            (normName.isNotEmpty && normName == normSermon)) {
+          return s;
+        }
+      }
+    }
+
+    // 3. Safe non-empty contains match
+    for (final s in speakers) {
+      final fullNameLower = s.fullName.toLowerCase().trim();
+      final nameLower = s.name.toLowerCase().trim();
+      if (fullNameLower.isNotEmpty &&
+          (fullNameLower.contains(sermonSpeaker) ||
+              sermonSpeaker.contains(fullNameLower))) {
+        return s;
+      }
+      if (nameLower.isNotEmpty &&
+          (nameLower.contains(sermonSpeaker) ||
+              sermonSpeaker.contains(nameLower))) {
+        return s;
+      }
+    }
+    return null;
+  }
+
   Future<void> _loadSpeakerInfo() async {
     debugPrint('=== LOADING SPEAKER INFO ===');
     debugPrint('Sermon speaker: "${widget.sermon.speaker}"');
-    if (widget.sermon.speaker == null || widget.sermon.speaker!.isEmpty) {
+    if (widget.sermon.speaker == null || widget.sermon.speaker!.trim().isEmpty) {
       debugPrint('Speaker is null or empty, skipping');
       return;
     }
@@ -95,32 +152,20 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
         debugPrint('Got ${speakers.length} speakers from API');
       } catch (e) {
         debugPrint('Failed to fetch speakers: $e');
-        // Continue without speaker profile - will try to get messages directly
       }
 
-      final sermonSpeaker = widget.sermon.speaker!.toLowerCase().trim();
+      SpeakerModel? speaker = _matchSpeaker(speakers, widget.sermon.speaker!);
 
-      // More flexible speaker matching - check for partial matches and contains
-      SpeakerModel? speaker;
-      for (final s in speakers) {
-        final fullNameLower = s.fullName.toLowerCase().trim();
-        final nameLower = s.name.toLowerCase().trim();
-
-        // Exact match
-        if (fullNameLower == sermonSpeaker || nameLower == sermonSpeaker) {
-          speaker = s;
-          break;
-        }
-        // Contains match (e.g., "Pastor John Doe" contains "John Doe")
-        if (fullNameLower.contains(sermonSpeaker) ||
-            sermonSpeaker.contains(fullNameLower)) {
-          speaker = s;
-          break;
-        }
-        if (nameLower.contains(sermonSpeaker) ||
-            sermonSpeaker.contains(nameLower)) {
-          speaker = s;
-          break;
+      // Retry with fresh server data if not matched or bio is empty (e.g. stale cache)
+      if (speaker == null || (speaker.bio?.trim().isEmpty ?? true)) {
+        try {
+          final freshSpeakers = await _dataService.getSpeakers(forceRefresh: true);
+          if (freshSpeakers.isNotEmpty) {
+            speakers = freshSpeakers;
+            speaker = _matchSpeaker(speakers, widget.sermon.speaker!) ?? speaker;
+          }
+        } catch (e) {
+          debugPrint('Failed force-refresh speakers: $e');
         }
       }
 
