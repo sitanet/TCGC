@@ -40,23 +40,29 @@ class ResumePlaybackSheet extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 22),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDark
+                ? const [Color(0xFF211B11), Color(0xFF13100B)]
+                : const [Color(0xFFFFFDF8), Color(0xFFF6EDD9)],
+          ),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border(
+            top: BorderSide(
+              color: AppColors.primaryGold.withValues(alpha: isDark ? 0.45 : 0.35),
+              width: 1.5,
+            ),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.15),
+              color: Colors.black.withValues(alpha: isDark ? 0.65 : 0.16),
               blurRadius: 28,
               offset: const Offset(0, -6),
             ),
           ],
-          border: Border.all(
-            color: isDark
-                ? AppColors.primaryGold.withValues(alpha: 0.2)
-                : Colors.grey.shade200,
-            width: 1,
-          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -65,293 +71,243 @@ class ResumePlaybackSheet extends StatelessWidget {
             // Drag handle
             Center(
               child: Container(
-                width: 44,
-                height: 4.5,
-                margin: const EdgeInsets.only(top: 4, bottom: 12),
+                width: 42,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : Colors.grey.shade300,
+                  color: AppColors.primaryGold.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
             ),
 
-            // Header row with badge and close button
+            // Hero artwork + title + close button
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryGold.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: AppColors.primaryGold.withValues(alpha: 0.35),
-                      width: 0.8,
+                      color: AppColors.primaryGold.withValues(alpha: 0.5),
+                      width: 1.4,
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.graphic_eq_rounded,
-                        size: 14,
-                        color: AppColors.primaryGold,
-                      ),
-                      const SizedBox(width: 6),
-                      const Text(
-                        'CONTINUE LISTENING',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.1,
-                          color: AppColors.primaryGold,
-                        ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryGold.withValues(alpha: 0.2),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
-                ),
-                const Spacer(),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: onClose,
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Icon(
-                        Icons.close_rounded,
-                        size: 20,
-                        color: isDark ? Colors.white60 : Colors.black54,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // Message Info Card
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.04)
-                    : Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark ? Colors.white10 : Colors.grey.shade200,
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  // Poster Thumbnail
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14.5),
                     child: SizedBox(
-                      width: 60,
-                      height: 60,
-                      child: sermon.imageUrl != null && sermon.imageUrl!.isNotEmpty
+                      width: 68,
+                      height: 68,
+                      child: sermon.imageUrl != null &&
+                              sermon.imageUrl!.isNotEmpty
                           ? CachedNetworkImage(
                               imageUrl: sermon.imageUrl!,
                               cacheManager: CustomImageCacheManager.instance,
                               fit: BoxFit.cover,
                               placeholder: (_, __) => _buildPlaceholder(isDark),
-                              errorWidget: (_, __, ___) => _buildPlaceholder(isDark),
+                              errorWidget: (_, __, ___) =>
+                                  _buildPlaceholder(isDark),
                             )
                           : _buildPlaceholder(isDark),
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  // Title & Speaker
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          sermon.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            height: 1.25,
-                            color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.mic_none_rounded,
-                              size: 13,
-                              color: AppColors.primaryGold,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                speakerName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.primaryGold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Progress Section
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.03)
-                    : Colors.black.withValues(alpha: 0.02),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.05),
                 ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            Icons.bookmark_added_rounded,
-                            size: 15,
-                            color: isDark ? Colors.white70 : Colors.black87,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 9, vertical: 3.5),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryGold.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.graphic_eq_rounded,
+                                  size: 12,
+                                  color: AppColors.primaryGold,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'RESUME PLAYBACK',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.8,
+                                    color: AppColors.primaryGold,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Stopped at ${position.formattedPosition}',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : Colors.black87,
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: onClose,
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.08)
+                                    : Colors.black.withValues(alpha: 0.06),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 18,
+                                color: isDark ? Colors.white70 : Colors.black54,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryGold.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '$percentNum% played',
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primaryGold,
-                          ),
+                      const SizedBox(height: 8),
+                      Text(
+                        sermon.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          height: 1.25,
+                          color: isDark
+                              ? Colors.white
+                              : AppColors.textPrimaryLight,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: position.progress.clamp(0.0, 1.0),
-                      minHeight: 6,
-                      backgroundColor: isDark ? Colors.white12 : Colors.grey.shade200,
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryGold),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
+                      const SizedBox(height: 4),
                       Text(
-                        position.formattedPosition,
+                        speakerName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w600,
                           color: AppColors.primaryGold,
                         ),
                       ),
-                      Text(
-                        position.formattedDuration,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: isDark ? Colors.white54 : Colors.black45,
-                        ),
-                      ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 18),
+
+            // Sleek inline progress bar
+            Column(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: position.progress.clamp(0.0, 1.0),
+                    minHeight: 7,
+                    backgroundColor: isDark
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : Colors.black.withValues(alpha: 0.08),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.primaryGold),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.bookmark_rounded,
+                          size: 14,
+                          color: AppColors.primaryGold,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Stopped at ${position.formattedPosition}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      '$percentNum% of ${position.formattedDuration}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white60 : Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
 
             const SizedBox(height: 20),
 
-            // PRIMARY BUTTON: Continue where stopped
-            GestureDetector(
-              onTap: () {
-                HapticFeedback.mediumImpact();
-                onContinue();
-              },
-              child: Container(
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFFE5A93C),
-                      Color(0xFFC6B36A),
+            // PRIMARY BUTTON: Continue from saved position
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  onContinue();
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Ink(
+                  height: 52,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFFF3C65F),
+                        AppColors.primaryGold,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryGold.withValues(alpha: 0.35),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
                     ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primaryGold.withValues(alpha: 0.35),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.black26,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
                         Icons.play_arrow_rounded,
-                        size: 22,
-                        color: Colors.white,
+                        size: 24,
+                        color: Colors.black,
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Continue Where You Stopped (${position.formattedPosition})',
-                      style: const TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 0.2,
+                      const SizedBox(width: 8),
+                      Text(
+                        'Continue from ${position.formattedPosition}',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black,
+                          letterSpacing: 0.2,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -359,46 +315,48 @@ class ResumePlaybackSheet extends StatelessWidget {
             const SizedBox(height: 10),
 
             // SECONDARY BUTTON: Start Over
-            GestureDetector(
-              onTap: () {
-                HapticFeedback.lightImpact();
-                onStartOver();
-              },
-              child: Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  onStartOver();
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Ink(
+                  height: 48,
+                  decoration: BoxDecoration(
                     color: isDark
-                        ? Colors.white.withValues(alpha: 0.18)
-                        : Colors.grey.shade300,
-                    width: 1.2,
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.replay_rounded,
-                      size: 19,
-                      color: isDark ? Colors.white70 : Colors.black87,
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.white.withValues(alpha: 0.75),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.primaryGold.withValues(alpha: 0.35),
+                      width: 1.2,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Start Over (Play from Beginning)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.replay_rounded,
+                        size: 18,
                         color: isDark ? Colors.white : Colors.black87,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Text(
+                        'Start Over from Beginning',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-
-            const SizedBox(height: 6),
           ],
         ),
       ),
