@@ -12,15 +12,62 @@ class OnlineMember {
   final String? department;
   final bool isOnline;
   final String? lastSeen;
+  final bool isFollowing;
+  final int followersCount;
+  final int? listeningMessageId;
+  final String? listeningMessageTitle;
+  final double listeningPositionSeconds;
+  final int? listeningRoomId;
 
-  OnlineMember({required this.id, required this.name,
-      this.photoUrl, this.department, this.isOnline = false, this.lastSeen});
+  OnlineMember({
+    required this.id,
+    required this.name,
+    this.photoUrl,
+    this.department,
+    this.isOnline = false,
+    this.lastSeen,
+    this.isFollowing = false,
+    this.followersCount = 0,
+    this.listeningMessageId,
+    this.listeningMessageTitle,
+    this.listeningPositionSeconds = 0.0,
+    this.listeningRoomId,
+  });
+
+  OnlineMember copyWith({
+    bool? isFollowing,
+    int? followersCount,
+  }) =>
+      OnlineMember(
+        id: id,
+        name: name,
+        photoUrl: photoUrl,
+        department: department,
+        isOnline: isOnline,
+        lastSeen: lastSeen,
+        isFollowing: isFollowing ?? this.isFollowing,
+        followersCount: followersCount ?? this.followersCount,
+        listeningMessageId: listeningMessageId,
+        listeningMessageTitle: listeningMessageTitle,
+        listeningPositionSeconds: listeningPositionSeconds,
+        listeningRoomId: listeningRoomId,
+      );
 
   factory OnlineMember.fromJson(Map<String, dynamic> j) => OnlineMember(
-        id: j['id'], name: j['name'] ?? '',
-        photoUrl: j['photo_url'], department: j['department'],
+        id: j['id'],
+        name: j['name'] ?? '',
+        photoUrl: j['photo_url'],
+        department: j['department'],
         isOnline: j['is_online'] ?? false,
-        lastSeen: j['last_seen']);
+        lastSeen: j['last_seen'],
+        isFollowing: j['is_following'] ?? false,
+        followersCount: j['followers_count'] ?? 0,
+        listeningMessageId: j['listening_message_id'],
+        listeningMessageTitle: j['listening_message_title'],
+        listeningPositionSeconds:
+            (j['listening_position_seconds'] ?? 0).toDouble(),
+        listeningRoomId: j['listening_room_id'],
+      );
 
   String get statusText => isOnline ? 'Online' : formatLastSeen(lastSeen);
 }
@@ -271,6 +318,75 @@ class CommunityProvider extends ChangeNotifier {
       _error = 'Could not open chat. Please try again.';
     }
     return null;
+  }
+
+  Future<bool?> toggleFollowMember(int userId) async {
+    final idx = _allMembers.indexWhere((m) => m.id == userId);
+    final oldMember = idx != -1 ? _allMembers[idx] : null;
+    if (oldMember != null) {
+      final nextFollow = !oldMember.isFollowing;
+      final nextCount = (oldMember.followersCount + (nextFollow ? 1 : -1))
+          .clamp(0, 1 << 30);
+      _allMembers[idx] = oldMember.copyWith(
+        isFollowing: nextFollow,
+        followersCount: nextCount,
+      );
+      notifyListeners();
+    }
+
+    try {
+      final res =
+          await _api.post(ApiConstants.communityFollowMember(userId), {});
+      if (res.isSuccess) {
+        final isFollowing = res.data['is_following'] == true;
+        final followersCount = res.data['followers_count'] as int? ?? 0;
+        final curIdx = _allMembers.indexWhere((m) => m.id == userId);
+        if (curIdx != -1) {
+          _allMembers[curIdx] = _allMembers[curIdx].copyWith(
+            isFollowing: isFollowing,
+            followersCount: followersCount,
+          );
+          notifyListeners();
+        }
+        return isFollowing;
+      }
+      _error = res.errorMessage ?? 'Could not update follow status';
+    } catch (e) {
+      debugPrint('toggleFollowMember: $e');
+      _error = 'Could not update follow status';
+    }
+
+    // Revert optimistic update on failure
+    if (oldMember != null) {
+      final curIdx = _allMembers.indexWhere((m) => m.id == userId);
+      if (curIdx != -1) {
+        _allMembers[curIdx] = oldMember;
+        notifyListeners();
+      }
+    }
+    return null;
+  }
+
+  Future<void> updateListeningStatus({
+    required int messageId,
+    required String messageTitle,
+    String? audioUrl,
+    double positionSeconds = 0.0,
+    int? roomId,
+    bool isListening = true,
+  }) async {
+    try {
+      await _api.post(ApiConstants.communityListeningStatus, {
+        'message_id': messageId,
+        'message_title': messageTitle,
+        if (audioUrl != null && audioUrl.isNotEmpty) 'audio_url': audioUrl,
+        'position_seconds': positionSeconds,
+        if (roomId != null) 'room_id': roomId,
+        'is_listening': isListening,
+      });
+    } catch (e) {
+      debugPrint('updateListeningStatus: $e');
+    }
   }
 
   Future<void> fetchAllMembers() async {

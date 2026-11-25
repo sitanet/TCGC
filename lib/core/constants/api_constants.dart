@@ -122,6 +122,9 @@ class ApiConstants {
   // Community
   static const String communityOnline = '/community/online/';
   static const String communityMembers = '/community/members/';
+  static String communityFollowMember(int userId) =>
+      '/community/members/$userId/follow/';
+  static const String communityListeningStatus = '/community/listening-status/';
   static const String communityRooms = '/community/rooms/';
   static String communityMessages(int roomId) =>
       '/community/rooms/$roomId/messages/';

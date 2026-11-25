@@ -11,6 +11,8 @@ import '../../data/services/download_service.dart';
 import '../../data/services/played_audio_service.dart';
 import '../../data/services/app_rating_service.dart';
 import '../../data/services/restream_service.dart';
+import '../../data/services/api_service.dart';
+import '../constants/api_constants.dart';
 import '../services/audio_handler.dart';
 
 MyAudioHandler? _audioHandler;
@@ -458,6 +460,26 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   
   String _sanitizeFileName(String id) => id.replaceAll(RegExp(r'[^\w\-]'), '_');
 
+  Future<void> _broadcastListeningStatus(
+    Sermon sermon, {
+    Duration position = Duration.zero,
+  }) async {
+    final msgId = int.tryParse(sermon.id);
+    if (msgId == null || msgId <= 0) return;
+    try {
+      await ApiService().post(ApiConstants.communityListeningStatus, {
+        'message_id': msgId,
+        'message_title': sermon.title,
+        if (sermon.audioUrl != null && sermon.audioUrl!.isNotEmpty)
+          'audio_url': sermon.audioUrl,
+        'position_seconds': position.inSeconds.toDouble(),
+        'is_listening': true,
+      });
+    } catch (_) {
+      // Non-blocking: ignore if unauthenticated or offline
+    }
+  }
+
   Future<void> playSermon(Sermon sermon) async {
     // Toggle play/pause if same sermon AND it is actually loaded (and not switching out of restream)
     if (_currentSermon?.id == sermon.id && !_isLiveRestream) {
@@ -482,6 +504,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
     // Mark audio as played (removes "NEW" badge)
     _playedAudioService.markAsPlayed(sermon.id);
     _clearRestreamState();
+    _broadcastListeningStatus(sermon);
 
     // Update UI immediately - no loading state for pre-buffered content
     _errorMessage = null;
@@ -748,6 +771,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
   }) async {
     if (!preserveRestream) {
       _clearRestreamState();
+      _broadcastListeningStatus(sermon, position: startPosition);
     }
     _errorMessage = null;
     _currentSermon = sermon;

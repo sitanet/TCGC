@@ -1619,6 +1619,50 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                   ),
                 ),
               ),
+              if (m.isFollowing)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGold,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark ? AppColors.cardDark : Colors.white,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.star_rounded,
+                      size: 10,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              if (m.listeningMessageId != null)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark ? AppColors.cardDark : Colors.white,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.headphones_rounded,
+                      size: 10,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 5),
@@ -1652,8 +1696,328 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     );
 
     return GestureDetector(
-      onTap: () => _openDm(m),
+      onTap: () {
+        final meId =
+            int.tryParse(ref.read(authChangeNotifierProvider).user?.id ?? '');
+        if (meId != null && m.id == meId) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('This is you! Tap another member to follow or chat.'),
+            ),
+          );
+          return;
+        }
+        _showMemberActionsSheet(m);
+      },
       child: isOnline ? content : Opacity(opacity: 0.58, child: content),
+    );
+  }
+
+  void _showMemberActionsSheet(OnlineMember initialMember) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return Consumer(
+          builder: (ctx, sheetRef, _) {
+            final p = sheetRef.watch(communityChangeNotifierProvider);
+            final member = p.allMembers
+                    .where((m) => m.id == initialMember.id)
+                    .firstOrNull ??
+                initialMember;
+            final bottomPad = MediaQuery.of(ctx).padding.bottom;
+
+            return Container(
+              padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomPad),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.cardDark : Colors.white,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor:
+                            AppColors.primaryGold.withValues(alpha: 0.18),
+                        child: member.photoUrl != null
+                            ? ClipOval(
+                                child: AppImage(
+                                  imagePath: member.photoUrl!,
+                                  width: 56,
+                                  height: 56,
+                                ),
+                              )
+                            : Text(
+                                member.name.isNotEmpty
+                                    ? member.name[0].toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  color: AppColors.primaryGold,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 22,
+                                ),
+                              ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              member.name,
+                              style: TextStyle(
+                                fontSize: 16.5,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: member.isOnline
+                                        ? const Color(0xFF22C55E)
+                                        : Colors.grey.shade400,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${member.statusText} · ${member.followersCount} ${member.followersCount == 1 ? 'follower' : 'followers'}',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (member.listeningMessageId != null) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGold
+                            .withValues(alpha: isDark ? 0.14 : 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.primaryGold.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.headphones_rounded,
+                              color: AppColors.primaryGold, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'LISTENING NOW',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.6,
+                                    color: AppColors.primaryGold,
+                                  ),
+                                ),
+                                Text(
+                                  member.listeningMessageTitle ?? 'A message',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w600,
+                                    color:
+                                        isDark ? Colors.white : Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(sheetCtx);
+                              _joinMemberListening(member);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryGold,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              minimumSize: Size.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                            ),
+                            child: const Text(
+                              'Join',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final res = await sheetRef
+                                .read(communityChangeNotifierProvider)
+                                .toggleFollowMember(member.id);
+                            if (!mounted) return;
+                            if (res == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(p.error ??
+                                      'Could not update follow status'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          },
+                          icon: Icon(
+                            member.isFollowing
+                                ? Icons.check_circle_rounded
+                                : Icons.person_add_alt_1_rounded,
+                            size: 18,
+                            color: member.isFollowing
+                                ? AppColors.primaryGold
+                                : (isDark ? Colors.white : Colors.black87),
+                          ),
+                          label: Text(
+                            member.isFollowing ? 'Following' : 'Follow',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: member.isFollowing
+                                  ? AppColors.primaryGold
+                                  : (isDark ? Colors.white : Colors.black87),
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: BorderSide(
+                              color: member.isFollowing
+                                  ? AppColors.primaryGold
+                                  : (isDark
+                                      ? Colors.white24
+                                      : Colors.grey.shade300),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(sheetCtx);
+                            _openDm(member);
+                          },
+                          icon: const Icon(Icons.chat_bubble_rounded,
+                              size: 17, color: Colors.black),
+                          label: const Text(
+                            'Message',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryGold,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _joinMemberListening(OnlineMember member) async {
+    final p = ref.read(communityChangeNotifierProvider);
+    if (member.listeningRoomId != null) {
+      final room =
+          p.rooms.where((r) => r.id == member.listeningRoomId).firstOrNull;
+      if (room != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                ChatRoomPage(room: room, autoJoinListenSession: true),
+          ),
+        );
+        return;
+      }
+    }
+
+    if (member.listeningMessageId == null) return;
+    final sermon = await DataService()
+        .getMessageById(member.listeningMessageId.toString());
+    if (!mounted) return;
+    if (sermon == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not load message'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AudioPlayerPage(
+          sermon: sermon,
+          initialPosition: member.listeningPositionSeconds > 0
+              ? Duration(seconds: member.listeningPositionSeconds.round())
+              : null,
+        ),
+      ),
     );
   }
 

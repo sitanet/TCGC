@@ -845,6 +845,32 @@ class _MainScreenState extends ConsumerState<MainScreen>
       return;
     }
 
+    if (type == 'member_listening') {
+      final roomId = data['room_id']?.toString() ?? '';
+      if (roomId.isNotEmpty) {
+        await _navigateToCommunityRoom(roomId, autoJoin: true);
+        return;
+      }
+      final messageId = data['message_id'];
+      if (messageId != null) {
+        final sermon = await _dataService.getMessageById(messageId.toString());
+        if (sermon != null && mounted) {
+          final posSec =
+              int.tryParse(data['position_seconds']?.toString() ?? '') ?? 0;
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => AudioPlayerPage(
+                sermon: sermon,
+                initialPosition:
+                    posSec > 0 ? Duration(seconds: posSec) : null,
+              ),
+            ),
+          );
+        }
+      }
+      return;
+    }
+
     if (type == 'livestream' ||
         type == 'live' ||
         type == 'live_stream' ||
