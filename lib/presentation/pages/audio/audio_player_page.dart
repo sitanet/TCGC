@@ -172,6 +172,9 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
       }
 
       SpeakerModel? speaker = _matchSpeaker(speakers, widget.sermon.speaker!);
+      if (speaker != null && mounted) {
+        setState(() => _speaker = speaker);
+      }
 
       // Retry with fresh server data if not matched or bio is empty (e.g. stale cache)
       if (speaker == null || (speaker.bio?.trim().isEmpty ?? true)) {
@@ -180,14 +183,29 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
           if (freshSpeakers.isNotEmpty) {
             speakers = freshSpeakers;
             speaker = _matchSpeaker(speakers, widget.sermon.speaker!) ?? speaker;
+            if (speaker != null && mounted) {
+              setState(() => _speaker = speaker);
+            }
           }
         } catch (e) {
           debugPrint('Failed force-refresh speakers: $e');
         }
       }
 
+      // Fallback so matched/named speaker always shows a card under the player
+      if (speaker == null && mounted) {
+        final rawName = widget.sermon.speaker!.trim();
+        setState(() {
+          _speaker = SpeakerModel(
+            id: 0,
+            name: rawName,
+            fullName: rawName,
+          );
+        });
+      }
+
       debugPrint(
-        'Match result: ${speaker != null ? "id=${speaker.id}, name=${speaker.fullName}" : "no match"}',
+        'Match result: ${speaker != null ? "id=${speaker.id}, name=${speaker.fullName}" : "fallback"}',
       );
 
       // Show explore section for all matched speakers
@@ -198,17 +216,10 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
         final messages = await _dataService.getMessagesBySpeaker(
           widget.sermon.speaker!,
         );
-        debugPrint(
-          'Got ${messages.length} total messages from speaker "${widget.sermon.speaker}"',
-        );
-
         final otherMessages = messages
             .where((m) => m.id != widget.sermon.id)
             .take(5)
             .toList();
-        debugPrint(
-          'Found ${otherMessages.length} other messages (excluding current)',
-        );
 
         if (mounted) {
           setState(() {
