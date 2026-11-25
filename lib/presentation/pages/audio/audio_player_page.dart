@@ -117,6 +117,23 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
           return s;
         }
       }
+
+      // 3. Unordered word-set match (handles "Dimeji Elugbadebo" vs "Elugbadebo Dimeji")
+      final sermonWords =
+          normSermon.split(' ').where((w) => w.length > 1).toSet();
+      if (sermonWords.length >= 2) {
+        for (final s in speakers) {
+          final speakerWords = _normalizeSpeakerName(s.name)
+              .split(' ')
+              .where((w) => w.length > 1)
+              .toSet();
+          if (speakerWords.length >= 2 &&
+              (sermonWords.containsAll(speakerWords) ||
+                  speakerWords.containsAll(sermonWords))) {
+            return s;
+          }
+        }
+      }
     }
 
     // 3. Safe non-empty contains match
@@ -507,10 +524,10 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
 
   Widget _buildSpeakerProfileSection(bool isDark) {
     final speaker = _speaker;
-    final bio = speaker?.bio?.trim() ?? '';
-    if (speaker == null || bio.isEmpty) {
+    if (speaker == null) {
       return const SizedBox.shrink();
     }
+    final bio = speaker.bio?.trim() ?? '';
 
     final textStyle = TextStyle(
       fontSize: 13.5,
@@ -618,80 +635,82 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Divider(
-            height: 1,
-            color: AppColors.primaryGold.withValues(alpha: 0.22),
-          ),
-          const SizedBox(height: 12),
-          // Bio with 5-line preview & Read more pull-down
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final painter = TextPainter(
-                text: TextSpan(text: bio, style: textStyle),
-                maxLines: 5,
-                textDirection: TextDirection.ltr,
-              )..layout(maxWidth: constraints.maxWidth);
-              final hasOverflow = painter.didExceedMaxLines;
+          if (bio.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Divider(
+              height: 1,
+              color: AppColors.primaryGold.withValues(alpha: 0.22),
+            ),
+            const SizedBox(height: 12),
+            // Bio with 5-line preview & Read more pull-down
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final painter = TextPainter(
+                  text: TextSpan(text: bio, style: textStyle),
+                  maxLines: 5,
+                  textDirection: TextDirection.ltr,
+                )..layout(maxWidth: constraints.maxWidth);
+                final hasOverflow = painter.didExceedMaxLines;
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 240),
-                    curve: Curves.easeInOut,
-                    alignment: Alignment.topCenter,
-                    child: Text(
-                      bio,
-                      style: textStyle,
-                      maxLines: _isBioExpanded ? null : 5,
-                      overflow: _isBioExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (hasOverflow) ...[
-                    const SizedBox(height: 10),
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        setState(() => _isBioExpanded = !_isBioExpanded);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryGold.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: AppColors.primaryGold.withValues(alpha: 0.45),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _isBioExpanded ? 'Show less' : 'Read more',
-                              style: const TextStyle(
-                                color: AppColors.primaryGold,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              _isBioExpanded
-                                  ? Icons.keyboard_arrow_up_rounded
-                                  : Icons.keyboard_arrow_down_rounded,
-                              color: AppColors.primaryGold,
-                              size: 16,
-                            ),
-                          ],
-                        ),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 240),
+                      curve: Curves.easeInOut,
+                      alignment: Alignment.topCenter,
+                      child: Text(
+                        bio,
+                        style: textStyle,
+                        maxLines: _isBioExpanded ? null : 5,
+                        overflow: _isBioExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
                       ),
                     ),
+                    if (hasOverflow) ...[
+                      const SizedBox(height: 10),
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _isBioExpanded = !_isBioExpanded);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGold.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppColors.primaryGold.withValues(alpha: 0.45),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _isBioExpanded ? 'Show less' : 'Read more',
+                                style: const TextStyle(
+                                  color: AppColors.primaryGold,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                _isBioExpanded
+                                    ? Icons.keyboard_arrow_up_rounded
+                                    : Icons.keyboard_arrow_down_rounded,
+                                color: AppColors.primaryGold,
+                                size: 16,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
-              );
-            },
-          ),
+                );
+              },
+            ),
+          ],
         ],
       ),
     );
