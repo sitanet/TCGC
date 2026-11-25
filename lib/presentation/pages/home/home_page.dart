@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
@@ -69,6 +71,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   static List<Sermon> _staticCitygateSongs = [];
   static List<Sermon> _staticRecentlyPlayedSermons = [];
   static AudioRestreamInfo? _staticActiveRestream;
+  static bool _staticIsMixlrLive = false;
+  static String? _staticMixlrTitle;
 
   List<Sermon> _sermons = [];
   List<BeginnerCategory> _beginnerCategories = [];
@@ -77,6 +81,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   List<Sermon> _citygateSongs = [];
   List<Sermon> _recentlyPlayedSermons = [];
   AudioRestreamInfo? _activeRestream;
+  bool _isMixlrLive = false;
+  String? _mixlrTitle;
   bool _isLoading = true;
   late final ScrollController _homeScrollController;
   bool _isScrolledPastHeader = false;
@@ -85,6 +91,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   void initState() {
     super.initState();
     _activeRestream = _staticActiveRestream;
+    _isMixlrLive = _staticIsMixlrLive;
+    _mixlrTitle = _staticMixlrTitle;
     // 1. Immediately show cached data from memory if previously loaded (instant 0ms)
     if (_staticSermons.isNotEmpty) {
       _sermons = _staticSermons;
@@ -154,8 +162,48 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  Future<void> _loadMixlrLiveStatus() async {
+    try {
+      final resp = await http
+          .get(Uri.parse('https://api.mixlr.com/users/dcitygatechurch'))
+          .timeout(const Duration(seconds: 6));
+      if (resp.statusCode != 200) return;
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final isLive = data['is_live'] == true;
+      String? title;
+      if (isLive) {
+        final bcastIds = data['broadcast_ids'];
+        if (bcastIds is List && bcastIds.isNotEmpty) {
+          try {
+            final bResp = await http
+                .get(Uri.parse('https://api.mixlr.com/broadcasts/${bcastIds.first}'))
+                .timeout(const Duration(seconds: 5));
+            if (bResp.statusCode == 200) {
+              final bData = jsonDecode(bResp.body) as Map<String, dynamic>;
+              final rawTitle = bData['title']?.toString().trim();
+              if (rawTitle != null && rawTitle.isNotEmpty) {
+                title = rawTitle;
+              }
+            }
+          } catch (_) {}
+        }
+      }
+      _staticIsMixlrLive = isLive;
+      _staticMixlrTitle = title;
+      if (mounted) {
+        setState(() {
+          _isMixlrLive = isLive;
+          _mixlrTitle = title;
+        });
+      }
+    } catch (e) {
+      debugPrint('Mixlr live status check error: $e');
+    }
+  }
+
   Future<void> _loadData({bool forceRefresh = false}) async {
     _loadActiveRestream();
+    _loadMixlrLiveStatus();
     if (!mounted) return;
     // Only show full loading spinner if we have NO cached data at all
     if (_sermons.isEmpty && _staticSermons.isEmpty) {
@@ -480,6 +528,10 @@ class _HomePageState extends ConsumerState<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeaderBanner(context, isDark),
+                if (_isMixlrLive) ...[
+                  SizedBox(height: spacing),
+                  _buildLiveMeetingBanner(context, isDark),
+                ],
                 if (_activeRestream != null && _activeRestream!.isLive) ...[
                   SizedBox(height: spacing),
                   _buildLiveRestreamBanner(context, isDark),
@@ -930,6 +982,143 @@ class _HomePageState extends ConsumerState<HomePage> {
     ),
   );
 }
+
+  Widget _buildLiveMeetingBanner(BuildContext context, bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+    void goToStream() {
+      HapticFeedback.mediumImpact();
+      ref.read(liveStreamSubTabIndexProvider.notifier).state = 0;
+      ref.read(mainTabIndexProvider.notifier).state = 2;
+    }
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: goToStream,
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isDark
+                    ? const [Color(0xFF2B1818), Color(0xFF171311)]
+                    : const [Color(0xFF231618), Color(0xFF141118)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Colors.redAccent.withValues(alpha: 0.65),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.redAccent.withValues(alpha: 0.2),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.redAccent.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.sensors_rounded,
+                    color: Colors.redAccent,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.circle, size: 7, color: Colors.white),
+                            SizedBox(width: 5),
+                            Text(
+                              'LIVE MEETING NOW',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.6,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _mixlrTitle ?? 'The CityGate Church Live Broadcast',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Tap to join the live stream',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: Colors.white.withValues(alpha: 0.72),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: goToStream,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGold,
+                    foregroundColor: Colors.black,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    minimumSize: Size.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                  ),
+                  child: const Text(
+                    'Join Live',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildLiveRestreamBanner(BuildContext context, bool isDark) {
     final restream = _activeRestream;
