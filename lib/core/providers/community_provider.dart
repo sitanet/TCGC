@@ -14,6 +14,7 @@ class OnlineMember {
   final String? lastSeen;
   final bool isFollowing;
   final int followersCount;
+  final bool isRoomAdmin;
   final int? listeningMessageId;
   final String? listeningMessageTitle;
   final double listeningPositionSeconds;
@@ -28,6 +29,7 @@ class OnlineMember {
     this.lastSeen,
     this.isFollowing = false,
     this.followersCount = 0,
+    this.isRoomAdmin = false,
     this.listeningMessageId,
     this.listeningMessageTitle,
     this.listeningPositionSeconds = 0.0,
@@ -47,6 +49,7 @@ class OnlineMember {
         lastSeen: lastSeen,
         isFollowing: isFollowing ?? this.isFollowing,
         followersCount: followersCount ?? this.followersCount,
+        isRoomAdmin: isRoomAdmin,
         listeningMessageId: listeningMessageId,
         listeningMessageTitle: listeningMessageTitle,
         listeningPositionSeconds: listeningPositionSeconds,
@@ -62,6 +65,7 @@ class OnlineMember {
         lastSeen: j['last_seen'],
         isFollowing: j['is_following'] ?? false,
         followersCount: j['followers_count'] ?? 0,
+        isRoomAdmin: j['is_admin'] ?? false,
         listeningMessageId: j['listening_message_id'],
         listeningMessageTitle: j['listening_message_title'],
         listeningPositionSeconds:
@@ -84,11 +88,13 @@ class CommunityRoom {
   final int? memberCount;
   final ChatMessage? lastMessage;
   final bool isHosting;
+  final bool isAdmin;
 
   CommunityRoom({required this.id, required this.name, this.description,
       required this.icon, this.roomType = 'public',
       this.categoryId, this.categoryName, this.categoryOrder = 9999,
-      this.memberCount, this.lastMessage, this.isHosting = false});
+      this.memberCount, this.lastMessage, this.isHosting = false,
+      this.isAdmin = false});
 
   factory CommunityRoom.fromJson(Map<String, dynamic> j) {
     final cat = j['category'] is Map<String, dynamic>
@@ -109,7 +115,8 @@ class CommunityRoom {
         lastMessage: j['last_message'] is Map<String, dynamic>
             ? ChatMessage.fromJson(j['last_message'] as Map<String, dynamic>)
             : null,
-        isHosting: hasActiveSession);
+        isHosting: hasActiveSession,
+        isAdmin: j['is_admin'] == true);
   }
 
   bool get isPublic => roomType == 'public';
@@ -388,6 +395,62 @@ class CommunityProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('updateListeningStatus: $e');
     }
+  }
+
+  Future<({List<OnlineMember> members, bool isAdmin})?> fetchRoomMembers(
+      int roomId) async {
+    try {
+      final res = await _api.get(ApiConstants.communityRoomMembers(roomId));
+      if (res.isSuccess) {
+        final raw = res.data;
+        final list = (raw['members'] as List? ?? [])
+            .map((e) => OnlineMember.fromJson(e as Map<String, dynamic>))
+            .toList();
+        final isAdmin = raw['is_admin'] == true;
+        return (members: list, isAdmin: isAdmin);
+      }
+      _error = res.errorMessage ?? 'Could not load group members';
+    } catch (e) {
+      debugPrint('fetchRoomMembers: $e');
+      _error = 'Could not load group members';
+    }
+    return null;
+  }
+
+  Future<bool> addRoomMembers(int roomId, List<int> userIds) async {
+    if (userIds.isEmpty) return false;
+    try {
+      final res = await _api.post(
+        ApiConstants.communityRoomMembers(roomId),
+        {'user_ids': userIds},
+      );
+      if (res.isSuccess) {
+        await fetchRooms();
+        return true;
+      }
+      _error = res.errorMessage ?? 'Could not add members';
+    } catch (e) {
+      debugPrint('addRoomMembers: $e');
+      _error = 'Could not add members';
+    }
+    return false;
+  }
+
+  Future<bool> removeRoomMember(int roomId, int userId) async {
+    try {
+      final res = await _api.delete(
+        '${ApiConstants.communityRoomMembers(roomId)}?user_id=$userId',
+      );
+      if (res.isSuccess) {
+        await fetchRooms();
+        return true;
+      }
+      _error = res.errorMessage ?? 'Could not remove member';
+    } catch (e) {
+      debugPrint('removeRoomMember: $e');
+      _error = 'Could not remove member';
+    }
+    return false;
   }
 
   Future<void> fetchAllMembers() async {

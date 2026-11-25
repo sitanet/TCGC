@@ -126,6 +126,8 @@ class ApiConstants {
       '/community/members/$userId/follow/';
   static const String communityListeningStatus = '/community/listening-status/';
   static const String communityRooms = '/community/rooms/';
+  static String communityRoomMembers(int roomId) =>
+      '/community/rooms/$roomId/members/';
   static String communityMessages(int roomId) =>
       '/community/rooms/$roomId/messages/';
   static String communityDeleteMessage(int messageId) =>

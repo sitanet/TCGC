@@ -161,14 +161,15 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
 
   void _showGroupMembersSheet() {
     final provider = ref.read(communityChangeNotifierProvider);
-    if (provider.allMembers.isEmpty) {
-      provider.fetchAllMembers();
-    }
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final meId =
         int.tryParse(ref.read(authChangeNotifierProvider).user?.id ?? '');
     final memberSearchController = TextEditingController();
     String memberQuery = '';
+    List<OnlineMember> roomMembers = [];
+    bool isAdmin = widget.room.isAdmin;
+    bool isLoading = true;
+    bool loadedOnce = false;
 
     showModalBottomSheet(
       context: context,
@@ -177,273 +178,349 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
       builder: (sheetCtx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
-            return Consumer(
-              builder: (cCtx, sheetRef, _) {
-                final p = sheetRef.watch(communityChangeNotifierProvider);
-                final members = p.allMembers
-                    .where((m) =>
-                        memberQuery.isEmpty ||
-                        m.name.toLowerCase().contains(memberQuery))
-                    .toList()
-                  ..sort((a, b) {
-                    if (a.isOnline == b.isOnline) {
-                      return a.name
-                          .toLowerCase()
-                          .compareTo(b.name.toLowerCase());
-                    }
-                    return a.isOnline ? -1 : 1;
-                  });
-                final onlineCount = members.where((m) => m.isOnline).length;
-                final bottomPad = MediaQuery.of(ctx).padding.bottom;
+            Future<void> reload() async {
+              final res = await provider.fetchRoomMembers(widget.room.id);
+              if (!sheetCtx.mounted) return;
+              setSheetState(() {
+                isLoading = false;
+                if (res != null) {
+                  roomMembers = res.members;
+                  isAdmin = res.isAdmin;
+                }
+              });
+            }
 
-                return Container(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(ctx).size.height * 0.82,
+            if (!loadedOnce) {
+              loadedOnce = true;
+              reload();
+            }
+
+            final filtered = roomMembers
+                .where((m) =>
+                    memberQuery.isEmpty ||
+                    m.name.toLowerCase().contains(memberQuery))
+                .toList()
+              ..sort((a, b) {
+                if (a.isRoomAdmin != b.isRoomAdmin) {
+                  return a.isRoomAdmin ? -1 : 1;
+                }
+                if (a.isOnline != b.isOnline) return a.isOnline ? -1 : 1;
+                return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+              });
+            final onlineCount = roomMembers.where((m) => m.isOnline).length;
+            final bottomPad = MediaQuery.of(ctx).padding.bottom;
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.84,
+              ),
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + bottomPad),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.cardDark : Colors.white,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + bottomPad),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.cardDark : Colors.white,
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(24)),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                  const SizedBox(height: 14),
+                  Row(
                     children: [
                       Container(
-                        width: 40,
-                        height: 4,
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
-                          color:
-                              isDark ? Colors.white24 : Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
+                          color: AppColors.primaryGold.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(Icons.forum_rounded,
+                            color: AppColors.primaryGold, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.room.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 16.5,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              '${roomMembers.length} members · $onlineCount online',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color:
-                                  AppColors.primaryGold.withValues(alpha: 0.16),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(Icons.forum_rounded,
-                                color: AppColors.primaryGold, size: 22),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  widget.room.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 16.5,
-                                    fontWeight: FontWeight.w700,
-                                    color:
-                                        isDark ? Colors.white : Colors.black87,
-                                  ),
-                                ),
-                                Text(
-                                  '${members.length} members · $onlineCount online',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDark
-                                        ? AppColors.textSecondaryDark
-                                        : AppColors.textSecondaryLight,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.close_rounded,
-                                color:
-                                    isDark ? Colors.white60 : Colors.black54),
-                            onPressed: () => Navigator.pop(sheetCtx),
-                          ),
-                        ],
-                      ),
-                      if (widget.room.description != null &&
-                          widget.room.description!.trim().isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            widget.room.description!.trim(),
+                      if (isAdmin)
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            final existingIds =
+                                roomMembers.map((m) => m.id).toSet();
+                            await _showAddMembersPicker(
+                              existingIds.toList(),
+                              onAdded: reload,
+                            );
+                          },
+                          icon: const Icon(Icons.person_add_alt_1_rounded,
+                              size: 16, color: Colors.black),
+                          label: const Text(
+                            'Add',
                             style: TextStyle(
-                              fontSize: 12.5,
-                              color: isDark
-                                  ? Colors.white70
-                                  : AppColors.textSecondaryLight,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black,
                             ),
                           ),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: memberSearchController,
-                        onChanged: (v) => setSheetState(
-                            () => memberQuery = v.trim().toLowerCase()),
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Search members...',
-                          hintStyle: TextStyle(
-                            fontSize: 13.5,
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                          ),
-                          prefixIcon: const Icon(Icons.search_rounded,
-                              size: 19, color: AppColors.primaryGold),
-                          filled: true,
-                          fillColor: isDark
-                              ? Colors.white.withValues(alpha: 0.06)
-                              : Colors.grey.shade100,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 10),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      if (members.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 28),
-                          child: Text(
-                            p.allMembers.isEmpty
-                                ? 'Loading group members...'
-                                : 'No members match "$memberQuery"',
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryGold,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            minimumSize: Size.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
                             ),
                           ),
                         )
                       else
-                        Flexible(
-                          child: ListView.separated(
-                            shrinkWrap: true,
-                            itemCount: members.length,
-                            separatorBuilder: (_, __) => Divider(
-                              height: 1,
-                              color: isDark
-                                  ? Colors.white10
-                                  : Colors.grey.shade200,
-                            ),
-                            itemBuilder: (_, i) {
-                              final m = members[i];
-                              final isSelf = meId != null && m.id == meId;
-                              return ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 4, vertical: 2),
-                                leading: Stack(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 21,
-                                      backgroundColor: AppColors.primaryGold
-                                          .withValues(alpha: 0.16),
-                                      child: m.photoUrl != null
-                                          ? ClipOval(
-                                              child: AppImage(
-                                                imagePath: m.photoUrl!,
-                                                width: 42,
-                                                height: 42,
-                                              ),
-                                            )
-                                          : Text(
-                                              m.name.isNotEmpty
-                                                  ? m.name[0].toUpperCase()
-                                                  : '?',
-                                              style: const TextStyle(
-                                                color: AppColors.primaryGold,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                    ),
-                                    Positioned(
-                                      bottom: 0,
-                                      right: 0,
-                                      child: Container(
-                                        width: 11,
-                                        height: 11,
-                                        decoration: BoxDecoration(
-                                          color: m.isOnline
-                                              ? const Color(0xFF22C55E)
-                                              : Colors.grey.shade400,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: isDark
-                                                ? AppColors.cardDark
-                                                : Colors.white,
-                                            width: 1.8,
+                        IconButton(
+                          icon: Icon(Icons.close_rounded,
+                              color: isDark ? Colors.white60 : Colors.black54),
+                          onPressed: () => Navigator.pop(sheetCtx),
+                        ),
+                    ],
+                  ),
+                  if (widget.room.description != null &&
+                      widget.room.description!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        widget.room.description!.trim(),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: isDark
+                              ? Colors.white70
+                              : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: memberSearchController,
+                    onChanged: (v) => setSheetState(
+                        () => memberQuery = v.trim().toLowerCase()),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search group members...',
+                      hintStyle: TextStyle(
+                        fontSize: 13.5,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          size: 19, color: AppColors.primaryGold),
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.grey.shade100,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (isLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: CircularProgressIndicator(
+                          color: AppColors.primaryGold),
+                    )
+                  else if (filtered.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 28),
+                      child: Text(
+                        roomMembers.isEmpty
+                            ? 'No members in this group yet.'
+                            : 'No members match "$memberQuery"',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: isDark
+                              ? Colors.white10
+                              : Colors.grey.shade200,
+                        ),
+                        itemBuilder: (_, i) {
+                          final m = filtered[i];
+                          final isSelf = meId != null && m.id == meId;
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 2),
+                            leading: Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 21,
+                                  backgroundColor: AppColors.primaryGold
+                                      .withValues(alpha: 0.16),
+                                  child: m.photoUrl != null
+                                      ? ClipOval(
+                                          child: AppImage(
+                                            imagePath: m.photoUrl!,
+                                            width: 42,
+                                            height: 42,
+                                          ),
+                                        )
+                                      : Text(
+                                          m.name.isNotEmpty
+                                              ? m.name[0].toUpperCase()
+                                              : '?',
+                                          style: const TextStyle(
+                                            color: AppColors.primaryGold,
+                                            fontWeight: FontWeight.bold,
                                           ),
                                         ),
+                                ),
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: Container(
+                                    width: 11,
+                                    height: 11,
+                                    decoration: BoxDecoration(
+                                      color: m.isOnline
+                                          ? const Color(0xFF22C55E)
+                                          : Colors.grey.shade400,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: isDark
+                                            ? AppColors.cardDark
+                                            : Colors.white,
+                                        width: 1.8,
                                       ),
                                     ),
-                                  ],
-                                ),
-                                title: Text(
-                                  isSelf ? '${m.name} (You)' : m.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color:
-                                        isDark ? Colors.white : Colors.black87,
                                   ),
                                 ),
-                                subtitle: Text(
-                                  m.isOnline
-                                      ? 'Online'
-                                      : (m.department != null &&
-                                              m.department!.isNotEmpty
-                                          ? m.department!
-                                          : m.statusText),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: m.isOnline
-                                        ? Colors.green
-                                        : (isDark
-                                            ? AppColors.textSecondaryDark
-                                            : AppColors.textSecondaryLight),
+                              ],
+                            ),
+                            title: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    isSelf ? '${m.name} (You)' : m.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark
+                                          ? Colors.white
+                                          : Colors.black87,
+                                    ),
                                   ),
                                 ),
-                                trailing: isSelf
-                                    ? null
-                                    : TextButton(
+                                if (m.isRoomAdmin) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryGold
+                                          .withValues(alpha: 0.18),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: AppColors.primaryGold
+                                            .withValues(alpha: 0.45),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Admin',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primaryGold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            subtitle: Text(
+                              m.isOnline
+                                  ? 'Online'
+                                  : (m.department != null &&
+                                          m.department!.isNotEmpty
+                                      ? m.department!
+                                      : m.statusText),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: m.isOnline
+                                    ? Colors.green
+                                    : (isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight),
+                              ),
+                            ),
+                            trailing: isSelf
+                                ? null
+                                : Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      TextButton(
                                         onPressed: () async {
-                                          final ok = await ref
-                                              .read(
-                                                  communityChangeNotifierProvider)
+                                          final ok = await provider
                                               .toggleFollowMember(m.id);
-                                          if (ok == null && mounted) {
-                                            final err = ref
-                                                    .read(
-                                                        communityChangeNotifierProvider)
-                                                    .error ??
-                                                'Could not update follow status';
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                content: Text(err),
-                                                backgroundColor: Colors.red,
-                                              ),
-                                            );
+                                          if (ok != null && sheetCtx.mounted) {
+                                            setSheetState(() {
+                                              final idx = roomMembers
+                                                  .indexWhere(
+                                                      (x) => x.id == m.id);
+                                              if (idx != -1) {
+                                                roomMembers[idx] =
+                                                    roomMembers[idx].copyWith(
+                                                        isFollowing: ok);
+                                              }
+                                            });
                                           }
                                         },
                                         style: TextButton.styleFrom(
@@ -454,17 +531,19 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                                                   ? Colors.white10
                                                   : Colors.grey.shade100),
                                           padding: const EdgeInsets.symmetric(
-                                              horizontal: 12, vertical: 6),
+                                              horizontal: 10, vertical: 5),
                                           minimumSize: Size.zero,
                                           shape: RoundedRectangleBorder(
                                             borderRadius:
-                                                BorderRadius.circular(16),
+                                                BorderRadius.circular(14),
                                           ),
                                         ),
                                         child: Text(
-                                          m.isFollowing ? 'Following' : 'Follow',
+                                          m.isFollowing
+                                              ? 'Following'
+                                              : 'Follow',
                                           style: TextStyle(
-                                            fontSize: 11.5,
+                                            fontSize: 11,
                                             fontWeight: FontWeight.w700,
                                             color: m.isFollowing
                                                 ? AppColors.primaryGold
@@ -474,44 +553,332 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                                           ),
                                         ),
                                       ),
-                                onTap: isSelf
-                                    ? null
-                                    : () async {
-                                        Navigator.pop(sheetCtx);
-                                        final room = await ref
-                                            .read(
-                                                communityChangeNotifierProvider)
-                                            .openDm(m.id);
-                                        if (!mounted) return;
-                                        if (room != null) {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => ChatRoomPage(
-                                                room: room,
-                                                dmUserName: m.name,
-                                                dmUserPhoto: m.photoUrl,
-                                                dmUserId: m.id,
-                                                dmUserOnline: m.isOnline,
-                                                dmUserLastSeen: m.lastSeen,
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      },
-                              );
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              },
+                                      if (isAdmin && !m.isRoomAdmin)
+                                        IconButton(
+                                          tooltip: 'Remove from group',
+                                          icon: const Icon(
+                                            Icons.person_remove_outlined,
+                                            size: 18,
+                                            color: Colors.redAccent,
+                                          ),
+                                          onPressed: () async {
+                                            final removed = await provider
+                                                .removeRoomMember(
+                                                    widget.room.id, m.id);
+                                            if (removed && sheetCtx.mounted) {
+                                              reload();
+                                            }
+                                          },
+                                        ),
+                                    ],
+                                  ),
+                            onTap: isSelf
+                                ? null
+                                : () async {
+                                    Navigator.pop(sheetCtx);
+                                    final room = await provider.openDm(m.id);
+                                    if (!mounted) return;
+                                    if (room != null) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => ChatRoomPage(
+                                            room: room,
+                                            dmUserName: m.name,
+                                            dmUserPhoto: m.photoUrl,
+                                            dmUserId: m.id,
+                                            dmUserOnline: m.isOnline,
+                                            dmUserLastSeen: m.lastSeen,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
             );
           },
         );
       },
     ).whenComplete(memberSearchController.dispose);
+  }
+
+  Future<void> _showAddMembersPicker(
+    List<int> existingMemberIds, {
+    Future<void> Function()? onAdded,
+  }) async {
+    final provider = ref.read(communityChangeNotifierProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (provider.allMembers.isEmpty) {
+      await provider.fetchAllMembers();
+    }
+    var currentMemberIds = existingMemberIds.toSet();
+    if (currentMemberIds.isEmpty) {
+      final res = await provider.fetchRoomMembers(widget.room.id);
+      if (res != null) {
+        currentMemberIds = res.members.map((m) => m.id).toSet();
+      }
+    }
+    if (!mounted) return;
+
+    final searchCtrl = TextEditingController();
+    String query = '';
+    final selectedIds = <int>{};
+    bool adding = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final candidates = provider.allMembers
+                .where((m) =>
+                    !currentMemberIds.contains(m.id) &&
+                    (query.isEmpty || m.name.toLowerCase().contains(query)))
+                .toList()
+              ..sort((a, b) =>
+                  a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+            final bottomPad = MediaQuery.of(ctx).padding.bottom;
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.82,
+              ),
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + bottomPad),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.cardDark : Colors.white,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Icon(Icons.person_add_alt_1_rounded,
+                          color: AppColors.primaryGold, size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Add Members to ${widget.room.name}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close_rounded,
+                            color: isDark ? Colors.white60 : Colors.black54),
+                        onPressed: () => Navigator.pop(sheetCtx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: searchCtrl,
+                    onChanged: (v) =>
+                        setSheetState(() => query = v.trim().toLowerCase()),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search members to add...',
+                      hintStyle: TextStyle(
+                        fontSize: 13.5,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          size: 19, color: AppColors.primaryGold),
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.grey.shade100,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (candidates.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 28),
+                      child: Text(
+                        query.isNotEmpty
+                            ? 'No members match "$query"'
+                            : 'All members are already in this group.',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: candidates.length,
+                        itemBuilder: (_, i) {
+                          final m = candidates[i];
+                          final checked = selectedIds.contains(m.id);
+                          return CheckboxListTile(
+                            value: checked,
+                            activeColor: AppColors.primaryGold,
+                            checkColor: Colors.black,
+                            onChanged: (val) {
+                              setSheetState(() {
+                                if (val == true) {
+                                  selectedIds.add(m.id);
+                                } else {
+                                  selectedIds.remove(m.id);
+                                }
+                              });
+                            },
+                            secondary: CircleAvatar(
+                              radius: 19,
+                              backgroundColor:
+                                  AppColors.primaryGold.withValues(alpha: 0.16),
+                              child: m.photoUrl != null
+                                  ? ClipOval(
+                                      child: AppImage(
+                                        imagePath: m.photoUrl!,
+                                        width: 38,
+                                        height: 38,
+                                      ),
+                                    )
+                                  : Text(
+                                      m.name.isNotEmpty
+                                          ? m.name[0].toUpperCase()
+                                          : '?',
+                                      style: const TextStyle(
+                                        color: AppColors.primaryGold,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                            ),
+                            title: Text(
+                              m.name,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            subtitle: m.department != null &&
+                                    m.department!.isNotEmpty
+                                ? Text(
+                                    m.department!,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight,
+                                    ),
+                                  )
+                                : null,
+                          );
+                        },
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: (selectedIds.isEmpty || adding)
+                          ? null
+                          : () async {
+                              setSheetState(() => adding = true);
+                              final ok = await provider.addRoomMembers(
+                                  widget.room.id, selectedIds.toList());
+                              if (!sheetCtx.mounted) return;
+                              if (ok) {
+                                Navigator.pop(sheetCtx);
+                                if (onAdded != null) await onAdded();
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          'Added ${selectedIds.length} member(s) to ${widget.room.name}'),
+                                      backgroundColor: AppColors.primaryGold,
+                                    ),
+                                  );
+                                }
+                              } else {
+                                setSheetState(() => adding = false);
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(provider.error ??
+                                          'Could not add members'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                      icon: adding
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.black,
+                              ),
+                            )
+                          : const Icon(Icons.check_rounded,
+                              size: 18, color: Colors.black),
+                      label: Text(
+                        adding
+                            ? 'Adding...'
+                            : 'Add ${selectedIds.length} Member${selectedIds.length == 1 ? '' : 's'}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryGold,
+                        disabledBackgroundColor:
+                            AppColors.primaryGold.withValues(alpha: 0.4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(searchCtrl.dispose);
   }
 
   void _shareRoomLink() {
@@ -1213,6 +1580,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                   case 'members':
                     _showGroupMembersSheet();
                     break;
+                  case 'add_members':
+                    _showAddMembersPicker([]);
+                    break;
                   case 'listen':
                     _openSermonPickerForListenTogether();
                     break;
@@ -1248,6 +1618,18 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                       ],
                     ),
                   ),
+                  if (widget.room.isAdmin)
+                    PopupMenuItem(
+                      value: 'add_members',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.person_add_alt_1_rounded, size: 19, color: AppColors.primaryGold),
+                          const SizedBox(width: 10),
+                          Text('Add Members',
+                              style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                        ],
+                      ),
+                    ),
                   PopupMenuItem(
                     value: 'listen',
                     child: Row(

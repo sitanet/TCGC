@@ -346,7 +346,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                               Text(
                                 _searchQuery.isNotEmpty
                                     ? 'No rooms match "$_searchQuery"'
-                                    : (p.error ?? 'No chat rooms available yet.'),
+                                    : (p.error ?? 'You have not been added to any group yet.'),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 14,
