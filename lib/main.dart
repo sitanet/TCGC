@@ -905,6 +905,28 @@ class _MainScreenState extends ConsumerState<MainScreen>
           );
         }
       }
+      return;
+    }
+
+    if (type == 'transcript' && data['transcript_id'] != null) {
+      await _navigateToTranscript(data['transcript_id'].toString());
+      return;
+    }
+
+    if (type == 'wallet_credit' || type == 'wallet' || type == 'transaction') {
+      final showWallet =
+          !ref.read(appConfigChangeNotifierProvider).config.walletPageDisabled;
+      if (showWallet) {
+        ref.read(mainTabIndexProvider.notifier).state = 3; // Wallet tab
+      }
+      return;
+    }
+
+    if (url.isNotEmpty) {
+      final uri = Uri.tryParse(url);
+      if (uri != null) {
+        _handleDeepLink(uri);
+      }
     }
   }
 
