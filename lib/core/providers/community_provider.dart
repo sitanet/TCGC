@@ -44,7 +44,9 @@ class CommunityRoom {
       this.memberCount, this.lastMessage, this.isHosting = false});
 
   factory CommunityRoom.fromJson(Map<String, dynamic> j) {
-    final cat = j['category'] as Map<String, dynamic>?;
+    final cat = j['category'] is Map<String, dynamic>
+        ? j['category'] as Map<String, dynamic>
+        : null;
     final rawSession = j['active_listen_session'] ?? j['listen_session'];
     final hasActiveSession = j['is_hosting'] == true ||
         j['has_active_session'] == true ||
@@ -57,8 +59,9 @@ class CommunityRoom {
         categoryName: cat?['name'],
         categoryOrder: cat?['order'] ?? 9999,
         memberCount: j['member_count'],
-        lastMessage: j['last_message'] != null
-            ? ChatMessage.fromJson(j['last_message']) : null,
+        lastMessage: j['last_message'] is Map<String, dynamic>
+            ? ChatMessage.fromJson(j['last_message'] as Map<String, dynamic>)
+            : null,
         isHosting: hasActiveSession);
   }
 
@@ -249,13 +252,23 @@ class CommunityProvider extends ChangeNotifier {
     }
   }
 
-  Future<CommunityRoom?> openDm(int userId) async {    try {
+  Future<CommunityRoom?> openDm(int userId) async {
+    _error = null;
+    try {
       final res = await _api.post(ApiConstants.communityDm(userId), {});
       if (res.isSuccess) {
-        return CommunityRoom.fromJson(res.data);
+        final raw = res.data;
+        final roomJson = raw['room'] is Map<String, dynamic>
+            ? raw['room'] as Map<String, dynamic>
+            : (raw['data'] is Map<String, dynamic>
+                ? raw['data'] as Map<String, dynamic>
+                : raw);
+        return CommunityRoom.fromJson(roomJson);
       }
+      _error = res.errorMessage ?? 'Could not open chat (${res.statusCode})';
     } catch (e) {
       debugPrint('openDm: $e');
+      _error = 'Could not open chat. Please try again.';
     }
     return null;
   }

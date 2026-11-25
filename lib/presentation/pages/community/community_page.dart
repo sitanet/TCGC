@@ -1624,17 +1624,27 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
           const SizedBox(height: 5),
           SizedBox(
             width: 56,
-            child: Text(
-              m.name.split(' ').first,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: isOnline ? FontWeight.w700 : FontWeight.normal,
-                color: isDark
-                    ? (isOnline ? Colors.white : AppColors.textSecondaryDark)
-                    : (isOnline ? Colors.black87 : AppColors.textSecondaryLight),
-              ),
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
+            child: Builder(
+              builder: (context) {
+                final meId = int.tryParse(
+                    ref.read(authChangeNotifierProvider).user?.id ?? '');
+                final isSelf = meId != null && m.id == meId;
+                final label = isSelf ? 'You' : m.name.split(' ').first;
+                return Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: isOnline ? FontWeight.w700 : FontWeight.normal,
+                    color: isDark
+                        ? (isOnline ? Colors.white : AppColors.textSecondaryDark)
+                        : (isOnline
+                            ? Colors.black87
+                            : AppColors.textSecondaryLight),
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                );
+              },
             ),
           ),
         ],
@@ -1648,6 +1658,17 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
   }
 
   Future<void> _openDm(OnlineMember member) async {
+    final meId =
+        int.tryParse(ref.read(authChangeNotifierProvider).user?.id ?? '');
+    if (meId != null && member.id == meId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This is you! Tap another member to start a chat.'),
+        ),
+      );
+      return;
+    }
+
     final p = ref.read(communityChangeNotifierProvider);
     // Show loading
     showDialog(
@@ -1677,8 +1698,8 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open chat. Please try again.'),
+        SnackBar(
+          content: Text(p.error ?? 'Could not open chat. Please try again.'),
           backgroundColor: Colors.red,
         ),
       );
