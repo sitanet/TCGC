@@ -730,18 +730,31 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
+        color: isMinister
+            ? null
+            : (isDark ? AppColors.cardDark : Colors.white),
+        gradient: isMinister
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? const [Color(0xFF231D12), Color(0xFF15120D)]
+                    : const [Color(0xFFFFFDF7), Color(0xFFF6EDD9)],
+              )
+            : null,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isMinister && (pillColor == Colors.cyanAccent.shade700)
-              ? (isDark ? Colors.cyanAccent.withValues(alpha: 0.35) : Colors.cyan.shade200)
+          color: isMinister
+              ? pillColor.withValues(alpha: isDark ? 0.45 : 0.38)
               : (isDark ? AppColors.dividerDark : Colors.grey.shade200),
-          width: 1.0,
+          width: isMinister ? 1.3 : 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
-            blurRadius: 12,
+            color: isMinister
+                ? pillColor.withValues(alpha: isDark ? 0.14 : 0.12)
+                : Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+            blurRadius: isMinister ? 16 : 12,
             offset: const Offset(0, 4),
           ),
         ],
@@ -752,44 +765,65 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(isMinister ? 40 : 14),
-                child: Container(
-                  width: 76,
-                  height: 76,
-                  color: isDark ? Colors.white10 : Colors.grey.shade100,
-                  child: imageUrl != null && imageUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          cacheManager: CustomImageCacheManager.instance,
-                          fit: BoxFit.cover,
-                          alignment: Alignment.topCenter,
-                          memCacheWidth: 152,
-                          useOldImageOnUrlChange: true,
-                          fadeInDuration: Duration.zero,
-                          fadeOutDuration: Duration.zero,
-                          placeholder: (_, __) => isMinister
-                              ? const SizedBox.shrink()
-                              : Icon(
-                                  Icons.music_note_rounded,
-                                  size: 32,
-                                  color: pillColor,
-                                ),
-                          errorWidget: (_, __, ___) => isMinister
-                              ? const SizedBox.shrink()
-                              : Icon(
-                                  Icons.music_note_rounded,
-                                  size: 32,
-                                  color: pillColor,
-                                ),
-                        )
-                      : (isMinister
-                          ? null
-                          : Icon(
-                              Icons.music_note_rounded,
-                              size: 32,
-                              color: pillColor,
-                            )),
+              Container(
+                padding: EdgeInsets.all(isMinister ? 2.5 : 0),
+                decoration: isMinister
+                    ? BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [
+                            pillColor,
+                            pillColor.withValues(alpha: 0.45),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: pillColor.withValues(alpha: 0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      )
+                    : null,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(isMinister ? 40 : 14),
+                  child: Container(
+                    width: 76,
+                    height: 76,
+                    color: isDark ? Colors.white10 : Colors.grey.shade100,
+                    child: imageUrl != null && imageUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl,
+                            cacheManager: CustomImageCacheManager.instance,
+                            fit: BoxFit.cover,
+                            alignment: Alignment.topCenter,
+                            memCacheWidth: 152,
+                            useOldImageOnUrlChange: true,
+                            fadeInDuration: Duration.zero,
+                            fadeOutDuration: Duration.zero,
+                            placeholder: (_, __) => isMinister
+                                ? Icon(Icons.person_rounded, size: 34, color: pillColor)
+                                : Icon(
+                                    Icons.music_note_rounded,
+                                    size: 32,
+                                    color: pillColor,
+                                  ),
+                            errorWidget: (_, __, ___) => isMinister
+                                ? Icon(Icons.person_rounded, size: 34, color: pillColor)
+                                : Icon(
+                                    Icons.music_note_rounded,
+                                    size: 32,
+                                    color: pillColor,
+                                  ),
+                          )
+                        : Icon(
+                            isMinister ? Icons.person_rounded : Icons.music_note_rounded,
+                            size: isMinister ? 34 : 32,
+                            color: pillColor,
+                          ),
+                  ),
                 ),
               ),
               const SizedBox(width: 14),
@@ -851,6 +885,11 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
             ],
           ),
           if (description != null && description.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Divider(
+              height: 1,
+              color: pillColor.withValues(alpha: 0.22),
+            ),
             const SizedBox(height: 10),
             LayoutBuilder(
               builder: (context, constraints) {
@@ -884,30 +923,40 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                       ),
                     ),
                     if (isOverflowing) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       GestureDetector(
                         onTap: () => setState(
                             () => _isHeroBioExpanded = !_isHeroBioExpanded),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _isHeroBioExpanded ? 'Show less' : 'Read more',
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGold.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppColors.primaryGold.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _isHeroBioExpanded ? 'Show less' : 'Read more',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primaryGold,
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              Icon(
+                                _isHeroBioExpanded
+                                    ? Icons.keyboard_arrow_up_rounded
+                                    : Icons.keyboard_arrow_down_rounded,
+                                size: 15,
                                 color: AppColors.primaryGold,
                               ),
-                            ),
-                            const SizedBox(width: 2),
-                            Icon(
-                              _isHeroBioExpanded
-                                  ? Icons.keyboard_arrow_up_rounded
-                                  : Icons.keyboard_arrow_down_rounded,
-                              size: 16,
-                              color: AppColors.primaryGold,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -922,13 +971,13 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: _playAll,
-                  icon: const Icon(Icons.play_arrow_rounded, size: 20, color: Colors.white),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 20, color: Colors.black),
                   label: const Text(
                     'Play All',
                     style: TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: Colors.black,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
