@@ -53,10 +53,13 @@ class ImageCacheService {
                 await cache.downloadFile(url, force: true);
               }
             }
-            // Warm RAM image cache so portrait cards paint instantaneously
-            CachedNetworkImageProvider(
-              url,
-              cacheManager: cache,
+            // Warm RAM image cache with bounded dimensions so full-res photos don't OOM Android
+            ResizeImage(
+              CachedNetworkImageProvider(
+                url,
+                cacheManager: cache,
+              ),
+              width: 240,
             ).resolve(ImageConfiguration.empty);
           } catch (e) {
             _warmedUrls.remove(url);
@@ -70,9 +73,12 @@ class ImageCacheService {
   void preCacheUrl(String url) {
     if (url.isEmpty) return;
     try {
-      CachedNetworkImageProvider(
-        url,
-        cacheManager: CustomImageCacheManager.instance,
+      ResizeImage(
+        CachedNetworkImageProvider(
+          url,
+          cacheManager: CustomImageCacheManager.instance,
+        ),
+        width: 240,
       ).resolve(ImageConfiguration.empty);
     } catch (e) {
       debugPrint('ImageCacheService: Failed to cache $url');

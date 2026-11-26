@@ -1014,8 +1014,12 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
   @override
   void didHaveMemoryPressure() {
-    // System is low on memory - clear image caches
+    // System is low on memory - clear image caches and release offstage WebView
     ImageCacheService.clearMemoryCache();
+    final currentTab = ref.read(mainTabIndexProvider);
+    if (_liveStreamVisited && currentTab != 2 && mounted) {
+      setState(() => _liveStreamVisited = false);
+    }
     debugPrint('Memory pressure detected - cleared image cache');
   }
 
@@ -1028,6 +1032,9 @@ class _MainScreenState extends ConsumerState<MainScreen>
       final safeIndex = (lastIndex >= 0 && lastIndex <= maxIndex) ? lastIndex : 0;
       if (mounted) {
         ref.read(mainTabIndexProvider.notifier).state = safeIndex;
+        if (_pageController.hasClients && safeIndex != 0) {
+          _pageController.jumpToPage(safeIndex);
+        }
       }
     } catch (e) {
       debugPrint('Error restoring last tab: $e');

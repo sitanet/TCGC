@@ -18,9 +18,9 @@ class ImageCacheService {
       maxImages = 150;
       maxBytes = 60 * 1024 * 1024; // 60MB for web
     } else if (Platform.isAndroid) {
-      // Balanced limit so decoded minister & sermon images stay in RAM
-      maxImages = 150;
-      maxBytes = 50 * 1024 * 1024; // 50MB for Android
+      // Conservative limit on Android to leave headroom for WebView & audio player
+      maxImages = 80;
+      maxBytes = 24 * 1024 * 1024; // 24MB for Android
     } else if (Platform.isIOS) {
       // iOS devices generally have better memory management
       maxImages = 200;
