@@ -1475,6 +1475,38 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                   ),
                 ),
               ),
+              GestureDetector(
+                onTap: () => _showMyFollowersSheet(context, isDark),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  margin: const EdgeInsets.only(right: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.primaryGold.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.favorite_rounded,
+                          size: 11, color: AppColors.primaryGold),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${p.myFollowersCount} Follower${p.myFollowersCount == 1 ? '' : 's'}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isDark
+                              ? AppColors.primaryGold
+                              : const Color(0xFF9A7512),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                 decoration: BoxDecoration(
@@ -1750,6 +1782,255 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
       child: (isOnline || m.unreadCount > 0)
           ? content
           : Opacity(opacity: 0.58, child: content),
+    );
+  }
+
+  void _showMyFollowersSheet(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return Consumer(
+          builder: (ctx, sheetRef, _) {
+            final p = sheetRef.watch(communityChangeNotifierProvider);
+            final followers = p.myFollowers;
+            final count = p.myFollowersCount;
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.72,
+              ),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.cardDark : Colors.white,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 10),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white24 : Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 16, 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color:
+                                  AppColors.primaryGold.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.people_alt_rounded,
+                                color: AppColors.primaryGold, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Your Followers',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    color:
+                                        isDark ? Colors.white : Colors.black87,
+                                  ),
+                                ),
+                                Text(
+                                  '$count member${count == 1 ? ' is' : 's are'} following you',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(sheetCtx),
+                            icon: Icon(
+                              Icons.close_rounded,
+                              color: isDark ? Colors.white70 : Colors.black54,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    if (followers.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 36),
+                        child: Column(
+                          children: [
+                            Icon(Icons.person_search_rounded,
+                                size: 42,
+                                color: isDark
+                                    ? Colors.white24
+                                    : Colors.grey.shade400),
+                            const SizedBox(height: 10),
+                            Text(
+                              'No followers yet',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: isDark ? Colors.white70 : Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'When fellowship members follow you, they will appear here.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Flexible(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: followers.length,
+                          separatorBuilder: (_, __) => Divider(
+                            height: 1,
+                            indent: 72,
+                            color: isDark
+                                ? Colors.white10
+                                : Colors.grey.shade200,
+                          ),
+                          itemBuilder: (_, idx) {
+                            final m = followers[idx];
+                            return ListTile(
+                              onTap: () {
+                                Navigator.pop(sheetCtx);
+                                _showMemberActionsSheet(m);
+                              },
+                              leading: Stack(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: AppColors.primaryGold
+                                        .withValues(alpha: 0.18),
+                                    child: m.photoUrl != null
+                                        ? ClipOval(
+                                            child: AppImage(
+                                              imagePath: m.photoUrl!,
+                                              width: 44,
+                                              height: 44,
+                                            ),
+                                          )
+                                        : Text(
+                                            m.name.isNotEmpty
+                                                ? m.name[0].toUpperCase()
+                                                : '?',
+                                            style: const TextStyle(
+                                              color: AppColors.primaryGold,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 17,
+                                            ),
+                                          ),
+                                  ),
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Container(
+                                      width: 11,
+                                      height: 11,
+                                      decoration: BoxDecoration(
+                                        color: m.isOnline
+                                            ? const Color(0xFF22C55E)
+                                            : Colors.grey.shade400,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isDark
+                                              ? AppColors.cardDark
+                                              : Colors.white,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              title: Text(
+                                m.name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.5,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                              subtitle: Text(
+                                (m.department != null &&
+                                        m.department!.isNotEmpty)
+                                    ? '${m.department} • ${m.statusText}'
+                                    : m.statusText,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
+                              ),
+                              trailing: OutlinedButton(
+                                onPressed: () => sheetRef
+                                    .read(communityChangeNotifierProvider)
+                                    .toggleFollowMember(m.id),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  side: BorderSide(
+                                    color: m.isFollowing
+                                        ? Colors.grey.shade400
+                                        : AppColors.primaryGold,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                ),
+                                child: Text(
+                                  m.isFollowing ? 'Following' : 'Follow Back',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: m.isFollowing
+                                        ? (isDark
+                                            ? Colors.white70
+                                            : Colors.black54)
+                                        : AppColors.primaryGold,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

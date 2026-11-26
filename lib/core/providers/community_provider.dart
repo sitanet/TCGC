@@ -13,6 +13,7 @@ class OnlineMember {
   final bool isOnline;
   final String? lastSeen;
   final bool isFollowing;
+  final bool isFollower;
   final int followersCount;
   final int unreadCount;
   final bool isRoomAdmin;
@@ -29,6 +30,7 @@ class OnlineMember {
     this.isOnline = false,
     this.lastSeen,
     this.isFollowing = false,
+    this.isFollower = false,
     this.followersCount = 0,
     this.unreadCount = 0,
     this.isRoomAdmin = false,
@@ -51,6 +53,7 @@ class OnlineMember {
         isOnline: isOnline,
         lastSeen: lastSeen,
         isFollowing: isFollowing ?? this.isFollowing,
+        isFollower: isFollower,
         followersCount: followersCount ?? this.followersCount,
         unreadCount: unreadCount ?? this.unreadCount,
         isRoomAdmin: isRoomAdmin,
@@ -68,6 +71,7 @@ class OnlineMember {
         isOnline: j['is_online'] ?? false,
         lastSeen: j['last_seen'],
         isFollowing: j['is_following'] ?? false,
+        isFollower: j['is_follower'] ?? false,
         followersCount: j['followers_count'] ?? 0,
         unreadCount: j['unread_count'] ?? 0,
         isRoomAdmin: j['is_admin'] ?? false,
@@ -206,6 +210,12 @@ class CommunityProvider extends ChangeNotifier {
   List<OnlineMember> _onlineMembers = [];
   int _onlineCount = 0;
   List<OnlineMember> _allMembers = [];
+  int _myFollowersCount = 0;
+
+  int get myFollowersCount =>
+      _myFollowersCount > 0 ? _myFollowersCount : myFollowers.length;
+  List<OnlineMember> get myFollowers =>
+      _allMembers.where((m) => m.isFollower).toList();
   List<CommunityRoom> _rooms = [];
   Map<int, ListenSession> _activeSessionsByRoom = {};
   List<ChatMessage> _messages = [];
@@ -475,6 +485,8 @@ class CommunityProvider extends ChangeNotifier {
         _authExpired = false;
         final list = res.data['members'] as List? ?? [];
         _allMembers = list.map((e) => OnlineMember.fromJson(e)).toList();
+        _myFollowersCount = (res.data['my_followers_count'] as int?) ??
+            _allMembers.where((m) => m.isFollower).length;
         debugPrint('fetchAllMembers: loaded ${_allMembers.length} members');
         try {
           final prefs = await SharedPreferences.getInstance();
