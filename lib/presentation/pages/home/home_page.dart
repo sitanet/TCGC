@@ -17,6 +17,7 @@ import '../../../data/services/played_audio_service.dart';
 
 import '../../widgets/resume_playback_sheet.dart';
 import '../audio/audio_list_page.dart';
+import '../audio/word_quiz_page.dart';
 import '../profile/profile_page.dart';
 import '../notifications/notifications_page.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -608,7 +609,53 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                 ),
               ),
-              // Button 2: Contact Us
+              // Button 2: Word Quiz (after Wing AI)
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() => _isFabMenuOpen = false);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const WordQuizPage()),
+                  );
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF231D12) : Colors.white,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: AppColors.primaryGold.withValues(alpha: 0.65),
+                      width: 1.3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.14),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.quiz_rounded, color: AppColors.primaryGold, size: 19),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Word Quiz',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Button 3: Contact Us
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
