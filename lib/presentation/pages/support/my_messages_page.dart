@@ -66,7 +66,11 @@ class _MyMessagesPageState extends State<MyMessagesPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: const CustomAppBar(title: 'My Messages', showBackButton: true),
+      appBar: CustomAppBar(
+        title: 'My Messages',
+        showBackButton: true,
+        lightBackground: !isDark,
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGold))
           : _error != null

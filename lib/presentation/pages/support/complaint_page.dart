@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
@@ -56,8 +57,18 @@ class _ComplaintPageState extends ConsumerState<ComplaintPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: const CustomAppBar(title: 'Contact Support', showBackButton: true),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+      ),
+      child: Scaffold(
+        appBar: CustomAppBar(
+          title: 'Contact Support',
+          showBackButton: true,
+          lightBackground: !isDark,
+        ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -138,6 +149,7 @@ class _ComplaintPageState extends ConsumerState<ComplaintPage> {
             ),
           ),
         ),
+      ),
       ),
     );
   }
