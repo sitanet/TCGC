@@ -7,7 +7,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final List<Widget>? actions;
   final Widget? leading;
   final VoidCallback? onBackPressed;
-  final bool lightBackground; // Set to true for white/light background pages
+  final bool? lightBackground; // Override auto theme detection if needed
 
   const CustomAppBar({
     super.key,
@@ -16,20 +16,24 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.actions,
     this.leading,
     this.onBackPressed,
-    this.lightBackground = false,
+    this.lightBackground,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final useLight = lightBackground ?? !isDark;
+
     // In dark theme: always use white status bar icons (Brightness.light)
     // In light theme with light background: use black icons (Brightness.dark)
     // In light theme with dark background: use white icons (Brightness.light)
-    final statusBarIconBrightness = isDark ? Brightness.light : (lightBackground ? Brightness.dark : Brightness.light);
-    final statusBarBrightness = isDark ? Brightness.dark : (lightBackground ? Brightness.light : Brightness.dark);
-    
-    final foregroundColor = isDark || !lightBackground ? Colors.white : Colors.black87;
+    final statusBarIconBrightness =
+        isDark ? Brightness.light : (useLight ? Brightness.dark : Brightness.light);
+    final statusBarBrightness =
+        isDark ? Brightness.dark : (useLight ? Brightness.light : Brightness.dark);
+
+    final foregroundColor =
+        (isDark || !useLight) ? Colors.white : Colors.black87;
 
     return AppBar(
       backgroundColor: Colors.transparent,
