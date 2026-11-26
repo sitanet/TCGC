@@ -514,14 +514,35 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
   static const String _lastTabKey = 'last_tab_index';
   bool _liveStreamVisited = false;
+  late final PageController _pageController;
 
   Widget _buildBody(int safeIndex, bool showWallet) {
     if (safeIndex == 2) {
       _liveStreamVisited = true;
     }
+    final pageCount = showWallet ? 6 : 5;
     return Stack(
       children: [
-        if (safeIndex != 2) _buildPage(safeIndex, showWallet),
+        PageView.builder(
+          controller: _pageController,
+          itemCount: pageCount,
+          physics: const BouncingScrollPhysics(),
+          onPageChanged: (index) {
+            if (showWallet && index == 3 && !_walletAuthenticated) {
+              _handleWalletTap();
+              return;
+            }
+            if (index != safeIndex) {
+              _setCurrentIndex(index);
+            }
+          },
+          itemBuilder: (context, index) {
+            if (index == 2) {
+              return const SizedBox.shrink();
+            }
+            return _buildPage(index, showWallet);
+          },
+        ),
         if (_liveStreamVisited)
           Offstage(
             offstage: safeIndex != 2,
@@ -578,6 +599,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: ref.read(mainTabIndexProvider));
     WidgetsBinding.instance.addObserver(this);
     _setupNotificationHandler();
     _restoreLastTab();
@@ -932,6 +954,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
   @override
   void dispose() {
+    _pageController.dispose();
     _deepLinkSub?.cancel();
     NotificationService.onNotificationTapped = null;
     WidgetsBinding.instance.removeObserver(this);
@@ -1081,6 +1104,18 @@ class _MainScreenState extends ConsumerState<MainScreen>
     final showWallet = !appConfig.config.walletPageDisabled;
     final maxIndex = showWallet ? 5 : 4;
     final safeIndex = _currentIndex > maxIndex ? 0 : _currentIndex;
+
+    ref.listen<int>(mainTabIndexProvider, (prev, next) {
+      final target = next > maxIndex ? 0 : next;
+      if (_pageController.hasClients &&
+          _pageController.page?.round() != target) {
+        _pageController.animateToPage(
+          target,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
 
     if (_showPromotion && _activePromotions.isNotEmpty) {
       return BlocProvider<AskWingAICubit>(
