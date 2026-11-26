@@ -46,6 +46,7 @@ class ApiConstants {
   // Transcripts (standalone)
   static const String transcripts = '/transcripts/';
   static const String transcriptsByCategory = '/transcripts/by_category/';
+  static const String transcriptCategorySummary = '/transcripts/category-summary/';
   static const String featuredTranscripts = '/transcripts/featured/';
   static const String ebooks = '/ebooks/';
   static const String featuredEbooks = '/ebooks/featured/';

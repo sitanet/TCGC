@@ -121,8 +121,16 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
         );
       }
 
-      // Fetch fresh data from API
-      final transcripts = await _dataService.getTranscripts(forceRefresh: true);
+      // Fetch fresh data from API (use fast category endpoint when opened for a specific category)
+      List<Transcript> transcripts = [];
+      if (_selectedCategoryId != null &&
+          _selectedCategoryId!.isNotEmpty &&
+          _selectedCategoryId != 'all') {
+        transcripts = await _dataService.getTranscriptsByCategory(_selectedCategoryId!);
+      }
+      if (transcripts.isEmpty) {
+        transcripts = await _dataService.getTranscripts(forceRefresh: true);
+      }
       if (mounted && transcripts.isNotEmpty) {
         setState(() {
           _allItems = transcripts;
@@ -181,7 +189,15 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
     try {
       // Load speakers with photos
       final speakers = await _dataService.getSpeakers();
-      final transcripts = await _dataService.getTranscripts(forceRefresh: true);
+      List<Transcript> transcripts = [];
+      if (_selectedCategoryId != null &&
+          _selectedCategoryId!.isNotEmpty &&
+          _selectedCategoryId != 'all') {
+        transcripts = await _dataService.getTranscriptsByCategory(_selectedCategoryId!);
+      }
+      if (transcripts.isEmpty) {
+        transcripts = await _dataService.getTranscripts(forceRefresh: true);
+      }
       if (mounted) {
         setState(() {
           _speakerModels = speakers;

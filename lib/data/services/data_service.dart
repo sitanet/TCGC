@@ -609,6 +609,43 @@ class DataService {
     return null;
   }
 
+  Future<List<Map<String, dynamic>>> getTranscriptCategorySummary({
+    bool forceRefresh = false,
+  }) async {
+    const cacheKey = 'transcript_category_summary_cache';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!forceRefresh) {
+        final cached = prefs.getString(cacheKey);
+        if (cached != null && cached.isNotEmpty) {
+          final List<dynamic> decoded = jsonDecode(cached);
+          // Refresh in background without blocking UI
+          Future.microtask(() => getTranscriptCategorySummary(forceRefresh: true));
+          return decoded.cast<Map<String, dynamic>>();
+        }
+      }
+
+      final response = await _api.get(ApiConstants.transcriptCategorySummary);
+      if (response.isSuccess && response.dataList.isNotEmpty) {
+        final list = response.dataList
+            .whereType<Map>()
+            .map((m) => Map<String, dynamic>.from(m))
+            .toList();
+        await prefs.setString(cacheKey, jsonEncode(list));
+        return list;
+      }
+
+      final fallback = prefs.getString(cacheKey);
+      if (fallback != null && fallback.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(fallback);
+        return decoded.cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      debugPrint('Error fetching transcript category summary: $e');
+    }
+    return [];
+  }
+
   Future<List<Transcript>> getTranscriptsByCategory(String categoryId) async {
     final response = await _api.get(
       '${ApiConstants.transcriptsByCategory}?category_id=$categoryId',

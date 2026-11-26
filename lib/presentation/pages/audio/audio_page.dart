@@ -56,11 +56,13 @@ class _AudioPageState extends ConsumerState<AudioPage>
   static List<MessageCategory> _staticCategories = [];
   static List<Sermon> _staticSermons = [];
   static List<Transcript> _staticTranscripts = [];
+  static List<Map<String, dynamic>> _staticTranscriptCategorySummary = [];
   static List<SpeakerModel> _staticSpeakers = [];
 
   List<MessageCategory> _categories = [];
   List<Sermon> _sermons = [];
   List<Transcript> _transcripts = [];
+  List<Map<String, dynamic>> _transcriptCategorySummary = [];
   List<SpeakerModel> _speakerModels = [];
   bool _isLoading = true;
 
@@ -75,6 +77,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
       _categories = _staticCategories;
       _sermons = _staticSermons;
       _transcripts = _staticTranscripts;
+      _transcriptCategorySummary = _staticTranscriptCategorySummary;
       _speakerModels = _staticSpeakers;
       _isLoading = false;
     }
@@ -99,12 +102,14 @@ class _AudioPageState extends ConsumerState<AudioPage>
         _dataService.getMessages(), // Uses cache-first
         _dataService.getTranscripts(), // Uses cache-first (instant display)
         _dataService.getSpeakers(), // Uses cache-first
+        _dataService.getTranscriptCategorySummary(), // Lightweight <2KB summary of all transcript categories
       ]);
 
       final categories = results[0] as List<MessageCategory>;
       final allSermons = results[1] as List<Sermon>;
       final transcripts = results[2] as List<Transcript>;
       final speakers = results[3] as List<SpeakerModel>;
+      final transcriptSummary = results[4] as List<Map<String, dynamic>>;
 
       // Filter based on permissions
       final filteredCategories = categories.where((category) {
@@ -130,12 +135,14 @@ class _AudioPageState extends ConsumerState<AudioPage>
           _categories = processedCategories;
           _sermons = sermons;
           _transcripts = transcripts;
+          _transcriptCategorySummary = transcriptSummary;
           _speakerModels = speakers;
           _isLoading = false;
         });
         _staticCategories = processedCategories;
         _staticSermons = sermons;
         _staticTranscripts = transcripts;
+        _staticTranscriptCategorySummary = transcriptSummary;
         _staticSpeakers = speakers;
 
         // Pre-warm & silently refresh minister portraits in background
@@ -192,12 +199,14 @@ class _AudioPageState extends ConsumerState<AudioPage>
         _dataService.getMessages(forceRefresh: true),
         _dataService.getTranscripts(forceRefresh: true),
         _dataService.getSpeakers(forceRefresh: true),
+        _dataService.getTranscriptCategorySummary(forceRefresh: true),
       ]);
 
       final categories = results[0] as List<MessageCategory>;
       final allSermons = results[1] as List<Sermon>;
       final transcripts = results[2] as List<Transcript>;
       final speakers = results[3] as List<SpeakerModel>;
+      final transcriptSummary = results[4] as List<Map<String, dynamic>>;
 
       // Filter based on permissions
       final filteredCategories = categories.where((category) {
@@ -222,11 +231,13 @@ class _AudioPageState extends ConsumerState<AudioPage>
           _categories = processedCategories;
           _sermons = sermons;
           _transcripts = transcripts;
+          _transcriptCategorySummary = transcriptSummary;
           _speakerModels = speakers;
         });
         _staticCategories = processedCategories;
         _staticSermons = sermons;
         _staticTranscripts = transcripts;
+        _staticTranscriptCategorySummary = transcriptSummary;
         _staticSpeakers = speakers;
 
         // Pre-warm & silently refresh minister portraits in background
@@ -328,12 +339,14 @@ class _AudioPageState extends ConsumerState<AudioPage>
         _dataService.getMessages(forceRefresh: true),
         _dataService.getTranscripts(forceRefresh: true),
         _dataService.getSpeakers(forceRefresh: true),
+        _dataService.getTranscriptCategorySummary(forceRefresh: true),
       ]);
 
       final categories = results[0] as List<MessageCategory>;
       final allSermons = results[1] as List<Sermon>;
       final transcripts = results[2] as List<Transcript>;
       final speakers = results[3] as List<SpeakerModel>;
+      final transcriptSummary = results[4] as List<Map<String, dynamic>>;
 
       final filteredCategories = categories.where((category) {
         if (category.isServiceTeamOnly && !isServiceTeamMember) return false;
@@ -364,8 +377,14 @@ class _AudioPageState extends ConsumerState<AudioPage>
           _categories = processedCategories;
           _sermons = sermons;
           _transcripts = transcripts;
+          _transcriptCategorySummary = transcriptSummary;
           _speakerModels = speakers;
         });
+        _staticCategories = processedCategories;
+        _staticSermons = sermons;
+        _staticTranscripts = transcripts;
+        _staticTranscriptCategorySummary = transcriptSummary;
+        _staticSpeakers = speakers;
         _audioCacheService.preBufferCategory(sermons, count: 3);
       }
     } catch (e) {
@@ -1868,23 +1887,56 @@ class _AudioPageState extends ConsumerState<AudioPage>
     final hasMiniPlayer = audioProvider.currentSermon != null;
     final bottomInset = (hasMiniPlayer ? 140.0 : 90.0) + MediaQuery.of(context).padding.bottom;
 
-    // Filter categories to only include those that have 1 or more transcripts
-    final List<MessageCategory> categoriesToDisplay = _categories.where((category) {
+    final List<MessageCategory> categoriesToDisplay = [];
+    final Set<String> existingCategoryIds = {};
+    final Set<String> existingCategoryNames = {};
+
+    // 1. Seed from lightweight server summary (all categories with transcripts, <2KB)
+    for (final item in _transcriptCategorySummary) {
+      final id = (item['id'] ?? '').toString().trim();
+      final name = (item['name'] ?? '').toString().trim();
+      final count = (item['transcript_count'] is int)
+          ? item['transcript_count'] as int
+          : int.tryParse((item['transcript_count'] ?? '0').toString()) ?? 0;
+      if (name.isEmpty || count <= 0) continue;
+      if (!existingCategoryNames.contains(name.toLowerCase()) &&
+          (id.isEmpty || !existingCategoryIds.contains(id))) {
+        existingCategoryNames.add(name.toLowerCase());
+        if (id.isNotEmpty) existingCategoryIds.add(id);
+        categoriesToDisplay.add(
+          MessageCategory(
+            id: id.isNotEmpty ? id : name,
+            name: name,
+            description: (item['description'] ?? '').toString(),
+            imageUrl: item['image_url']?.toString(),
+            isActive: true,
+          ),
+        );
+      }
+    }
+
+    // 2. Include any categories matched by loaded _transcripts (fallback / offline)
+    for (final category in _categories) {
+      final id = category.id.toString().trim();
+      final nameLower = category.name.toLowerCase();
+      if (existingCategoryNames.contains(nameLower) ||
+          (id.isNotEmpty && existingCategoryIds.contains(id))) {
+        continue;
+      }
       final count = _transcripts.where((t) {
         if (category.id == 'all') return true;
         return t.category == category.id ||
             t.category.toString() == category.id.toString() ||
-            t.categoryName.toLowerCase() == category.name.toLowerCase();
+            t.categoryName.toLowerCase() == nameLower;
       }).length;
-      return count > 0;
-    }).toList();
+      if (count > 0) {
+        existingCategoryNames.add(nameLower);
+        if (id.isNotEmpty) existingCategoryIds.add(id);
+        categoriesToDisplay.add(category);
+      }
+    }
 
-    // Dynamically include any category found on transcripts that isn't already in categoriesToDisplay
-    final Set<String> existingCategoryIds =
-        categoriesToDisplay.map((c) => c.id.toString()).toSet();
-    final Set<String> existingCategoryNames =
-        categoriesToDisplay.map((c) => c.name.toLowerCase()).toSet();
-
+    // 3. Dynamically include any category found on transcripts that isn't already in categoriesToDisplay
     for (final t in _transcripts) {
       final catId = t.category.toString().trim();
       final catName = t.categoryName.trim();
@@ -1965,13 +2017,26 @@ class _AudioPageState extends ConsumerState<AudioPage>
     MessageCategory category,
     List<MessageCategory> allCategories,
   ) {
-    // Count transcripts for this category
-    final count = _transcripts.where((t) {
-      if (category.id == 'all') return true;
-      return t.category == category.id ||
-          t.category.toString() == category.id.toString() ||
-          t.categoryName.toLowerCase() == category.name.toLowerCase();
-    }).length;
+    // Count transcripts for this category (preferring lightweight summary count)
+    int count = 0;
+    for (final item in _transcriptCategorySummary) {
+      final id = (item['id'] ?? '').toString().trim();
+      final name = (item['name'] ?? '').toString().trim().toLowerCase();
+      if (id == category.id.toString() || name == category.name.toLowerCase()) {
+        count = (item['transcript_count'] is int)
+            ? item['transcript_count'] as int
+            : int.tryParse((item['transcript_count'] ?? '0').toString()) ?? 0;
+        break;
+      }
+    }
+    if (count == 0) {
+      count = _transcripts.where((t) {
+        if (category.id == 'all') return true;
+        return t.category == category.id ||
+            t.category.toString() == category.id.toString() ||
+            t.categoryName.toLowerCase() == category.name.toLowerCase();
+      }).length;
+    }
 
     final categoryNameToId = {for (var c in allCategories) c.name: c.id};
 
