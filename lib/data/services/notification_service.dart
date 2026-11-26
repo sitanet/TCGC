@@ -579,6 +579,15 @@ class NotificationService {
           color: const Color(0xFFD4AF37), // Gold
           summaryText: '<font color="#D4AF37">Community Chat</font>',
         );
+      case 'support_message':
+      case 'contact_reply':
+        return _NotificationChannelConfig(
+          channelId: 'high_importance_channel',
+          channelName: 'High Importance Notifications',
+          description: 'Support & Contact Us replies',
+          color: const Color(0xFFD4AF37), // Gold
+          summaryText: '<font color="#D4AF37">Support Reply</font>',
+        );
       case 'livestream':
       case 'live':
       case 'live_stream':

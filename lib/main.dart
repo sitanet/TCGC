@@ -28,6 +28,7 @@ import 'presentation/pages/wallet/wallet_page.dart';
 import 'presentation/pages/teens/teens_page.dart';
 import 'presentation/pages/community/community_page.dart';
 import 'presentation/pages/community/chat_room_page.dart';
+import 'presentation/pages/support/my_messages_page.dart';
 import 'presentation/pages/auth/auth_flow_page.dart';
 import 'presentation/pages/get_started/get_started_page.dart';
 import 'presentation/pages/auth/sign_in_page.dart';
@@ -974,6 +975,15 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
     if (type == 'transcript' && data['transcript_id'] != null) {
       await _navigateToTranscript(data['transcript_id'].toString());
+      return;
+    }
+
+    if (type == 'support_message' || type == 'contact_reply') {
+      if (mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => const MyMessagesPage()),
+        );
+      }
       return;
     }
 
