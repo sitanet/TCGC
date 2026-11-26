@@ -579,9 +579,15 @@ class DataService {
 
   Future<void> _saveTranscriptsCache(List<Transcript> transcripts) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
       final jsonList = transcripts.map((t) => t.toJson()).toList();
-      await prefs.setString(_transcriptsCacheKey, jsonEncode(jsonList));
+      final encoded = jsonEncode(jsonList);
+      // Avoid writing multi-megabyte payloads to SharedPreferences on Android (prevents OOM/ANR)
+      if (encoded.length > 2 * 1024 * 1024) {
+        debugPrint('Skipping SharedPreferences transcript cache (${encoded.length} bytes > 2MB limit)');
+        return;
+      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_transcriptsCacheKey, encoded);
       await prefs.setInt(
         _transcriptsCacheTimeKey,
         DateTime.now().millisecondsSinceEpoch,

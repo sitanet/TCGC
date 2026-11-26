@@ -55,7 +55,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
 
   static List<MessageCategory> _staticCategories = [];
   static List<Sermon> _staticSermons = [];
-  static List<Transcript> _staticTranscripts = [];
+  static final List<Transcript> _staticTranscripts = [];
   static List<Map<String, dynamic>> _staticTranscriptCategorySummary = [];
   static List<SpeakerModel> _staticSpeakers = [];
 
@@ -96,20 +96,18 @@ class _AudioPageState extends ConsumerState<AudioPage>
       final isGeneralMarried = user?.isGeneralMarried ?? false;
       final isInHouseMarried = user?.isInHouseMarried ?? false;
 
-      // Load categories, sermons, transcripts, and speakers from cache FIRST (instant)
+      // Load categories, sermons, transcript category summary, and speakers from cache FIRST (instant)
       final results = await Future.wait([
         _dataService.getMessageCategories(), // Uses cache-first
         _dataService.getMessages(), // Uses cache-first
-        _dataService.getTranscripts(), // Uses cache-first (instant display)
         _dataService.getSpeakers(), // Uses cache-first
         _dataService.getTranscriptCategorySummary(), // Lightweight <2KB summary of all transcript categories
       ]);
 
       final categories = results[0] as List<MessageCategory>;
       final allSermons = results[1] as List<Sermon>;
-      final transcripts = results[2] as List<Transcript>;
-      final speakers = results[3] as List<SpeakerModel>;
-      final transcriptSummary = results[4] as List<Map<String, dynamic>>;
+      final speakers = results[2] as List<SpeakerModel>;
+      final transcriptSummary = results[3] as List<Map<String, dynamic>>;
 
       // Filter based on permissions
       final filteredCategories = categories.where((category) {
@@ -134,14 +132,12 @@ class _AudioPageState extends ConsumerState<AudioPage>
         setState(() {
           _categories = processedCategories;
           _sermons = sermons;
-          _transcripts = transcripts;
           _transcriptCategorySummary = transcriptSummary;
           _speakerModels = speakers;
           _isLoading = false;
         });
         _staticCategories = processedCategories;
         _staticSermons = sermons;
-        _staticTranscripts = transcripts;
         _staticTranscriptCategorySummary = transcriptSummary;
         _staticSpeakers = speakers;
 
@@ -197,16 +193,14 @@ class _AudioPageState extends ConsumerState<AudioPage>
       final results = await Future.wait([
         _dataService.getMessageCategories(forceRefresh: true),
         _dataService.getMessages(forceRefresh: true),
-        _dataService.getTranscripts(forceRefresh: true),
         _dataService.getSpeakers(forceRefresh: true),
         _dataService.getTranscriptCategorySummary(forceRefresh: true),
       ]);
 
       final categories = results[0] as List<MessageCategory>;
       final allSermons = results[1] as List<Sermon>;
-      final transcripts = results[2] as List<Transcript>;
-      final speakers = results[3] as List<SpeakerModel>;
-      final transcriptSummary = results[4] as List<Map<String, dynamic>>;
+      final speakers = results[2] as List<SpeakerModel>;
+      final transcriptSummary = results[3] as List<Map<String, dynamic>>;
 
       // Filter based on permissions
       final filteredCategories = categories.where((category) {
@@ -230,13 +224,11 @@ class _AudioPageState extends ConsumerState<AudioPage>
         setState(() {
           _categories = processedCategories;
           _sermons = sermons;
-          _transcripts = transcripts;
           _transcriptCategorySummary = transcriptSummary;
           _speakerModels = speakers;
         });
         _staticCategories = processedCategories;
         _staticSermons = sermons;
-        _staticTranscripts = transcripts;
         _staticTranscriptCategorySummary = transcriptSummary;
         _staticSpeakers = speakers;
 
@@ -266,7 +258,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
         }
       }
 
-      debugPrint('Background refresh completed - ${transcripts.length} transcripts loaded');
+      debugPrint('Background refresh completed - ${transcriptSummary.length} transcript categories loaded');
     } catch (e) {
       debugPrint('Error refreshing data in background: $e');
     }
@@ -337,16 +329,14 @@ class _AudioPageState extends ConsumerState<AudioPage>
       final results = await Future.wait([
         _dataService.getMessageCategories(forceRefresh: true),
         _dataService.getMessages(forceRefresh: true),
-        _dataService.getTranscripts(forceRefresh: true),
         _dataService.getSpeakers(forceRefresh: true),
         _dataService.getTranscriptCategorySummary(forceRefresh: true),
       ]);
 
       final categories = results[0] as List<MessageCategory>;
       final allSermons = results[1] as List<Sermon>;
-      final transcripts = results[2] as List<Transcript>;
-      final speakers = results[3] as List<SpeakerModel>;
-      final transcriptSummary = results[4] as List<Map<String, dynamic>>;
+      final speakers = results[2] as List<SpeakerModel>;
+      final transcriptSummary = results[3] as List<Map<String, dynamic>>;
 
       final filteredCategories = categories.where((category) {
         if (category.isServiceTeamOnly && !isServiceTeamMember) return false;
@@ -376,13 +366,11 @@ class _AudioPageState extends ConsumerState<AudioPage>
         setState(() {
           _categories = processedCategories;
           _sermons = sermons;
-          _transcripts = transcripts;
           _transcriptCategorySummary = transcriptSummary;
           _speakerModels = speakers;
         });
         _staticCategories = processedCategories;
         _staticSermons = sermons;
-        _staticTranscripts = transcripts;
         _staticTranscriptCategorySummary = transcriptSummary;
         _staticSpeakers = speakers;
         _audioCacheService.preBufferCategory(sermons, count: 3);
