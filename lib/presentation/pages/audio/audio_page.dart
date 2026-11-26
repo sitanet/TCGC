@@ -429,6 +429,7 @@ class _AudioPageState extends ConsumerState<AudioPage>
             Expanded(
               child: TabBarView(
                 controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildCategoryList(context, isDark),
                   _buildTranscriptList(context, isDark),
