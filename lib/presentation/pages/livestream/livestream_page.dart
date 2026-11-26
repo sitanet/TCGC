@@ -671,13 +671,19 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
       color: bgColor,
       child: Stack(
         children: [
-          // Active WebView with EagerGestureRecognizer for instant platform responsiveness
+          // Active WebView allowing vertical scroll/tap while letting horizontal swipes navigate pages
           if (controller != null)
             WebViewWidget(
               controller: controller,
               gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                Factory<EagerGestureRecognizer>(
-                  () => EagerGestureRecognizer(),
+                Factory<VerticalDragGestureRecognizer>(
+                  () => VerticalDragGestureRecognizer(),
+                ),
+                Factory<TapGestureRecognizer>(
+                  () => TapGestureRecognizer(),
+                ),
+                Factory<LongPressGestureRecognizer>(
+                  () => LongPressGestureRecognizer(),
                 ),
               },
             ),

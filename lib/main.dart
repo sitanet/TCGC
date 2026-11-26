@@ -514,6 +514,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
   static const String _lastTabKey = 'last_tab_index';
   bool _liveStreamVisited = false;
+  double _liveStreamDragDelta = 0;
   late final PageController _pageController;
 
   Widget _buildBody(int safeIndex, bool showWallet) {
@@ -546,7 +547,35 @@ class _MainScreenState extends ConsumerState<MainScreen>
         if (_liveStreamVisited)
           Offstage(
             offstage: safeIndex != 2,
-            child: const LiveStreamPage(),
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragStart: (_) => _liveStreamDragDelta = 0,
+              onHorizontalDragUpdate: (details) {
+                _liveStreamDragDelta += details.delta.dx;
+              },
+              onHorizontalDragEnd: (details) {
+                final velocity = details.primaryVelocity ?? 0;
+                if (velocity > 250 || _liveStreamDragDelta > 60) {
+                  if (safeIndex > 0) {
+                    _pageController.animateToPage(
+                      safeIndex - 1,
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeOutCubic,
+                    );
+                  }
+                } else if (velocity < -250 || _liveStreamDragDelta < -60) {
+                  if (safeIndex < pageCount - 1) {
+                    _pageController.animateToPage(
+                      safeIndex + 1,
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeOutCubic,
+                    );
+                  }
+                }
+                _liveStreamDragDelta = 0;
+              },
+              child: const LiveStreamPage(),
+            ),
           ),
       ],
     );
