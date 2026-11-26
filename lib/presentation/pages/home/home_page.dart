@@ -747,13 +747,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.auto_awesome_rounded,
+                            Icons.apps_rounded,
                             color: Colors.white,
                             size: 18,
                           ),
                           SizedBox(width: 7),
                           Text(
-                            'Ask Wing AI',
+                            'Quick Help',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13.5,
