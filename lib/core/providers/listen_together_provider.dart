@@ -198,6 +198,14 @@ class ListenTogetherNotifier extends ChangeNotifier {
       if (_isHost) {
         _syncTimer = Timer.periodic(const Duration(seconds: 2), (_) => _pushState());
       } else {
+        // Notify host that this listener joined
+        Future(() async {
+          try {
+            await _api.post(ApiConstants.communityListenSession(roomId), {
+              'notify_join': true,
+            });
+          } catch (_) {}
+        });
         // Poll every 1.5s to stay responsive while avoiding 429 rate limits
         _syncTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) => _pollAndSync());
       }
