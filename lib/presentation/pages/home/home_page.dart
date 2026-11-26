@@ -614,6 +614,17 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onTap: () {
                   HapticFeedback.lightImpact();
                   setState(() => _isFabMenuOpen = false);
+                  final auth = ref.read(authChangeNotifierProvider);
+                  if (!auth.isAuthenticated) {
+                    AuthRequiredSheet.show(
+                      context,
+                      title: 'Word Quiz',
+                      message:
+                          'Sign in to take the Word Quiz on the latest message and earn points.',
+                      featureIcon: Icons.quiz_rounded,
+                    );
+                    return;
+                  }
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const WordQuizPage()),

@@ -16,7 +16,9 @@ class _WordQuizPageState extends State<WordQuizPage> {
   final ApiService _api = ApiService();
 
   bool _isLoading = true;
+  bool _isSubmitting = false;
   String? _error;
+  int _transcriptId = 0;
   String _title = '';
   String _speakerName = '';
   String _categoryName = '';
@@ -24,6 +26,11 @@ class _WordQuizPageState extends State<WordQuizPage> {
 
   int _currentIndex = 0;
   final Map<int, int> _selectedAnswers = {};
+  int _score = 0;
+  int _pointsEarned = 0;
+  int _totalPoints = 0;
+  int _pointsPerQuestion = 10;
+  bool _isCompleted = false;
   bool _showResults = false;
 
   @override
@@ -57,14 +64,45 @@ class _WordQuizPageState extends State<WordQuizPage> {
           return;
         }
 
+        final parsedAnswers = <int, int>{};
+        final rawAnswers = data['answers'];
+        if (rawAnswers is Map) {
+          rawAnswers.forEach((k, v) {
+            final idx = int.tryParse(k.toString());
+            final opt = v is int ? v : int.tryParse(v.toString());
+            if (idx != null && opt != null) {
+              parsedAnswers[idx] = opt;
+            }
+          });
+        }
+
+        // Jump to first unanswered question, or straight to results if completed
+        int startIndex = 0;
+        for (int i = 0; i < rawQuestions.length; i++) {
+          if (!parsedAnswers.containsKey(i)) {
+            startIndex = i;
+            break;
+          }
+        }
+        final completed = data['is_completed'] == true ||
+            parsedAnswers.length >= rawQuestions.length;
+
         setState(() {
+          _transcriptId = (data['transcript_id'] as int?) ?? 0;
           _title = (data['title'] ?? 'Latest Message').toString();
           _speakerName = (data['speaker_name'] ?? 'The CityGate Church').toString();
           _categoryName = (data['category_name'] ?? 'General').toString();
           _questions = rawQuestions;
-          _currentIndex = 0;
-          _selectedAnswers.clear();
-          _showResults = false;
+          _selectedAnswers
+            ..clear()
+            ..addAll(parsedAnswers);
+          _score = (data['score'] as int?) ?? 0;
+          _pointsEarned = (data['points_earned'] as int?) ?? 0;
+          _totalPoints = (data['total_points'] as int?) ?? 0;
+          _pointsPerQuestion = (data['points_per_question'] as int?) ?? 10;
+          _isCompleted = completed;
+          _showResults = completed;
+          _currentIndex = startIndex;
           _isLoading = false;
         });
       } else {
@@ -82,23 +120,59 @@ class _WordQuizPageState extends State<WordQuizPage> {
     }
   }
 
-  int get _score {
-    int total = 0;
-    for (int i = 0; i < _questions.length; i++) {
-      final correctIdx = _questions[i]['correct_index'] as int? ?? -1;
-      if (_selectedAnswers[i] == correctIdx) {
-        total++;
-      }
+  Future<void> _selectOption(int optionIndex) async {
+    if (_isCompleted || _isSubmitting || _selectedAnswers.containsKey(_currentIndex)) {
+      return;
     }
-    return total;
-  }
-
-  void _selectOption(int optionIndex) {
-    if (_selectedAnswers.containsKey(_currentIndex)) return;
     HapticFeedback.selectionClick();
+    final qIdx = _currentIndex;
+
     setState(() {
-      _selectedAnswers[_currentIndex] = optionIndex;
+      _selectedAnswers[qIdx] = optionIndex;
+      _isSubmitting = true;
     });
+
+    try {
+      final res = await _api.post(ApiConstants.wordQuizAnswer, {
+        'transcript_id': _transcriptId,
+        'question_index': qIdx,
+        'selected_index': optionIndex,
+      });
+      if (!mounted) return;
+      if (res.isSuccess) {
+        final d = res.data;
+        setState(() {
+          _score = (d['score'] as int?) ?? _score;
+          _pointsEarned = (d['points_earned'] as int?) ?? _pointsEarned;
+          _totalPoints = (d['total_points'] as int?) ?? _totalPoints;
+          _isCompleted = d['is_completed'] == true;
+          _isSubmitting = false;
+        });
+      } else {
+        setState(() {
+          _selectedAnswers.remove(qIdx);
+          _isSubmitting = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.errorMessage ?? 'Could not save your answer.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _selectedAnswers.remove(qIdx);
+        _isSubmitting = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Network error saving answer. Please try again.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   void _nextStep() {
@@ -112,15 +186,6 @@ class _WordQuizPageState extends State<WordQuizPage> {
         _showResults = true;
       });
     }
-  }
-
-  void _retakeQuiz() {
-    HapticFeedback.lightImpact();
-    setState(() {
-      _currentIndex = 0;
-      _selectedAnswers.clear();
-      _showResults = false;
-    });
   }
 
   @override
@@ -183,7 +248,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Wing AI is loading 5 questions from the latest transcript...',
+              'Wing AI is creating your personalized 5 questions from the latest transcript...',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13.5,
@@ -252,7 +317,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Latest Transcript Banner
+          // Latest Transcript Banner + Cumulative Points
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
@@ -290,17 +355,31 @@ class _WordQuizPageState extends State<WordQuizPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _categoryName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white60 : Colors.black54,
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGold.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppColors.primaryGold.withValues(alpha: 0.45),
                         ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.stars_rounded,
+                              size: 13, color: AppColors.primaryGold),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$_totalPoints pts',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primaryGold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -316,9 +395,9 @@ class _WordQuizPageState extends State<WordQuizPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'By $_speakerName',
-                  style: TextStyle(
-                    fontSize: 12.5,
+                  '$_categoryName • By $_speakerName',
+                  style: const TextStyle(
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.primaryGold,
                   ),
@@ -342,9 +421,9 @@ class _WordQuizPageState extends State<WordQuizPage> {
                 ),
               ),
               Text(
-                'Score: $_score/${_questions.length}',
+                '+$_pointsPerQuestion pts / correct  •  Score: $_score/${_questions.length}',
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w800,
                   color: AppColors.primaryGold,
                 ),
@@ -409,7 +488,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
             }
 
             return GestureDetector(
-              onTap: isAnswered ? null : () => _selectOption(idx),
+              onTap: (isAnswered || _isSubmitting) ? null : () => _selectOption(idx),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 margin: const EdgeInsets.only(bottom: 12),
@@ -470,7 +549,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
             );
           }),
 
-          // Wing AI Explanation
+          // Wing AI Explanation + Next Button
           if (isAnswered) ...[
             if (explanation.isNotEmpty)
               Container(
@@ -505,7 +584,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _nextStep,
+                onPressed: _isSubmitting ? null : _nextStep,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryGold,
                   padding: const EdgeInsets.symmetric(vertical: 15),
@@ -533,14 +612,13 @@ class _WordQuizPageState extends State<WordQuizPage> {
   }
 
   Widget _buildResultsView(bool isDark) {
-    final score = _score;
     final total = _questions.length;
-    final ratio = total > 0 ? score / total : 0.0;
+    final ratio = total > 0 ? _score / total : 0.0;
     final encouragement = ratio >= 0.8
         ? 'Excellent grasp of the Word!'
         : (ratio >= 0.6
             ? 'Well done! Keep meditating on the message.'
-            : 'Keep pressing into the Word—review the takeaways below!');
+            : 'Keep pressing into the Word—review your takeaways below!');
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 32),
@@ -570,14 +648,30 @@ class _WordQuizPageState extends State<WordQuizPage> {
                     color: Colors.black, size: 44),
                 const SizedBox(height: 10),
                 Text(
-                  '$score / $total',
+                  '$_score / $total',
                   style: const TextStyle(
                     color: Colors.black,
                     fontSize: 38,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '+$_pointsEarned pts earned  •  Total: $_totalPoints pts',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Text(
                   encouragement,
                   textAlign: TextAlign.center,
@@ -587,7 +681,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   _title,
                   textAlign: TextAlign.center,
@@ -600,57 +694,62 @@ class _WordQuizPageState extends State<WordQuizPage> {
               ],
             ),
           ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _retakeQuiz,
-                  icon: const Icon(Icons.replay_rounded, color: AppColors.primaryGold),
-                  label: const Text(
-                    'Retake Quiz',
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.primaryGold.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.lock_clock_rounded,
+                    size: 18, color: AppColors.primaryGold),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Quiz completed! New questions unlock automatically when the next transcript is published.',
                     style: TextStyle(
-                      color: AppColors.primaryGold,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    side: const BorderSide(color: AppColors.primaryGold),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      fontSize: 12.5,
+                      color: isDark ? Colors.white70 : Colors.black87,
                     ),
                   ),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGold,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGold,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Done',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+              child: const Text(
+                'Done',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
                 ),
               ),
-            ],
+            ),
           ),
           const SizedBox(height: 22),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Review Answers',
+              'Your Answers',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -703,9 +802,18 @@ class _WordQuizPageState extends State<WordQuizPage> {
                     ],
                   ),
                   const SizedBox(height: 6),
+                  if (userIdx != null && userIdx >= 0 && userIdx < opts.length)
+                    Text(
+                      'Your Answer: ${opts[userIdx]}',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: isRight ? const Color(0xFF22C55E) : Colors.redAccent,
+                      ),
+                    ),
                   if (cIdx >= 0 && cIdx < opts.length)
                     Text(
-                      'Answer: ${opts[cIdx]}',
+                      'Correct Answer: ${opts[cIdx]}',
                       style: const TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
