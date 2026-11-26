@@ -539,6 +539,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                   SizedBox(height: spacing),
                   _buildLiveRestreamBanner(context, isDark),
                 ],
+                SizedBox(height: spacing),
+                _buildWordQuizCard(context, isDark),
                 SizedBox(height: spacing * 1.5),
                 _buildBeginnerCategories(context, isDark),
                 SizedBox(height: spacing * 1.5),
@@ -605,24 +607,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
               // Button 2: Word Quiz (after Wing AI)
               GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  final auth = ref.read(authChangeNotifierProvider);
-                  if (!auth.isAuthenticated) {
-                    AuthRequiredSheet.show(
-                      context,
-                      title: 'Word Quiz',
-                      message:
-                          'Sign in to take the Word Quiz on the latest message and earn points.',
-                      featureIcon: Icons.quiz_rounded,
-                    );
-                    return;
-                  }
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const WordQuizPage()),
-                  );
-                },
+                onTap: () => _openWordQuiz(context),
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
@@ -1519,6 +1504,249 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openWordQuiz(BuildContext context) {
+    HapticFeedback.lightImpact();
+    final auth = ref.read(authChangeNotifierProvider);
+    if (!auth.isAuthenticated) {
+      AuthRequiredSheet.show(
+        context,
+        title: 'Word Quiz',
+        message:
+            'Sign in to take the Word Quiz on the latest message and earn points.',
+        featureIcon: Icons.quiz_rounded,
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const WordQuizPage()),
+    );
+  }
+
+  Widget _buildWordQuizCard(BuildContext context, bool isDark) {
+    final horizontalPadding = Responsive.horizontalPadding(context);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? const [
+                    Color(0xFF2B2212),
+                    Color(0xFF19140E),
+                    Color(0xFF131118),
+                  ]
+                : const [
+                    Color(0xFFFFFDF8),
+                    Color(0xFFFAF0DA),
+                    Color(0xFFF3E4C2),
+                  ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.55 : 0.7),
+            width: 1.3,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryGold.withValues(alpha: isDark ? 0.16 : 0.18),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(19),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -24,
+                top: -24,
+                child: Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primaryGold.withValues(
+                      alpha: isDark ? 0.10 : 0.16,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 26,
+                bottom: -28,
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primaryGold.withValues(
+                      alpha: isDark ? 0.06 : 0.10,
+                    ),
+                  ),
+                ),
+              ),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _openWordQuiz(context),
+                  borderRadius: BorderRadius.circular(19),
+                  child: Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 54,
+                          height: 54,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFFFFE082),
+                                AppColors.primaryGold,
+                                Color(0xFFC89B2B),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primaryGold.withValues(
+                                  alpha: 0.35,
+                                ),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.quiz_rounded,
+                            color: Colors.black,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 13),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryGold.withValues(
+                                    alpha: isDark ? 0.18 : 0.22,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.auto_awesome_rounded,
+                                      color: AppColors.primaryGold,
+                                      size: 11,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'WORD QUIZ • 20 QUESTIONS',
+                                      style: TextStyle(
+                                        color: AppColors.primaryGold,
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.6,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Test Your Word Knowledge',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : AppColors.textPrimaryLight,
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Answer questions from recent messages & earn points',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                  fontSize: 11.5,
+                                  height: 1.25,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 9,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGold,
+                            borderRadius: BorderRadius.circular(22),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primaryGold.withValues(
+                                  alpha: 0.3,
+                                ),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Play',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              SizedBox(width: 4),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                color: Colors.black,
+                                size: 15,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
