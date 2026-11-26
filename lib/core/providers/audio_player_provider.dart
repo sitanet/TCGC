@@ -493,6 +493,7 @@ class AudioPlayerProvider extends ChangeNotifier with WidgetsBindingObserver {
         if (_isPlaying) {
           await pause();
         } else {
+          _broadcastListeningStatus(sermon, position: _position);
           await play();
         }
         return;
