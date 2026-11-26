@@ -1561,6 +1561,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Stack(
+            clipBehavior: Clip.none,
             children: [
               Container(
                 padding: EdgeInsets.all(isOnline ? 2.5 : 1.5),
@@ -1643,7 +1644,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                     ),
                   ),
                 ),
-              if (m.listeningMessageId != null)
+              if (m.listeningMessageId != null && m.unreadCount == 0)
                 Positioned(
                   top: 0,
                   right: 0,
@@ -1662,6 +1663,41 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                       Icons.headphones_rounded,
                       size: 10,
                       color: Colors.white,
+                    ),
+                  ),
+                ),
+              if (m.unreadCount > 0)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isDark ? AppColors.cardDark : Colors.white,
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        m.unreadCount > 99 ? '99+' : '${m.unreadCount}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          height: 1.0,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1711,7 +1747,9 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
         }
         _showMemberActionsSheet(m);
       },
-      child: isOnline ? content : Opacity(opacity: 0.58, child: content),
+      child: (isOnline || m.unreadCount > 0)
+          ? content
+          : Opacity(opacity: 0.58, child: content),
     );
   }
 
@@ -2051,6 +2089,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     Navigator.pop(context); // close loading
 
     if (room != null) {
+      p.clearMemberUnread(member.id);
       Navigator.push(
         context,
         MaterialPageRoute(

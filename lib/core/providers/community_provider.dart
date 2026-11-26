@@ -14,6 +14,7 @@ class OnlineMember {
   final String? lastSeen;
   final bool isFollowing;
   final int followersCount;
+  final int unreadCount;
   final bool isRoomAdmin;
   final int? listeningMessageId;
   final String? listeningMessageTitle;
@@ -29,6 +30,7 @@ class OnlineMember {
     this.lastSeen,
     this.isFollowing = false,
     this.followersCount = 0,
+    this.unreadCount = 0,
     this.isRoomAdmin = false,
     this.listeningMessageId,
     this.listeningMessageTitle,
@@ -39,6 +41,7 @@ class OnlineMember {
   OnlineMember copyWith({
     bool? isFollowing,
     int? followersCount,
+    int? unreadCount,
   }) =>
       OnlineMember(
         id: id,
@@ -49,6 +52,7 @@ class OnlineMember {
         lastSeen: lastSeen,
         isFollowing: isFollowing ?? this.isFollowing,
         followersCount: followersCount ?? this.followersCount,
+        unreadCount: unreadCount ?? this.unreadCount,
         isRoomAdmin: isRoomAdmin,
         listeningMessageId: listeningMessageId,
         listeningMessageTitle: listeningMessageTitle,
@@ -65,6 +69,7 @@ class OnlineMember {
         lastSeen: j['last_seen'],
         isFollowing: j['is_following'] ?? false,
         followersCount: j['followers_count'] ?? 0,
+        unreadCount: j['unread_count'] ?? 0,
         isRoomAdmin: j['is_admin'] ?? false,
         listeningMessageId: j['listening_message_id'],
         listeningMessageTitle: j['listening_message_title'],
@@ -775,6 +780,25 @@ class CommunityProvider extends ChangeNotifier {
     _isSending = false;
     notifyListeners();
     return false;
+  }
+
+  void clearMemberUnread(int userId) {
+    var changed = false;
+    _allMembers = _allMembers.map((m) {
+      if (m.id == userId && m.unreadCount > 0) {
+        changed = true;
+        return m.copyWith(unreadCount: 0);
+      }
+      return m;
+    }).toList();
+    _onlineMembers = _onlineMembers.map((m) {
+      if (m.id == userId && m.unreadCount > 0) {
+        changed = true;
+        return m.copyWith(unreadCount: 0);
+      }
+      return m;
+    }).toList();
+    if (changed) notifyListeners();
   }
 
   Future<bool> sendMessage(
