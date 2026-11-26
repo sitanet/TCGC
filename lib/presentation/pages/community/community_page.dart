@@ -2469,16 +2469,20 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
         : (room.roomType == 'group'
             ? (isDark ? const Color(0xFFE5C86E) : const Color(0xFF7C5D10))
             : (isDark ? Colors.white70 : const Color(0xFF57534E)));
+    final hasUnread = room.unreadCount > 0;
     final badgeIcon = room.isPublic
         ? Icons.public_rounded
         : (room.roomType == 'group' ? Icons.groups_rounded : Icons.lock_rounded);
 
     return GestureDetector(
       onTap: () async {
+        p.clearRoomUnread(room.id);
         await Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => ChatRoomPage(room: room)),
         );
+        p.fetchRooms();
+        p.fetchAllMembers();
         p.refreshHostingRooms();
       },
       child: Container(
@@ -2493,19 +2497,33 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 )
-              : null,
-          color: isHosting ? null : (isDark ? AppColors.cardDark : Colors.white),
+              : (hasUnread
+                  ? LinearGradient(
+                      colors: isDark
+                          ? [const Color(0xFF102A1F), AppColors.cardDark]
+                          : [const Color(0xFFE7F9EF), const Color(0xFFF4FCF7)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null),
+          color: (isHosting || hasUnread)
+              ? null
+              : (isDark ? AppColors.cardDark : Colors.white),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isHosting
                 ? Colors.green.withValues(alpha: 0.55)
-                : AppColors.primaryGold.withValues(alpha: isDark ? 0.18 : 0.2),
-            width: isHosting ? 1.4 : 1,
+                : (hasUnread
+                    ? const Color(0xFF25D366).withValues(alpha: 0.65)
+                    : AppColors.primaryGold.withValues(alpha: isDark ? 0.18 : 0.2)),
+            width: (isHosting || hasUnread) ? 1.5 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: (isHosting ? Colors.green : Colors.black)
-                  .withValues(alpha: isDark ? 0.18 : 0.05),
+              color: (isHosting
+                      ? Colors.green
+                      : (hasUnread ? const Color(0xFF25D366) : Colors.black))
+                  .withValues(alpha: isDark ? 0.18 : (hasUnread ? 0.12 : 0.05)),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -2553,7 +2571,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                         child: Text(
                           room.name,
                           style: TextStyle(
-                            fontWeight: FontWeight.w700,
+                            fontWeight: hasUnread ? FontWeight.w800 : FontWeight.w700,
                             fontSize: 15.5,
                             color: isDark ? Colors.white : Colors.black87,
                           ),
@@ -2561,6 +2579,28 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (hasUnread) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF25D366),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Center(
+                            child: Text(
+                              room.unreadCount > 99 ? '99+' : '${room.unreadCount}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                height: 1.0,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

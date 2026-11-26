@@ -98,12 +98,29 @@ class CommunityRoom {
   final ChatMessage? lastMessage;
   final bool isHosting;
   final bool isAdmin;
+  final int unreadCount;
 
   CommunityRoom({required this.id, required this.name, this.description,
       required this.icon, this.roomType = 'public',
       this.categoryId, this.categoryName, this.categoryOrder = 9999,
       this.memberCount, this.lastMessage, this.isHosting = false,
-      this.isAdmin = false});
+      this.isAdmin = false, this.unreadCount = 0});
+
+  CommunityRoom copyWith({int? unreadCount}) => CommunityRoom(
+        id: id,
+        name: name,
+        description: description,
+        icon: icon,
+        roomType: roomType,
+        categoryId: categoryId,
+        categoryName: categoryName,
+        categoryOrder: categoryOrder,
+        memberCount: memberCount,
+        lastMessage: lastMessage,
+        isHosting: isHosting,
+        isAdmin: isAdmin,
+        unreadCount: unreadCount ?? this.unreadCount,
+      );
 
   factory CommunityRoom.fromJson(Map<String, dynamic> j) {
     final cat = j['category'] is Map<String, dynamic>
@@ -125,7 +142,8 @@ class CommunityRoom {
             ? ChatMessage.fromJson(j['last_message'] as Map<String, dynamic>)
             : null,
         isHosting: hasActiveSession,
-        isAdmin: j['is_admin'] == true);
+        isAdmin: j['is_admin'] == true,
+        unreadCount: j['unread_count'] ?? 0);
   }
 
   bool get isPublic => roomType == 'public';
@@ -792,6 +810,18 @@ class CommunityProvider extends ChangeNotifier {
     _isSending = false;
     notifyListeners();
     return false;
+  }
+
+  void clearRoomUnread(int roomId) {
+    var changed = false;
+    _rooms = _rooms.map((r) {
+      if (r.id == roomId && r.unreadCount > 0) {
+        changed = true;
+        return r.copyWith(unreadCount: 0);
+      }
+      return r;
+    }).toList();
+    if (changed) notifyListeners();
   }
 
   void clearMemberUnread(int userId) {
