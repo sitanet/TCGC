@@ -1199,29 +1199,34 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
 
   Future<void> _sendMessage() async {
     final text = _textController.text.trim();
-    if (text.isEmpty || _isSending) return;
+    if (text.isEmpty) return;
 
-    final replyToId = _replyingTo?.id;
+    final replyTo = _replyingTo;
+    final me = ref.read(authChangeNotifierProvider).user;
+    final myId = int.tryParse(me?.id ?? '0') ?? 0;
+
     setState(() {
-      _isSending = true;
       _replyingTo = null;
     });
     _stopTyping();
     _textController.clear();
 
-    bool ok = false;
+    // Post optimistically: message appears immediately before server response
     final p = ref.read(communityChangeNotifierProvider);
-    try {
-      ok = await p.sendMessage(widget.room.id, text, replyToId: replyToId);
-    } finally {
-      if (mounted) {
-        setState(() => _isSending = false);
-      }
-    }
+    final future = p.sendMessage(
+      widget.room.id,
+      text,
+      replyToId: replyTo?.id,
+      senderId: myId,
+      senderName: (me?.fullName.isNotEmpty ?? false) ? me!.fullName : 'You',
+      replyToSender: replyTo?.senderName,
+      replyToText: replyTo?.text,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+
+    final ok = await future;
     if (!mounted) return;
-    if (ok) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-    } else {
+    if (!ok) {
       if (_textController.text.isEmpty) {
         _textController.text = text;
       }

@@ -660,7 +660,10 @@ class CommunityProvider extends ChangeNotifier {
           _currentRoomId == roomId &&
           fetchVersion == _messagesFetchVersion) {
         final list = res.data['messages'] as List? ?? [];
-        _messages = list.map((e) => ChatMessage.fromJson(e)).toList();
+        final serverMsgs = list.map((e) => ChatMessage.fromJson(e)).toList();
+        // Preserve any optimistic (in-flight) messages not yet confirmed by the server
+        final pendingOptimistic = _messages.where((m) => m.id < 0).toList();
+        _messages = [...serverMsgs, ...pendingOptimistic];
         if (res.data.containsKey('typing_users')) {
           _updateTypingUsersFromRaw(res.data['typing_users']);
         }
@@ -774,11 +777,52 @@ class CommunityProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> sendMessage(int roomId, String text,
-      {String? resourceType, int? resourceId, String? resourceTitle, int? replyToId}) async {
-    _isSending = true;
+  Future<bool> sendMessage(
+    int roomId,
+    String text, {
+    String? resourceType,
+    int? resourceId,
+    String? resourceTitle,
+    int? replyToId,
+    int? senderId,
+    String? senderName,
+    String? senderPhoto,
+    String? replyToSender,
+    String? replyToText,
+  }) async {
     _error = null;
-    notifyListeners();
+    final int? tempId = senderId != null
+        ? -DateTime.now().microsecondsSinceEpoch
+        : null;
+
+    // Optimistically insert message immediately before server responds
+    if (tempId != null) {
+      _messagesFetchVersion++;
+      _messages.add(
+        ChatMessage(
+          id: tempId,
+          text: text,
+          isDeleted: false,
+          senderId: senderId!,
+          senderName: senderName ?? 'You',
+          senderPhoto: senderPhoto,
+          resourceType: resourceType,
+          resourceId: resourceId,
+          resourceTitle: resourceTitle,
+          isDelivered: false,
+          isRead: false,
+          replyToId: replyToId,
+          replyToSender: replyToSender,
+          replyToText: replyToText,
+          createdAt: DateTime.now(),
+        ),
+      );
+      notifyListeners();
+    } else {
+      _isSending = true;
+      notifyListeners();
+    }
+
     try {
       final body = <String, dynamic>{'text': text};
       if (resourceType != null) body['resource_type'] = resourceType;
@@ -789,7 +833,17 @@ class CommunityProvider extends ChangeNotifier {
       final res = await _api.post(ApiConstants.communityMessages(roomId), body);
       if (res.isSuccess) {
         _messagesFetchVersion++;
-        _messages.add(ChatMessage.fromJson(res.data));
+        final confirmed = ChatMessage.fromJson(res.data);
+        if (tempId != null) {
+          final idx = _messages.indexWhere((m) => m.id == tempId);
+          if (idx != -1) {
+            _messages[idx] = confirmed;
+          } else {
+            _messages.add(confirmed);
+          }
+        } else {
+          _messages.add(confirmed);
+        }
         _isSending = false;
         notifyListeners();
         return true;
@@ -797,6 +851,10 @@ class CommunityProvider extends ChangeNotifier {
       _error = res.errorMessage ?? 'Failed to send';
     } catch (e) {
       _error = 'Failed to send message';
+    }
+
+    if (tempId != null) {
+      _messages.removeWhere((m) => m.id == tempId);
     }
     _isSending = false;
     notifyListeners();
