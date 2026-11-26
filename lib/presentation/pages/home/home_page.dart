@@ -29,6 +29,7 @@ import '../../widgets/auth_required_sheet.dart';
 import '../auth/auth_flow_page.dart';
 import '../../../data/services/restream_service.dart';
 import '../audio/audio_player_page.dart';
+import '../support/complaint_page.dart';
 import '../../widgets/conference_invite_sheet.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -84,6 +85,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _isMixlrLive = false;
   String? _mixlrTitle;
   bool _isLoading = true;
+  bool _isFabMenuOpen = false;
   late final ScrollController _homeScrollController;
   bool _isScrolledPastHeader = false;
 
@@ -557,68 +559,162 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           ),
         ),
-        floatingActionButton: GestureDetector(
-          onTap: () async {
-            final auth = ref.read(authChangeNotifierProvider);
-            if (!auth.isAuthenticated) {
-              AuthRequiredSheet.show(
-                context,
-                title: 'Ask Wing AI Assistant',
-                message: 'Sign in to ask questions about messages, study scripture, and receive AI-guided spiritual answers.',
-                featureIcon: Icons.auto_awesome_rounded,
-              );
-              return;
-            }
-            final hasConsent = await AIConsentDialog.hasConsented();
-            if (!context.mounted) return;
-            if (!hasConsent) {
-              final granted = await AIConsentDialog.showConsentDialog(context);
-              if (!granted || !context.mounted) return;
-            }
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => BlocProvider.value(
-                  value: context.read<AskWingAICubit>(),
-                  child: const AskWingAIChatPage(),
-                ),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.primaryGold,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primaryGold.withValues(alpha: 0.4),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.auto_awesome_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
-                SizedBox(width: 7),
-                Text(
-                  'Ask Wing AI',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.2,
+        floatingActionButton: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (_isFabMenuOpen) ...[
+              // Button 1: Wing AI
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() => _isFabMenuOpen = false);
+                  _openWingAI(context);
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFF3C65F), AppColors.primaryGold],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryGold.withValues(alpha: 0.42),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.auto_awesome_rounded, color: Colors.black, size: 19),
+                      SizedBox(width: 8),
+                      Text(
+                        'Wing AI',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
+              // Button 2: Contact Us
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() => _isFabMenuOpen = false);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ComplaintPage()),
+                  );
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF231D12) : Colors.white,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: AppColors.primaryGold,
+                      width: 1.4,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.16),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.support_agent_rounded,
+                        color: AppColors.primaryGold,
+                        size: 19,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Contact Us',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            // Main Toggle FAB
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => _isFabMenuOpen = !_isFabMenuOpen);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: EdgeInsets.symmetric(
+                  horizontal: _isFabMenuOpen ? 13 : 16,
+                  vertical: _isFabMenuOpen ? 13 : 10,
+                ),
+                decoration: BoxDecoration(
+                  color: _isFabMenuOpen
+                      ? (isDark ? const Color(0xFF2B2418) : Colors.black87)
+                      : AppColors.primaryGold,
+                  borderRadius: BorderRadius.circular(30),
+                  border: _isFabMenuOpen
+                      ? Border.all(color: AppColors.primaryGold, width: 1.4)
+                      : null,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryGold.withValues(alpha: 0.4),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: _isFabMenuOpen
+                    ? const Icon(
+                        Icons.close_rounded,
+                        color: AppColors.primaryGold,
+                        size: 20,
+                      )
+                    : const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.auto_awesome_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          SizedBox(width: 7),
+                          Text(
+                            'Ask Wing AI',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -982,6 +1078,35 @@ class _HomePageState extends ConsumerState<HomePage> {
     ),
   );
 }
+
+  Future<void> _openWingAI(BuildContext context) async {
+    final auth = ref.read(authChangeNotifierProvider);
+    if (!auth.isAuthenticated) {
+      AuthRequiredSheet.show(
+        context,
+        title: 'Ask Wing AI Assistant',
+        message:
+            'Sign in to ask questions about messages, study scripture, and receive AI-guided spiritual answers.',
+        featureIcon: Icons.auto_awesome_rounded,
+      );
+      return;
+    }
+    final hasConsent = await AIConsentDialog.hasConsented();
+    if (!context.mounted) return;
+    if (!hasConsent) {
+      final granted = await AIConsentDialog.showConsentDialog(context);
+      if (!granted || !context.mounted) return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: context.read<AskWingAICubit>(),
+          child: const AskWingAIChatPage(),
+        ),
+      ),
+    );
+  }
 
   Widget _buildLiveMeetingBanner(BuildContext context, bool isDark) {
     final horizontalPadding = Responsive.horizontalPadding(context);
