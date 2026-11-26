@@ -1475,11 +1475,17 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                   ),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
               GestureDetector(
                 onTap: () => _showMyFollowersSheet(context, isDark),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.primaryGold.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(12),
@@ -1508,7 +1514,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.green.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
