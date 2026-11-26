@@ -183,6 +183,7 @@ class MyApp extends ConsumerStatefulWidget {
 }
 
 class _MyAppState extends ConsumerState<MyApp> {
+  bool _isAuthInitialized = false;
   bool _showGetStarted = true;
   bool _showSignUp = false;
   String? _prefilledLoginEmail;
@@ -298,9 +299,7 @@ class _MyAppState extends ConsumerState<MyApp> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeApp();
-    });
+    _initializeApp();
   }
 
   Future<void> _initializeApp() async {
@@ -315,13 +314,16 @@ class _MyAppState extends ConsumerState<MyApp> {
         },
       );
 
-      if (authProvider.isAuthenticated) {
+      if (authProvider.isAuthenticated || authProvider.isGuestMode) {
         _showGetStarted = false;
       }
     } catch (e) {
       debugPrint('Auth initialization error: $e');
     } finally {
       if (mounted) {
+        setState(() {
+          _isAuthInitialized = true;
+        });
         _checkForAppUpdate();
       }
     }
@@ -396,8 +398,19 @@ class _MyAppState extends ConsumerState<MyApp> {
 
     Widget homeWidget;
 
+    // 0. Wait for local session restoration before deciding between MainScreen and GetStartedPage
+    if (!_isAuthInitialized &&
+        !authProvider.isAuthenticated &&
+        !authProvider.isGuestMode) {
+      homeWidget = Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primaryGold),
+        ),
+      );
+    }
     // 1. If authenticated or continuing as guest, show main app
-    if (authProvider.isAuthenticated || authProvider.isGuestMode) {
+    else if (authProvider.isAuthenticated || authProvider.isGuestMode) {
       homeWidget = const NetworkAwareWidget(child: MainScreen());
     }
     // 2. If user registered or attempted login but email is unverified,
