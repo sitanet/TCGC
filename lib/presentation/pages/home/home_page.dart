@@ -30,6 +30,7 @@ import '../auth/auth_flow_page.dart';
 import '../../../data/services/restream_service.dart';
 import '../audio/audio_player_page.dart';
 import '../support/complaint_page.dart';
+import '../support/testimony_page.dart';
 import '../../widgets/conference_invite_sheet.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -618,7 +619,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   );
                 },
                 child: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
+                  margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF231D12) : Colors.white,
@@ -646,6 +647,56 @@ class _HomePageState extends ConsumerState<HomePage> {
                       const SizedBox(width: 8),
                       Text(
                         'Contact Us',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Button 3: Testimony
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() => _isFabMenuOpen = false);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TestimonyPage()),
+                  );
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF231D12) : Colors.white,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: AppColors.primaryGold,
+                      width: 1.4,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.16),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.celebration_rounded,
+                        color: AppColors.primaryGold,
+                        size: 19,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Testimony',
                         style: TextStyle(
                           color: isDark ? Colors.white : Colors.black87,
                           fontSize: 13.5,

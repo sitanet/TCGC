@@ -98,6 +98,7 @@ class ApiConstants {
   static const String myContactMessages = '/contact/my-messages/';
   static const String myContactMessageDetail =
       '/contact/my-messages/'; // append {id}/
+  static const String submitTestimony = '/testimony/submit/';
 
   // Notifications
   static const String notifications = '/notifications/';
