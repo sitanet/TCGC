@@ -569,6 +569,16 @@ class NotificationService {
           color: const Color(0xFFD4AF37), // Gold
           summaryText: '<font color="#D4AF37">Wallet</font>',
         );
+      case 'community_message':
+      case 'dm_message':
+      case 'member_listening':
+        return _NotificationChannelConfig(
+          channelId: 'high_importance_channel',
+          channelName: 'High Importance Notifications',
+          description: 'Community & direct message notifications',
+          color: const Color(0xFFD4AF37), // Gold
+          summaryText: '<font color="#D4AF37">Community Chat</font>',
+        );
       case 'livestream':
       case 'live':
       case 'live_stream':
