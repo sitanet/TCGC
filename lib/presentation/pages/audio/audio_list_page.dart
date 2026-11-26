@@ -655,26 +655,35 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
     IconData pillIcon = Icons.library_music_rounded;
     String displayTitle = widget.category != 'All' ? widget.category : 'Audio Messages';
     String subtitle = '${_filteredItems.length} Messages • The CityGate Church';
-    String? imageUrl = widget.headerImageUrl;
-    String? description = widget.headerDescription;
+    String? imageUrl;
+    String? description;
 
     if (isSeries) {
       headerTypePill = 'TEACHING SERIES';
       pillColor = AppColors.primaryGold;
       pillIcon = Icons.auto_stories_rounded;
       displayTitle = _selectedCategory != 'All' ? _selectedCategory : widget.category;
-      if (imageUrl == null || imageUrl.isEmpty) {
-        final matchSeries = widget.beginnerCategories?.where((c) => c.name.toLowerCase() == displayTitle.toLowerCase()).firstOrNull;
-        imageUrl = matchSeries?.imageUrl;
-        description ??= matchSeries?.description;
-      }
+      final matchSeries = widget.beginnerCategories
+          ?.where((c) => c.name.toLowerCase() == displayTitle.toLowerCase())
+          .firstOrNull;
+      imageUrl = matchSeries?.imageUrl ??
+          (displayTitle == widget.category ? widget.headerImageUrl : null);
+      description = matchSeries?.description ??
+          (displayTitle == widget.category ? widget.headerDescription : null);
     } else if (isMinister) {
       final selSpk = _selectedSpeaker!.toLowerCase().trim();
-      final model = _speakerModels.where((s) =>
-          s.fullName.toLowerCase().trim() == selSpk ||
-          s.name.toLowerCase().trim() == selSpk ||
-          selSpk.contains(s.fullName.toLowerCase().trim()) ||
-          s.fullName.toLowerCase().trim().contains(selSpk)).firstOrNull;
+      final model = _speakerModels
+              .where((s) =>
+                  s.fullName.toLowerCase().trim() == selSpk ||
+                  s.name.toLowerCase().trim() == selSpk)
+              .firstOrNull ??
+          _speakerModels
+              .where((s) {
+                final full = s.fullName.toLowerCase().trim();
+                return full.isNotEmpty &&
+                    (selSpk.contains(full) || full.contains(selSpk));
+              })
+              .firstOrNull;
 
       final isExternal = model?.isExternalMinister ?? false;
       final isSong = model?.isSongMinister ?? false;
@@ -707,14 +716,23 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
         pillIcon = Icons.person_rounded;
       }
 
+      final isInitialMinister = widget.initialSpeaker != null &&
+          selSpk == widget.initialSpeaker!.toLowerCase().trim();
       displayTitle = _formatSpeakerName(_selectedSpeaker!).replaceAll('\n', ' ');
-      imageUrl = model?.photoUrl ?? imageUrl;
-      description ??= model?.bio;
+      imageUrl = model?.photoUrl ?? (isInitialMinister ? widget.headerImageUrl : null);
+      description = model?.bio ?? (isInitialMinister ? widget.headerDescription : null);
     } else if (isCategory) {
       headerTypePill = 'MESSAGE CATEGORY';
       pillColor = AppColors.primaryGold;
       pillIcon = Icons.category_rounded;
       displayTitle = _selectedCategory;
+      if (_selectedCategory == widget.category) {
+        imageUrl = widget.headerImageUrl;
+        description = widget.headerDescription;
+      }
+    } else if (widget.initialSpeaker == null && widget.category == 'All') {
+      imageUrl = widget.headerImageUrl;
+      description = widget.headerDescription;
     }
 
     if (!isMinister && (imageUrl == null || imageUrl.isEmpty) && _filteredItems.isNotEmpty) {
@@ -795,12 +813,15 @@ class _AudioListPageState extends ConsumerState<AudioListPage> {
                     color: isDark ? Colors.white10 : Colors.grey.shade100,
                     child: imageUrl != null && imageUrl.isNotEmpty
                         ? CachedNetworkImage(
+                            key: ValueKey(imageUrl),
                             imageUrl: imageUrl,
-                            cacheManager: CustomImageCacheManager.instance,
+                            cacheManager: isMinister
+                                ? CustomImageCacheManager.ministersInstance
+                                : CustomImageCacheManager.instance,
                             fit: BoxFit.cover,
                             alignment: Alignment.topCenter,
                             memCacheWidth: 152,
-                            useOldImageOnUrlChange: true,
+                            useOldImageOnUrlChange: false,
                             fadeInDuration: Duration.zero,
                             fadeOutDuration: Duration.zero,
                             placeholder: (_, __) => isMinister
