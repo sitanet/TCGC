@@ -2559,7 +2559,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                       padding: const EdgeInsets.only(bottom: 3, left: 4),
                       child: Text(msg.senderName,
                           style: const TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w600,
+                            fontSize: 12, fontWeight: FontWeight.w600,
                             color: AppColors.primaryGold)),
                     ),
                   Container(
@@ -2651,7 +2651,7 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     color: isMe
                                         ? Colors.white.withValues(alpha: 0.85)
                                         : (isDark ? Colors.white70 : Colors.black54),
@@ -2668,7 +2668,8 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                                 : Text(
                                     msg.text,
                                     style: TextStyle(
-                                      fontSize: 14,
+                                      fontSize: 16,
+                                      height: 1.38,
                                       color: isMe
                                           ? Colors.white
                                           : (isDark ? Colors.white : Colors.black87),
@@ -3823,15 +3824,16 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                           minLines: 1,
                           textCapitalization: TextCapitalization.sentences,
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 16,
+                            height: 1.35,
                             color: isDark ? Colors.white : Colors.black87),
                           decoration: InputDecoration(
                             hintText: 'Type a message...',
                             hintStyle: TextStyle(
                               color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                              fontSize: 14),
+                              fontSize: 16),
                             border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                           ),
                           onSubmitted: (_) => _sendMessage(),
                         ),

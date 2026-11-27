@@ -173,7 +173,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     final p = ref.watch(communityChangeNotifierProvider);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF12100C) : const Color(0xFFF9F3E3),
+      backgroundColor: isDark ? const Color(0xFF12100C) : const Color(0xFFFBF9F4),
       appBar: CustomAppBar(
         title: 'Community',
         showBackButton: false,
@@ -194,7 +194,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             end: Alignment.bottomCenter,
             colors: isDark
                 ? [const Color(0xFF14110C), const Color(0xFF0E0D0A)]
-                : [const Color(0xFFFCF7EA), const Color(0xFFF4EAD2)],
+                : [const Color(0xFFFBF9F4), const Color(0xFFF4EFE3)],
           ),
         ),
         child: !ref.watch(authChangeNotifierProvider).isAuthenticated
@@ -226,29 +226,42 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             // Section header
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
+                padding: const EdgeInsets.fromLTRB(18, 20, 18, 10),
                 child: Row(
                   children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGold.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: const Icon(
+                        Icons.forum_rounded,
+                        size: 16,
+                        color: AppColors.primaryGold,
+                      ),
+                    ),
+                    const SizedBox(width: 9),
                     Text('Chat Rooms',
                         style: TextStyle(
                           fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.2,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.1,
                           color: isDark ? Colors.white : Colors.black87,
                         )),
                     const SizedBox(width: 8),
                     if (p.rooms.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryGold.withValues(alpha: 0.15),
+                          color: AppColors.primaryGold.withValues(alpha: 0.16),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           '${p.rooms.length}',
                           style: const TextStyle(
                             fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w800,
                             color: AppColors.primaryGold,
                           ),
                         ),
@@ -260,8 +273,10 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
             // Category filter chips (when rooms have categories)
             if (_roomCategories(p.rooms).length > 1)
               SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 44,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: SizedBox(
+                    height: 44,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -318,6 +333,7 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
                       );
                     },
                   ),
+                ),
                 ),
               ),
             // Rooms list
@@ -541,112 +557,150 @@ class _CommunityPageState extends ConsumerState<CommunityPage> {
     final onlineCount = p.allMembers.where((m) => m.isOnline).length;
     final liveRoomsCount = p.rooms.where((r) => p.isRoomHosting(r.id)).length;
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF231D12), Color(0xFF12100B)],
+          colors: [Color(0xFF282012), Color(0xFF16130E)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppColors.primaryGold.withValues(alpha: 0.65),
-          width: 1.3,
+          color: AppColors.primaryGold.withValues(alpha: 0.55),
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.16 : 0.24),
-            blurRadius: 18,
+            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.15 : 0.2),
+            blurRadius: 16,
             offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(19),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -22,
+              top: -22,
+              child: Container(
+                width: 88,
+                height: 88,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.goldVariant1, AppColors.primaryGold],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                  shape: BoxShape.circle,
+                  color: AppColors.primaryGold.withValues(alpha: 0.1),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFFE082), AppColors.primaryGold],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primaryGold.withValues(alpha: 0.32),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.forum_rounded, color: Colors.black, size: 24),
+                      ),
+                      const SizedBox(width: 13),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryGold.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'FELLOWSHIP',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.7,
+                                  color: AppColors.primaryGold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'TCGC Community',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.1,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Chat with members & listen together',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white.withValues(alpha: 0.75),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primaryGold.withValues(alpha: 0.35),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.forum_rounded, color: Colors.black, size: 25),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'TCGC Community Fellowship',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.2,
-                        color: Colors.white,
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _heroStatPill(
+                        isDark,
+                        dotColor: Colors.greenAccent,
+                        label: '$onlineCount Online',
+                        textColor: Colors.greenAccent,
+                        bgColor: Colors.green.withValues(alpha: 0.18),
+                        borderColor: Colors.greenAccent.withValues(alpha: 0.35),
                       ),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      'Chat with members & listen to messages together',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: AppColors.goldVariant2,
+                      _heroStatPill(
+                        isDark,
+                        icon: Icons.groups_rounded,
+                        label: '${p.rooms.length} Rooms',
+                        textColor: AppColors.goldVariant2,
+                        bgColor: AppColors.primaryGold.withValues(alpha: 0.18),
+                        borderColor: AppColors.primaryGold.withValues(alpha: 0.45),
                       ),
-                    ),
-                  ],
-                ),
+                      if (liveRoomsCount > 0)
+                        _heroStatPill(
+                          isDark,
+                          icon: Icons.headphones_rounded,
+                          label: '$liveRoomsCount Live Listening',
+                          textColor: Colors.greenAccent,
+                          bgColor: Colors.green.withValues(alpha: 0.18),
+                          borderColor: Colors.greenAccent.withValues(alpha: 0.4),
+                        ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _heroStatPill(
-                isDark,
-                dotColor: Colors.greenAccent,
-                label: '$onlineCount Online',
-                textColor: Colors.greenAccent,
-                bgColor: Colors.green.withValues(alpha: 0.18),
-                borderColor: Colors.greenAccent.withValues(alpha: 0.35),
-              ),
-              _heroStatPill(
-                isDark,
-                icon: Icons.groups_rounded,
-                label: '${p.rooms.length} Rooms',
-                textColor: AppColors.goldVariant2,
-                bgColor: AppColors.primaryGold.withValues(alpha: 0.18),
-                borderColor: AppColors.primaryGold.withValues(alpha: 0.45),
-              ),
-              if (liveRoomsCount > 0)
-                _heroStatPill(
-                  isDark,
-                  icon: Icons.headphones_rounded,
-                  label: '$liveRoomsCount Live Listening',
-                  textColor: Colors.greenAccent,
-                  bgColor: Colors.green.withValues(alpha: 0.18),
-                  borderColor: Colors.greenAccent.withValues(alpha: 0.4),
-                ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
