@@ -130,6 +130,7 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
       }
       if (transcripts.isEmpty) {
         transcripts = await _dataService.getTranscripts(forceRefresh: true);
+        _hasLoadedAllTranscripts = true;
       }
       if (mounted && transcripts.isNotEmpty) {
         setState(() {
@@ -197,6 +198,7 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
       }
       if (transcripts.isEmpty) {
         transcripts = await _dataService.getTranscripts(forceRefresh: true);
+        _hasLoadedAllTranscripts = true;
       }
       if (mounted) {
         setState(() {
@@ -303,15 +305,69 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
     return filtered;
   }
 
+  bool _hasLoadedAllTranscripts = false;
+
+  Future<void> _fetchAndMergeForSelection({
+    required String? categoryId,
+    required bool loadAll,
+  }) async {
+    try {
+      List<Transcript> fetched = [];
+      if (!loadAll &&
+          categoryId != null &&
+          categoryId.isNotEmpty &&
+          categoryId != 'all') {
+        fetched = await _dataService.getTranscriptsByCategory(categoryId);
+      } else {
+        fetched = await _dataService.getTranscripts();
+        _hasLoadedAllTranscripts = true;
+      }
+
+      if (!mounted) return;
+      final existingById = <String, Transcript>{
+        for (final t in _allItems) t.id: t,
+      };
+      for (final t in fetched) {
+        existingById[t.id] = t;
+      }
+      final merged = existingById.values.toList();
+      final query = _searchController.text.toLowerCase();
+      setState(() {
+        _allItems = merged;
+        _extractSpeakers();
+        _extractCategories();
+        _filteredItems = _getFilteredItems(query);
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   void _selectCategory(String category) {
     final query = _searchController.text.toLowerCase();
+    final nextCategoryId = widget.categoryNameToId?[category];
     setState(() {
       _filterType = TranscriptFilterType.category;
       _selectedCategory = category;
-      _selectedCategoryId = widget.categoryNameToId?[category];
+      _selectedCategoryId = nextCategoryId;
       _selectedSpeaker = null;
       _filteredItems = _getFilteredItems(query);
+      if (_filteredItems.isEmpty || (category == 'All' && !_hasLoadedAllTranscripts)) {
+        _isLoading = true;
+      }
     });
+
+    if (category == 'All' && !_hasLoadedAllTranscripts) {
+      _fetchAndMergeForSelection(categoryId: null, loadAll: true);
+    } else if (_filteredItems.isEmpty) {
+      _fetchAndMergeForSelection(
+        categoryId: nextCategoryId,
+        loadAll: nextCategoryId == null || nextCategoryId.isEmpty,
+      );
+    }
   }
 
   void _selectSpeaker(String speaker) {
@@ -323,7 +379,14 @@ class _TranscriptListPageState extends ConsumerState<TranscriptListPage> {
       _selectedCategoryId = null;
       _isHeroBioExpanded = false;
       _filteredItems = _getFilteredItems(query);
+      if (!_hasLoadedAllTranscripts && _filteredItems.isEmpty) {
+        _isLoading = true;
+      }
     });
+
+    if (!_hasLoadedAllTranscripts) {
+      _fetchAndMergeForSelection(categoryId: null, loadAll: true);
+    }
   }
 
   @override
