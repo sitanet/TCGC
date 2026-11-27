@@ -32,7 +32,6 @@ import '../../../data/services/restream_service.dart';
 import '../audio/audio_player_page.dart';
 import '../support/complaint_page.dart';
 import '../support/testimony_page.dart';
-import '../../widgets/conference_invite_sheet.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -539,10 +538,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 if (_activeRestream != null && _activeRestream!.isLive) ...[
                   SizedBox(height: spacing),
                   _buildLiveRestreamBanner(context, isDark),
-                ],
-                if (ConferenceInviteSheet.isConferenceWindowActive) ...[
-                  SizedBox(height: spacing),
-                  _buildConferenceInviteCard(context, isDark),
                 ],
                 SizedBox(height: spacing * 1.5),
                 _buildBeginnerCategories(context, isDark),
@@ -1523,140 +1518,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                 ),
               ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildConferenceInviteCard(BuildContext context, bool isDark) {
-    final horizontalPadding = Responsive.horizontalPadding(context);
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isDark
-                ? [const Color(0xFF1F1B12), const Color(0xFF141418)]
-                : [const Color(0xFFFFFBF0), const Color(0xFFF6EFE0)],
-          ),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: AppColors.primaryGold.withValues(alpha: isDark ? 0.45 : 0.6),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primaryGold.withValues(alpha: isDark ? 0.12 : 0.14),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => ConferenceInviteSheet.show(context),
-            borderRadius: BorderRadius.circular(18),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: Image.asset(
-                      'assets/images/tcgc_logo.png',
-                      width: 54,
-                      height: 54,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryGold.withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Text(
-                            'MORNING & EVENING SESSIONS',
-                            style: TextStyle(
-                              color: AppColors.primaryGold,
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.6,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          'Image & Glory Conference 2026',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Theme: The Rise of True Worshippers • Invite friends on WhatsApp',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                            fontSize: 11.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryGold,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.share_rounded,
-                          color: Colors.black,
-                          size: 14,
-                        ),
-                        SizedBox(width: 5),
-                        Text(
-                          'Invite',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ),
