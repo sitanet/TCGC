@@ -87,7 +87,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _isMixlrLive = false;
   String? _mixlrTitle;
   bool _isLoading = true;
-  bool _isFabMenuOpen = false;
+  bool _isFabMenuOpen = true;
   late final ScrollController _homeScrollController;
   bool _isScrolledPastHeader = false;
 
@@ -570,7 +570,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  setState(() => _isFabMenuOpen = false);
                   _openWingAI(context);
                 },
                 child: Container(
@@ -613,7 +612,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  setState(() => _isFabMenuOpen = false);
                   final auth = ref.read(authChangeNotifierProvider);
                   if (!auth.isAuthenticated) {
                     AuthRequiredSheet.show(
@@ -670,7 +668,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  setState(() => _isFabMenuOpen = false);
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const ComplaintPage()),
@@ -720,7 +717,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  setState(() => _isFabMenuOpen = false);
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const TestimonyPage()),
