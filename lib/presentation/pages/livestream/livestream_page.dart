@@ -11,7 +11,6 @@ import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
-import '../../widgets/conference_invite_sheet.dart';
 import '../../widgets/custom_app_bar.dart';
 
 class LiveStreamPage extends ConsumerStatefulWidget {
@@ -493,42 +492,6 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
         ),
         onBackPressed: () => ref.read(mainTabIndexProvider.notifier).state = 0,
         actions: [
-          if (ConferenceInviteSheet.isConferenceWindowActive)
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-            child: TextButton.icon(
-              onPressed: () {
-                ConferenceInviteSheet.show(
-                  context,
-                  initialStreamType: _tabController.index == 1
-                      ? ConferenceStreamType.video
-                      : ConferenceStreamType.audio,
-                );
-              },
-              icon: const Icon(
-                Icons.share_rounded,
-                size: 16,
-                color: Colors.black,
-              ),
-              label: const Text(
-                'Invite',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              style: TextButton.styleFrom(
-                backgroundColor: AppColors.primaryGold,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                minimumSize: const Size(0, 32),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              ),
-            ),
-          ),
           IconButton(
             tooltip: 'Open in Browser',
             icon: Icon(Icons.open_in_new_rounded, size: 20, color: fgColor),
