@@ -4,6 +4,7 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/api_service.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../auth/auth_flow_page.dart';
 
 class WordQuizPage extends StatefulWidget {
   const WordQuizPage({super.key});
@@ -17,6 +18,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
 
   bool _isLoading = true;
   bool _isSubmitting = false;
+  bool _isAuthError = false;
   String? _error;
   int _transcriptId = 0;
   String _title = '';
@@ -42,6 +44,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
   Future<void> _loadQuiz() async {
     setState(() {
       _isLoading = true;
+      _isAuthError = false;
       _error = null;
     });
 
@@ -106,7 +109,10 @@ class _WordQuizPageState extends State<WordQuizPage> {
         });
       } else {
         setState(() {
-          _error = res.errorMessage ?? 'Could not load Word Quiz. Please try again.';
+          _isAuthError = res.statusCode == 401;
+          _error = res.statusCode == 401
+              ? 'Your session has expired. Please sign in again to take the Word Quiz.'
+              : res.userFriendlyError;
           _isLoading = false;
         });
       }
@@ -346,11 +352,22 @@ class _WordQuizPageState extends State<WordQuizPage> {
               ),
               const SizedBox(height: 18),
               ElevatedButton.icon(
-                onPressed: _loadQuiz,
-                icon: const Icon(Icons.refresh_rounded, color: Colors.black),
-                label: const Text(
-                  'Try Again',
-                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800),
+                onPressed: _isAuthError
+                    ? () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AuthFlowPage()),
+                        );
+                        if (mounted) _loadQuiz();
+                      }
+                    : _loadQuiz,
+                icon: Icon(
+                  _isAuthError ? Icons.login_rounded : Icons.refresh_rounded,
+                  color: Colors.black,
+                ),
+                label: Text(
+                  _isAuthError ? 'Sign In' : 'Try Again',
+                  style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w800),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryGold,
@@ -1085,7 +1102,9 @@ class _WordQuizHistoryPageState extends State<WordQuizHistoryPage> {
         });
       } else {
         setState(() {
-          _error = res.errorMessage ?? 'Could not load quiz history.';
+          _error = res.statusCode == 401
+              ? 'Your session has expired. Please sign in again.'
+              : res.userFriendlyError;
           _isLoading = false;
         });
       }
