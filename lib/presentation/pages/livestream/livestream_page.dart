@@ -251,10 +251,11 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
           if (window._flutterStreamBridgeInstalled) return;
           window._flutterStreamBridgeInstalled = true;
 
-          // Ensure audio element is completely unmuted so sound plays directly in WebView
+          // Mute WebView HTML5 audio element — native AudioService handles playback
+          // so the stream keeps playing when switching tabs or opening other apps.
           if (audioPlayer) {
-            audioPlayer.muted = false;
-            audioPlayer.volume = 1.0;
+            audioPlayer.muted = true;
+            audioPlayer.volume = 0.0;
           }
 
           if (playBtn) {
@@ -262,13 +263,33 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
               setTimeout(function() {
                 var isPlayingNow = typeof isPlaying !== 'undefined' ? isPlaying : false;
                 if (isPlayingNow) {
-                  // Ensure audio remains unmuted
                   if (audioPlayer) {
-                    audioPlayer.muted = false;
-                    audioPlayer.volume = 1.0;
+                    audioPlayer.muted = true;
+                    audioPlayer.volume = 0.0;
+                    try { audioPlayer.pause(); } catch (_) {}
                   }
+                  var streamUrl = (typeof currentStreamUrl !== 'undefined' && currentStreamUrl)
+                      ? currentStreamUrl
+                      : ((typeof mixlrInfo !== 'undefined' && mixlrInfo && mixlrInfo.stream_url)
+                          ? mixlrInfo.stream_url
+                          : (audioPlayer ? (audioPlayer.currentSrc || audioPlayer.src || '') : ''));
+                  var title = (typeof mixlrInfo !== 'undefined' && mixlrInfo && mixlrInfo.title)
+                      ? mixlrInfo.title
+                      : 'Live Broadcast';
+                  var subtitle = (typeof mixlrInfo !== 'undefined' && mixlrInfo && mixlrInfo.channel_name)
+                      ? mixlrInfo.channel_name
+                      : 'Citygate Radio';
+                  var artworkUrl = (typeof mixlrInfo !== 'undefined' && mixlrInfo && mixlrInfo.thumbnail_url)
+                      ? mixlrInfo.thumbnail_url
+                      : '';
                   if (window.FlutterLiveStream) {
-                    window.FlutterLiveStream.postMessage(JSON.stringify({ action: 'play' }));
+                    window.FlutterLiveStream.postMessage(JSON.stringify({
+                      action: 'play',
+                      streamUrl: streamUrl,
+                      title: title,
+                      subtitle: subtitle,
+                      artworkUrl: artworkUrl
+                    }));
                   }
                 } else {
                   if (window.FlutterLiveStream) {
@@ -290,11 +311,35 @@ class _LiveStreamPageState extends ConsumerState<LiveStreamPage>
       final action = data['action'] as String?;
 
       if (action == 'play') {
-        // Pause any background sermon playback so it doesn't overlap with live stream
-        final audioState = ref.read(audioPlayerChangeNotifierProvider);
-        if (audioState.isPlaying && audioState.currentSermon?.id != 'livestream') {
-          await ref.read(audioPlayerChangeNotifierProvider).pause();
+        final audioProvider = ref.read(audioPlayerChangeNotifierProvider);
+        final streamUrl = (data['streamUrl'] as String?)?.trim() ?? '';
+        if (streamUrl.isNotEmpty) {
+          try {
+            await audioProvider.playLiveStream(
+              streamUrl,
+              title: (data['title'] as String?)?.trim().isNotEmpty == true
+                  ? (data['title'] as String).trim()
+                  : 'Live Broadcast',
+              subtitle: (data['subtitle'] as String?)?.trim().isNotEmpty == true
+                  ? (data['subtitle'] as String).trim()
+                  : 'Citygate Radio',
+              artworkUrl: data['artworkUrl'] as String?,
+            );
+            return;
+          } catch (e) {
+            debugPrint('Native livestream playback failed, falling back to WebView: $e');
+            _webViewController?.runJavaScript('''
+              var a = document.getElementById('nativeAudioPlayer');
+              if (a) { a.muted = false; a.volume = 1.0; a.play().catch(function(){}); }
+            ''');
+          }
         }
+        // Fallback: pause any background sermon playback so it doesn't overlap with WebView stream
+        if (audioProvider.isPlaying && audioProvider.currentSermon?.id != 'livestream') {
+          await audioProvider.pause();
+        }
+      } else if (action == 'pause') {
+        await ref.read(audioPlayerChangeNotifierProvider).stopLiveStream();
       }
     } catch (e) {
       debugPrint('Error handling stream bridge message: $e');
