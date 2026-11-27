@@ -491,17 +491,19 @@ class ApiResponse {
     
     // Otherwise, convert based on status code
     if (statusCode == 0) {
-      return 'No internet connection. Please check your network and try again.';
+      return 'No internet connection. Turn on Wi-Fi or mobile data, then pull down to refresh.';
     } else if (statusCode == 401) {
-      return 'Session expired. Please login again.';
+      return 'Your session has expired. Go to Profile → Sign Out and sign back in to continue.';
     } else if (statusCode == 403) {
-      return 'You don\'t have permission to access this.';
+      return 'You don\'t have access to this feature. Make sure you are signed in with the right account or contact Support.';
     } else if (statusCode == 404) {
-      return 'The requested content was not found.';
+      return 'This item could not be found. Pull down to refresh or update the app.';
+    } else if (statusCode == 429) {
+      return 'Too many requests too quickly. Wait 1 minute before trying again.';
     } else if (statusCode >= 500) {
-      return 'Server is experiencing issues. Please try again later.';
+      return 'Our server is temporarily busy. Wait 30 seconds and pull down to refresh.';
     } else if (!isSuccess) {
-      return 'Something went wrong. Please try again.';
+      return 'Something unexpected happened. Check your internet connection and pull down to refresh.';
     }
     
     return 'Operation completed successfully.';

@@ -18,56 +18,67 @@ class ErrorHandler {
     return rootScaffoldMessengerKey.currentState;
   }
 
-  /// Convert exception to user-friendly message
+  /// Convert exception to user-friendly, actionable message
   static String getErrorMessage(dynamic error) {
-    if (error == null) return 'Something went wrong. Please try again.';
+    if (error == null) {
+      return 'Something unexpected happened. Check your internet connection and pull down to refresh.';
+    }
 
     // Network errors
     if (error is SocketException) {
-      return 'No internet connection. Please check your network and try again.';
+      return 'No internet connection. Turn on Wi-Fi or mobile data, then pull down to refresh.';
     }
     
     if (error is HttpException) {
-      return 'Unable to connect to server. Please try again later.';
+      return 'Unable to reach our server. Check your internet connection or switch networks and retry.';
     }
     
     if (error is HandshakeException) {
-      return 'Secure connection failed. Please check your internet connection.';
+      return 'Secure connection failed. Make sure your device date & time are set to automatic, or switch networks.';
     }
     
     if (error is TimeoutException) {
-      return 'Connection timeout. Please check your internet and try again.';
+      return 'The connection timed out. Switch to a stronger network or move to a better signal area, then retry.';
     }
     
     // Format exception (JSON parsing errors)
     if (error is FormatException) {
-      return 'Unable to process data. Please try again.';
+      return 'Could not read the server response. Pull down to refresh, or update the app if this continues.';
     }
     
     // Get the error message string
     String errorMessage = error.toString().toLowerCase();
     
-    // Authentication errors
-    if (errorMessage.contains('unauthorized') || 
+    // Authentication & JWT token errors
+    if (errorMessage.contains('token not valid') ||
+        errorMessage.contains('token_not_valid') ||
+        errorMessage.contains('authentication credentials') ||
+        errorMessage.contains('unauthorized') ||
         errorMessage.contains('401')) {
-      return 'Session expired. Please login again.';
+      return 'Your session has expired. Go to Profile → Sign Out and sign back in to continue.';
     }
     
     if (errorMessage.contains('forbidden') || 
         errorMessage.contains('403')) {
-      return 'You don\'t have permission to access this.';
+      return 'You don\'t have access to this feature. Make sure you are signed in with the right account or contact Support.';
     }
     
     if (errorMessage.contains('not found') || 
         errorMessage.contains('404')) {
-      return 'The requested content was not found.';
+      return 'This item could not be found. Pull down to refresh the list or update the app.';
+    }
+
+    if (errorMessage.contains('429') ||
+        errorMessage.contains('too many requests') ||
+        errorMessage.contains('throttled')) {
+      return 'Too many requests too quickly. Wait 1 minute before trying again.';
     }
     
     // Server errors
     if (errorMessage.contains('500') || 
         errorMessage.contains('502') || 
         errorMessage.contains('503')) {
-      return 'Server is experiencing issues. Please try again later.';
+      return 'Our server is temporarily busy. Wait 30 seconds and pull down to refresh.';
     }
     
     // Connection & network errors (including http.ClientException wrapping SocketException)
@@ -83,79 +94,79 @@ class ErrorHandler {
         errorMessage.contains('software caused connection abort') ||
         errorMessage.contains('broken pipe') ||
         errorMessage.contains('unable to connect')) {
-      return 'No internet connection. Please check your network and try again.';
+      return 'No internet connection. Turn on Wi-Fi or mobile data, then pull down to refresh.';
     }
 
     if (errorMessage.contains('connection') ||
         errorMessage.contains('network')) {
-      return 'Connection problem. Please check your internet and try again.';
+      return 'Connection problem. Switch between Wi-Fi and mobile data, then retry.';
     }
 
     // Timeout errors
     if (errorMessage.contains('timeout') ||
         errorMessage.contains('timed out')) {
-      return 'Request took too long. Please check your internet and try again.';
+      return 'The connection timed out. Switch to a stronger network or move to a better signal area, then retry.';
     }
 
     // Login & profile errors (preserve explicit user-friendly auth messages)
     if (errorMessage.contains('invalid email or password') ||
         errorMessage.contains('invalid credentials') ||
         errorMessage.contains('no active account')) {
-      return 'Invalid email or password. Please try again.';
+      return 'Incorrect email or password. Double-check your spelling or tap "Forgot Password" to reset it.';
     }
 
     if (errorMessage.contains('failed to load profile') ||
         errorMessage.contains('unable to load your profile')) {
-      return 'Unable to load your profile. Please check your internet connection and try again.';
+      return 'Unable to load your profile. Check your internet connection, or sign out and sign back in.';
     }
     
     // Payment/wallet errors
     if (errorMessage.contains('insufficient')) {
-      return 'Insufficient balance. Please add money to your wallet.';
+      return 'Insufficient wallet balance. Tap "Add Money" to top up your wallet first.';
     }
     
     if (errorMessage.contains('transaction') && 
         errorMessage.contains('failed')) {
-      return 'Transaction failed. Please try again or contact support.';
+      return 'Transaction could not be completed. Check your balance and internet connection, or contact Support.';
     }
     
     // File/upload errors
     if (errorMessage.contains('file') && 
         (errorMessage.contains('large') || errorMessage.contains('size'))) {
-      return 'File is too large. Please choose a smaller file.';
+      return 'File is too large. Choose a smaller file (under 10 MB) and upload again.';
     }
     
     if (errorMessage.contains('upload')) {
-      return 'Upload failed. Please check your connection and try again.';
+      return 'Upload failed. Check your internet connection and re-select the file to upload.';
     }
     
     // Audio/media errors
     if (errorMessage.contains('audio') || 
         errorMessage.contains('media') || 
         errorMessage.contains('playback')) {
-      return 'Unable to play media. Please try again.';
+      return 'Unable to play this audio. Check your internet connection or download the sermon first for offline playback.';
     }
     
     // Email errors
     if (errorMessage.contains('email') && 
         errorMessage.contains('invalid')) {
-      return 'Invalid email address. Please check and try again.';
+      return 'Invalid email address. Check for typos or extra spaces and re-enter it.';
     }
     
     if (errorMessage.contains('email') && 
         errorMessage.contains('exists')) {
-      return 'This email is already registered. Please login or use another email.';
+      return 'This email is already registered. Tap "Sign In" or use "Forgot Password" to recover your account.';
     }
     
     // Password errors
     if (errorMessage.contains('password') && 
         (errorMessage.contains('incorrect') || errorMessage.contains('wrong'))) {
-      return 'Incorrect password. Please try again.';
+      return 'Incorrect password. Check Caps Lock or tap "Forgot Password" to reset it.';
     }
     
     if (errorMessage.contains('password') && 
         errorMessage.contains('weak')) {
-      return 'Password is too weak. Please use a stronger password.';
+      return 'Password is too weak. Use at least 8 characters with letters and numbers.';
     }
     
     // Wing AI specific errors
@@ -163,17 +174,17 @@ class ErrorHandler {
         errorMessage.contains('ask wing')) {
       if (errorMessage.contains('unavailable') || 
           errorMessage.contains('disabled')) {
-        return 'Wing AI is currently unavailable. Please try again later.';
+        return 'Wing AI is temporarily unavailable. Please check back in a few minutes.';
       }
       if (errorMessage.contains('limit') || 
           errorMessage.contains('quota')) {
-        return 'You\'ve reached your daily question limit. Please try again tomorrow.';
+        return 'You\'ve reached your daily question limit. Your quota resets tomorrow.';
       }
-      return 'Unable to process your question right now. Please try again.';
+      return 'Unable to process your question right now. Shorten your question or check your internet connection.';
     }
     
     // Default fallback message
-    return 'Something went wrong. Please try again.';
+    return 'Something unexpected happened. Check your internet connection, pull down to refresh, or sign out and sign back in if it persists.';
   }
   
   /// Show error snackbar with user-friendly message
