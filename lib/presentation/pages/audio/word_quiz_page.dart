@@ -76,7 +76,6 @@ class _WordQuizPageState extends State<WordQuizPage> {
           });
         }
 
-        // Jump to first unanswered question, or straight to results if completed
         int startIndex = 0;
         for (int i = 0; i < rawQuestions.length; i++) {
           if (!parsedAnswers.containsKey(i)) {
@@ -199,7 +198,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
         statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFFDFBF5),
+        backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF9F6EE),
         appBar: const CustomAppBar(
           title: 'Word Quiz',
           showBackButton: true,
@@ -223,39 +222,73 @@ class _WordQuizPageState extends State<WordQuizPage> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: AppColors.primaryGold.withValues(alpha: 0.35),
+            ),
+            boxShadow: [
+              BoxShadow(
                 color: AppColors.primaryGold.withValues(alpha: 0.14),
-                shape: BoxShape.circle,
+                blurRadius: 24,
+                offset: const Offset(0, 8),
               ),
-              child: const CircularProgressIndicator(
-                color: AppColors.primaryGold,
-                strokeWidth: 3,
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFF3C65F), AppColors.primaryGold],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryGold.withValues(alpha: 0.35),
+                      blurRadius: 14,
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.auto_awesome_rounded,
+                    color: Colors.black, size: 30),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Preparing Your Word Quiz',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: isDark ? Colors.white : Colors.black87,
+              const SizedBox(height: 20),
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  color: AppColors.primaryGold,
+                  strokeWidth: 3,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Wing AI is creating your personalized 5 questions from the latest transcript...',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13.5,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              const SizedBox(height: 18),
+              Text(
+                'Preparing Your 20-Question Word Quiz',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Wing AI is crafting your personalized questions from the latest transcript...',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  height: 1.4,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -265,39 +298,57 @@ class _WordQuizPageState extends State<WordQuizPage> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.quiz_outlined,
-              size: 54,
-              color: AppColors.primaryGold.withValues(alpha: 0.8),
+        child: Container(
+          padding: const EdgeInsets.all(26),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: AppColors.primaryGold.withValues(alpha: 0.25),
             ),
-            const SizedBox(height: 14),
-            Text(
-              _error ?? 'Something went wrong',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white70 : Colors.black87,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.quiz_outlined,
+                  size: 42,
+                  color: AppColors.primaryGold,
+                ),
               ),
-            ),
-            const SizedBox(height: 18),
-            ElevatedButton.icon(
-              onPressed: _loadQuiz,
-              icon: const Icon(Icons.refresh_rounded, color: Colors.black),
-              label: const Text(
-                'Try Again',
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700),
+              const SizedBox(height: 14),
+              Text(
+                _error ?? 'Something went wrong',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGold,
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              const SizedBox(height: 18),
+              ElevatedButton.icon(
+                onPressed: _loadQuiz,
+                icon: const Icon(Icons.refresh_rounded, color: Colors.black),
+                label: const Text(
+                  'Try Again',
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGold,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 13),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -313,26 +364,28 @@ class _WordQuizPageState extends State<WordQuizPage> {
     final progress = (_currentIndex + 1) / _questions.length;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Latest Transcript Banner + Cumulative Points
+          // Premium Gold Hero Banner
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark
-                    ? [const Color(0xFF2B2412), AppColors.cardDark]
-                    : [const Color(0xFFFFF8E1), Colors.white],
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2B2110), Color(0xFF473616), Color(0xFF6B501C)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppColors.primaryGold.withValues(alpha: 0.35),
-              ),
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryGold.withValues(alpha: 0.25),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -340,43 +393,50 @@ class _WordQuizPageState extends State<WordQuizPage> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppColors.primaryGold,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
-                        'LATEST TRANSCRIPT',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.4,
-                        ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.menu_book_rounded, size: 12, color: Colors.black),
+                          SizedBox(width: 5),
+                          Text(
+                            'LATEST MESSAGE',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryGold.withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(10),
+                        color: Colors.white.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: AppColors.primaryGold.withValues(alpha: 0.45),
+                          color: AppColors.primaryGold.withValues(alpha: 0.5),
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.stars_rounded,
-                              size: 13, color: AppColors.primaryGold),
+                              size: 14, color: AppColors.primaryGold),
                           const SizedBox(width: 4),
                           Text(
                             '$_totalPoints pts',
                             style: const TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 12,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.primaryGold,
+                              color: Color(0xFFF6D982),
                             ),
                           ),
                         ],
@@ -384,79 +444,142 @@ class _WordQuizPageState extends State<WordQuizPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Text(
                   _title,
-                  style: TextStyle(
-                    fontSize: 15.5,
+                  style: const TextStyle(
+                    fontSize: 16.5,
                     fontWeight: FontWeight.w800,
-                    color: isDark ? Colors.white : Colors.black87,
+                    color: Colors.white,
+                    height: 1.25,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 5),
                 Text(
-                  '$_categoryName • By $_speakerName',
-                  style: const TextStyle(
+                  '$_categoryName  •  $_speakerName',
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.primaryGold,
+                    color: Colors.white.withValues(alpha: 0.78),
                   ),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
-          // Progress Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Question ${_currentIndex + 1} of ${_questions.length}',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white70 : Colors.black87,
-                ),
+          // Progress & Score Bar Card
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.primaryGold.withValues(alpha: 0.2),
               ),
-              Text(
-                '+$_pointsPerQuestion pts / correct  •  Score: $_score/${_questions.length}',
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.primaryGold,
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGold.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'Question ${_currentIndex + 1} / ${_questions.length}',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primaryGold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'Score: $_score/${_questions.length}  •  +$_pointsPerQuestion pts',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 7,
-              backgroundColor: isDark ? Colors.white12 : Colors.grey.shade200,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryGold),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 300),
+                    tween: Tween(begin: 0, end: progress),
+                    builder: (_, value, __) => LinearProgressIndicator(
+                      value: value,
+                      minHeight: 8,
+                      backgroundColor: isDark ? Colors.white12 : Colors.grey.shade200,
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryGold),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // Question Text
-          Text(
-            (q['question'] ?? '').toString(),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              height: 1.35,
-              color: isDark ? Colors.white : Colors.black87,
+          // Elevated Question Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppColors.primaryGold.withValues(alpha: isDark ? 0.22 : 0.28),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.05),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'QUESTION ${_currentIndex + 1}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    color: AppColors.primaryGold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  (q['question'] ?? '').toString(),
+                  style: TextStyle(
+                    fontSize: 17.5,
+                    fontWeight: FontWeight.w800,
+                    height: 1.4,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ],
             ),
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
-          // 4 Options
+          // 4 Tactile Option Cards
           ...List.generate(options.length, (idx) {
             final letter = String.fromCharCode(65 + idx);
             final isChosen = selected == idx;
@@ -490,15 +613,15 @@ class _WordQuizPageState extends State<WordQuizPage> {
             return GestureDetector(
               onTap: (isAnswered || _isSubmitting) ? null : () => _selectOption(idx),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(14),
+                duration: const Duration(milliseconds: 220),
+                margin: const EdgeInsets.only(bottom: 11),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                 decoration: BoxDecoration(
                   color: bgColor,
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: borderColor,
-                    width: (isAnswered && (isRightOption || isChosen)) ? 1.6 : 1,
+                    width: (isAnswered && (isRightOption || isChosen)) ? 1.7 : 1,
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -511,8 +634,8 @@ class _WordQuizPageState extends State<WordQuizPage> {
                 child: Row(
                   children: [
                     Container(
-                      width: 30,
-                      height: 30,
+                      width: 32,
+                      height: 32,
                       decoration: BoxDecoration(
                         color: badgeBg,
                         shape: BoxShape.circle,
@@ -534,6 +657,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
                         options[idx],
                         style: TextStyle(
                           fontSize: 14.5,
+                          height: 1.35,
                           fontWeight: FontWeight.w600,
                           color: isDark ? Colors.white : Colors.black87,
                         ),
@@ -554,28 +678,45 @@ class _WordQuizPageState extends State<WordQuizPage> {
             if (explanation.isNotEmpty)
               Container(
                 margin: const EdgeInsets.only(top: 6, bottom: 18),
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryGold.withValues(alpha: isDark ? 0.12 : 0.09),
-                  borderRadius: BorderRadius.circular(14),
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [const Color(0xFF282112), AppColors.cardDark]
+                        : [const Color(0xFFFFF8E4), Colors.white],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: AppColors.primaryGold.withValues(alpha: 0.35),
+                    color: AppColors.primaryGold.withValues(alpha: 0.4),
                   ),
                 ),
-                child: Row(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.auto_awesome_rounded,
-                        color: AppColors.primaryGold, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        explanation,
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          height: 1.4,
-                          color: isDark ? Colors.white.withValues(alpha: 0.9) : Colors.black87,
+                    const Row(
+                      children: [
+                        Icon(Icons.auto_awesome_rounded,
+                            color: AppColors.primaryGold, size: 16),
+                        SizedBox(width: 6),
+                        Text(
+                          'Wing AI Insight',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primaryGold,
+                          ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      explanation,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        height: 1.45,
+                        color: isDark ? Colors.white.withValues(alpha: 0.9) : Colors.black87,
                       ),
                     ),
                   ],
@@ -589,19 +730,27 @@ class _WordQuizPageState extends State<WordQuizPage> {
                   backgroundColor: AppColors.primaryGold,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   elevation: 0,
                 ),
-                child: Text(
-                  _currentIndex < _questions.length - 1
-                      ? 'Next Question'
-                      : 'See Results',
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w800,
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _currentIndex < _questions.length - 1
+                          ? 'Next Question (${_currentIndex + 2}/${_questions.length})'
+                          : 'View Final Results',
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.arrow_forward_rounded,
+                        color: Colors.black, size: 19),
+                  ],
                 ),
               ),
             ),
@@ -614,6 +763,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
   Widget _buildResultsView(bool isDark) {
     final total = _questions.length;
     final ratio = total > 0 ? _score / total : 0.0;
+    final percent = (ratio * 100).round();
     final encouragement = ratio >= 0.8
         ? 'Excellent grasp of the Word!'
         : (ratio >= 0.6
@@ -621,7 +771,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
             : 'Keep pressing into the Word—review your takeaways below!');
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 32),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       child: Column(
         children: [
           Container(
@@ -629,37 +779,44 @@ class _WordQuizPageState extends State<WordQuizPage> {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFF3C65F), AppColors.primaryGold],
+                colors: [Color(0xFFF5CF6B), AppColors.primaryGold, Color(0xFFB88E22)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
                   color: AppColors.primaryGold.withValues(alpha: 0.35),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
             child: Column(
               children: [
-                const Icon(Icons.emoji_events_rounded,
-                    color: Colors.black, size: 44),
-                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.emoji_events_rounded,
+                      color: Colors.black, size: 40),
+                ),
+                const SizedBox(height: 12),
                 Text(
-                  '$_score / $total',
+                  '$_score / $total  ($percent%)',
                   style: const TextStyle(
                     color: Colors.black,
-                    fontSize: 38,
+                    fontSize: 34,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.12),
+                    color: Colors.black.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -671,7 +828,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Text(
                   encouragement,
                   textAlign: TextAlign.center,
@@ -697,10 +854,10 @@ class _WordQuizPageState extends State<WordQuizPage> {
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             decoration: BoxDecoration(
               color: isDark ? AppColors.cardDark : Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: AppColors.primaryGold.withValues(alpha: 0.3),
               ),
@@ -749,7 +906,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Your Answers',
+              'Your Answers (${_questions.length})',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -772,7 +929,7 @@ class _WordQuizPageState extends State<WordQuizPage> {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: isDark ? AppColors.cardDark : Colors.white,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(15),
                 border: Border.all(
                   color: (isRight ? const Color(0xFF22C55E) : Colors.redAccent)
                       .withValues(alpha: 0.4),
