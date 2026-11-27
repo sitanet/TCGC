@@ -49,6 +49,7 @@ class ApiConstants {
   static const String transcriptCategorySummary = '/transcripts/category-summary/';
   static const String wordQuiz = '/transcripts/word-quiz/';
   static const String wordQuizAnswer = '/transcripts/word-quiz/answer/';
+  static const String wordQuizHistory = '/transcripts/word-quiz/history/';
   static const String featuredTranscripts = '/transcripts/featured/';
   static const String ebooks = '/ebooks/';
   static const String featuredEbooks = '/ebooks/featured/';
