@@ -10,6 +10,8 @@ import '../../../data/services/audio_cache_service.dart';
 import '../../../data/services/image_cache_service.dart';
 import '../../../data/services/played_audio_service.dart';
 import '../../../domain/entities/sermon.dart';
+import '../../../domain/entities/teens_category.dart';
+import '../../../domain/entities/teens_content.dart';
 import '../../../domain/entities/transcript.dart';
 import '../../../main.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -122,6 +124,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
         return true;
       }).toList();
 
+      await _mergeTeensAudio(filteredCategories, sermons);
+
       // Process and sort categories
       final processedCategories = _processCategories(
         filteredCategories,
@@ -215,6 +219,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
         return true;
       }).toList();
 
+      await _mergeTeensAudio(filteredCategories, sermons, forceRefresh: true);
+
       final processedCategories = _processCategories(
         filteredCategories,
         sermons,
@@ -261,6 +267,84 @@ class _AudioPageState extends ConsumerState<AudioPage>
       debugPrint('Background refresh completed - ${transcriptSummary.length} transcript categories loaded');
     } catch (e) {
       debugPrint('Error refreshing data in background: $e');
+    }
+  }
+
+  /// Safely merges TeensContent audio items and TeensCategories into AudioPage
+  /// without affecting any existing Message/Sermon or TeensPage behavior.
+  Future<void> _mergeTeensAudio(
+    List<MessageCategory> categories,
+    List<Sermon> sermons, {
+    bool forceRefresh = false,
+  }) async {
+    try {
+      final teensResults = await Future.wait([
+        _dataService.getTeensCategories(forceRefresh: forceRefresh),
+        _dataService.getTeensContent(forceRefresh: forceRefresh),
+      ]);
+      final teensCategories = teensResults[0] as List<TeensCategory>;
+      final teensItems = teensResults[1] as List<TeensContent>;
+
+      final audioTeensItems = teensItems
+          .where((t) =>
+              (t.audioUrl != null && t.audioUrl!.isNotEmpty) ||
+              (t.videoUrl != null && t.videoUrl!.isNotEmpty))
+          .toList();
+      if (audioTeensItems.isEmpty) return;
+
+      final categoryNameToTeens = <String, TeensCategory>{
+        for (final tc in teensCategories) tc.name.toLowerCase().trim(): tc,
+      };
+      final existingCatIds = categories.map((c) => c.id).toSet();
+      final existingSermonIds = sermons.map((s) => s.id).toSet();
+
+      for (final item in audioTeensItems) {
+        final rawCat = item.category.trim();
+        final matchedCat = categoryNameToTeens[rawCat.toLowerCase()];
+        final catId = matchedCat != null
+            ? 'teens_${matchedCat.id}'
+            : (rawCat.isNotEmpty ? 'teens_$rawCat' : 'teens_general');
+        final catName = matchedCat?.name ??
+            (rawCat.isNotEmpty ? rawCat : 'Teenagers & Young Adults');
+
+        if (!existingCatIds.contains(catId)) {
+          existingCatIds.add(catId);
+          categories.add(
+            MessageCategory(
+              id: catId,
+              name: catName,
+              description: matchedCat?.description ??
+                  'Teenagers & Young Adults messages',
+              imageUrl: matchedCat?.imageUrl ?? item.thumbnailUrl,
+              isActive: matchedCat?.isActive ?? true,
+              latestMessageDate: item.date,
+            ),
+          );
+        }
+
+        final sermonId = 'teens_${item.id}';
+        if (!existingSermonIds.contains(sermonId)) {
+          existingSermonIds.add(sermonId);
+          sermons.add(
+            Sermon(
+              id: sermonId,
+              title: item.title,
+              description: item.description,
+              speaker: item.speaker,
+              imageUrl: item.thumbnailUrl ?? matchedCat?.imageUrl,
+              audioUrl: item.audioUrl,
+              videoUrl: item.videoUrl,
+              transcript: item.transcript,
+              category: catId,
+              categoryName: catName,
+              date: item.date,
+              duration: item.duration ?? Duration.zero,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error merging teens audio into AudioPage: $e');
     }
   }
 
@@ -356,6 +440,8 @@ class _AudioPageState extends ConsumerState<AudioPage>
           sermons: sermons,
         );
       });
+
+      await _mergeTeensAudio(filteredCategories, sermons, forceRefresh: true);
 
       final processedCategories = _processCategories(
         filteredCategories,
